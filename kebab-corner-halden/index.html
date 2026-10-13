@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kebab Corner Halden</title>
+<meta name="description" content="Kebab Corner i Halden: kebab i pita og rull, kebabtallerken, falafel og burger. Se menyen og åpningstidene, og ring for å bestille.">
+<meta property="og:title" content="Kebab Corner Halden">
+<meta property="og:description" content="Kebab, falafel og burger i Halden. Ta med, eller spis hos oss.">
+<meta property="og:type" content="restaurant">
+<meta name="theme-color" content="#B8251B">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23B8251B'/%3E%3Ctext x='32' y='46' font-family='Arial Black,Arial' font-weight='900' font-size='38' text-anchor='middle' fill='%23F4B41A'%3EK%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: et skilt over disken. Rødt skiltbånd øverst, deretter menyen satt som et menybrett med prislinjer. */
+:root{
+  --sumac:#B8251B;        /* hovedfarge, skiltet */
+  --sumac-deep:#8E1A12;
+  --saffron:#F4B41A;      /* priser på skiltet, merkelapper */
+  --parsley:#2E6B3C;      /* vegetar, åpent */
+  --paper:#FBF9F6;        /* bakgrunn */
+  --card:#FFFFFF;
+  --ink:#1E1715;          /* tekst */
+  --muted:#6B5F5A;
+  --line:#E6DFD9;
+  --on-sumac:#FFF6EC;
+  --font-display:"Big Shoulders Display","Arial Narrow","Roboto Condensed",Impact,sans-serif;
+  --font-body:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --wrap:72rem;
+  --gutter:clamp(1rem,4vw,2rem);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --sumac:#C42E22;--sumac-deep:#7A150E;--saffron:#F6C043;--parsley:#6FBF82;
+    --paper:#161211;--card:#201A18;--ink:#F3ECE7;--muted:#B3A7A1;--line:#3A302C;--on-sumac:#FFF6EC;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --sumac:#C42E22;--sumac-deep:#7A150E;--saffron:#F6C043;--parsley:#6FBF82;
+  --paper:#161211;--card:#201A18;--ink:#F3ECE7;--muted:#B3A7A1;--line:#3A302C;--on-sumac:#FFF6EC;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:5rem}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 1rem/1.6 var(--font-body);-webkit-font-smoothing:antialiased}
+img{max-width:100%}
+[hidden]{display:none!important}
+a{color:inherit}
+h1,h2,h3{font-family:var(--font-display);line-height:.95;margin:0;text-wrap:balance;letter-spacing:.005em}
+.wrap{max-width:var(--wrap);margin-inline:auto;padding-inline:var(--gutter)}
+:focus-visible{outline:3px solid var(--saffron);outline-offset:3px;border-radius:4px}
+.skip{position:absolute;left:-999px;top:0;background:var(--ink);color:var(--paper);padding:.5rem 1rem;z-index:100}
+.skip:focus{left:1rem}
+
+/* Demo-varsel */
+.demo{background:var(--saffron);color:#1E1715;font-size:.875rem;font-weight:600}
+.demo .wrap{display:flex;gap:1rem;align-items:center;justify-content:space-between;padding-block:.5rem}
+.demo button{background:none;border:0;font:inherit;cursor:pointer;text-decoration:underline;color:inherit;flex:none}
+
+/* Topplinje */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;background:var(--sumac);color:var(--on-sumac);border-bottom:3px solid var(--sumac-deep)}
+.top .wrap{display:flex;align-items:center;gap:1.5rem;min-height:4rem}
+.brand{display:flex;align-items:baseline;gap:.5rem;text-decoration:none;font-family:var(--font-display);font-weight:900;font-size:1.75rem;text-transform:uppercase;letter-spacing:.02em;line-height:1}
+.brand small{font-size:.95rem;color:var(--saffron);letter-spacing:.18em}
+.nav{display:flex;gap:1.25rem;margin-left:auto;font-weight:600}
+.nav a{text-decoration:none;opacity:.9}
+.nav a:hover{opacity:1;text-decoration:underline;text-underline-offset:4px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:2.875rem;padding:.6rem 1.15rem;border-radius:999px;font-weight:700;text-decoration:none;border:2px solid transparent;cursor:pointer;font-size:1rem;transition:transform .15s ease,background .15s ease}
+.btn:hover{transform:translateY(-1px)}
+.btn-saffron{background:var(--saffron);color:#1E1715}
+.btn-ghost{border-color:currentColor;color:inherit;background:transparent}
+.btn svg{width:1.1em;height:1.1em;flex:none}
+.top .btn{min-height:2.5rem;padding:.4rem 1rem}
+@media (max-width:760px){.nav{display:none}.top .btn{margin-left:auto}}
+.brand,.top .btn{white-space:nowrap}
+@media (max-width:420px){.brand{font-size:1.4rem}.brand small{font-size:.8rem;letter-spacing:.12em}.top .wrap{gap:.75rem}}
+
+/* Skiltet */
+.hero{background:var(--sumac);color:var(--on-sumac);position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;inset:auto 0 0 0;height:22px;background:repeating-linear-gradient(90deg,var(--sumac-deep) 0 22px,transparent 22px 44px);opacity:.55}
+.hero .wrap{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:clamp(1.5rem,4vw,3rem);align-items:center;padding-block:clamp(2.5rem,7vw,5rem) clamp(3.5rem,8vw,6rem)}
+.hero h1{font-size:clamp(3.25rem,10vw,7.5rem);font-weight:900;text-transform:uppercase;letter-spacing:-.005em}
+.hero h1 span{display:block;color:var(--saffron)}
+.hero p.lede{font-size:clamp(1.05rem,2.2vw,1.25rem);max-width:34rem;margin:1.25rem 0 1.75rem;opacity:.95}
+.cta{display:flex;flex-wrap:wrap;gap:.75rem}
+.status{display:inline-flex;align-items:center;gap:.6rem;background:rgba(0,0,0,.22);padding:.4rem .9rem .4rem .7rem;border-radius:999px;font-weight:600;font-size:.95rem;margin-bottom:1.25rem}
+.status i{width:.7rem;height:.7rem;border-radius:50%;background:#9A8F8A;flex:none}
+.status.open i{background:#5FD37A;box-shadow:0 0 0 4px rgba(95,211,122,.25)}
+.status.closed i{background:#FF9A8A}
+
+.deal{justify-self:center;width:min(19rem,100%);aspect-ratio:1;border-radius:50%;background:var(--saffron);color:#1E1715;display:grid;place-content:center;text-align:center;padding:2rem;transform:rotate(-7deg);box-shadow:0 18px 0 -6px var(--sumac-deep)}
+.deal .k{font-weight:700;text-transform:uppercase;letter-spacing:.16em;font-size:.8rem}
+.deal .t{font-family:var(--font-display);font-weight:800;font-size:clamp(1.6rem,4vw,2.1rem);line-height:1;margin:.5rem 0}
+.deal .p{font-family:var(--font-display);font-weight:900;font-size:clamp(3.5rem,8vw,4.75rem);line-height:.9;font-variant-numeric:tabular-nums}
+.deal .p small{font-size:.45em}
+.deal .n{font-size:.85rem;margin-top:.35rem}
+@media (max-width:760px){
+  .hero .wrap{grid-template-columns:1fr}
+  .deal{width:15rem;justify-self:start;margin-left:.5rem}
+}
+
+/* Fakta-stripe */
+.facts{border-bottom:1px solid var(--line)}
+.facts ul{list-style:none;margin:0;padding-block:1.1rem;display:flex;flex-wrap:wrap;gap:.6rem 2rem;font-weight:600}
+.facts li{display:flex;align-items:center;gap:.5rem}
+.facts li::before{content:"";width:.5rem;height:.5rem;background:var(--sumac);transform:rotate(45deg);flex:none}
+
+/* Seksjoner */
+section{padding-block:clamp(3rem,7vw,5rem)}
+.eyebrow{font-weight:700;text-transform:uppercase;letter-spacing:.16em;font-size:.8rem;color:var(--sumac);margin:0 0 .5rem}
+.sec-head{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:1rem;margin-bottom:1.75rem}
+.sec-head h2{font-size:clamp(2.5rem,6vw,4rem);font-weight:900;text-transform:uppercase}
+.sec-head p{margin:0;color:var(--muted);max-width:28rem}
+
+/* Meny */
+.chips{position:sticky;top:calc(env(safe-area-inset-top,0px) + 4rem);z-index:40;background:var(--paper);border-bottom:1px solid var(--line);margin-bottom:2rem}
+.chips .row{display:flex;gap:.5rem;overflow-x:auto;padding-block:.75rem;scrollbar-width:none}
+.chips .row::-webkit-scrollbar{display:none}
+.chip{flex:none;text-decoration:none;font-weight:600;padding:.45rem 1rem;border-radius:999px;border:1.5px solid var(--line);background:var(--card);white-space:nowrap}
+.chip:hover,.chip.on{border-color:var(--sumac);background:var(--sumac);color:var(--on-sumac)}
+
+.menu{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2.5rem 3.5rem}
+@media (max-width:860px){.menu{grid-template-columns:1fr}}
+.cat h3{font-size:2rem;font-weight:800;text-transform:uppercase;padding-bottom:.6rem;border-bottom:3px solid var(--ink);margin-bottom:.25rem;display:flex;justify-content:space-between;align-items:baseline;gap:1rem}
+.cat h3 .sizes{font-family:var(--font-body);font-size:.75rem;font-weight:700;letter-spacing:.12em;color:var(--muted);display:flex;gap:0}
+.cat h3 .sizes span{width:4.25rem;text-align:right}
+.item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.15rem 1rem;padding-block:.9rem;border-bottom:1px dashed var(--line)}
+.item .name{font-weight:700;font-size:1.075rem;display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .5rem}
+.item .desc{grid-column:1;color:var(--muted);font-size:.95rem;line-height:1.45;margin:0}
+.item .price{grid-row:1 / span 2;grid-column:2;display:flex;align-items:flex-start;font-family:var(--font-display);font-weight:800;font-size:1.6rem;line-height:1.1;font-variant-numeric:tabular-nums}
+.item .price span{width:4.25rem;text-align:right}
+.item .price span.dim{color:var(--muted)}
+.tag{font-family:var(--font-body);font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:.15rem .5rem;border-radius:4px;line-height:1.4}
+.tag.veg{background:color-mix(in srgb,var(--parsley) 16%,transparent);color:var(--parsley)}
+.tag.pop{background:color-mix(in srgb,var(--saffron) 30%,transparent);color:var(--ink)}
+.tag.hot{background:color-mix(in srgb,var(--sumac) 15%,transparent);color:var(--sumac)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tag.hot{color:#FF8A7D}}
+:root[data-theme="dark"] .tag.hot{color:#FF8A7D}
+
+.sauce{margin-top:3rem;background:var(--card);border:1px solid var(--line);border-radius:1rem;padding:1.5rem;display:grid;grid-template-columns:auto minmax(0,1fr);gap:1rem 2rem;align-items:center}
+.sauce h3{font-size:1.75rem;font-weight:800;text-transform:uppercase}
+.sauce ol{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:.6rem}
+.sauce li{display:flex;align-items:center;gap:.6rem;padding:.5rem .9rem;border:1.5px solid var(--line);border-radius:999px;font-weight:600}
+.heat{display:inline-flex;gap:3px}
+.heat b{width:7px;height:14px;border-radius:7px 7px 3px 3px;background:var(--line)}
+.heat b.on{background:var(--sumac)}
+@media (max-width:640px){.sauce{grid-template-columns:1fr}}
+.allergen{margin-top:1.25rem;color:var(--muted);font-size:.95rem}
+
+/* Tider og sted */
+.visit{background:var(--card);border-block:1px solid var(--line)}
+.visit .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:clamp(2rem,5vw,4rem)}
+@media (max-width:860px){.visit .grid{grid-template-columns:1fr}}
+.hours{width:100%;border-collapse:collapse;font-size:1.05rem;font-variant-numeric:tabular-nums}
+.hours th,.hours td{padding:.7rem .25rem;border-bottom:1px solid var(--line);text-align:left}
+.hours th{font-weight:600}
+.hours td{text-align:right;font-weight:600}
+.hours tr.today th,.hours tr.today td{color:var(--sumac);font-weight:800}
+.hours tr.today th::after{content:"I dag";margin-left:.6rem;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;background:var(--sumac);color:var(--on-sumac);padding:.15rem .45rem;border-radius:4px;vertical-align:middle}
+.hours td.closed{color:var(--muted)}
+.where address{font-style:normal;font-size:1.25rem;font-weight:600;line-height:1.4;margin-bottom:1rem}
+.where .lines{display:grid;gap:.4rem;margin-bottom:1.5rem}
+.where .lines a{font-weight:600}
+.map{border-radius:1rem;overflow:hidden;border:1px solid var(--line);aspect-ratio:16/10;max-width:100%;background:var(--paper)}
+.map iframe{width:100%;height:100%;border:0;display:block}
+.visit .cta .btn-ghost{color:var(--ink)}
+.btn-sumac{background:var(--sumac);color:var(--on-sumac)}
+
+footer{padding-block:2.5rem 6rem;color:var(--muted);font-size:.9rem}
+footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:1rem}
+@media (min-width:761px){footer{padding-bottom:2.5rem}}
+
+/* Mobil: fast handlingslinje */
+.dock{display:none}
+@media (max-width:760px){
+  .dock{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;position:fixed;left:0;right:0;bottom:0;z-index:60;padding:.6rem var(--gutter) calc(.6rem + env(safe-area-inset-bottom,0px));background:var(--paper);border-top:1px solid var(--line);box-shadow:0 -8px 24px rgba(0,0,0,.08)}
+  .dock .btn{width:100%}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#meny">Hopp til menyen</a>
+
+<div class="demo" id="demo" hidden>
+  <div class="wrap">
+    <span>Eksempelinnhold: priser, åpningstider, adresse og telefon må byttes ut med de ekte før siden publiseres.</span>
+    <button type="button" id="demo-close">Skjul</button>
+  </div>
+</div>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#"><span data-f="navn">Kebab Corner</span><small data-f="by">Halden</small></a>
+    <nav class="nav" aria-label="Hovedmeny">
+      <a href="#meny">Meny</a>
+      <a href="#besok">Åpningstider</a>
+      <a href="#besok">Finn oss</a>
+    </nav>
+    <a class="btn btn-saffron js-tel" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>
+      Ring oss
+    </a>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="wrap">
+      <div>
+        <div class="status" id="status" role="status"><i></i><span>Sjekker åpningstider…</span></div>
+        <h1>Kebab som<span>den skal være</span></h1>
+        <p class="lede" data-f="ingress">Kjøtt rett fra grillspydet, hjemmelaget saus og sprø grønnsaker. Ta med, eller spis hos oss i Halden.</p>
+        <div class="cta">
+          <a class="btn btn-saffron" href="#meny">Se menyen</a>
+          <a class="btn btn-ghost js-tel" href="#">Ring og bestill</a>
+        </div>
+      </div>
+      <aside class="deal" id="deal" aria-label="Dagens tilbud">
+        <div class="k">Tilbud</div>
+        <div class="t" data-f="tilbud.tittel"></div>
+        <div class="p"><span data-f="tilbud.pris"></span><small>,-</small></div>
+        <div class="n" data-f="tilbud.merknad"></div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="facts"><ul class="wrap" id="facts"></ul></div>
+
+  <section id="meny" aria-labelledby="meny-h">
+    <div class="wrap">
+      <div class="sec-head">
+        <div>
+          <p class="eyebrow">Meny</p>
+          <h2 id="meny-h">Hva skal det være?</h2>
+        </div>
+        <p>Alle retter lages når du bestiller. Ring på forhånd, så er maten klar når du kommer.</p>
+      </div>
+    </div>
+    <nav class="chips" aria-label="Menykategorier"><div class="wrap row" id="chips"></div></nav>
+    <div class="wrap">
+      <div class="menu" id="menu"></div>
+
+      <div class="sauce">
+        <h3>Velg saus</h3>
+        <ol id="sauces"></ol>
+      </div>
+      <p class="allergen">Allergener: Spør oss gjerne. Vi forteller deg hva som er i maten, og hva vi kan bytte ut.</p>
+    </div>
+  </section>
+
+  <section class="visit" id="besok" aria-labelledby="besok-h">
+    <div class="wrap">
+      <div class="sec-head">
+        <div>
+          <p class="eyebrow">Besøk oss</p>
+          <h2 id="besok-h">Åpent hver dag</h2>
+        </div>
+      </div>
+      <div class="grid">
+        <div>
+          <table class="hours" aria-label="Åpningstider"><tbody id="hours"></tbody></table>
+          <p class="allergen" data-f="tiderMerknad"></p>
+        </div>
+        <div class="where">
+          <address data-f="adresse"></address>
+          <div class="lines">
+            <div>Telefon: <a class="js-tel js-tel-text" href="#"></a></div>
+          </div>
+          <div class="cta" style="margin-bottom:1.5rem">
+            <a class="btn btn-sumac js-tel" href="#">Ring og bestill</a>
+            <a class="btn btn-ghost js-maps" href="#" target="_blank" rel="noopener">Veibeskrivelse</a>
+          </div>
+          <div class="map"><iframe id="map" title="Kart som viser hvor vi ligger" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© <span id="year"></span> <span data-f="navn"></span> <span data-f="by"></span></span>
+    <span data-f="adresse"></span>
+  </div>
+</footer>
+
+<div class="dock">
+  <a class="btn btn-sumac js-tel" href="#">Ring og bestill</a>
+  <a class="btn btn-ghost js-maps" href="#" target="_blank" rel="noopener" style="color:var(--ink)">Veibeskrivelse</a>
+</div>
+
+<script>
+/* =====================================================================
+   ALT INNHOLD LIGGER HER. Endre verdiene under, så oppdateres hele siden.
+   Sett demo: false når priser, tider, adresse og telefon er riktige.
+   ===================================================================== */
+const SITE = {
+  demo: true,
+  navn: "Kebab Corner",
+  by: "Halden",
+  ingress: "Kjøtt rett fra grillspydet, hjemmelaget saus og sprø grønnsaker. Ta med, eller spis hos oss i Halden.",
+  telefon: "+47 000 00 000",            // f.eks. "+47 69 12 34 56"
+  adresse: "Gateadresse 1, 1771 Halden", // gate, postnummer og sted
+  kartSok: "Kebab Corner Halden",        // det som søkes etter i Google Maps
+  fakta: ["Ta med eller spis inne", "Bestill på telefon", "Vipps og kort"],
+  tilbud: { tittel: "Kebab i pita + 0,5 l brus", pris: 169, merknad: "Hele dagen, hver dag" }, // sett til null for å skjule
+  // Åpningstider, mandag til søndag. Stengetid etter midnatt er lov (f.eks. "03:00"). null = stengt.
+  tider: [
+    ["11:00","23:00"], ["11:00","23:00"], ["11:00","23:00"], ["11:00","23:00"],
+    ["11:00","03:00"], ["12:00","03:00"], ["13:00","23:00"]
+  ],
+  tiderMerknad: "Kjøkkenet tar siste bestilling 15 minutter før stengetid.",
+  sauser: [["Hvitløksdressing",0],["Mild",1],["Medium",2],["Sterk",3]],
+  // Priser i kroner. To priser = liten / stor.
+  meny: [
+    { kategori: "Kebab", storrelser: ["Liten","Stor"], retter: [
+      { navn: "Kebab i pita", tekst: "Kebabkjøtt, salat, tomat, agurk, rødløk og saus i nybakt pitabrød.", pris: [129,159], tag: "pop" },
+      { navn: "Kebab i rull", tekst: "Rullet i tynt lefsebrød (dürüm) med salat og saus.", pris: [149,179] },
+      { navn: "Kyllingkebab i pita", tekst: "Marinert kylling fra grillen med salat og saus.", pris: [139,169] },
+      { navn: "Kebab i boks", tekst: "Kebabkjøtt over pommes frites, med salat og saus.", pris: [159] },
+    ]},
+    { kategori: "Tallerken", retter: [
+      { navn: "Kebabtallerken", tekst: "Kebabkjøtt med pommes frites eller ris, salat og to sauser.", pris: [209], tag: "pop" },
+      { navn: "Kyllingtallerken", tekst: "Kylling fra grillen med pommes frites eller ris og salat.", pris: [209] },
+      { navn: "Mix-tallerken", tekst: "Både kebab og kylling, for deg som ikke klarer å velge.", pris: [229] },
+    ]},
+    { kategori: "Vegetar", retter: [
+      { navn: "Falafel i pita", tekst: "Hjemmelagde falafler, salat, tomat og tahinisaus.", pris: [129,149], tag: "veg" },
+      { navn: "Halloumi i rull", tekst: "Grillet halloumi, salat og hvitløksdressing.", pris: [159], tag: "veg" },
+      { navn: "Falafeltallerken", tekst: "Falafel med ris eller pommes frites, salat og hummus.", pris: [189], tag: "veg" },
+    ]},
+    { kategori: "Burger", retter: [
+      { navn: "Cheeseburger", tekst: "Grillet burger med cheddar, salat og dressing. Med pommes frites.", pris: [169] },
+      { navn: "Kyllingburger", tekst: "Sprø kyllingfilet, salat og hvitløksdressing. Med pommes frites.", pris: [169] },
+      { navn: "Chiliburger", tekst: "Cheeseburger med jalapeños og sterk saus.", pris: [179], tag: "hot" },
+    ]},
+    { kategori: "Tilbehør", storrelser: ["Liten","Stor"], retter: [
+      { navn: "Pommes frites", tekst: "", pris: [49,69] },
+      { navn: "Ekstra saus", tekst: "", pris: [15] },
+      { navn: "Ekstra ost", tekst: "", pris: [20] },
+    ]},
+    { kategori: "Drikke", retter: [
+      { navn: "Brus 0,5 l", tekst: "", pris: [39] },
+      { navn: "Ayran", tekst: "Kald yoghurtdrikk. Passer godt til kebab.", pris: [35] },
+      { navn: "Vann 0,5 l", tekst: "", pris: [29] },
+    ]},
+  ],
+};
+/* ===================================================================== */
+
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const get = path => path.split(".").reduce((o,k) => o == null ? o : o[k], SITE);
+const slug = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-");
+const DAGER = ["Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag","Søndag"];
+const TAGS = { veg: "Vegetar", pop: "Mest solgt", hot: "Sterk" };
+
+// Tekstfelt
+$$("[data-f]").forEach(el => { const v = get(el.dataset.f); if (v != null) el.textContent = v; });
+$("#year").textContent = new Date().getFullYear();
+if (SITE.demo) {
+  let hidden = false;
+  try { hidden = sessionStorage.getItem("demo-skjult") === "1"; } catch (e) {}
+  $("#demo").hidden = hidden;
+  $("#demo-close").addEventListener("click", () => {
+    $("#demo").hidden = true;
+    try { sessionStorage.setItem("demo-skjult","1"); } catch (e) {}
+  });
+}
+if (!SITE.tilbud) $("#deal").hidden = true;
+
+// Telefon og kart
+const telHref = "tel:" + SITE.telefon.replace(/[^\d+]/g, "");
+$$(".js-tel").forEach(a => a.href = telHref);
+$$(".js-tel-text").forEach(a => a.textContent = SITE.telefon);
+const q = encodeURIComponent(SITE.kartSok || (SITE.navn + " " + SITE.adresse));
+$$(".js-maps").forEach(a => a.href = "https://www.google.com/maps/search/?api=1&query=" + q);
+$("#map").src = "https://www.google.com/maps?q=" + q + "&output=embed";
+
+// Fakta
+$("#facts").innerHTML = SITE.fakta.map(f => `<li>${esc(f)}</li>`).join("");
+
+// Meny
+$("#chips").innerHTML = SITE.meny.map(c => `<a class="chip" href="#${slug(c.kategori)}">${esc(c.kategori)}</a>`).join("");
+$("#menu").innerHTML = SITE.meny.map(c => {
+  const sizes = c.storrelser ? `<span class="sizes">${c.storrelser.map(s => `<span>${esc(s.toUpperCase())}</span>`).join("")}</span>` : "";
+  const items = c.retter.map(r => {
+    const tag = r.tag ? `<span class="tag ${r.tag}">${TAGS[r.tag]}</span>` : "";
+    let prices = r.pris.map(p => `<span>${p}</span>`);
+    if (c.storrelser && r.pris.length === 1) prices = [`<span class="dim" aria-hidden="true"></span>`, `<span>${r.pris[0]}</span>`];
+    const label = r.pris.length === 2 ? `Pris: liten ${r.pris[0]} kroner, stor ${r.pris[1]} kroner` : `Pris: ${r.pris[0]} kroner`;
+    return `<div class="item">
+      <div class="name">${esc(r.navn)}${tag}</div>
+      ${r.tekst ? `<p class="desc">${esc(r.tekst)}</p>` : ""}
+      <div class="price" aria-label="${label}">${prices.join("")}</div>
+    </div>`;
+  }).join("");
+  return `<div class="cat" id="${slug(c.kategori)}"><h3>${esc(c.kategori)}${sizes}</h3>${items}</div>`;
+}).join("");
+
+// Sauser
+$("#sauces").innerHTML = SITE.sauser.map(([navn, styrke]) =>
+  `<li>${esc(navn)}<span class="heat" aria-label="Styrke ${styrke} av 3">${[1,2,3].map(i => `<b class="${i <= styrke ? "on" : ""}"></b>`).join("")}</span></li>`
+).join("");
+
+// Åpningstider og "åpent nå" (norsk tid)
+const min = s => { const [h,m] = s.split(":").map(Number); return h*60 + m; };
+function osloNow() {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Oslo", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
+  const p = Object.fromEntries(parts.map(x => [x.type, x.value]));
+  const day = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].indexOf(p.weekday);
+  return { day, t: Number(p.hour)*60 + Number(p.minute) };
+}
+function span(i) { // [åpner, stenger] i minutter fra dagens start; stenger kan være > 1440
+  const d = SITE.tider[i]; if (!d) return null;
+  const o = min(d[0]); let c = min(d[1]); if (c <= o) c += 1440; return [o, c];
+}
+function status() {
+  const { day, t } = osloNow();
+  const y = span((day + 6) % 7);
+  if (y && t + 1440 < y[1]) return { open: true, text: `Åpent nå, stenger kl. ${SITE.tider[(day+6)%7][1]}` };
+  const s = span(day);
+  if (s && t >= s[0] && t < s[1]) return { open: true, text: `Åpent nå, stenger kl. ${SITE.tider[day][1]}` };
+  if (s && t < s[0]) return { open: false, text: `Stengt nå, åpner kl. ${SITE.tider[day][0]} i dag` };
+  for (let k = 1; k <= 7; k++) {
+    const i = (day + k) % 7;
+    if (SITE.tider[i]) return { open: false, text: `Stengt nå, åpner ${k === 1 ? "i morgen" : DAGER[i].toLowerCase()} kl. ${SITE.tider[i][0]}` };
+  }
+  return { open: false, text: "Stengt" };
+}
+function renderHours() {
+  const { day } = osloNow();
+  $("#hours").innerHTML = SITE.tider.map((d, i) =>
+    `<tr class="${i === day ? "today" : ""}"><th scope="row">${DAGER[i]}</th>${d ? `<td>${d[0]} – ${d[1]}</td>` : `<td class="closed">Stengt</td>`}</tr>`
+  ).join("");
+  const s = status(), el = $("#status");
+  el.className = "status " + (s.open ? "open" : "closed");
+  $("span", el).textContent = s.text;
+}
+renderHours();
+setInterval(renderHours, 60000);
+
+// Marker aktiv kategori i menyen
+const chips = $$(".chip");
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) chips.forEach(c => c.classList.toggle("on", c.getAttribute("href") === "#" + e.target.id)); });
+}, { rootMargin: "-40% 0px -55% 0px" });
+$$(".cat").forEach(c => io.observe(c));
+
+// Strukturert data for Google (åpningstider, adresse, telefon)
+const ld = {
+  "@context": "https://schema.org", "@type": "Restaurant",
+  name: SITE.navn + " " + SITE.by, servesCuisine: ["Kebab","Tyrkisk","Falafel","Burger"],
+  telephone: SITE.telefon, priceRange: "kr",
+  address: { "@type": "PostalAddress", streetAddress: SITE.adresse.split(",")[0], addressLocality: SITE.by, addressCountry: "NO" },
+  openingHoursSpecification: SITE.tider.map((d, i) => d && ({ "@type": "OpeningHoursSpecification",
+    dayOfWeek: ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"][i], opens: d[0], closes: d[1] })).filter(Boolean),
+};
+if (!SITE.demo) {
+  const s = document.createElement("script"); s.type = "application/ld+json"; s.textContent = JSON.stringify(ld);
+  document.head.appendChild(s);
+}
+</script>
+</body>
+</html>
