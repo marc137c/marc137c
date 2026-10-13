@@ -136,9 +136,9 @@ section{padding-block:clamp(4rem,9vw,7rem)}
 
 /* Menyfaner */
 .tabs{position:sticky;top:calc(env(safe-area-inset-top,0px) + 4.5rem);z-index:40;background:rgba(20,16,16,.95);border-block:1px solid var(--line);margin-bottom:3rem}
-.tabs-row{display:flex;gap:2rem;overflow-x:auto;scrollbar-width:none}
+.tabs-row{display:flex;gap:2rem;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .tabs-row::-webkit-scrollbar{display:none}
-.chip{flex:none;text-decoration:none;font-weight:600;font-size:.95rem;color:var(--muted);padding-block:1.05rem;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:color .2s,border-color .2s}
+.chip{flex:none;text-decoration:none;font-weight:600;font-size:.95rem;color:var(--muted);padding-block:1.05rem;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s,border-color .2s}
 .chip:hover{color:var(--text)}
 .chip.on{color:var(--text);border-bottom-color:var(--accent)}
 
@@ -240,7 +240,7 @@ section{padding-block:clamp(4rem,9vw,7rem)}
 .btn-primary{box-shadow:0 0 0 0 rgba(212,46,35,0);transition:background .2s ease,box-shadow .3s ease,transform .2s ease}
 @media (hover:hover){.btn-primary:hover{box-shadow:0 10px 28px -8px rgba(212,46,35,.7);transform:translateY(-1px)}}
 .tabs-row{position:relative}
-.tabs .ink{position:absolute;bottom:-1px;left:0;height:2px;width:0;background:var(--accent);transition:transform .45s cubic-bezier(.2,.75,.1,1),width .45s cubic-bezier(.2,.75,.1,1);pointer-events:none}
+.tabs .ink{position:absolute;bottom:0;left:0;height:2px;width:0;background:var(--accent);transition:transform .45s cubic-bezier(.2,.75,.1,1),width .45s cubic-bezier(.2,.75,.1,1);pointer-events:none}
 .tabs.has-ink .chip.on{border-bottom-color:transparent}
 
 /* Slik bestiller du */
