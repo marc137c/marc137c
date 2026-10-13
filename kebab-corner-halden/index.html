@@ -79,8 +79,10 @@ p{margin:0}
 .nav{display:flex;gap:2rem;margin-left:auto;font-weight:600;font-size:.95rem}
 .nav a{text-decoration:none;color:var(--muted);transition:color .2s}
 .nav a:hover{color:var(--text)}
+.lang{flex:none;font-size:.8rem;font-weight:700;letter-spacing:.1em;text-decoration:none;color:var(--muted);border:1px solid var(--line-strong);border-radius:999px;padding:.35rem .75rem;transition:color .2s,border-color .2s}
+.lang:hover{color:var(--text);border-color:var(--text)}
 .top .btn{min-height:2.6rem;padding:.5rem 1.1rem;white-space:nowrap}
-@media (max-width:760px){.nav,.top .btn{display:none}}
+@media (max-width:760px){.nav,.top .btn{display:none}.lang{margin-left:auto}}
 
 /* Topp: tekst til venstre, bilde til høyre */
 .hero{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);min-height:38rem;border-bottom:1px solid var(--line)}
@@ -184,7 +186,7 @@ section{padding-block:clamp(4rem,9vw,7rem)}
 .hours th,.hours td{padding:.45rem 0;text-align:left;font-weight:500;color:var(--muted)}
 .hours td{text-align:right}
 .hours tr.today th,.hours tr.today td{color:var(--text);font-weight:700}
-.hours tr.today th::after{content:"I dag";margin-left:.6rem;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-text);vertical-align:middle}
+.hours tr.today th::after{content:attr(data-today);margin-left:.6rem;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-text);vertical-align:middle}
 .hours-note{color:var(--muted);font-size:.9rem;margin-top:.5rem}
 .map{position:relative;border-radius:var(--radius);overflow:hidden;border:1px solid var(--line);height:26rem;aspect-ratio:4/3;max-width:100%;background:var(--surface)}
 .map iframe{width:100%;height:100%;border:0;display:block;filter:grayscale(1) invert(.92) contrast(.88) brightness(.95)}
@@ -318,12 +320,12 @@ footer .legal{flex-basis:100%;padding-top:1.5rem;border-top:1px solid var(--line
 </script>
 </head>
 <body>
-<a class="skip" href="#meny">Hopp til menyen</a>
+<a class="skip" href="#meny" data-en="Skip to menu">Hopp til menyen</a>
 
-<aside class="demo" id="demo" aria-label="Utkast" hidden>
+<aside class="demo" id="demo" aria-label="Utkast" data-en-aria-label="Draft" hidden>
   <div class="wrap">
-    <span><b>Utkast.</b> Logo og matbilde er klippet fra skjermbilder.</span>
-    <button type="button" id="demo-close">Skjul</button>
+    <span data-en="&lt;b&gt;Draft.&lt;/b&gt; The logo and food photo are cropped from screenshots."><b>Utkast.</b> Logo og matbilde er klippet fra skjermbilder.</span>
+    <button type="button" id="demo-close" data-en="Hide">Skjul</button>
   </div>
 </aside>
 
@@ -331,13 +333,14 @@ footer .legal{flex-basis:100%;padding-top:1.5rem;border-top:1px solid var(--line
   <span class="progress" aria-hidden="true"></span>
   <div class="wrap">
     <a class="brand" href="#"><picture><source srcset="bilder/logo.webp" type="image/webp"><img class="logo" id="logo" src="bilder/logo.png" alt="" width="44" height="48"></picture><span class="words"><span class="name" data-f="navn">Kebab Corner</span><span class="city" data-f="by">Halden</span></span></a>
-    <nav class="nav" aria-label="Hovedmeny">
-      <a href="#meny">Meny</a>
-      <a href="#besok">Finn oss</a>
+    <nav class="nav" aria-label="Hovedmeny" data-en-aria-label="Main menu">
+      <a href="#meny" data-en="Menu">Meny</a>
+      <a href="#besok" data-en="Find us">Finn oss</a>
     </nav>
+    <a class="lang" id="lang" href="?lang=en" hreflang="en" lang="en" aria-label="Switch to English">EN</a>
     <a class="btn btn-primary js-tel" href="#">
       <svg class="phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>
-      <span>Ring og bestill</span>
+      <span data-en="Call to order">Ring og bestill</span>
     </a>
   </div>
 </header>
@@ -352,12 +355,12 @@ footer .legal{flex-basis:100%;padding-top:1.5rem;border-top:1px solid var(--line
         <h1><span class="l1" data-f="overskrift.linje1">Kebab,</span><span class="l2" data-f="overskrift.linje2">pizza &amp; burgere.</span></h1>
         <p class="lede" data-f="ingress">Sulten? Finn din favoritt på menyen. Ring oss, så ordner vi maten.</p>
         <div class="cta">
-          <a class="btn btn-primary js-tel" href="#"><svg class="phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>Ring og bestill</a>
-          <a class="btn btn-line" href="#meny">Se menyen<svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg></a>
+          <a class="btn btn-primary js-tel" href="#"><svg class="phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg><span data-en="Call to order">Ring og bestill</span></a>
+          <a class="btn btn-line" href="#meny"><span data-en="See the menu">Se menyen</span><svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg></a>
         </div>
-        <aside class="deal" id="deal" aria-label="Tilbud">
+        <aside class="deal" id="deal" aria-label="Tilbud" data-en-aria-label="Offer">
           <div class="p"><span data-f="tilbud.pris"></span><small>kr</small></div>
-          <div><div class="k">Tilbud</div><div class="t" data-f="tilbud.tittel"></div><div class="n" data-f="tilbud.merknad"></div></div>
+          <div><div class="k" data-en="Offer">Tilbud</div><div class="t" data-f="tilbud.tittel"></div><div class="n" data-f="tilbud.merknad"></div></div>
         </aside>
         <p class="where-line">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -365,7 +368,7 @@ footer .legal{flex-basis:100%;padding-top:1.5rem;border-top:1px solid var(--line
         </p>
       </div>
     </div>
-    <figure class="hero-photo" id="photo"><picture><source srcset="bilder/mat-hero.webp" type="image/webp"><img id="photo-img" src="bilder/mat-hero.jpg" alt="Burgere, pommes frites og kebab i pita" width="700" height="694" fetchpriority="high" decoding="async"></picture></figure>
+    <figure class="hero-photo" id="photo"><picture><source srcset="bilder/mat-hero.webp" type="image/webp"><img id="photo-img" src="bilder/mat-hero.jpg" alt="Burgere, pommes frites og kebab i pita" data-en-alt="Burgers, fries and kebab in pita" width="700" height="694" fetchpriority="high" decoding="async"></picture></figure>
   </div>
 
   <div class="marquee" id="marquee" aria-hidden="true"><div class="track" id="track"></div></div>
@@ -374,29 +377,29 @@ footer .legal{flex-basis:100%;padding-top:1.5rem;border-top:1px solid var(--line
     <div class="wrap">
       <div class="sec-head">
         <div>
-          <p class="kicker">Slik bestiller du</p>
-          <h2 id="slik-h">Klar på tre steg</h2>
+          <p class="kicker" data-en="How to order">Slik bestiller du</p>
+          <h2 id="slik-h" data-en="Ready in three steps">Klar på tre steg</h2>
         </div>
-        <p>Ingen app og ingen konto. Bare velg, ring og hent.</p>
+        <p data-en="No app and no account. Just choose, call and pick up.">Ingen app og ingen konto. Bare velg, ring og hent.</p>
       </div>
       <ol class="steps">
         <li class="step">
           <span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></span>
-          <span class="n">STEG 1</span>
-          <h3>Velg fra menyen</h3>
-          <p>Finn favoritten din <a href="#meny">i menyen</a>. Du kan søke etter en rett eller en ingrediens.</p>
+          <span class="n" data-en="STEP 1">STEG 1</span>
+          <h3 data-en="Choose from the menu">Velg fra menyen</h3>
+          <p data-en="Find your favourite &lt;a href=&quot;#meny&quot;&gt;on the menu&lt;/a&gt;. You can search for a dish or an ingredient.">Finn favoritten din <a href="#meny">i menyen</a>. Du kan søke etter en rett eller en ingrediens.</p>
         </li>
         <li class="step">
           <span class="dot"><svg class="phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg></span>
-          <span class="n">STEG 2</span>
-          <h3>Ring oss</h3>
-          <p>Ring <a class="js-tel js-tel-text" href="#"></a> og si hva du vil ha.</p>
+          <span class="n" data-en="STEP 2">STEG 2</span>
+          <h3 data-en="Give us a call">Ring oss</h3>
+          <p data-en="Call &lt;a class=&quot;js-tel js-tel-text&quot; href=&quot;#&quot;&gt;&lt;/a&gt; and tell us what you would like.">Ring <a class="js-tel js-tel-text" href="#"></a> og si hva du vil ha.</p>
         </li>
         <li class="step">
           <span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
-          <span class="n">STEG 3</span>
-          <h3>Hent maten</h3>
-          <p>Kom innom oss i <a class="js-maps" href="#" target="_blank" rel="noopener" data-f="adresse"></a>.</p>
+          <span class="n" data-en="STEP 3">STEG 3</span>
+          <h3 data-en="Pick up your food">Hent maten</h3>
+          <p data-en="Drop by at &lt;a class=&quot;js-maps&quot; href=&quot;#&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot; data-f=&quot;adresse&quot;&gt;&lt;/a&gt;.">Kom innom oss i <a class="js-maps" href="#" target="_blank" rel="noopener" data-f="adresse"></a>.</p>
         </li>
       </ol>
     </div>
@@ -406,33 +409,33 @@ footer .legal{flex-basis:100%;padding-top:1.5rem;border-top:1px solid var(--line
     <div class="wrap">
       <div class="sec-head">
         <div>
-          <p class="kicker">Finn din favoritt</p>
-          <h2 id="meny-h">Hva frister?</h2>
+          <p class="kicker" data-en="Find your favourite">Finn din favoritt</p>
+          <h2 id="meny-h" data-en="What are you craving?">Hva frister?</h2>
         </div>
         <div>
-          <p>Kebab, pizza eller noe fra grillen. Ring oss med bestillingen, så er maten klar når du kommer.</p>
+          <p data-en="Kebab, pizza or something from the grill. Call in your order and it will be ready when you arrive.">Kebab, pizza eller noe fra grillen. Ring oss med bestillingen, så er maten klar når du kommer.</p>
           <label class="search" for="q">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-            <span class="sr-only">Søk i menyen</span>
-            <input type="search" id="q" placeholder="Søk i menyen, f.eks. kylling" autocomplete="off" enterkeyhint="search">
+            <span class="sr-only" data-en="Search the menu">Søk i menyen</span>
+            <input type="search" id="q" placeholder="Søk i menyen, f.eks. kylling" data-en-placeholder="Search the menu, e.g. chicken" autocomplete="off" enterkeyhint="search">
           </label>
         </div>
       </div>
     </div>
-    <nav class="tabs" aria-label="Menykategorier"><div class="wrap"><div class="tabs-row" id="chips"></div></div></nav>
+    <nav class="tabs" aria-label="Menykategorier" data-en-aria-label="Menu categories"><div class="wrap"><div class="tabs-row" id="chips"></div></div></nav>
     <div class="wrap">
       <div id="menu"></div>
       <p class="no-hits" id="no-hits" role="status" hidden></p>
 
       <div class="sauce" id="sauce-box">
-        <h3>Velg saus</h3>
+        <h3 data-en="Choose your sauce">Velg saus</h3>
         <ol id="sauces"></ol>
       </div>
 
       <div class="menu-foot">
         <p class="legend" id="legend" hidden></p>
-        <p>Har du allergier? Spør oss når du bestiller, så forteller vi hva som er i maten.</p>
-        <a class="orig" id="orig" href="#" target="_blank" rel="noopener" hidden>Se originalmeny <span aria-hidden="true">↗</span></a>
+        <p data-en="Have allergies? Ask us when you order and we will tell you what is in the food.">Har du allergier? Spør oss når du bestiller, så forteller vi hva som er i maten.</p>
+        <a class="orig" id="orig" href="#" target="_blank" rel="noopener" hidden data-en="See the original menu &lt;span aria-hidden=&quot;true&quot;&gt;↗&lt;/span&gt;">Se originalmeny <span aria-hidden="true">↗</span></a>
       </div>
     </div>
   </section>
@@ -440,19 +443,19 @@ footer .legal{flex-basis:100%;padding-top:1.5rem;border-top:1px solid var(--line
   <section class="visit" id="besok" aria-labelledby="besok-h">
     <div class="wrap grid">
       <div>
-        <p class="kicker">Besøk oss</p>
-        <h2 id="besok-h">Finn oss</h2>
+        <p class="kicker" data-en="Visit us">Besøk oss</p>
+        <h2 id="besok-h" data-en="Find us">Finn oss</h2>
         <dl class="facts-list">
-          <div><dt>Adresse</dt><dd><a class="js-maps" href="#" target="_blank" rel="noopener" data-f="adresse"></a></dd></div>
-          <div><dt>Telefon</dt><dd><a class="js-tel js-tel-text" href="#"></a></dd></div>
-          <div id="hours-wrap"><dt>Åpningstider</dt><dd><table class="hours" aria-label="Åpningstider"><tbody id="hours"></tbody></table><p class="hours-note" data-f="tiderMerknad"></p></dd></div>
+          <div><dt data-en="Address">Adresse</dt><dd><a class="js-maps" href="#" target="_blank" rel="noopener" data-f="adresse"></a></dd></div>
+          <div><dt data-en="Phone">Telefon</dt><dd><a class="js-tel js-tel-text" href="#"></a></dd></div>
+          <div id="hours-wrap"><dt data-en="Opening hours">Åpningstider</dt><dd><table class="hours" aria-label="Åpningstider" data-en-aria-label="Opening hours"><tbody id="hours"></tbody></table><p class="hours-note" data-f="tiderMerknad"></p></dd></div>
         </dl>
         <div class="cta">
-          <a class="btn btn-primary js-tel" href="#">Ring og bestill</a>
-          <a class="btn btn-line js-maps" href="#" target="_blank" rel="noopener">Veibeskrivelse</a>
+          <a class="btn btn-primary js-tel" href="#" data-en="Call to order">Ring og bestill</a>
+          <a class="btn btn-line js-maps" href="#" target="_blank" rel="noopener" data-en="Directions">Veibeskrivelse</a>
         </div>
       </div>
-      <div class="map"><iframe id="map" title="Kart som viser hvor vi ligger" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
+      <div class="map"><iframe id="map" title="Kart som viser hvor vi ligger" data-en-title="Map showing where we are" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
     </div>
   </section>
 </main>
@@ -460,22 +463,22 @@ footer .legal{flex-basis:100%;padding-top:1.5rem;border-top:1px solid var(--line
 <footer>
   <div class="wrap">
     <a class="brand" href="#"><span class="words"><span class="name" data-f="navn">Kebab Corner</span><span class="city" data-f="by">Halden</span></span></a>
-    <nav aria-label="Bunnmeny">
-      <a href="#meny">Meny</a>
-      <a href="#besok">Finn oss</a>
+    <nav aria-label="Bunnmeny" data-en-aria-label="Footer">
+      <a href="#meny" data-en="Menu">Meny</a>
+      <a href="#besok" data-en="Find us">Finn oss</a>
       <a class="js-tel js-tel-text" href="#"></a>
     </nav>
-    <a class="to-top" id="to-top" href="#" aria-label="Til toppen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></a>
+    <a class="to-top" id="to-top" href="#" aria-label="Til toppen" data-en-aria-label="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></a>
     <p class="legal">© <span id="year"></span> <span data-f="navn"></span> <span data-f="by"></span> · <span data-f="adresse"></span></p>
   </div>
 </footer>
 
-<nav class="dock" aria-label="Ring eller finn veien">
+<nav class="dock" aria-label="Ring eller finn veien" data-en-aria-label="Call or get directions">
   <a class="btn btn-primary js-tel" href="#">
     <svg class="phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>
-    Ring og bestill
+    <span data-en="Call to order">Ring og bestill</span>
   </a>
-  <a class="btn btn-line js-maps" href="#" target="_blank" rel="noopener">Kart</a>
+  <a class="btn btn-line js-maps" href="#" target="_blank" rel="noopener" data-en="Map">Kart</a>
 </nav>
 
 <script src="meny.js"></script>
@@ -506,6 +509,13 @@ const SITE = {
   ],
   tiderMerknad: "",
   sauser: [],                            // f.eks. [["Hvitløksdressing",0],["Mild",1],["Sterk",3]]
+  // Engelske tekster til feltene over. Mangler et felt her, vises den norske teksten.
+  en: {
+    overskrift: { linje1: "Kebab,", linje2: "pizza & burgers." },
+    ingress: "Hungry? Find your favourite on the menu. Give us a call and we will get your food ready.",
+    fakta: ["Kebab", "Pizza", "Flame-grilled burgers"],
+    tiderMerknad: ""
+  },
   // Allergenkoder som brukes i menyen under
   allergener: { G: "Gluten", SO: "Soya", M: "Melk", F: "Fisk", SE: "ikke oppgitt", H: "ikke oppgitt" },
   // Priser i kroner. To priser = liten / stor (krever storrelser på kategorien).
@@ -540,10 +550,120 @@ if (window.MENY_DATA) {
 const $ = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => Array.prototype.slice.call(r.querySelectorAll(s));
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const get = path => path.split(".").reduce((o,k) => o == null ? o : o[k], SITE);
+const pick = (obj, path) => path.split(".").reduce((o,k) => o == null ? o : o[k], obj);
+
+// ---------- Språk: norsk eller engelsk ----------
+// ?lang=en eller ?lang=no i adressen vinner, så det siste valget på denne enheten,
+// ellers nettleserens språk (norsk, svensk og dansk gir norsk, alt annet engelsk).
+const LANG = (() => {
+  let l = null;
+  try { const m = /[?&]lang=(en|no)\b/.exec(location.search); if (m) l = m[1]; } catch (e) {}
+  if (!l) try { l = localStorage.getItem("kc-lang"); } catch (e) {}
+  if (l !== "en" && l !== "no") {
+    const langs = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || "no"]).map(x => String(x).toLowerCase());
+    l = langs.some(x => /^(nb|nn|no|sv|da)\b/.test(x)) ? "no" : "en";
+  }
+  return l;
+})();
+const EN = LANG === "en";
+document.documentElement.lang = EN ? "en" : "no";
+const get = path => { const v = EN && SITE.en ? pick(SITE.en, path) : null; return v != null && v !== "" ? v : pick(SITE, path); };
+
+// Engelske navn og beskrivelser til menyen. Tekst som ikke står her, vises på norsk.
+const EN_WORDS = {
+  "Burgere": "Burgers", "Middag": "Dinner", "Tilbehør og drikke": "Sides and drinks",
+  "Liten": "Small", "Stor": "Large", "Medium": "Medium",
+  "Soya": "Soy", "Melk": "Milk", "Fisk": "Fish", "ikke oppgitt": "not specified",
+  "Kebab i pita": "Kebab in pita", "Kebab rull": "Kebab wrap", "Kebab tallerken": "Kebab plate",
+  "Kyllingkebab i pita": "Chicken kebab in pita", "Biffkebab i pita": "Beef kebab in pita",
+  "Kyllingrull": "Chicken wrap", "Biffrull": "Beef wrap",
+  "Kyllingkebab tallerken": "Chicken kebab plate", "Biffkebab tallerken": "Beef kebab plate",
+  "Biff pizza": "Beef pizza", "Lag din egen pizza": "Build your own pizza",
+  "Garlic brød": "Garlic bread", "Garlic brød med ost": "Garlic bread with cheese", "Garlic brød supreme": "Garlic bread supreme",
+  "Biffburger 200 g": "Beef burger 200 g", "Løvbiff burger": "Sliced beef burger", "Ost på burgeren": "Cheese on the burger",
+  "Biff snadder": "Beef snadder", "Kylling snadder": "Chicken snadder", "Løvstek tallerken": "Sliced steak plate",
+  "Nuggets og pommes": "Nuggets and fries", "Falafelrull": "Falafel wrap", "Falafeltallerken": "Falafel plate",
+  "Pommes frites": "French fries", "Pommes med salat og dressing": "Fries with salad and dressing",
+  "Pitabrød": "Pita bread", "Ekstra kjøtt i kebaben": "Extra meat in your kebab", "Ost i kebaben": "Cheese in your kebab",
+  "Ananas i kebaben": "Pineapple in your kebab", "Ekstra saus i beger": "Extra sauce in a cup",
+  "Drikke": "Drink", "Energidrikke": "Energy drink", "Drikke 1,5 l": "Drink 1.5 l",
+  "Tomatsaus og ost.": "Tomato sauce and cheese.",
+  "Tomatsaus, ost, marinert kylling, mais og fersk løk og paprika.": "Tomato sauce, cheese, marinated chicken, corn and fresh onion and bell pepper.",
+  "Tomatsaus, ost, marinert biff, sopp og fersk løk og paprika.": "Tomato sauce, cheese, marinated beef, mushrooms and fresh onion and bell pepper.",
+  "Tomatsaus, ost, kebabkjøtt, pommes frites og fersk paprika og champignon.": "Tomato sauce, cheese, kebab meat, fries and fresh bell pepper and mushrooms.",
+  "Tomatsaus, ost, tunfisk og mais.": "Tomato sauce, cheese, tuna and corn.",
+  "Tomatsaus, ost, pepperoni og fersk champignon.": "Tomato sauce, cheese, pepperoni and fresh mushrooms.",
+  "Tomatsaus, ost, mais, peppermix, oliven, ananas og fersk løk, paprika og champignon.": "Tomato sauce, cheese, corn, mixed peppers, olives, pineapple and fresh onion, bell pepper and mushrooms.",
+  "Chili-tomatsaus, ost, nachos chips, jalapeños, valgfritt kjøtt og løk.": "Chili tomato sauce, cheese, nacho chips, jalapeños, your choice of meat and onion.",
+  "Tomatsaus, ost og opptil 4 ingredienser.": "Tomato sauce, cheese and up to 4 toppings.",
+  "Barbecuesaus, ost, kylling eller biff, jalapeños og fersk løk.": "Barbecue sauce, cheese, chicken or beef, jalapeños and fresh onion.",
+  "Tomatsaus, ost, kylling, mais og ananas.": "Tomato sauce, cheese, chicken, corn and pineapple.",
+  "Tomatsaus, ost, kylling, biff, mais, jalapeños og fersk løk og champignon.": "Tomato sauce, cheese, chicken, beef, corn, jalapeños and fresh onion and mushrooms.",
+  "Hvitløkssmør.": "Garlic butter.", "Hvitløkssmør og ost.": "Garlic butter and cheese.",
+  "Hvitløkssmør, ost, fersk champignon og løk.": "Garlic butter, cheese, fresh mushrooms and onion.",
+  "Hjemmelaget.": "Homemade.", "19 kr i tillegg til burgeren.": "19 kr on top of the burger price.",
+  "Liten eller stor.": "Small or large."
+};
+const tr = s => (EN && s && Object.prototype.hasOwnProperty.call(EN_WORDS, s)) ? EN_WORDS[s] : s;
+
+// Faste tekster i siden og tekster som skriptet lager
+const T = EN ? {
+  days: ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
+  today: "Today", closed: "Closed",
+  openUntil: c => `Open now, closes at ${c}`,
+  opensToday: o => `Closed now, opens today at ${o}`,
+  opensTomorrow: o => `Closed now, opens tomorrow at ${o}`,
+  opensOn: (d, o) => `Closed now, opens ${d} at ${o}`,
+  dishes: n => n === 1 ? "1 dish" : n + " dishes",
+  contains: "Contains", allergens: "Allergens",
+  price: p => `Price: ${p} kroner`, priceSizes: (a, b) => `Price: ${a}, ${b}`, priceTwo: (a, b) => `Price: ${a} or ${b} kroner`,
+  noHits: q => `No dishes match <b>${q}</b>. Try another word, or give us a call.`,
+  strength: n => `Strength ${n} of 3`,
+  tags: { veg: "Vegetarian", pop: "Bestseller", hot: "Spicy" },
+  checking: "Checking opening hours…",
+  description: "Kebab Corner at Nedre Bankegate 6 in Halden: kebab, pizza and flame-grilled burgers. See the full menu with prices and allergens, and call to order."
+} : {
+  days: ["Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag","Søndag"],
+  today: "I dag", closed: "Stengt",
+  openUntil: c => `Åpent nå, stenger kl. ${c}`,
+  opensToday: o => `Stengt nå, åpner kl. ${o} i dag`,
+  opensTomorrow: o => `Stengt nå, åpner i morgen kl. ${o}`,
+  opensOn: (d, o) => `Stengt nå, åpner ${d.toLowerCase()} kl. ${o}`,
+  dishes: n => n === 1 ? "1 rett" : n + " retter",
+  contains: "Inneholder", allergens: "Allergener",
+  price: p => `Pris: ${p} kroner`, priceSizes: (a, b) => `Pris: ${a}, ${b}`, priceTwo: (a, b) => `Pris: ${a} eller ${b} kroner`,
+  noHits: q => `Ingen retter passer til <b>${q}</b>. Prøv et annet ord, eller ring oss.`,
+  strength: n => `Styrke ${n} av 3`,
+  tags: { veg: "Vegetar", pop: "Mest solgt", hot: "Sterk" },
+  checking: "Sjekker åpningstider…",
+  description: null
+};
+
+// Bytt de faste tekstene i HTML-en når siden vises på engelsk
+if (EN) {
+  $$("[data-en]").forEach(el => { el.innerHTML = el.getAttribute("data-en"); });
+  ["aria-label", "placeholder", "alt", "title"].forEach(a =>
+    $$("[data-en-" + a + "]").forEach(el => el.setAttribute(a, el.getAttribute("data-en-" + a))));
+  if (T.description) { const m = $('meta[name="description"]'); if (m) m.setAttribute("content", T.description); }
+  $("#status span").textContent = T.checking;
+}
+
+// Språkknappen er en vanlig lenke til den andre språkversjonen. Valget huskes, og siden
+// åpnes på samme sted som du var.
+(function langSwitch() {
+  const a = $("#lang"), other = EN ? "no" : "en";
+  a.href = "?lang=" + other + location.hash;
+  a.textContent = other.toUpperCase();
+  a.setAttribute("hreflang", other); a.setAttribute("lang", other);
+  a.setAttribute("aria-label", EN ? "Bytt til norsk" : "Switch to English");
+  a.addEventListener("click", () => {
+    try { localStorage.setItem("kc-lang", other); sessionStorage.setItem("kc-scroll", String(window.pageYOffset || 0)); } catch (e) {}
+  });
+  try { localStorage.setItem("kc-lang", LANG); } catch (e) {}
+})();
 const slug = s => s.toLowerCase().replace(/æ/g,"ae").replace(/ø/g,"o").replace(/å/g,"a").replace(/[^a-z0-9]+/g,"-");
-const DAGER = ["Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag","Søndag"];
-const TAGS = { veg: "Vegetar", pop: "Mest solgt", hot: "Sterk" };
+const DAGER = T.days;
+const TAGS = T.tags;
 
 // Tekstfelt
 $$("[data-f]").forEach(el => { const v = get(el.dataset.f); if (v != null) el.textContent = v; });
@@ -582,7 +702,7 @@ $$(".js-maps").forEach(a => a.href = "https://www.google.com/maps/search/?api=1&
 $("#map").src = "https://www.google.com/maps?q=" + q + "&output=embed";
 
 // Linjen over overskriften
-const fakta = SITE.fakta || [];
+const fakta = get("fakta") || [];
 $("#kicker").textContent = fakta.join("  ·  ");
 $("#kicker").hidden = !fakta.length;
 if (fakta.length) {
@@ -595,13 +715,13 @@ const ALL = SITE.allergener || {};
 const kjent = k => ALL[k] && ALL[k] !== "ikke oppgitt";
 const allergenNavn = k => kjent(k) ? ALL[k] : k;
 if (Object.keys(ALL).length) {
-  $("#legend").innerHTML = "<b>Allergener:</b> " + Object.keys(ALL).map(k => `${esc(k)} = ${esc(ALL[k])}`).join(", ") + ".";
+  $("#legend").innerHTML = "<b>" + T.allergens + ":</b> " + Object.keys(ALL).map(k => `${esc(k)} = ${esc(tr(ALL[k]))}`).join(", ") + ".";
   $("#legend").hidden = false;
 }
 
 // Meny (kategorier uten retter hoppes over)
 const kategorier = SITE.meny.filter(c => c.retter && c.retter.length);
-$("#chips").innerHTML = kategorier.map(c => `<a class="chip" href="#${slug(c.kategori)}">${esc(c.kategori)}</a>`).join("");
+$("#chips").innerHTML = kategorier.map(c => `<a class="chip" href="#${slug(c.kategori)}">${esc(tr(c.kategori))}</a>`).join("");
 $(".tabs").hidden = kategorier.length < 2;
 $("#menu").innerHTML = kategorier.map(c => {
   const items = c.retter.map(r => {
@@ -609,19 +729,22 @@ $("#menu").innerHTML = kategorier.map(c => {
     const pris = r.pris.length === 2
       ? `${r.pris[0]}<span class="sep">/</span>${r.pris[1]}<small>kr</small>`
       : `${r.pris[0]}<small>kr</small>`;
-    const label = r.pris.length === 2 ? `Pris: liten ${r.pris[0]} kroner, stor ${r.pris[1]} kroner` : `Pris: ${r.pris[0]} kroner`;
+    const sz = c.storrelser && c.storrelser.length === 2 ? c.storrelser.map(tr) : null;
+    const label = r.pris.length === 2
+      ? (sz ? T.priceSizes(`${sz[0]} ${r.pris[0]} kr`, `${sz[1]} ${r.pris[1]} kr`) : T.priceTwo(r.pris[0], r.pris[1]))
+      : T.price(r.pris[0]);
     const al = r.allergener || [];
-    const sok = esc([r.navn, r.tekst || "", c.kategori].join(" ").toLowerCase());
+    const sok = esc([r.navn, r.tekst || "", c.kategori, tr(r.navn), tr(r.tekst || ""), tr(c.kategori)].join(" ").toLowerCase());
     return `<li class="item" data-s="${sok}">
-      <div class="row"><span class="name">${esc(r.navn)}${tag}</span><span class="leader" aria-hidden="true"></span><span class="price" aria-label="${label}">${pris}</span></div>
-      ${r.tekst ? `<p class="desc">${esc(r.tekst)}</p>` : ""}
-      ${al.length ? `<p class="all">Inneholder <b>${al.map(k => esc(kjent(k) ? ALL[k].toLowerCase() : k)).join(", ")}</b></p>` : ""}
+      <div class="row"><span class="name">${esc(tr(r.navn))}${tag}</span><span class="leader" aria-hidden="true"></span><span class="price" aria-label="${label}">${pris}</span></div>
+      ${r.tekst ? `<p class="desc">${esc(tr(r.tekst))}</p>` : ""}
+      ${al.length ? `<p class="all">${T.contains} <b>${al.map(k => esc(kjent(k) ? tr(ALL[k]).toLowerCase() : k)).join(", ")}</b></p>` : ""}
     </li>`;
   }).join("");
-  const sizes = c.storrelser ? ` · ${c.storrelser.map(esc).join(" / ")}` : "";
+  const sizes = c.storrelser ? ` · ${c.storrelser.map(x => esc(tr(x))).join(" / ")}` : "";
   const n = c.retter.length;
   return `<div class="cat" id="${slug(c.kategori)}">
-    <div class="cat-head"><h3>${esc(c.kategori)}</h3><span class="count">${n} ${n === 1 ? "rett" : "retter"}${sizes}</span></div>
+    <div class="cat-head"><h3>${esc(tr(c.kategori))}</h3><span class="count">${T.dishes(n)}${sizes}</span></div>
     <ul class="items">${items}</ul>
   </div>`;
 }).join("");
@@ -630,7 +753,7 @@ $("#menu").innerHTML = kategorier.map(c => {
 const sauser = SITE.sauser || [];
 $("#sauce-box").hidden = !sauser.length;
 $("#sauces").innerHTML = sauser.map(([navn, styrke]) =>
-  `<li>${esc(navn)}<span class="heat" aria-label="Styrke ${styrke} av 3">${[1,2,3].map(i => `<b class="${i <= styrke ? "on" : ""}"></b>`).join("")}</span></li>`
+  `<li>${esc(navn)}<span class="heat" aria-label="${T.strength(styrke)}">${[1,2,3].map(i => `<b class="${i <= styrke ? "on" : ""}"></b>`).join("")}</span></li>`
 ).join("");
 
 // Åpningstider og "åpent nå" (norsk tid)
@@ -653,20 +776,20 @@ function span(i) { // [åpner, stenger] i minutter fra dagens start; stenger kan
 function status() {
   const { day, t } = osloNow();
   const y = span((day + 6) % 7);
-  if (y && t + 1440 < y[1]) return { open: true, text: `Åpent nå, stenger kl. ${SITE.tider[(day+6)%7][1]}` };
+  if (y && t + 1440 < y[1]) return { open: true, text: T.openUntil(SITE.tider[(day+6)%7][1]) };
   const s = span(day);
-  if (s && t >= s[0] && t < s[1]) return { open: true, text: `Åpent nå, stenger kl. ${SITE.tider[day][1]}` };
-  if (s && t < s[0]) return { open: false, text: `Stengt nå, åpner kl. ${SITE.tider[day][0]} i dag` };
+  if (s && t >= s[0] && t < s[1]) return { open: true, text: T.openUntil(SITE.tider[day][1]) };
+  if (s && t < s[0]) return { open: false, text: T.opensToday(SITE.tider[day][0]) };
   for (let k = 1; k <= 7; k++) {
     const i = (day + k) % 7;
-    if (SITE.tider[i]) return { open: false, text: `Stengt nå, åpner ${k === 1 ? "i morgen" : DAGER[i].toLowerCase()} kl. ${SITE.tider[i][0]}` };
+    if (SITE.tider[i]) return { open: false, text: k === 1 ? T.opensTomorrow(SITE.tider[i][0]) : T.opensOn(DAGER[i], SITE.tider[i][0]) };
   }
-  return { open: false, text: "Stengt" };
+  return { open: false, text: T.closed };
 }
 function renderHours() {
   const { day } = osloNow();
   $("#hours").innerHTML = SITE.tider.map((d, i) =>
-    `<tr class="${i === day ? "today" : ""}"><th scope="row">${DAGER[i]}</th>${d ? `<td>${d[0]} – ${d[1]}</td>` : `<td>Stengt</td>`}</tr>`
+    `<tr class="${i === day ? "today" : ""}"><th scope="row" data-today="${T.today}">${DAGER[i]}</th>${d ? `<td>${d[0]} – ${d[1]}</td>` : `<td>${T.closed}</td>`}</tr>`
   ).join("");
   const s = status(), el = $("#status");
   el.className = "status " + (s.open ? "open" : "closed");
@@ -724,7 +847,7 @@ qEl.addEventListener("input", () => {
   });
   const nh = $("#no-hits");
   nh.hidden = hits > 0;
-  if (!hits) nh.innerHTML = `Ingen retter passer til <b>${esc(qEl.value.trim())}</b>. Prøv et annet ord, eller ring oss.`;
+  if (!hits) nh.innerHTML = T.noHits(esc(qEl.value.trim()));
   $(".tabs").hidden = !!term || chips.length < 2;
 });
 
@@ -756,6 +879,15 @@ function onScroll() {
   if (motion && window.innerWidth > 860) heroImg.style.setProperty("--py", Math.min(y * 0.12, 90) + "px");
 }
 window.addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(onScroll); } }, { passive: true });
+try {
+  const y0 = sessionStorage.getItem("kc-scroll");
+  if (y0) {
+    sessionStorage.removeItem("kc-scroll");
+    const go = () => window.scrollTo({ top: +y0, behavior: "instant" });
+    go(); // med en gang, og igjen når bilder og skrifter har gitt siden full høyde
+    if (document.readyState !== "complete") window.addEventListener("load", go, { once: true });
+  }
+} catch (e) {}
 onScroll();
 
 // Svake glør bak teksten i toppen (WebGL).
