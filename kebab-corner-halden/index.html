@@ -322,7 +322,7 @@ footer .legal{flex-basis:100%;padding-top:1.5rem;border-top:1px solid var(--line
 
 <aside class="demo" id="demo" aria-label="Utkast" hidden>
   <div class="wrap">
-    <span><b>Utkast.</b> Åpningstider og resten av menyen mangler. Logo og bilde er klippet fra skjermbilder.</span>
+    <span><b>Utkast.</b> Resten av menyen mangler. Logo og bilde er klippet fra skjermbilder.</span>
     <button type="button" id="demo-close">Skjul</button>
   </div>
 </aside>
@@ -500,7 +500,10 @@ const SITE = {
   tilbud: null,                          // f.eks. { tittel: "Kebab i pita + brus", pris: 129, merknad: "Hele dagen" }
   // Åpningstider, mandag til søndag. null = ikke vist. Stengetid etter midnatt er lov (f.eks. "03:00").
   // Eksempel: tider: [["11:00","23:00"], ["11:00","23:00"], ["11:00","23:00"], ["11:00","23:00"], ["11:00","03:00"], ["12:00","03:00"], ["13:00","23:00"]],
-  tider: null,
+  tider: [
+    ["12:00","22:00"], ["12:00","22:00"], ["12:00","22:00"], ["12:00","22:00"],
+    ["12:00","23:00"], ["12:00","23:00"], ["12:00","22:00"]
+  ],
   tiderMerknad: "",
   sauser: [],                            // f.eks. [["Hvitløksdressing",0],["Mild",1],["Sterk",3]]
   // Allergenkoder som brukes i menyen under
