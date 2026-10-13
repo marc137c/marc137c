@@ -10,7 +10,7 @@ const MAX_CHARS = 1000;
 
 // Holdes uendret mellom forespørsler. Oppdater når ekte priser/adresse er på plass.
 const SYSTEM = `Du er stilrådgiveren på nettsiden til Viggo's Barbershop, en herrefrisør.
-Svar alltid på norsk, kort og vennlig (maks 4–5 setninger), som en erfaren barberer ville gjort.
+Svar på samme språk som kunden skriver på (norsk eller engelsk), kort og vennlig (maks 4–5 setninger), som en erfaren barberer ville gjort.
 Hjelp kunden å finne en klipp eller skjeggstil som passer ansiktsform, hårtype og livsstil, og anbefal en konkret tjeneste fra listen.
 Avslutt gjerne med å foreslå at de bestiller time via skjemaet på siden eller ringer.
 Hold deg til hår, skjegg, stell og barbershopen. Er spørsmålet utenfor dette, si høflig at du bare kan hjelpe med det.
@@ -49,9 +49,9 @@ function validate(messages) {
 export default async (req) => {
   if (req.method !== "POST") return json(405, { error: "Bruk POST." });
 
-  let messages;
+  let messages, lang;
   try {
-    ({ messages } = await req.json());
+    ({ messages, lang } = await req.json());
   } catch {
     return json(400, { error: "Ugyldig forespørsel." });
   }
@@ -70,7 +70,11 @@ export default async (req) => {
     });
 
     if (response.stop_reason === "refusal") {
-      return json(200, { reply: "Det kan jeg dessverre ikke hjelpe med. Spør meg gjerne om klipp, skjegg eller stell!" });
+      return json(200, {
+        reply: lang === "en"
+          ? "Sorry, I can't help with that. Feel free to ask me about haircuts, beards or grooming!"
+          : "Det kan jeg dessverre ikke hjelpe med. Spør meg gjerne om klipp, skjegg eller stell!",
+      });
     }
 
     const reply = response.content
@@ -79,7 +83,8 @@ export default async (req) => {
       .join("")
       .trim();
 
-    return json(200, { reply: reply || "Beklager, jeg fikk ikke til å svare. Prøv igjen?" });
+    if (!reply) return json(502, { error: "Tomt svar." });
+    return json(200, { reply });
   } catch (error) {
     if (error instanceof Anthropic.RateLimitError) {
       return json(429, { error: "Mange spør nå – prøv igjen om litt." });

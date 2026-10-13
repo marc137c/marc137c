@@ -88,6 +88,16 @@ p { margin: 0 0 1em; }
 .nav-menu { display: flex; align-items: center; gap: 28px; }
 .nav-menu a:not(.btn) { color: var(--muted); font-weight: 500; }
 .nav-menu a:not(.btn):hover { color: var(--text); }
+.nav-menu { order: 1; margin-left: auto; }
+.lang-toggle {
+  order: 2; margin-left: 18px;
+  background: transparent; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 6px 12px; font: 600 .8rem var(--sans); letter-spacing: .08em; cursor: pointer;
+  transition: color .2s, border-color .2s;
+}
+.lang-toggle:hover { color: var(--gold); border-color: var(--gold); }
+.nav-toggle { order: 3; }
 .nav-toggle { display: none; background: none; border: 0; padding: 8px; cursor: pointer; }
 .nav-toggle span { display: block; width: 24px; height: 2px; background: var(--text); margin: 5px 0; transition: transform .3s, opacity .3s; }
 .nav-toggle[aria-expanded="true"] span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
@@ -255,6 +265,7 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 }
 @media (max-width: 760px) {
   .nav-toggle { display: block; }
+  .lang-toggle { margin-left: auto; margin-right: 8px; }
   .nav-menu {
     position: absolute; top: 68px; left: 0; right: 0;
     flex-direction: column; align-items: stretch; gap: 0;
@@ -320,4 +331,8 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 @media (max-width: 480px) {
   .chat-panel { right: 0; bottom: 0; width: 100vw; height: 100dvh; border-radius: 0; }
   .chat-fab { right: 16px; bottom: 16px; }
+}
+@media (max-width: 420px) {
+  .trust-badge { font-size: .78rem; gap: 8px; padding: 7px 14px; white-space: nowrap; }
+  .trust-badge .stars { letter-spacing: 1px; }
 }

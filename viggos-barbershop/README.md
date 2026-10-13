@@ -23,3 +23,13 @@ Oppsett i Netlify → **Site configuration → Environment variables**:
 - `CLAUDE_MODEL` – valgfri, standard er `claude-fable-5-1`. Sett f.eks. `claude-haiku-5-5` for en mye billigere modell.
 
 Priser, åpningstider og regler for assistenten står i `SYSTEM`-teksten øverst i `chat.mjs` – oppdater den sammen med nettsiden.
+
+## Språk (norsk / English)
+Siden finnes på norsk og engelsk. Knappen **EN/NO** i menyen bytter språk, og valget huskes.
+Besøkende med nettleser på norsk får norsk, alle andre får engelsk. Lenke direkte til en versjon med `?lang=en` eller `?lang=no`.
+
+- Norsk tekst står i `index.html`. Engelsk tekst står i `EN` i `i18n.js` (samme nøkkel som `data-i18n` i HTML-en).
+- Endrer du en tekst på norsk, oppdater den engelske også.
+- Tekster som lages av JavaScript (åpent/stengt, skjemameldinger, chat) står i `STRINGS` i `i18n.js`.
+- Bookingskjemaet sender alltid tjenestenavnet på norsk, så forespørslene i Netlify blir like uansett språk.
+- AI-stilrådgiveren svarer på samme språk som kunden skriver på.

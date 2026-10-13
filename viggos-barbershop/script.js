@@ -9,8 +9,6 @@ const HOURS = {
   5: [600, 1080],
   6: [600, 960],
 };
-const DAY_NAMES = ["søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"];
-
 const fmt = (min) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
 
 // Mobilmeny
@@ -19,13 +17,13 @@ const menu = document.getElementById("nav-menu");
 toggle.addEventListener("click", () => {
   const open = toggle.getAttribute("aria-expanded") === "true";
   toggle.setAttribute("aria-expanded", String(!open));
-  toggle.setAttribute("aria-label", open ? "Åpne meny" : "Lukk meny");
+  toggle.setAttribute("aria-label", open ? I18N.s().menuOpen : I18N.s().menuClose);
   menu.classList.toggle("open", !open);
 });
 menu.addEventListener("click", (e) => {
   if (e.target.closest("a")) {
     toggle.setAttribute("aria-expanded", "false");
-    toggle.setAttribute("aria-label", "Åpne meny");
+    toggle.setAttribute("aria-label", I18N.s().menuOpen);
     menu.classList.remove("open");
   }
 });
@@ -43,6 +41,7 @@ function updateStatus() {
   const minutes = now.getHours() * 60 + now.getMinutes();
   const today = HOURS[day];
   const el = document.getElementById("open-status");
+  const s = I18N.s();
 
   document.querySelectorAll("#hours-table tr").forEach((tr) => {
     tr.classList.toggle("today", Number(tr.dataset.day) === day);
@@ -50,25 +49,28 @@ function updateStatus() {
 
   if (today && minutes >= today[0] && minutes < today[1]) {
     el.className = "status open";
-    el.textContent = `Åpent nå – stenger kl. ${fmt(today[1])}`;
+    el.textContent = s.openNow(fmt(today[1]));
     return;
   }
   el.className = "status closed";
   if (today && minutes < today[0]) {
-    el.textContent = `Stengt nå – åpner i dag kl. ${fmt(today[0])}`;
+    el.textContent = s.opensToday(fmt(today[0]));
     return;
   }
   for (let i = 1; i <= 7; i++) {
     const d = (day + i) % 7;
     if (HOURS[d]) {
-      const when = i === 1 ? "i morgen" : DAY_NAMES[d];
-      el.textContent = `Stengt nå – åpner ${when} kl. ${fmt(HOURS[d][0])}`;
+      el.textContent = s.opensOn(i === 1 ? s.tomorrow : s.days[d], fmt(HOURS[d][0]));
       return;
     }
   }
 }
 updateStatus();
 setInterval(updateStatus, 60_000);
+I18N.onChange(() => {
+  updateStatus();
+  toggle.setAttribute("aria-label", toggle.getAttribute("aria-expanded") === "true" ? I18N.s().menuClose : I18N.s().menuOpen);
+});
 
 // Filtrering av tjenester
 const tabs = document.querySelectorAll(".tabs button");
@@ -97,20 +99,20 @@ form.addEventListener("submit", async (e) => {
   const hours = HOURS[day];
   if (!hours) {
     msg.className = "form-msg err";
-    msg.textContent = "Vi har stengt på søndager. Velg en annen dag.";
+    msg.textContent = I18N.s().sundayClosed;
     return;
   }
   const [hh, mm] = form.tid.value.split(":").map(Number);
   const t = hh * 60 + mm;
   if (t < hours[0] || t >= hours[1]) {
     msg.className = "form-msg err";
-    msg.textContent = `Den dagen har vi åpent ${fmt(hours[0])}–${fmt(hours[1])}.`;
+    msg.textContent = I18N.s().openBetween(fmt(hours[0]), fmt(hours[1]));
     return;
   }
 
   const btn = form.querySelector("button[type=submit]");
   btn.disabled = true;
-  msg.textContent = "Sender …";
+  msg.textContent = I18N.s().sending;
   try {
     const res = await fetch("/", {
       method: "POST",
@@ -120,10 +122,10 @@ form.addEventListener("submit", async (e) => {
     if (!res.ok) throw new Error(res.status);
     form.reset();
     msg.className = "form-msg ok";
-    msg.textContent = "Takk! Vi tar kontakt for å bekrefte timen.";
+    msg.textContent = I18N.s().sent;
   } catch {
     msg.className = "form-msg err";
-    msg.textContent = "Noe gikk galt. Ring oss gjerne i stedet.";
+    msg.textContent = I18N.s().sendFailed;
   } finally {
     btn.disabled = false;
   }
@@ -190,22 +192,22 @@ async function ask(text) {
 
   const btn = chat.form.querySelector("button");
   btn.disabled = chat.input.disabled = true;
-  const typing = addMsg("Tenker", "bot typing");
+  const typing = addMsg(I18N.s().thinking, "bot typing");
   try {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: history }),
+      body: JSON.stringify({ messages: history, lang: I18N.lang }),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.reply) throw new Error(data.error || "Noe gikk galt.");
+    if (!res.ok || !data.reply) throw new Error(res.status === 429 ? "busy" : "down");
     typing.remove();
     addMsg(data.reply, "bot");
     history.push({ role: "assistant", content: data.reply });
   } catch (err) {
     typing.remove();
     history.pop(); // fjern spørsmålet så samtalen fortsatt veksler bruker/assistent
-    addMsg(err.message || "Noe gikk galt. Prøv igjen.", "bot err");
+    addMsg(err.message === "busy" ? I18N.s().chatBusy : I18N.s().chatDown, "bot err"); // også ved nettverksfeil
   } finally {
     btn.disabled = chat.input.disabled = false;
     chat.input.focus();

@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Viggo's Barbershop – Klipp, skjegg og barbering</title>
-  <meta name="description" content="Viggo's Barbershop – klassisk herreklipp, skjeggtrim og varm håndklebarbering. Book time i dag.">
+  <title data-i18n="meta.title">Viggo's Barbershop – Klipp, skjegg og barbering</title>
+  <meta name="description" data-i18n-attr="content:meta.desc" content="Viggo's Barbershop – klassisk herreklipp, skjeggtrim og varm håndklebarbering. Book time i dag.">
   <meta name="theme-color" content="#14110f">
   <meta property="og:title" content="Viggo's Barbershop">
   <meta property="og:description" content="Klassisk herreklipp, skjeggtrim og varm håndklebarbering.">
@@ -13,23 +13,24 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <a class="skip" href="#main">Hopp til innhold</a>
+  <a class="skip" href="#main" data-i18n="skip">Hopp til innhold</a>
 
   <header class="site-header" id="top">
     <div class="container nav">
-      <a class="brand" href="#top" aria-label="Viggo's Barbershop – til toppen">
+      <a class="brand" href="#top" data-i18n-attr="aria-label:brand.label" aria-label="Viggo's Barbershop – til toppen">
         <span class="brand-mark" aria-hidden="true">V</span>
         <span class="brand-text">Viggo's <em>Barbershop</em></span>
       </a>
+      <button class="lang-toggle" id="lang-toggle" type="button" lang="en" aria-label="Switch to English">EN</button>
       <button class="nav-toggle" aria-expanded="false" aria-controls="nav-menu" aria-label="Åpne meny">
         <span></span><span></span><span></span>
       </button>
-      <nav id="nav-menu" class="nav-menu" aria-label="Hovedmeny">
-        <a href="#tjenester">Tjenester</a>
-        <a href="#om">Om oss</a>
-        <a href="#apningstider">Åpningstider</a>
-        <a href="#kontakt">Kontakt</a>
-        <a class="btn btn-small" href="#bestill">Bestill time</a>
+      <nav id="nav-menu" class="nav-menu" data-i18n-attr="aria-label:nav.label" aria-label="Hovedmeny">
+        <a href="#tjenester" data-i18n="nav.services">Tjenester</a>
+        <a href="#om" data-i18n="nav.about">Om oss</a>
+        <a href="#apningstider" data-i18n="nav.hours">Åpningstider</a>
+        <a href="#kontakt" data-i18n="nav.contact">Kontakt</a>
+        <a class="btn btn-small" href="#bestill" data-i18n="cta.book">Bestill time</a>
       </nav>
     </div>
   </header>
@@ -42,36 +43,36 @@
       <div class="container hero-inner">
         <p class="trust-badge anim" style="--d:0s">
           <span class="stars" aria-hidden="true">★★★★★</span>
-          4,9 på Google · 5 000+ kunder
+          <span data-i18n="hero.badge">4,9 på Google · 5 000+ kunder</span>
         </p>
         <h1>
-          <span class="line anim" style="--d:.15s">Skarp klipp.</span>
-          <span class="line accent anim" style="--d:.35s">Rolig stol.</span>
+          <span class="line anim" style="--d:.15s" data-i18n="hero.l1">Skarp klipp.</span>
+          <span class="line accent anim" style="--d:.35s" data-i18n="hero.l2">Rolig stol.</span>
         </h1>
-        <p class="lead anim" style="--d:.55s">Klassisk barberhåndverk med moderne presisjon. Kom innom for fade, skjeggtrim eller en varm håndklebarbering – og gå ut som en bedre versjon av deg selv.</p>
+        <p class="lead anim" style="--d:.55s" data-i18n="hero.lead">Klassisk barberhåndverk med moderne presisjon. Kom innom for fade, skjeggtrim eller en varm håndklebarbering – og gå ut som en bedre versjon av deg selv.</p>
         <div class="hero-cta anim" style="--d:.75s">
-          <a class="btn" href="#bestill">Bestill time</a>
-          <a class="btn btn-ghost" href="#tjenester">Se priser</a>
-          <button class="btn btn-ghost" type="button" data-open-chat>✂ Finn din stil med AI</button>
+          <a class="btn" href="#bestill" data-i18n="cta.book">Bestill time</a>
+          <a class="btn btn-ghost" href="#tjenester" data-i18n="cta.prices">Se priser</a>
+          <button class="btn btn-ghost" type="button" data-open-chat data-i18n="cta.ai">✂ Finn din stil med AI</button>
         </div>
         <p class="status anim" style="--d:.9s" id="open-status" aria-live="polite"></p>
       </div>
     </section>
 
     <!-- HIGHLIGHTS -->
-    <section class="highlights" aria-label="Hvorfor velge oss">
+    <section class="highlights" data-i18n-attr="aria-label:hl.label" aria-label="Hvorfor velge oss">
       <div class="container grid-3">
         <div class="highlight">
-          <h3>Erfarne barberere</h3>
-          <p>Over 10 års erfaring med alt fra klassisk saksklipp til skarpe skin fades.</p>
+          <h3 data-i18n="hl.1t">Erfarne barberere</h3>
+          <p data-i18n="hl.1p">Over 10 års erfaring med alt fra klassisk saksklipp til skarpe skin fades.</p>
         </div>
         <div class="highlight">
-          <h3>Ingen stress</h3>
-          <p>Vi setter av god tid til hver kunde. Kaffe eller vann venter mens du sitter.</p>
+          <h3 data-i18n="hl.2t">Ingen stress</h3>
+          <p data-i18n="hl.2p">Vi setter av god tid til hver kunde. Kaffe eller vann venter mens du sitter.</p>
         </div>
         <div class="highlight">
-          <h3>Kvalitetsprodukter</h3>
-          <p>Vi bruker og selger profesjonelle produkter for hår og skjegg.</p>
+          <h3 data-i18n="hl.3t">Kvalitetsprodukter</h3>
+          <p data-i18n="hl.3p">Vi bruker og selger profesjonelle produkter for hår og skjegg.</p>
         </div>
       </div>
     </section>
@@ -80,26 +81,26 @@
     <section class="section" id="tjenester">
       <div class="container">
         <header class="section-head">
-          <p class="eyebrow">Tjenester &amp; priser</p>
-          <h2>Hva kan vi gjøre for deg?</h2>
+          <p class="eyebrow" data-i18n="svc.eyebrow">Tjenester &amp; priser</p>
+          <h2 data-i18n="svc.title">Hva kan vi gjøre for deg?</h2>
         </header>
 
-        <div class="tabs" role="tablist" aria-label="Kategorier">
-          <button role="tab" aria-selected="true" data-filter="alle">Alle</button>
-          <button role="tab" aria-selected="false" data-filter="har">Hår</button>
-          <button role="tab" aria-selected="false" data-filter="skjegg">Skjegg</button>
-          <button role="tab" aria-selected="false" data-filter="pakke">Pakker</button>
+        <div class="tabs" role="tablist" data-i18n-attr="aria-label:svc.cats" aria-label="Kategorier">
+          <button role="tab" aria-selected="true" data-filter="alle" data-i18n="tab.all">Alle</button>
+          <button role="tab" aria-selected="false" data-filter="har" data-i18n="tab.hair">Hår</button>
+          <button role="tab" aria-selected="false" data-filter="skjegg" data-i18n="tab.beard">Skjegg</button>
+          <button role="tab" aria-selected="false" data-filter="pakke" data-i18n="tab.pkg">Pakker</button>
         </div>
 
         <ul class="price-list">
-          <li data-cat="har"><div><h3>Herreklipp</h3><p>Klipp med saks og/eller maskin, vask og styling.</p></div><span class="dots" aria-hidden="true"></span><span class="price">450,-</span></li>
-          <li data-cat="har"><div><h3>Skin fade</h3><p>Presis fade helt ned til huden, med detaljert overgang.</p></div><span class="dots" aria-hidden="true"></span><span class="price">500,-</span></li>
-          <li data-cat="har"><div><h3>Barneklipp</h3><p>For gutter under 12 år.</p></div><span class="dots" aria-hidden="true"></span><span class="price">300,-</span></li>
-          <li data-cat="har"><div><h3>Maskinklipp</h3><p>Én lengde over hele hodet.</p></div><span class="dots" aria-hidden="true"></span><span class="price">250,-</span></li>
-          <li data-cat="skjegg"><div><h3>Skjeggtrim</h3><p>Forming, trim og skarpe linjer med kniv.</p></div><span class="dots" aria-hidden="true"></span><span class="price">300,-</span></li>
-          <li data-cat="skjegg"><div><h3>Varm håndklebarbering</h3><p>Tradisjonell barbering med kniv, varme håndklær og balm.</p></div><span class="dots" aria-hidden="true"></span><span class="price">400,-</span></li>
-          <li data-cat="pakke"><div><h3>Klipp + skjegg</h3><p>Vår mest populære kombo.</p></div><span class="dots" aria-hidden="true"></span><span class="price">700,-</span></li>
-          <li data-cat="pakke"><div><h3>Viggo's Deluxe</h3><p>Klipp, skjegg, varmt håndkle, ansiktsmaske og styling.</p></div><span class="dots" aria-hidden="true"></span><span class="price">950,-</span></li>
+          <li data-cat="har"><div><h3 data-i18n="s.cut">Herreklipp</h3><p data-i18n="s.cut.d">Klipp med saks og/eller maskin, vask og styling.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="450">450,-</span></li>
+          <li data-cat="har"><div><h3 data-i18n="s.fade">Skin fade</h3><p data-i18n="s.fade.d">Presis fade helt ned til huden, med detaljert overgang.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="500">500,-</span></li>
+          <li data-cat="har"><div><h3 data-i18n="s.kids">Barneklipp</h3><p data-i18n="s.kids.d">For gutter under 12 år.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="300">300,-</span></li>
+          <li data-cat="har"><div><h3 data-i18n="s.clip">Maskinklipp</h3><p data-i18n="s.clip.d">Én lengde over hele hodet.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="250">250,-</span></li>
+          <li data-cat="skjegg"><div><h3 data-i18n="s.beard">Skjeggtrim</h3><p data-i18n="s.beard.d">Forming, trim og skarpe linjer med kniv.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="300">300,-</span></li>
+          <li data-cat="skjegg"><div><h3 data-i18n="s.shave">Varm håndklebarbering</h3><p data-i18n="s.shave.d">Tradisjonell barbering med kniv, varme håndklær og balm.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="400">400,-</span></li>
+          <li data-cat="pakke"><div><h3 data-i18n="s.combo">Klipp + skjegg</h3><p data-i18n="s.combo.d">Vår mest populære kombo.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="700">700,-</span></li>
+          <li data-cat="pakke"><div><h3 data-i18n="s.deluxe">Viggo's Deluxe</h3><p data-i18n="s.deluxe.d">Klipp, skjegg, varmt håndkle, ansiktsmaske og styling.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="950">950,-</span></li>
         </ul>
       </div>
     </section>
@@ -121,14 +122,14 @@
           </div>
         </div>
         <div>
-          <p class="eyebrow">Om oss</p>
-          <h2>Et sted for gode samtaler og skarpe linjer</h2>
-          <p>Viggo's Barbershop startet med en enkel idé: en barbershop der du blir sett, hørt og klippet ordentlig. Vi kombinerer gammeldags service med teknikker fra dagens beste barbere.</p>
-          <p>Enten du vil ha en ren klassisk klipp, en moderne fade eller bare vil få skjegget i form – vi tar oss tid til å finne stilen som passer deg.</p>
+          <p class="eyebrow" data-i18n="about.eyebrow">Om oss</p>
+          <h2 data-i18n="about.title">Et sted for gode samtaler og skarpe linjer</h2>
+          <p data-i18n="about.p1">Viggo's Barbershop startet med en enkel idé: en barbershop der du blir sett, hørt og klippet ordentlig. Vi kombinerer gammeldags service med teknikker fra dagens beste barbere.</p>
+          <p data-i18n="about.p2">Enten du vil ha en ren klassisk klipp, en moderne fade eller bare vil få skjegget i form – vi tar oss tid til å finne stilen som passer deg.</p>
           <dl class="stats">
-            <div><dt>10+</dt><dd>års erfaring</dd></div>
-            <div><dt>5 000+</dt><dd>fornøyde kunder</dd></div>
-            <div><dt>4,9★</dt><dd>snittvurdering</dd></div>
+            <div><dt>10+</dt><dd data-i18n="stat.years">års erfaring</dd></div>
+            <div><dt>5 000+</dt><dd data-i18n="stat.customers">fornøyde kunder</dd></div>
+            <div><dt>4,9★</dt><dd data-i18n="stat.rating">snittvurdering</dd></div>
           </dl>
         </div>
       </div>
@@ -138,20 +139,20 @@
     <section class="section" aria-labelledby="omtaler">
       <div class="container">
         <header class="section-head">
-          <p class="eyebrow">Omtaler</p>
-          <h2 id="omtaler">Hva kundene sier</h2>
+          <p class="eyebrow" data-i18n="rev.eyebrow">Omtaler</p>
+          <h2 id="omtaler" data-i18n="rev.title">Hva kundene sier</h2>
         </header>
         <div class="grid-3">
           <figure class="review">
-            <blockquote>«Beste fade jeg har hatt. Rolig stemning og ekte fagfolk.»</blockquote>
+            <blockquote data-i18n="rev.1">«Beste fade jeg har hatt. Rolig stemning og ekte fagfolk.»</blockquote>
             <figcaption>— Kunde, Google</figcaption>
           </figure>
           <figure class="review">
-            <blockquote>«Varm håndklebarbering var en helt ny opplevelse. Kommer garantert tilbake.»</blockquote>
+            <blockquote data-i18n="rev.2">«Varm håndklebarbering var en helt ny opplevelse. Kommer garantert tilbake.»</blockquote>
             <figcaption>— Kunde, Google</figcaption>
           </figure>
           <figure class="review">
-            <blockquote>«Alltid presis, alltid hyggelig. Sønnen min elsker å klippe seg her.»</blockquote>
+            <blockquote data-i18n="rev.3">«Alltid presis, alltid hyggelig. Sønnen min elsker å klippe seg her.»</blockquote>
             <figcaption>— Kunde, Google</figcaption>
           </figure>
         </div>
@@ -162,59 +163,59 @@
     <section class="section section-alt" id="apningstider">
       <div class="container split">
         <div>
-          <p class="eyebrow">Åpningstider</p>
-          <h2>Når kan du komme?</h2>
+          <p class="eyebrow" data-i18n="hours.eyebrow">Åpningstider</p>
+          <h2 data-i18n="hours.title">Når kan du komme?</h2>
           <table class="hours" id="hours-table">
             <tbody>
-              <tr data-day="1"><th>Mandag</th><td>10:00 – 18:00</td></tr>
-              <tr data-day="2"><th>Tirsdag</th><td>10:00 – 18:00</td></tr>
-              <tr data-day="3"><th>Onsdag</th><td>10:00 – 18:00</td></tr>
-              <tr data-day="4"><th>Torsdag</th><td>10:00 – 20:00</td></tr>
-              <tr data-day="5"><th>Fredag</th><td>10:00 – 18:00</td></tr>
-              <tr data-day="6"><th>Lørdag</th><td>10:00 – 16:00</td></tr>
-              <tr data-day="0"><th>Søndag</th><td>Stengt</td></tr>
+              <tr data-day="1"><th data-i18n="day.1">Mandag</th><td>10:00 – 18:00</td></tr>
+              <tr data-day="2"><th data-i18n="day.2">Tirsdag</th><td>10:00 – 18:00</td></tr>
+              <tr data-day="3"><th data-i18n="day.3">Onsdag</th><td>10:00 – 18:00</td></tr>
+              <tr data-day="4"><th data-i18n="day.4">Torsdag</th><td>10:00 – 20:00</td></tr>
+              <tr data-day="5"><th data-i18n="day.5">Fredag</th><td>10:00 – 18:00</td></tr>
+              <tr data-day="6"><th data-i18n="day.6">Lørdag</th><td>10:00 – 16:00</td></tr>
+              <tr data-day="0"><th data-i18n="day.0">Søndag</th><td data-i18n="closed">Stengt</td></tr>
             </tbody>
           </table>
-          <p class="note">Drop-in tas imot når det er ledig, men vi anbefaler å bestille time.</p>
+          <p class="note" data-i18n="hours.note">Drop-in tas imot når det er ledig, men vi anbefaler å bestille time.</p>
         </div>
 
         <div class="booking" id="bestill">
-          <h2>Bestill time</h2>
-          <p>Ring oss eller send en forespørsel, så bekrefter vi timen så fort vi kan.</p>
+          <h2 data-i18n="book.title">Bestill time</h2>
+          <p data-i18n="book.lead">Ring oss eller send en forespørsel, så bekrefter vi timen så fort vi kan.</p>
           <form id="booking-form" name="booking" method="POST" data-netlify="true" netlify-honeypot="bot-field">
             <input type="hidden" name="form-name" value="booking">
             <p class="hidden"><label>Ikke fyll ut: <input name="bot-field"></label></p>
-            <label>Navn
+            <label><span data-i18n="f.name">Navn</span>
               <input name="navn" required autocomplete="name">
             </label>
-            <label>Telefon
+            <label><span data-i18n="f.phone">Telefon</span>
               <input name="telefon" type="tel" required autocomplete="tel" inputmode="tel">
             </label>
-            <label>Tjeneste
+            <label><span data-i18n="f.service">Tjeneste</span>
               <select name="tjeneste" required>
-                <option value="">Velg tjeneste</option>
-                <option>Herreklipp</option>
-                <option>Skin fade</option>
-                <option>Barneklipp</option>
-                <option>Maskinklipp</option>
-                <option>Skjeggtrim</option>
-                <option>Varm håndklebarbering</option>
-                <option>Klipp + skjegg</option>
-                <option>Viggo's Deluxe</option>
+                <option value="" data-i18n="f.choose">Velg tjeneste</option>
+                <option value="Herreklipp" data-i18n="s.cut">Herreklipp</option>
+                <option value="Skin fade" data-i18n="s.fade">Skin fade</option>
+                <option value="Barneklipp" data-i18n="s.kids">Barneklipp</option>
+                <option value="Maskinklipp" data-i18n="s.clip">Maskinklipp</option>
+                <option value="Skjeggtrim" data-i18n="s.beard">Skjeggtrim</option>
+                <option value="Varm håndklebarbering" data-i18n="s.shave">Varm håndklebarbering</option>
+                <option value="Klipp + skjegg" data-i18n="s.combo">Klipp + skjegg</option>
+                <option value="Viggo's Deluxe" data-i18n="s.deluxe">Viggo's Deluxe</option>
               </select>
             </label>
             <div class="row">
-              <label>Dato
+              <label><span data-i18n="f.date">Dato</span>
                 <input name="dato" type="date" required id="booking-date">
               </label>
-              <label>Ønsket tid
+              <label><span data-i18n="f.time">Ønsket tid</span>
                 <input name="tid" type="time" min="10:00" max="19:30" step="900" required>
               </label>
             </div>
-            <button class="btn btn-block" type="submit">Send forespørsel</button>
+            <button class="btn btn-block" type="submit" data-i18n="f.submit">Send forespørsel</button>
             <p class="form-msg" id="form-msg" role="status"></p>
           </form>
-          <p class="or">eller ring <a href="tel:+4700000000">+47 000 00 000</a></p>
+          <p class="or"><span data-i18n="f.orcall">eller ring</span> <a href="tel:+4700000000">+47 000 00 000</a></p>
         </div>
       </div>
     </section>
@@ -223,16 +224,16 @@
     <section class="section" id="kontakt">
       <div class="container grid-3 contact">
         <div>
-          <h3>Adresse</h3>
+          <h3 data-i18n="c.address">Adresse</h3>
           <p>Storgata 1<br>0000 Oslo</p>
-          <a href="https://maps.google.com/?q=Viggo's+Barbershop" target="_blank" rel="noopener">Vis i kart →</a>
+          <a href="https://maps.google.com/?q=Viggo's+Barbershop" target="_blank" rel="noopener" data-i18n="c.map">Vis i kart →</a>
         </div>
         <div>
-          <h3>Kontakt</h3>
+          <h3 data-i18n="nav.contact">Kontakt</h3>
           <p><a href="tel:+4700000000">+47 000 00 000</a><br><a href="mailto:post@viggosbarbershop.no">post@viggosbarbershop.no</a></p>
         </div>
         <div>
-          <h3>Følg oss</h3>
+          <h3 data-i18n="c.follow">Følg oss</h3>
           <p><a href="https://instagram.com/" target="_blank" rel="noopener">Instagram</a><br><a href="https://facebook.com/" target="_blank" rel="noopener">Facebook</a></p>
         </div>
       </div>
@@ -242,37 +243,38 @@
   <footer class="site-footer">
     <div class="container">
       <p>© <span id="year"></span> Viggo's Barbershop</p>
-      <a href="#top">Til toppen ↑</a>
+      <a href="#top" data-i18n="totop">Til toppen ↑</a>
     </div>
   </footer>
 
   <!-- AI-STILRÅDGIVER -->
   <button class="chat-fab" id="chat-open" aria-controls="chat-panel" aria-expanded="false">
-    <span aria-hidden="true">✂</span> Spør stilrådgiveren
+    <span aria-hidden="true">✂</span> <span data-i18n="chat.fab">Spør stilrådgiveren</span>
   </button>
-  <section class="chat-panel" id="chat-panel" aria-label="AI-stilrådgiver" hidden>
+  <section class="chat-panel" id="chat-panel" data-i18n-attr="aria-label:chat.label" aria-label="AI-stilrådgiver" hidden>
     <header class="chat-head">
       <div>
-        <strong>Stilrådgiveren</strong>
-        <small>AI-assistent · svarer på sekunder</small>
+        <strong data-i18n="chat.title">Stilrådgiveren</strong>
+        <small data-i18n="chat.sub">AI-assistent · svarer på sekunder</small>
       </div>
-      <button class="chat-close" id="chat-close" aria-label="Lukk">×</button>
+      <button class="chat-close" id="chat-close" data-i18n-attr="aria-label:chat.close" aria-label="Lukk">×</button>
     </header>
     <div class="chat-log" id="chat-log" aria-live="polite">
-      <div class="msg bot">Hei! Fortell litt om håret, ansiktsformen eller stilen du ønsker, så foreslår jeg en klipp som passer deg.</div>
+      <div class="msg bot" data-i18n="chat.hello">Hei! Fortell litt om håret, ansiktsformen eller stilen du ønsker, så foreslår jeg en klipp som passer deg.</div>
     </div>
     <div class="chat-chips" id="chat-chips">
-      <button type="button">Hvilken fade passer meg?</button>
-      <button type="button">Jeg har tynt hår – hva anbefaler du?</button>
-      <button type="button">Hvordan holder jeg skjegget pent?</button>
+      <button type="button" data-i18n="chip.1">Hvilken fade passer meg?</button>
+      <button type="button" data-i18n="chip.2">Jeg har tynt hår – hva anbefaler du?</button>
+      <button type="button" data-i18n="chip.3">Hvordan holder jeg skjegget pent?</button>
     </div>
     <form class="chat-form" id="chat-form">
-      <input id="chat-input" maxlength="1000" placeholder="Skriv et spørsmål …" autocomplete="off" aria-label="Melding">
+      <input id="chat-input" maxlength="1000" placeholder="Skriv et spørsmål …" autocomplete="off" aria-label="Melding" data-i18n-attr="placeholder:chat.ph;aria-label:chat.msg">
       <button type="submit" aria-label="Send">➤</button>
     </form>
-    <p class="chat-disclaimer">Svarene er generert av AI og kan inneholde feil.</p>
+    <p class="chat-disclaimer" data-i18n="chat.disc">Svarene er generert av AI og kan inneholde feil.</p>
   </section>
 
+  <script src="i18n.js"></script>
   <script src="shader-hero.js"></script>
   <script src="script.js"></script>
 </body>
