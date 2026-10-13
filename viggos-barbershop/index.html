@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Viggo's Barbershop – Klipp, skjegg og barbering</title>
+  <meta name="description" content="Viggo's Barbershop – klassisk herreklipp, skjeggtrim og varm håndklebarbering. Book time i dag.">
+  <meta name="theme-color" content="#14110f">
+  <meta property="og:title" content="Viggo's Barbershop">
+  <meta property="og:description" content="Klassisk herreklipp, skjeggtrim og varm håndklebarbering.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2314110f'/%3E%3Ctext x='32' y='44' font-family='Georgia,serif' font-size='36' font-weight='700' text-anchor='middle' fill='%23c9a35c'%3EV%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Hopp til innhold</a>
+
+  <header class="site-header" id="top">
+    <div class="container nav">
+      <a class="brand" href="#top" aria-label="Viggo's Barbershop – til toppen">
+        <span class="brand-mark" aria-hidden="true">V</span>
+        <span class="brand-text">Viggo's <em>Barbershop</em></span>
+      </a>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-menu" aria-label="Åpne meny">
+        <span></span><span></span><span></span>
+      </button>
+      <nav id="nav-menu" class="nav-menu" aria-label="Hovedmeny">
+        <a href="#tjenester">Tjenester</a>
+        <a href="#om">Om oss</a>
+        <a href="#apningstider">Åpningstider</a>
+        <a href="#kontakt">Kontakt</a>
+        <a class="btn btn-small" href="#bestill">Bestill time</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- HERO -->
+    <section class="hero">
+      <div class="pole" aria-hidden="true"></div>
+      <div class="container hero-inner">
+        <p class="eyebrow">Siden 2015 · Herrefrisør</p>
+        <h1>Skarp klipp.<br><span>Rolig stol.</span></h1>
+        <p class="lead">Klassisk barberhåndverk med moderne presisjon. Kom innom for fade, skjeggtrim eller en varm håndklebarbering – og gå ut som en bedre versjon av deg selv.</p>
+        <div class="hero-cta">
+          <a class="btn" href="#bestill">Bestill time</a>
+          <a class="btn btn-ghost" href="#tjenester">Se priser</a>
+        </div>
+        <p class="status" id="open-status" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <!-- HIGHLIGHTS -->
+    <section class="highlights" aria-label="Hvorfor velge oss">
+      <div class="container grid-3">
+        <div class="highlight">
+          <h3>Erfarne barberere</h3>
+          <p>Over 10 års erfaring med alt fra klassisk saksklipp til skarpe skin fades.</p>
+        </div>
+        <div class="highlight">
+          <h3>Ingen stress</h3>
+          <p>Vi setter av god tid til hver kunde. Kaffe eller vann venter mens du sitter.</p>
+        </div>
+        <div class="highlight">
+          <h3>Kvalitetsprodukter</h3>
+          <p>Vi bruker og selger profesjonelle produkter for hår og skjegg.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SERVICES -->
+    <section class="section" id="tjenester">
+      <div class="container">
+        <header class="section-head">
+          <p class="eyebrow">Tjenester &amp; priser</p>
+          <h2>Hva kan vi gjøre for deg?</h2>
+        </header>
+
+        <div class="tabs" role="tablist" aria-label="Kategorier">
+          <button role="tab" aria-selected="true" data-filter="alle">Alle</button>
+          <button role="tab" aria-selected="false" data-filter="har">Hår</button>
+          <button role="tab" aria-selected="false" data-filter="skjegg">Skjegg</button>
+          <button role="tab" aria-selected="false" data-filter="pakke">Pakker</button>
+        </div>
+
+        <ul class="price-list">
+          <li data-cat="har"><div><h3>Herreklipp</h3><p>Klipp med saks og/eller maskin, vask og styling.</p></div><span class="dots" aria-hidden="true"></span><span class="price">450,-</span></li>
+          <li data-cat="har"><div><h3>Skin fade</h3><p>Presis fade helt ned til huden, med detaljert overgang.</p></div><span class="dots" aria-hidden="true"></span><span class="price">500,-</span></li>
+          <li data-cat="har"><div><h3>Barneklipp</h3><p>For gutter under 12 år.</p></div><span class="dots" aria-hidden="true"></span><span class="price">300,-</span></li>
+          <li data-cat="har"><div><h3>Maskinklipp</h3><p>Én lengde over hele hodet.</p></div><span class="dots" aria-hidden="true"></span><span class="price">250,-</span></li>
+          <li data-cat="skjegg"><div><h3>Skjeggtrim</h3><p>Forming, trim og skarpe linjer med kniv.</p></div><span class="dots" aria-hidden="true"></span><span class="price">300,-</span></li>
+          <li data-cat="skjegg"><div><h3>Varm håndklebarbering</h3><p>Tradisjonell barbering med kniv, varme håndklær og balm.</p></div><span class="dots" aria-hidden="true"></span><span class="price">400,-</span></li>
+          <li data-cat="pakke"><div><h3>Klipp + skjegg</h3><p>Vår mest populære kombo.</p></div><span class="dots" aria-hidden="true"></span><span class="price">700,-</span></li>
+          <li data-cat="pakke"><div><h3>Viggo's Deluxe</h3><p>Klipp, skjegg, varmt håndkle, ansiktsmaske og styling.</p></div><span class="dots" aria-hidden="true"></span><span class="price">950,-</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section class="section section-alt" id="om">
+      <div class="container about">
+        <div class="about-visual" aria-hidden="true">
+          <div class="frame">
+            <svg viewBox="0 0 200 200" role="img">
+              <g fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="62" cy="148" r="20"/>
+                <circle cx="138" cy="148" r="20"/>
+                <path d="M76 133 L150 40"/>
+                <path d="M124 133 L50 40"/>
+                <circle cx="100" cy="100" r="4" fill="currentColor"/>
+              </g>
+            </svg>
+          </div>
+        </div>
+        <div>
+          <p class="eyebrow">Om oss</p>
+          <h2>Et sted for gode samtaler og skarpe linjer</h2>
+          <p>Viggo's Barbershop startet med en enkel idé: en barbershop der du blir sett, hørt og klippet ordentlig. Vi kombinerer gammeldags service med teknikker fra dagens beste barbere.</p>
+          <p>Enten du vil ha en ren klassisk klipp, en moderne fade eller bare vil få skjegget i form – vi tar oss tid til å finne stilen som passer deg.</p>
+          <dl class="stats">
+            <div><dt>10+</dt><dd>års erfaring</dd></div>
+            <div><dt>5 000+</dt><dd>fornøyde kunder</dd></div>
+            <div><dt>4,9★</dt><dd>snittvurdering</dd></div>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- REVIEWS -->
+    <section class="section" aria-labelledby="omtaler">
+      <div class="container">
+        <header class="section-head">
+          <p class="eyebrow">Omtaler</p>
+          <h2 id="omtaler">Hva kundene sier</h2>
+        </header>
+        <div class="grid-3">
+          <figure class="review">
+            <blockquote>«Beste fade jeg har hatt. Rolig stemning og ekte fagfolk.»</blockquote>
+            <figcaption>— Kunde, Google</figcaption>
+          </figure>
+          <figure class="review">
+            <blockquote>«Varm håndklebarbering var en helt ny opplevelse. Kommer garantert tilbake.»</blockquote>
+            <figcaption>— Kunde, Google</figcaption>
+          </figure>
+          <figure class="review">
+            <blockquote>«Alltid presis, alltid hyggelig. Sønnen min elsker å klippe seg her.»</blockquote>
+            <figcaption>— Kunde, Google</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOURS + BOOKING -->
+    <section class="section section-alt" id="apningstider">
+      <div class="container split">
+        <div>
+          <p class="eyebrow">Åpningstider</p>
+          <h2>Når kan du komme?</h2>
+          <table class="hours" id="hours-table">
+            <tbody>
+              <tr data-day="1"><th>Mandag</th><td>10:00 – 18:00</td></tr>
+              <tr data-day="2"><th>Tirsdag</th><td>10:00 – 18:00</td></tr>
+              <tr data-day="3"><th>Onsdag</th><td>10:00 – 18:00</td></tr>
+              <tr data-day="4"><th>Torsdag</th><td>10:00 – 20:00</td></tr>
+              <tr data-day="5"><th>Fredag</th><td>10:00 – 18:00</td></tr>
+              <tr data-day="6"><th>Lørdag</th><td>10:00 – 16:00</td></tr>
+              <tr data-day="0"><th>Søndag</th><td>Stengt</td></tr>
+            </tbody>
+          </table>
+          <p class="note">Drop-in tas imot når det er ledig, men vi anbefaler å bestille time.</p>
+        </div>
+
+        <div class="booking" id="bestill">
+          <h2>Bestill time</h2>
+          <p>Ring oss eller send en forespørsel, så bekrefter vi timen så fort vi kan.</p>
+          <form id="booking-form" name="booking" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+            <input type="hidden" name="form-name" value="booking">
+            <p class="hidden"><label>Ikke fyll ut: <input name="bot-field"></label></p>
+            <label>Navn
+              <input name="navn" required autocomplete="name">
+            </label>
+            <label>Telefon
+              <input name="telefon" type="tel" required autocomplete="tel" inputmode="tel">
+            </label>
+            <label>Tjeneste
+              <select name="tjeneste" required>
+                <option value="">Velg tjeneste</option>
+                <option>Herreklipp</option>
+                <option>Skin fade</option>
+                <option>Barneklipp</option>
+                <option>Maskinklipp</option>
+                <option>Skjeggtrim</option>
+                <option>Varm håndklebarbering</option>
+                <option>Klipp + skjegg</option>
+                <option>Viggo's Deluxe</option>
+              </select>
+            </label>
+            <div class="row">
+              <label>Dato
+                <input name="dato" type="date" required id="booking-date">
+              </label>
+              <label>Ønsket tid
+                <input name="tid" type="time" min="10:00" max="19:30" step="900" required>
+              </label>
+            </div>
+            <button class="btn btn-block" type="submit">Send forespørsel</button>
+            <p class="form-msg" id="form-msg" role="status"></p>
+          </form>
+          <p class="or">eller ring <a href="tel:+4700000000">+47 000 00 000</a></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTACT -->
+    <section class="section" id="kontakt">
+      <div class="container grid-3 contact">
+        <div>
+          <h3>Adresse</h3>
+          <p>Storgata 1<br>0000 Oslo</p>
+          <a href="https://maps.google.com/?q=Viggo's+Barbershop" target="_blank" rel="noopener">Vis i kart →</a>
+        </div>
+        <div>
+          <h3>Kontakt</h3>
+          <p><a href="tel:+4700000000">+47 000 00 000</a><br><a href="mailto:post@viggosbarbershop.no">post@viggosbarbershop.no</a></p>
+        </div>
+        <div>
+          <h3>Følg oss</h3>
+          <p><a href="https://instagram.com/" target="_blank" rel="noopener">Instagram</a><br><a href="https://facebook.com/" target="_blank" rel="noopener">Facebook</a></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>© <span id="year"></span> Viggo's Barbershop</p>
+      <a href="#top">Til toppen ↑</a>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
