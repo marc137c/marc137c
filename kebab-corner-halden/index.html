@@ -13,7 +13,9 @@
 <link rel="icon" href="bilder/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="preload" as="image" href="bilder/mat-hero.webp" type="image/webp" fetchpriority="high">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Figtree:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Figtree:wght@400;500;600;700&display=swap"></noscript>
 <style>
 /* Layout: mørkt og rolig, maten i fokus. Delt topp (tekst + bilde), deretter en ryddig meny med prislinjer og en enkel "finn oss"-del. */
 :root{
@@ -261,16 +263,16 @@ footer .legal{flex-basis:100%;padding-top:1.5rem;border-top:1px solid var(--line
 <body>
 <a class="skip" href="#meny">Hopp til menyen</a>
 
-<div class="demo" id="demo" hidden>
+<aside class="demo" id="demo" aria-label="Utkast" hidden>
   <div class="wrap">
     <span><b>Utkast.</b> Telefonnummer, åpningstider og resten av menyen mangler. Logo og bilde er klippet fra skjermbilder.</span>
     <button type="button" id="demo-close">Skjul</button>
   </div>
-</div>
+</aside>
 
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="#"><img class="logo" id="logo" alt="" hidden><span class="words"><span class="name" data-f="navn">Kebab Corner</span><span class="city" data-f="by">Halden</span></span></a>
+    <a class="brand" href="#"><picture><source srcset="bilder/logo.webp" type="image/webp"><img class="logo" id="logo" src="bilder/logo.png" alt="" width="44" height="48"></picture><span class="words"><span class="name" data-f="navn">Kebab Corner</span><span class="city" data-f="by">Halden</span></span></a>
     <nav class="nav" aria-label="Hovedmeny">
       <a href="#meny">Meny</a>
       <a href="#besok">Finn oss</a>
@@ -305,7 +307,7 @@ footer .legal{flex-basis:100%;padding-top:1.5rem;border-top:1px solid var(--line
         </p>
       </div>
     </div>
-    <figure class="hero-photo" id="photo" hidden><img id="photo-img" alt="" width="700" height="694" fetchpriority="high"></figure>
+    <figure class="hero-photo" id="photo"><picture><source srcset="bilder/mat-hero.webp" type="image/webp"><img id="photo-img" src="bilder/mat-hero.jpg" alt="Burgere, pommes frites og kebab i pita" width="700" height="694" fetchpriority="high" decoding="async"></picture></figure>
   </div>
 
   <div class="marquee" id="marquee" aria-hidden="true"><div class="track" id="track"></div></div>
@@ -377,13 +379,13 @@ footer .legal{flex-basis:100%;padding-top:1.5rem;border-top:1px solid var(--line
   </div>
 </footer>
 
-<div class="dock">
+<nav class="dock" aria-label="Ring eller finn veien">
   <a class="btn btn-primary js-tel" href="#">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>
     Ring og bestill
   </a>
   <a class="btn btn-line js-maps" href="#" target="_blank" rel="noopener">Kart</a>
-</div>
+</nav>
 
 <script>
 /* =====================================================================
@@ -453,10 +455,18 @@ if (SITE.demo) {
   });
 }
 if (!SITE.tilbud) $("#deal").hidden = true;
-if (SITE.logo) { $("#logo").src = SITE.logo; $("#logo").hidden = false; }
+// Bilder: HTML-en viser standardbildene med en gang. Peker SITE på andre filer, byttes de her.
+function setImg(img, src) {
+  if (img.getAttribute("src") === src) return;
+  const pic = img.parentNode;
+  if (pic && pic.tagName === "PICTURE") $$("source", pic).forEach(s => s.remove()); // WebP-versjonen gjelder bare standardbildet
+  img.src = src;
+}
+if (SITE.logo) setImg($("#logo"), SITE.logo);
+else $("#logo").hidden = true;
 const hb = typeof SITE.heroBilde === "string" ? { src: SITE.heroBilde, alt: "" } : SITE.heroBilde;
-if (hb && hb.src) { $("#photo-img").src = hb.src; $("#photo-img").alt = hb.alt || ""; $("#photo").hidden = false; }
-else $(".hero").classList.add("no-photo");
+if (hb && hb.src) { setImg($("#photo-img"), hb.src); if (hb.alt != null) $("#photo-img").alt = hb.alt; }
+else { $("#photo").hidden = true; $(".hero").classList.add("no-photo"); }
 if (SITE.originalmeny) { $("#orig").href = SITE.originalmeny; $("#orig").hidden = false; }
 
 // Telefon og kart
@@ -642,7 +652,7 @@ onScroll();
 // Svake glør bak teksten i toppen (WebGL).
 // Bare et tillegg: uten WebGL, med redusert bevegelse eller heroAnimasjon: false
 // er bakgrunnen helt rolig.
-(function heroFx() {
+function heroFx() {
   const hero = $(".hero"), panel = $(".hero-text"), canvas = $(".hero-fx");
   if (!hero || !panel || !canvas) return;
   const off = () => { hero.classList.remove("fx-on"); canvas.hidden = true; };
@@ -752,7 +762,9 @@ onScroll();
   }
   window.addEventListener("resize", () => { if (!raf) draw(elapsed); });
   canvas.addEventListener("webglcontextlost", e => { e.preventDefault(); if (raf) cancelAnimationFrame(raf); raf = 0; off(); });
-})();
+}
+function startFx() { (window.requestIdleCallback || setTimeout)(heroFx, { timeout: 1500 }); }
+if (document.readyState === "complete") startFx(); else window.addEventListener("load", startFx);
 
 // Strukturert data for Google (adresse, telefon, åpningstider)
 const ld = {
