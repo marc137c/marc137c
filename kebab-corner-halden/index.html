@@ -56,6 +56,12 @@ p{margin:0}
 /* Knapper */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:.6rem;min-height:3rem;padding:.75rem 1.4rem;border-radius:var(--radius);font-weight:700;font-size:.975rem;letter-spacing:.01em;text-decoration:none;border:1px solid transparent;cursor:pointer;transition:background .2s ease,border-color .2s ease,color .2s ease}
 .btn svg{width:1.05em;height:1.05em;flex:none}
+.ext{width:1em;height:1em;flex:none;transition:transform .3s cubic-bezier(.2,.75,.1,1)}
+@media (hover:hover){a:hover > .ext{transform:translate(2px,-2px)}}
+.cta.has-delivery .btn-line[href="#meny"]{border-color:transparent;padding-inline:0 .6rem}
+.cta.has-delivery .btn-line[href="#meny"]:hover{text-decoration:underline;text-underline-offset:4px}
+.deliver{margin-top:2.5rem;color:var(--muted);display:flex;flex-wrap:wrap;align-items:center;gap:.35rem .6rem}
+.deliver a{display:inline-flex;align-items:center;gap:.35rem;color:var(--text);font-weight:700;text-underline-offset:4px}
 .btn-primary{background:var(--accent);color:#fff}
 .btn-primary:hover{background:#B9251B}
 .btn-line{border-color:var(--line-strong);color:var(--text);background:transparent}
@@ -356,6 +362,7 @@ footer .legal{flex-basis:100%;padding-top:1.5rem;border-top:1px solid var(--line
         <p class="lede" data-f="ingress">Sulten? Finn din favoritt på menyen. Ring oss, så ordner vi maten.</p>
         <div class="cta">
           <a class="btn btn-primary js-tel" href="#"><svg class="phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg><span data-en="Call to order">Ring og bestill</span></a>
+          <a class="btn btn-line js-foodora" href="#" target="_blank" rel="noopener" hidden><span data-en="Order on foodora">Bestill på foodora</span><svg class="ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></a>
           <a class="btn btn-line" href="#meny"><span data-en="See the menu">Se menyen</span><svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg></a>
         </div>
         <aside class="deal" id="deal" aria-label="Tilbud" data-en-aria-label="Offer">
@@ -402,6 +409,7 @@ footer .legal{flex-basis:100%;padding-top:1.5rem;border-top:1px solid var(--line
           <p data-en="Drop by at &lt;a class=&quot;js-maps&quot; href=&quot;#&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot; data-f=&quot;adresse&quot;&gt;&lt;/a&gt;.">Kom innom oss i <a class="js-maps" href="#" target="_blank" rel="noopener" data-f="adresse"></a>.</p>
         </li>
       </ol>
+      <p class="deliver js-foodora-wrap" hidden><span data-en="Would you rather have it delivered?">Vil du heller ha maten levert?</span> <a class="js-foodora" href="#" target="_blank" rel="noopener"><span data-en="Order on foodora">Bestill på foodora</span><svg class="ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></a></p>
     </div>
   </section>
 
@@ -453,6 +461,7 @@ footer .legal{flex-basis:100%;padding-top:1.5rem;border-top:1px solid var(--line
         <div class="cta">
           <a class="btn btn-primary js-tel" href="#" data-en="Call to order">Ring og bestill</a>
           <a class="btn btn-line js-maps" href="#" target="_blank" rel="noopener" data-en="Directions">Veibeskrivelse</a>
+          <a class="btn btn-line js-foodora" href="#" target="_blank" rel="noopener" hidden><span data-en="Order on foodora">Bestill på foodora</span><svg class="ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></a>
         </div>
       </div>
       <div class="map"><iframe id="map" title="Kart som viser hvor vi ligger" data-en-title="Map showing where we are" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
@@ -497,7 +506,8 @@ const SITE = {
   telefon: "485 17 085",
   adresse: "Nedre Bankegate 6, Halden",
   kartSok: "Kebab Corner, Nedre Bankegate 6, Halden", // det som søkes etter i Google Maps
-  originalmeny: "",                      // lenke til originalmenyen (bilde eller PDF). "" = skjult
+  originalmeny: "",
+  foodora: "https://www.foodora.no/restaurant/mv2y/kebab-corner-mv2y", // lenke til levering på foodora. "" = skjult                      // lenke til originalmenyen (bilde eller PDF). "" = skjult
   heroAnimasjon: true,                   // svake glør bak teksten i toppen. false = helt rolig bakgrunn
   fakta: ["Kebab", "Pizza", "Flammeburgere"], // vises som liten linje over overskriften
   tilbud: null,                          // f.eks. { tittel: "Kebab i pita + brus", pris: 129, merknad: "Hele dagen" }
@@ -691,6 +701,11 @@ const hb = typeof SITE.heroBilde === "string" ? { src: SITE.heroBilde, alt: "" }
 if (hb && hb.src) { setImg($("#photo-img"), hb.src); if (hb.alt != null) $("#photo-img").alt = hb.alt; }
 else { $("#photo").hidden = true; $(".hero").classList.add("no-photo"); }
 if (SITE.originalmeny) { $("#orig").href = SITE.originalmeny; $("#orig").hidden = false; }
+if (SITE.foodora) {
+  $$(".js-foodora").forEach(a => { a.href = SITE.foodora; a.hidden = false; });
+  $$(".js-foodora-wrap").forEach(el => { el.hidden = false; });
+  $(".hero .cta").classList.add("has-delivery"); // tre knapper: "Se menyen" blir en lettere lenke
+}
 
 // Telefon og kart
 const telDigits = SITE.telefon.replace(/[^\d+]/g, "");
@@ -1011,7 +1026,7 @@ if (document.readyState === "complete") startFx(); else window.addEventListener(
 const ld = {
   "@context": "https://schema.org", "@type": "Restaurant",
   name: SITE.navn + " " + SITE.by, servesCuisine: ["Kebab","Pizza","Burger"],
-  telephone: SITE.telefon, priceRange: "kr", image: hb && hb.src ? new URL(hb.src, location.href).href : undefined,
+  telephone: SITE.telefon, priceRange: "kr", sameAs: SITE.foodora ? [SITE.foodora] : undefined, image: hb && hb.src ? new URL(hb.src, location.href).href : undefined,
   address: { "@type": "PostalAddress", streetAddress: SITE.adresse.split(",")[0], addressLocality: SITE.by, addressCountry: "NO" },
   openingHoursSpecification: (SITE.tider || []).map((d, i) => d && ({ "@type": "OpeningHoursSpecification",
     dayOfWeek: ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"][i], opens: d[0], closes: d[1] })).filter(Boolean),
