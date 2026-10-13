@@ -45,6 +45,7 @@
         <div class="hero-cta">
           <a class="btn" href="#bestill">Bestill time</a>
           <a class="btn btn-ghost" href="#tjenester">Se priser</a>
+          <button class="btn btn-ghost" type="button" data-open-chat>✂ Finn din stil med AI</button>
         </div>
         <p class="status" id="open-status" aria-live="polite"></p>
       </div>
@@ -237,6 +238,33 @@
       <a href="#top">Til toppen ↑</a>
     </div>
   </footer>
+
+  <!-- AI-STILRÅDGIVER -->
+  <button class="chat-fab" id="chat-open" aria-controls="chat-panel" aria-expanded="false">
+    <span aria-hidden="true">✂</span> Spør stilrådgiveren
+  </button>
+  <section class="chat-panel" id="chat-panel" aria-label="AI-stilrådgiver" hidden>
+    <header class="chat-head">
+      <div>
+        <strong>Stilrådgiveren</strong>
+        <small>AI-assistent · svarer på sekunder</small>
+      </div>
+      <button class="chat-close" id="chat-close" aria-label="Lukk">×</button>
+    </header>
+    <div class="chat-log" id="chat-log" aria-live="polite">
+      <div class="msg bot">Hei! Fortell litt om håret, ansiktsformen eller stilen du ønsker, så foreslår jeg en klipp som passer deg.</div>
+    </div>
+    <div class="chat-chips" id="chat-chips">
+      <button type="button">Hvilken fade passer meg?</button>
+      <button type="button">Jeg har tynt hår – hva anbefaler du?</button>
+      <button type="button">Hvordan holder jeg skjegget pent?</button>
+    </div>
+    <form class="chat-form" id="chat-form">
+      <input id="chat-input" maxlength="1000" placeholder="Skriv et spørsmål …" autocomplete="off" aria-label="Melding">
+      <button type="submit" aria-label="Send">➤</button>
+    </form>
+    <p class="chat-disclaimer">Svarene er generert av AI og kan inneholde feil.</p>
+  </section>
 
   <script src="script.js"></script>
 </body>

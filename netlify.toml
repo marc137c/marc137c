@@ -1,2 +1,5 @@
 [build]
   publish = "viggos-barbershop"
+
+[functions]
+  directory = "netlify/functions"

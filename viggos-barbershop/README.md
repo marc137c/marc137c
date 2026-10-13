@@ -13,3 +13,13 @@ Bookingskjemaet bruker Netlify Forms – forespørsler dukker opp under **Forms*
 - Priser og tjenester
 - Åpningstider – både tabellen i `index.html` og `HOURS` øverst i `script.js`
 - Omtaler og tall i «Om oss» (bruk ekte kundeomtaler)
+
+## AI-stilrådgiver (Claude)
+Chat-knappen nede til høyre sender spørsmål til `/api/chat`, en Netlify Function (`netlify/functions/chat.mjs`)
+som kaller Claude via Anthropic sitt offisielle SDK. API-nøkkelen ligger kun på serveren – aldri i nettleseren.
+
+Oppsett i Netlify → **Site configuration → Environment variables**:
+- `ANTHROPIC_API_KEY` – nøkkel fra https://platform.claude.com (påkrevd)
+- `CLAUDE_MODEL` – valgfri, standard er `claude-fable-5-1`. Sett f.eks. `claude-haiku-5-5` for en mye billigere modell.
+
+Priser, åpningstider og regler for assistenten står i `SYSTEM`-teksten øverst i `chat.mjs` – oppdater den sammen med nettsiden.
