@@ -478,6 +478,7 @@ footer .legal{flex-basis:100%;padding-top:1.5rem;border-top:1px solid var(--line
   <a class="btn btn-line js-maps" href="#" target="_blank" rel="noopener">Kart</a>
 </nav>
 
+<script src="meny.js"></script>
 <script>
 /* =====================================================================
    ALT INNHOLD LIGGER HER. Endre verdiene under, så oppdateres hele siden.
@@ -523,6 +524,14 @@ const SITE = {
     { kategori: "Tilbehør og drikke", retter: [] },
   ],
 };
+
+// Menyen i meny.js (lages på admin.html) brukes i stedet for menyen over når filen finnes
+if (window.MENY_DATA) {
+  const M = window.MENY_DATA;
+  if (Array.isArray(M.meny) && M.meny.length) SITE.meny = M.meny;
+  if (M.allergener && Object.keys(M.allergener).length) SITE.allergener = M.allergener;
+  if (M.telefon) SITE.telefon = M.telefon;
+}
 /* ===================================================================== */
 
 const $ = (s, r=document) => r.querySelector(s);
@@ -561,7 +570,8 @@ else { $("#photo").hidden = true; $(".hero").classList.add("no-photo"); }
 if (SITE.originalmeny) { $("#orig").href = SITE.originalmeny; $("#orig").hidden = false; }
 
 // Telefon og kart
-const telHref = "tel:" + SITE.telefon.replace(/[^\d+]/g, "");
+const telDigits = SITE.telefon.replace(/[^\d+]/g, "");
+const telHref = "tel:" + (/^\d{8}$/.test(telDigits) ? "+47" + telDigits : telDigits); // norske nummer uten landkode får +47
 $$(".js-tel").forEach(a => a.href = telHref);
 $$(".js-tel-text").forEach(a => a.textContent = SITE.telefon);
 const q = encodeURIComponent(SITE.kartSok || (SITE.navn + " " + SITE.adresse));
