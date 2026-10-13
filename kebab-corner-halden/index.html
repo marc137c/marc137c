@@ -83,8 +83,11 @@ h1,h2,h3{font-family:var(--font-display);line-height:.95;margin:0;text-wrap:bala
 
 /* Skiltet */
 .hero{background:var(--sumac);color:var(--on-sumac);position:relative;overflow:hidden}
-.hero::after{content:"";position:absolute;inset:auto 0 0 0;height:22px;background:repeating-linear-gradient(90deg,var(--sumac-deep) 0 22px,transparent 22px 44px);opacity:.55}
-.hero .wrap{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:clamp(1.5rem,4vw,3rem);align-items:center;padding-block:clamp(2.5rem,7vw,5rem) clamp(3.5rem,8vw,6rem)}
+.hero::after{content:"";position:absolute;left:0;right:0;bottom:0;z-index:2;height:22px;background:repeating-linear-gradient(90deg,var(--sumac-deep) 0 22px,transparent 22px 44px);opacity:.55}
+.hero-fx{position:absolute;top:0;left:0;width:100%;height:100%;z-index:0;display:block;opacity:0;transition:opacity .8s ease}
+.hero.fx-on .hero-fx{opacity:1}
+.hero.fx-on::before{content:"";position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(100deg,rgba(60,8,4,.55) 0%,rgba(60,8,4,.25) 45%,rgba(60,8,4,0) 70%)}
+.hero .wrap{position:relative;z-index:2;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:clamp(1.5rem,4vw,3rem);align-items:center;padding-block:clamp(2.5rem,7vw,5rem) clamp(3.5rem,8vw,6rem)}
 .hero h1{font-size:clamp(3.25rem,10vw,7.5rem);font-weight:900;text-transform:uppercase;letter-spacing:-.005em}
 .hero h1 span{display:block;color:var(--saffron)}
 .hero p.lede{font-size:clamp(1.05rem,2.2vw,1.25rem);max-width:34rem;margin:1.25rem 0 1.75rem;opacity:.95}
@@ -94,7 +97,7 @@ h1,h2,h3{font-family:var(--font-display);line-height:.95;margin:0;text-wrap:bala
 .status.open i{background:#5FD37A;box-shadow:0 0 0 4px rgba(95,211,122,.25)}
 .status.closed i{background:#FF9A8A}
 
-.deal{justify-self:center;width:min(19rem,100%);aspect-ratio:1;border-radius:50%;background:var(--saffron);color:#1E1715;display:grid;place-content:center;text-align:center;padding:2rem;transform:rotate(-7deg);box-shadow:0 18px 0 -6px var(--sumac-deep)}
+.deal{justify-self:center;width:19rem;max-width:100%;width:min(19rem,100%);height:19rem;aspect-ratio:1;border-radius:50%;background:var(--saffron);color:#1E1715;display:grid;place-content:center;text-align:center;padding:2rem;transform:rotate(-7deg);box-shadow:0 18px 0 -6px var(--sumac-deep)}
 .deal .k{font-weight:700;text-transform:uppercase;letter-spacing:.16em;font-size:.8rem}
 .deal .t{font-family:var(--font-display);font-weight:800;font-size:clamp(1.6rem,4vw,2.1rem);line-height:1;margin:.5rem 0}
 .deal .p{font-family:var(--font-display);font-weight:900;font-size:clamp(3.5rem,8vw,4.75rem);line-height:.9;font-variant-numeric:tabular-nums}
@@ -102,8 +105,9 @@ h1,h2,h3{font-family:var(--font-display);line-height:.95;margin:0;text-wrap:bala
 .deal .n{font-size:.85rem;margin-top:.35rem}
 @media (max-width:760px){
   .hero .wrap{grid-template-columns:1fr}
-  .deal{width:15rem;justify-self:start;margin-left:.5rem}
+  .deal{width:15rem;height:15rem;justify-self:start;margin-left:.5rem}
 }
+
 
 /* Fakta-stripe */
 .facts{border-bottom:1px solid var(--line)}
@@ -137,9 +141,9 @@ section{padding-block:clamp(3rem,7vw,5rem)}
 .item .price span{width:4.25rem;text-align:right}
 .item .price span.dim{color:var(--muted)}
 .tag{font-family:var(--font-body);font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:.15rem .5rem;border-radius:4px;line-height:1.4}
-.tag.veg{background:color-mix(in srgb,var(--parsley) 16%,transparent);color:var(--parsley)}
-.tag.pop{background:color-mix(in srgb,var(--saffron) 30%,transparent);color:var(--ink)}
-.tag.hot{background:color-mix(in srgb,var(--sumac) 15%,transparent);color:var(--sumac)}
+.tag.veg{background:rgba(46,107,60,.14);background:color-mix(in srgb,var(--parsley) 16%,transparent);color:var(--parsley)}
+.tag.pop{background:rgba(244,180,26,.3);background:color-mix(in srgb,var(--saffron) 30%,transparent);color:var(--ink)}
+.tag.hot{background:rgba(184,37,27,.13);background:color-mix(in srgb,var(--sumac) 15%,transparent);color:var(--sumac)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tag.hot{color:#FF8A7D}}
 :root[data-theme="dark"] .tag.hot{color:#FF8A7D}
 
@@ -167,7 +171,7 @@ section{padding-block:clamp(3rem,7vw,5rem)}
 .where address{font-style:normal;font-size:1.25rem;font-weight:600;line-height:1.4;margin-bottom:1rem}
 .where .lines{display:grid;gap:.4rem;margin-bottom:1.5rem}
 .where .lines a{font-weight:600}
-.map{border-radius:1rem;overflow:hidden;border:1px solid var(--line);aspect-ratio:16/10;max-width:100%;background:var(--paper)}
+.map{border-radius:1rem;overflow:hidden;border:1px solid var(--line);height:22rem;aspect-ratio:16/10;max-width:100%;background:var(--paper)}
 .map iframe{width:100%;height:100%;border:0;display:block}
 .visit .cta .btn-ghost{color:var(--ink)}
 .btn-sumac{background:var(--sumac);color:var(--on-sumac)}
@@ -182,6 +186,8 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:1rem}
   .dock{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;position:fixed;left:0;right:0;bottom:0;z-index:60;padding:.6rem var(--gutter) calc(.6rem + env(safe-area-inset-bottom,0px));background:var(--paper);border-top:1px solid var(--line);box-shadow:0 -8px 24px rgba(0,0,0,.08)}
   .dock .btn{width:100%}
 }
+/* Eldre nettlesere uten aspect-ratio bruker faste høyder over */
+@supports (aspect-ratio:1){.deal{height:auto}.map{height:auto}}
 </style>
 </head>
 <body>
@@ -211,6 +217,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:1rem}
 
 <main>
   <div class="hero">
+    <canvas class="hero-fx" aria-hidden="true"></canvas>
     <div class="wrap">
       <div>
         <div class="status" id="status" role="status"><i></i><span>Sjekker åpningstider…</span></div>
@@ -308,6 +315,7 @@ const SITE = {
   telefon: "+47 000 00 000",            // f.eks. "+47 69 12 34 56"
   adresse: "Gateadresse 1, 1771 Halden", // gate, postnummer og sted
   kartSok: "Kebab Corner Halden",        // det som søkes etter i Google Maps
+  heroAnimasjon: true,                   // glør og flammer bak overskriften. false = rolig rød bakgrunn som før
   fakta: ["Ta med eller spis inne", "Bestill på telefon", "Vipps og kort"],
   tilbud: { tittel: "Kebab i pita + 0,5 l brus", pris: 169, merknad: "Hele dagen, hver dag" }, // sett til null for å skjule
   // Åpningstider, mandag til søndag. Stengetid etter midnatt er lov (f.eks. "03:00"). null = stengt.
@@ -413,10 +421,15 @@ $("#sauces").innerHTML = SITE.sauser.map(([navn, styrke]) =>
 // Åpningstider og "åpent nå" (norsk tid)
 const min = s => { const [h,m] = s.split(":").map(Number); return h*60 + m; };
 function osloNow() {
-  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Oslo", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
-  const p = Object.fromEntries(parts.map(x => [x.type, x.value]));
-  const day = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].indexOf(p.weekday);
-  return { day, t: Number(p.hour)*60 + Number(p.minute) };
+  try {
+    const p = {};
+    new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Oslo", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false })
+      .formatToParts(new Date()).forEach(x => { p[x.type] = x.value; });
+    const day = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].indexOf(p.weekday);
+    if (day >= 0) return { day, t: (Number(p.hour) % 24)*60 + Number(p.minute) };
+  } catch (e) {}
+  const d = new Date(); // reserve: enhetens egen klokke
+  return { day: (d.getDay() + 6) % 7, t: d.getHours()*60 + d.getMinutes() };
 }
 function span(i) { // [åpner, stenger] i minutter fra dagens start; stenger kan være > 1440
   const d = SITE.tider[i]; if (!d) return null;
@@ -449,10 +462,129 @@ setInterval(renderHours, 60000);
 
 // Marker aktiv kategori i menyen
 const chips = $$(".chip");
-const io = new IntersectionObserver(entries => {
-  entries.forEach(e => { if (e.isIntersecting) chips.forEach(c => c.classList.toggle("on", c.getAttribute("href") === "#" + e.target.id)); });
-}, { rootMargin: "-40% 0px -55% 0px" });
-$$(".cat").forEach(c => io.observe(c));
+if ("IntersectionObserver" in window) {
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) chips.forEach(c => c.classList.toggle("on", c.getAttribute("href") === "#" + e.target.id)); });
+  }, { rootMargin: "-40% 0px -55% 0px" });
+  $$(".cat").forEach(c => io.observe(c));
+}
+
+// Animert bakgrunn i toppen: glør fra grillen (WebGL).
+// Bare et tillegg: uten WebGL, med redusert bevegelse eller heroAnimasjon: false
+// beholder toppen den røde bakgrunnen den alltid har hatt.
+(function heroFx() {
+  const hero = $(".hero"), canvas = $(".hero-fx");
+  if (!hero || !canvas) return;
+  const off = () => { hero.classList.remove("fx-on"); canvas.hidden = true; };
+  if (SITE.heroAnimasjon === false) return off();
+
+  let gl = null;
+  try {
+    const opts = { alpha: false, antialias: false, depth: false, powerPreference: "low-power" };
+    gl = canvas.getContext("webgl", opts) || canvas.getContext("experimental-webgl", opts);
+  } catch (e) {}
+  if (!gl) return off();
+
+  const VERT = "attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}";
+  const FRAG = [
+    "precision mediump float;",
+    "uniform vec2 r;uniform float t;uniform vec2 m;uniform float h;",
+    "float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}",
+    "float noise(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*(3.-2.*f);",
+    " return mix(mix(hash(i),hash(i+vec2(1.,0.)),u.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),u.x),u.y);}",
+    "float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*noise(p);p=p*2.02+vec2(1.7,9.2);a*=.5;}return v;}",
+    "void main(){",
+    " vec2 uv=gl_FragCoord.xy/r;float asp=r.x/r.y;vec2 p=vec2(uv.x*asp,uv.y);",
+    // varme som stiger fra bunnen, med virvler (domain warp)
+    " vec2 q=vec2(fbm(p*1.8+vec2(0.,-t*.30)),fbm(p*1.8+vec2(5.2,-t*.26)));",
+    " float n=fbm(p*2.4+q*1.6+vec2(0.,-t*.55));",
+    " float heat=n*1.25-uv.y*1.2+.02;",
+    // pekeren varmer opp der den er
+    " vec2 d=p-vec2(m.x*asp,m.y);heat+=h*.3*exp(-dot(d,d)*7.);",
+    " heat=clamp(heat,0.,1.);",
+    " vec3 deep=vec3(.42,.06,.04),base=vec3(.72,.145,.106),ember=vec3(.92,.36,.09),gold=vec3(.96,.71,.10);",
+    " vec3 c=mix(deep,base,smoothstep(0.,.3,heat+.22));",
+    " c=mix(c,ember,smoothstep(.38,.72,heat));",
+    " c=mix(c,gold,smoothstep(.72,.97,heat)*.75);",
+    // gnister som flyr opp
+    " vec2 g=vec2(p.x*16.,p.y*8.-t*1.1);vec2 id=floor(g);vec2 f=fract(g)-.5;float k=hash(id);",
+    " vec2 o=vec2(k-.5,fract(k*7.13)-.5)*.6+vec2(sin(t*2.+k*20.)*.08,0.);",
+    " float s=step(.9,k)*smoothstep(.09,0.,length(f-o));",
+    " c+=gold*s*(1.-uv.y*.85)*1.3;",
+    " gl_FragColor=vec4(c,1.);",
+    "}"
+  ].join("\n");
+
+  function compile(type, src) {
+    const sh = gl.createShader(type);
+    gl.shaderSource(sh, src); gl.compileShader(sh);
+    return gl.getShaderParameter(sh, gl.COMPILE_STATUS) ? sh : null;
+  }
+  const vs = compile(gl.VERTEX_SHADER, VERT), fs = compile(gl.FRAGMENT_SHADER, FRAG);
+  if (!vs || !fs) return off();
+  const prog = gl.createProgram();
+  gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return off();
+  gl.useProgram(prog);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const aLoc = gl.getAttribLocation(prog, "a");
+  gl.enableVertexAttribArray(aLoc);
+  gl.vertexAttribPointer(aLoc, 2, gl.FLOAT, false, 0, 0);
+  const U = { r: gl.getUniformLocation(prog, "r"), t: gl.getUniformLocation(prog, "t"), m: gl.getUniformLocation(prog, "m"), h: gl.getUniformLocation(prog, "h") };
+
+  // Lav oppløsning holder for myke flammer og sparer batteri
+  function resize() {
+    const scale = Math.min(window.devicePixelRatio || 1, 1.5) * 0.6;
+    const w = Math.max(1, Math.round(hero.clientWidth * scale)), hgt = Math.max(1, Math.round(hero.clientHeight * scale));
+    if (canvas.width !== w || canvas.height !== hgt) { canvas.width = w; canvas.height = hgt; gl.viewport(0, 0, w, hgt); }
+  }
+
+  let mouse = [0.5, 0.5], hover = 0, hoverTarget = 0;
+  hero.addEventListener("pointermove", e => {
+    const b = hero.getBoundingClientRect();
+    mouse = [(e.clientX - b.left) / b.width, 1 - (e.clientY - b.top) / b.height];
+    hoverTarget = 1;
+  });
+  hero.addEventListener("pointerleave", () => { hoverTarget = 0; });
+
+  function draw(time) {
+    resize();
+    hover += (hoverTarget - hover) * 0.06;
+    gl.uniform2f(U.r, canvas.width, canvas.height);
+    gl.uniform1f(U.t, time);
+    gl.uniform2f(U.m, mouse[0], mouse[1]);
+    gl.uniform1f(U.h, hover);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  const reduce = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : { matches: false };
+  let raf = 0, visible = true, start = 0, elapsed = 8;
+  function frame(now) {
+    if (!start) start = now - elapsed * 1000;
+    elapsed = (now - start) / 1000;
+    draw(elapsed);
+    raf = requestAnimationFrame(frame);
+  }
+  function update() {
+    const run = visible && !document.hidden && !reduce.matches;
+    if (run && !raf) { start = 0; raf = requestAnimationFrame(frame); }
+    if (!run && raf) { cancelAnimationFrame(raf); raf = 0; }
+    if (!run) draw(elapsed); // stillbilde ved redusert bevegelse eller når toppen ikke vises
+  }
+
+  draw(elapsed);
+  hero.classList.add("fx-on");
+  update();
+  document.addEventListener("visibilitychange", update);
+  if (reduce.addEventListener) reduce.addEventListener("change", update);
+  else if (reduce.addListener) reduce.addListener(update);
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(es => { visible = es[0].isIntersecting; update(); }).observe(hero);
+  }
+  window.addEventListener("resize", () => { if (!raf) draw(elapsed); });
+  canvas.addEventListener("webglcontextlost", e => { e.preventDefault(); if (raf) cancelAnimationFrame(raf); raf = 0; off(); });
+})();
 
 // Strukturert data for Google (åpningstider, adresse, telefon)
 const ld = {
