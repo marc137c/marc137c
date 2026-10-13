@@ -37,17 +37,24 @@
   <main id="main">
     <!-- HERO -->
     <section class="hero">
-      <div class="pole" aria-hidden="true"></div>
+      <canvas class="hero-canvas" id="hero-canvas" aria-hidden="true"></canvas>
+      <div class="hero-veil" aria-hidden="true"></div>
       <div class="container hero-inner">
-        <p class="eyebrow">Siden 2015 · Herrefrisør</p>
-        <h1>Skarp klipp.<br><span>Rolig stol.</span></h1>
-        <p class="lead">Klassisk barberhåndverk med moderne presisjon. Kom innom for fade, skjeggtrim eller en varm håndklebarbering – og gå ut som en bedre versjon av deg selv.</p>
-        <div class="hero-cta">
+        <p class="trust-badge anim" style="--d:0s">
+          <span class="stars" aria-hidden="true">★★★★★</span>
+          4,9 på Google · 5 000+ kunder
+        </p>
+        <h1>
+          <span class="line anim" style="--d:.15s">Skarp klipp.</span>
+          <span class="line accent anim" style="--d:.35s">Rolig stol.</span>
+        </h1>
+        <p class="lead anim" style="--d:.55s">Klassisk barberhåndverk med moderne presisjon. Kom innom for fade, skjeggtrim eller en varm håndklebarbering – og gå ut som en bedre versjon av deg selv.</p>
+        <div class="hero-cta anim" style="--d:.75s">
           <a class="btn" href="#bestill">Bestill time</a>
           <a class="btn btn-ghost" href="#tjenester">Se priser</a>
           <button class="btn btn-ghost" type="button" data-open-chat>✂ Finn din stil med AI</button>
         </div>
-        <p class="status" id="open-status" aria-live="polite"></p>
+        <p class="status anim" style="--d:.9s" id="open-status" aria-live="polite"></p>
       </div>
     </section>
 
@@ -266,6 +273,7 @@
     <p class="chat-disclaimer">Svarene er generert av AI og kan inneholde feil.</p>
   </section>
 
+  <script src="shader-hero.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
