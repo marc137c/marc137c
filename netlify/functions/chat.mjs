@@ -26,7 +26,8 @@ Tjenester og priser:
 - Klipp + skjegg 700,-
 - Viggo's Deluxe 950,- (klipp, skjegg, varmt håndkle, ansiktsmaske, styling)
 
-Åpningstider: man–ons og fre 10–18, tor 10–20, lør 10–16, søndag stengt. Drop-in når det er ledig.`;
+Åpningstider: man–ons og fre 10–18, tor 10–20, lør 10–16, søndag stengt. Drop-in når det er ledig.
+Telefon: 40 96 39 11. Instagram, TikTok og Facebook: Viggo's Barbershop.`;
 
 const json = (status, body) =>
   new Response(JSON.stringify(body), {

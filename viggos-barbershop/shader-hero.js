@@ -1,4 +1,4 @@
-// Animert WebGL2-bakgrunn for hero-seksjonen: varm røyk i gull og mørkt tre,
+// Animert WebGL2-bakgrunn for hero-seksjonen: røyk i dyp grønn og gull (fra logoen),
 // med svake, flytende barberstang-striper. Reagerer på mus/finger.
 // Faller tilbake til CSS-gradienten hvis WebGL2 mangler.
 (() => {
@@ -51,9 +51,9 @@ void main() {
   vec2 r = vec2(fbm(p * 1.4 + q * 2.2 + vec2(1.7, 9.2) + t * 1.3), fbm(p * 1.4 + q * 2.2 + vec2(8.3, 2.8) - t));
   float smoke = fbm(p * 1.2 + r * 2.0);
 
-  vec3 bg    = vec3(0.078, 0.066, 0.059);
-  vec3 wood  = vec3(0.34, 0.21, 0.11);
-  vec3 gold  = vec3(0.79, 0.64, 0.36);
+  vec3 bg    = vec3(0.043, 0.059, 0.051);
+  vec3 wood  = vec3(0.06, 0.20, 0.13);   // dyp grønn marmor
+  vec3 gold  = vec3(0.81, 0.65, 0.37);
   vec3 cream = vec3(0.95, 0.92, 0.88);
 
   vec3 col = mix(bg, wood, smoothstep(0.2, 0.7, smoke));

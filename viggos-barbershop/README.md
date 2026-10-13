@@ -8,8 +8,8 @@ Bookingskjemaet bruker Netlify Forms – forespørsler dukker opp under **Forms*
 
 ## Må fylles inn før lansering (plassholdere)
 - Adresse (`Storgata 1, 0000 Oslo`)
-- Telefon (`+47 000 00 000`) og e-post
-- Instagram/Facebook-lenker
+- E-post (`post@viggosbarbershop.no`)
+- Lenker til Instagram, TikTok og Facebook (peker nå bare til forsidene deres)
 - Priser og tjenester
 - Åpningstider – både tabellen i `index.html` og `HOURS` øverst i `script.js`
 - Omtaler og tall i «Om oss» (bruk ekte kundeomtaler)
@@ -33,3 +33,8 @@ Besøkende med nettleser på norsk får norsk, alle andre får engelsk. Lenke di
 - Tekster som lages av JavaScript (åpent/stengt, skjemameldinger, chat) står i `STRINGS` i `i18n.js`.
 - Bookingskjemaet sender alltid tjenestenavnet på norsk, så forespørslene i Netlify blir like uansett språk.
 - AI-stilrådgiveren svarer på samme språk som kunden skriver på.
+
+## Logo og profil
+Logoen er laget i kode slik at den er skarp på alle skjermer: «Viggo's» i skriveskrift (Google-fonten Great Vibes),
+«BARBERSHOP» i Cinzel, og ornamentlinjen med diamant som SVG (`--ornament` i `styles.css`). Fargene er dyp grønn og gull fra visittkortet.
+Bildet av gullskiltet ligger i `img/` (webp i to størrelser).
