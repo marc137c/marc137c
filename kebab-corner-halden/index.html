@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kebab Corner Halden</title>
-<meta name="description" content="Kebab Corner i Nedre Bankegate 6 i Halden: kebab, pizza og flammeburgere. Se hele menyen med priser og allergener, og ring for å bestille.">
+<meta name="description" content="Kebab Corner i Nedre Bankegate 6 i Halden: kebab, pizza og flammeburgere. Se hele menyen med priser, og ring for å bestille.">
 <meta property="og:title" content="Kebab Corner Halden">
 <meta property="og:description" content="Kebab, pizza og burgere i Halden. Ring oss, så ordner vi maten.">
 <meta property="og:type" content="restaurant">
@@ -526,25 +526,25 @@ const SITE = {
     fakta: ["Kebab", "Pizza", "Flame-grilled burgers"],
     tiderMerknad: ""
   },
-  // Allergenkoder som brukes i menyen under
-  allergener: { G: "Gluten", SO: "Soya", M: "Melk", F: "Fisk", SE: "ikke oppgitt", H: "ikke oppgitt" },
+  // Allergenkoder som brukes i menyen under, for eksempel { G: "Gluten", M: "Melk" }. {} = skjult
+  allergener: {},
   // Priser i kroner. To priser = liten / stor (krever storrelser på kategorien).
   // Felter per rett: navn, pris, og valgfritt tekst, allergener, tag ("pop" | "veg" | "hot").
   // Kategorier uten retter vises ikke.
   meny: [
     { kategori: "Kebab", retter: [
-      { navn: "Kebab i pita",        pris: [109], allergener: ["G","SO"] },
-      { navn: "Kebab rull",          pris: [119], allergener: ["G","SO"] },
-      { navn: "Kebab tallerken",     pris: [149], allergener: ["SO","SE"] },
-      { navn: "Kyllingkebab i pita", pris: [145], allergener: ["G"] },
-      { navn: "Biffkebab i pita",    pris: [149], allergener: ["G"] },
-      { navn: "Kyllingrull",         pris: [155], allergener: ["G"] },
-      { navn: "Biffrull",            pris: [159], allergener: ["G"] },
+      { navn: "Kebab i pita",        pris: [109] },
+      { navn: "Kebab rull",          pris: [119] },
+      { navn: "Kebab tallerken",     pris: [148] },
+      { navn: "Kyllingkebab i pita", pris: [135] },
+      { navn: "Biffkebab i pita",    pris: [135] },
+      { navn: "Kyllingrull",         pris: [148] },
+      { navn: "Biffrull",            pris: [148] },
     ]},
     { kategori: "Pizza", retter: [] },
     { kategori: "Burgere", retter: [] },
     { kategori: "Middag", retter: [] },
-    { kategori: "Tilbehør og drikke", retter: [] },
+    { kategori: "Drikke", retter: [] },
   ],
 };
 
@@ -596,7 +596,7 @@ const EN_WORDS = {
   "Pommes frites": "French fries", "Pommes med salat og dressing": "Fries with salad and dressing",
   "Pitabrød": "Pita bread", "Ekstra kjøtt i kebaben": "Extra meat in your kebab", "Ost i kebaben": "Cheese in your kebab",
   "Ananas i kebaben": "Pineapple in your kebab", "Ekstra saus i beger": "Extra sauce in a cup",
-  "Drikke": "Drink", "Energidrikke": "Energy drink", "Drikke 1,5 l": "Drink 1.5 l",
+  "Drikke": "Drinks", "Energidrikke": "Energy drink", "Drikke 1,5 l": "Drink 1.5 l",
   "Tomatsaus og ost.": "Tomato sauce and cheese.",
   "Tomatsaus, ost, marinert kylling, mais og fersk løk og paprika.": "Tomato sauce, cheese, marinated chicken, corn and fresh onion and bell pepper.",
   "Tomatsaus, ost, marinert biff, sopp og fersk løk og paprika.": "Tomato sauce, cheese, marinated beef, mushrooms and fresh onion and bell pepper.",
@@ -626,7 +626,19 @@ const EN_WORDS = {
   "Med salat, tomat, agurk, løk og mais. Jalapeños om du vil.": "With lettuce, tomato, cucumber, onion and corn. Jalapeños if you like.",
   "Cola, Cola Zero, Pepsi Max, Fanta Exotic, Solo, Villa, Urge, Fuze Tea Peach, Farris og Isklar.": "Cola, Cola Zero, Pepsi Max, Fanta Exotic, Solo, Villa, Urge, Fuze Tea Peach, Farris and Isklar.",
   "Red Bull, Monster og Prime i flere smaker.": "Red Bull, Monster and Prime in several flavours.",
-  "Cola, Pepsi Max, Urge og Fanta Exotic.": "Cola, Pepsi Max, Urge and Fanta Exotic."
+  "Cola, Pepsi Max, Urge og Fanta Exotic.": "Cola, Pepsi Max, Urge and Fanta Exotic.",
+  "Döner burger 200 g": "Döner burger 200 g",
+  "Biffburger med stekt döner, salat, tomat, agurk, løk, ost, hamburgerdressing og sterk saus om du vil.": "Beef burger with fried döner, lettuce, tomato, cucumber, onion, cheese, burger dressing and hot sauce if you like.",
+  "Liten porsjon. Stor kan også bestilles.": "Small portion. Large is also available.",
+  "Tomatsaus, ost, marinert biff og fersk champignon, løk og paprika.": "Tomato sauce, cheese, marinated beef and fresh mushrooms, onion and bell pepper.",
+  "Tomatsaus, ost, kebabkjøtt, pommes frites og fersk paprika og løk.": "Tomato sauce, cheese, kebab meat, fries and fresh bell pepper and onion.",
+  "Tomatsaus, ost, mais, peppermix, oliven og fersk løk, paprika og champignon.": "Tomato sauce, cheese, corn, mixed peppers, olives and fresh onion, bell pepper and mushrooms.",
+  "Chili-tomatsaus, ost, nachos chips, jalapeños, biff eller kylling og løk.": "Chili tomato sauce, cheese, nacho chips, jalapeños, beef or chicken and onion.",
+  "Brus 0,5 l": "Soft drink 0.5 l", "Brus 1,5 l": "Soft drink 1.5 l", "Vann 0,5 l": "Water 0.5 l",
+  "Cola, Cola Zero, Pepsi Max, Fanta Exotic, Villa, Solo, Fuze Tea Peach og Urge.": "Cola, Cola Zero, Pepsi Max, Fanta Exotic, Villa, Solo, Fuze Tea Peach and Urge.",
+  "Isklar uten kullsyre eller Farris med kullsyre.": "Isklar still or Farris sparkling.",
+  "Original, Monarch, Mango Loco, Ultra Fiesta Mango, Ultra Gold, Ultra Rosa og Lewis Hamilton.": "Original, Monarch, Mango Loco, Ultra Fiesta Mango, Ultra Gold, Ultra Rosa and Lewis Hamilton.",
+  "Lime, Blue Raspberry, Tropical Punch, Ice Pop og Jordbær Vannmelon.": "Lime, Blue Raspberry, Tropical Punch, Ice Pop and Strawberry Watermelon."
 };
 const tr = s => (EN && s && Object.prototype.hasOwnProperty.call(EN_WORDS, s)) ? EN_WORDS[s] : s;
 
@@ -645,7 +657,7 @@ const T = EN ? {
   strength: n => `Strength ${n} of 3`,
   tags: { veg: "Vegetarian", pop: "Bestseller", hot: "Spicy" },
   checking: "Checking opening hours…",
-  description: "Kebab Corner at Nedre Bankegate 6 in Halden: kebab, pizza and flame-grilled burgers. See the full menu with prices and allergens, and call to order."
+  description: "Kebab Corner at Nedre Bankegate 6 in Halden: kebab, pizza and flame-grilled burgers. See the full menu with prices, and call to order."
 } : {
   days: ["Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag","Søndag"],
   today: "I dag", closed: "Stengt",
