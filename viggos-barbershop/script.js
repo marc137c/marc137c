@@ -26,6 +26,26 @@ document.querySelectorAll("[data-socials-wrap]").forEach((w) => {
   w.hidden = !w.querySelector("[data-social]:not([hidden])");
 });
 
+// Lyst / mørkt tema (valget huskes)
+const themeBtn = document.getElementById("theme-toggle");
+const themeMeta = document.querySelector('meta[name="theme-color"]');
+const isLight = () => document.documentElement.dataset.theme === "light";
+function setThemeLabel() {
+  themeBtn.setAttribute("aria-label", isLight() ? I18N.s().toDark : I18N.s().toLight);
+  themeBtn.setAttribute("aria-pressed", String(isLight()));
+}
+themeBtn.addEventListener("click", () => {
+  const light = !isLight();
+  if (light) document.documentElement.dataset.theme = "light";
+  else delete document.documentElement.dataset.theme;
+  themeMeta.content = light ? "#f7f2e8" : "#0b0f0d";
+  try { localStorage.setItem("theme", light ? "light" : "dark"); } catch { /* privat modus */ }
+  setThemeLabel();
+  window.dispatchEvent(new Event("themechange"));
+});
+setThemeLabel();
+I18N.onChange(setThemeLabel);
+
 // Mobilmeny
 const toggle = document.querySelector(".nav-toggle");
 const menu = document.getElementById("nav-menu");

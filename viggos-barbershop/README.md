@@ -69,3 +69,8 @@ Instagram-kontoen må være en **profesjonell konto** (Bedrift eller Innholdsska
    Logg inn med @viggos.barbershop og godkjenn. Siden bekrefter når kontoen er koblet, og postene vises med en gang.
 
 `<din-side>` må være den samme adressen som er registrert i steg 3, for eksempel `viggos-barbershop.netlify.app`.
+
+## Lyst og mørkt tema
+Sol/måne-knappen øverst i menyen bytter mellom mørkt tema (standard) og lyst tema, og valget huskes.
+Fargene for begge temaene står som variabler øverst i `styles.css` (`:root` og `:root[data-theme="light"]`).
+Den animerte bakgrunnen i toppen bytter farger mykt sammen med temaet.

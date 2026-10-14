@@ -6,6 +6,10 @@
   <title data-i18n="meta.title">Viggo's Barbershop – Barber i Halden sentrum</title>
   <meta name="description" data-i18n-attr="content:meta.desc" content="Viggo's Barbershop i Svenskegata 2, Halden sentrum. Herreklipp, fade, skjeggtrim og varm håndklebarbering. Ring 409 63 911 eller bestill time.">
   <meta name="theme-color" content="#0b0f0d">
+  <script>
+    // Velg tema før siden tegnes, så den ikke blinker mørk først
+    try { if (localStorage.getItem("theme") === "light") { document.documentElement.dataset.theme = "light"; document.querySelector('meta[name="theme-color"]').content = "#f7f2e8"; } } catch (e) {}
+  </script>
   <meta property="og:title" content="Viggo's Barbershop">
   <meta property="og:description" content="Barber i Halden sentrum – herreklipp, fade, skjeggtrim og varm håndklebarbering.">
   <meta property="og:locale" content="nb_NO">
@@ -50,6 +54,10 @@
         <span class="brand-script">Viggo's</span>
         <span class="brand-caps">Barbershop</span>
       </a>
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Bytt til lyst tema">
+        <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.5 8.5 0 1 0 11.1 11.1z"/></svg>
+      </button>
       <button class="lang-toggle" id="lang-toggle" type="button" aria-label="Switch to English">
         <span class="lang-track" aria-hidden="true"><span class="lang-knob"></span></span>
         <span class="lang-label" lang="en">English</span>
