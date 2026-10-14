@@ -51,6 +51,9 @@
     "stat.dropin": "and appointments",
     "c.sms": "Send a text",
     "c.maptitle": "Map: Svenskegata 2, 1776 Halden",
+    "soc.eyebrow": "Social media",
+    "soc.title": "Fresh from the chair",
+    "soc.lead": "Our latest cuts from Instagram and TikTok.",
     "about.eyebrow": "About us",
     "about.img": "Viggo's Barbershop gold sign on the window",
     "about.title": "A place for good conversation and sharp lines",
@@ -111,6 +114,8 @@
       chatDown: "Stilrådgiveren er utilgjengelig akkurat nå.",
       price: (n) => `${n},-`,
       switchTo: "Switch to English",
+      followOn: (n) => `Følg oss på ${n}`,
+      openPost: (n) => `Åpne innlegget på ${n}`,
     },
     en: {
       days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
@@ -130,6 +135,8 @@
       chatDown: "The style advisor is unavailable right now.",
       price: (n) => `NOK ${n}`,
       switchTo: "Bytt til norsk",
+      followOn: (n) => `Follow us on ${n}`,
+      openPost: (n) => `Open the post on ${n}`,
     },
   };
 

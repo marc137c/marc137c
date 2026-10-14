@@ -9,10 +9,10 @@ Bookingskjemaet bruker Netlify Forms – forespørsler dukker opp under **Forms*
 ## Bedriftsinfo (bekreftet)
 - **Viggos Barbershop Kurti**, org.nr. 937 845 812, innehaver Vigan Kurti
 - Svenskegata 2, 1776 Halden – telefon 409 63 911 – e-post kurtivigan1@gmail.com
+- Instagram [@viggos.barbershop](https://www.instagram.com/viggos.barbershop/), TikTok [@viggos.barbershop1](https://www.tiktok.com/@viggos.barbershop1), [Facebook](https://www.facebook.com/share/19enEU6x6Q/) (lenkene står i `SOCIAL` i `script.js`)
 - Kilder: Brønnøysund via Proff.no, Gule Sider og Halden Arbeiderblad
 
 ## Må bekreftes / fylles inn
-- **Sosiale medier:** lim inn lenkene i `SOCIAL` øverst i `script.js`. Ikonene vises først når en lenke er lagt inn.
 - **Priser og tjenester:** står i `index.html` og i `SYSTEM` i `netlify/functions/chat.mjs`.
 - **Åpningstider:** står i tabellen i `index.html`, i `HOURS` øverst i `script.js` og i `chat.mjs`.
 - **Bookingvarsler:** i Netlify går du til **Forms → booking → Form notifications** og legger inn kurtivigan1@gmail.com, så kommer timeforespørslene på e-post.
@@ -42,3 +42,38 @@ Besøkende med nettleser på norsk får norsk, alle andre får engelsk. Lenke di
 Logoen er laget i kode slik at den er skarp på alle skjermer: «Viggo's» i skriveskrift (Google-fonten Great Vibes),
 «BARBERSHOP» i Cinzel, og ornamentlinjen med diamant som SVG (`--ornament` i `styles.css`). Fargene er dyp grønn og gull fra visittkortet.
 Bildet av gullskiltet ligger i `img/` (webp i to størrelser).
+
+## Instagram- og TikTok-feed (oppdateres automatisk)
+Seksjonen «Ferskt fra stolen» viser de 3 nyeste postene fra Instagram og de 3 nyeste fra TikTok (2 per rad, 3 rader).
+
+Slik fungerer det:
+- `netlify/functions/social-refresh.mjs` kjører **hver time**. Den henter nye poster, fornyer tilgangsnøklene automatisk og lagrer feeden i Netlify Blobs.
+- `/api/social` (`netlify/functions/social.mjs`) leverer feeden til siden (`social-feed.js`).
+- Før kontoene er koblet til, vises «Følg oss»-kort med lenke til profilene.
+
+### Engangsoppsett (ca. 20 minutter)
+**1. Netlify → Site configuration → Environment variables:**
+| Variabel | Verdi |
+|---|---|
+| `SOCIAL_ADMIN_KEY` | Et langt, hemmelig passord du finner på selv. Beskytter koblingslenkene. |
+| `INSTAGRAM_APP_ID`, `INSTAGRAM_APP_SECRET` | Fra Meta-appen (steg 2) |
+| `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET` | Fra TikTok-appen (steg 3) |
+
+**2. Instagram** (kontoen må være en *profesjonell konto*: Bedrift eller Innholdsskaper)
+1. Opprett en app på developers.facebook.com → produktet **Instagram** → «API setup with Instagram login».
+2. Legg inn **Valid OAuth Redirect URI**: `https://<din-side>/api/connect/instagram/callback`
+3. Legg til @viggos.barbershop som Instagram-tester og godta invitasjonen i Instagram-appen.
+4. Kopier Instagram App ID og App Secret til Netlify.
+
+**3. TikTok**
+1. Opprett en app på developers.tiktok.com med **Login Kit** og **Display API** (scopes `user.info.basic` og `video.list`).
+2. Legg inn **Redirect URI**: `https://<din-side>/api/connect/tiktok/callback`
+3. Mens appen er i sandbox: legg @viggos.barbershop1 til som «target user».
+4. Kopier Client key og Client secret til Netlify.
+
+**4. Koble til kontoene** (etter at siden er publisert med variablene over):
+- `https://<din-side>/api/connect/instagram?key=<SOCIAL_ADMIN_KEY>`
+- `https://<din-side>/api/connect/tiktok?key=<SOCIAL_ADMIN_KEY>`
+
+Logg inn og godkjenn. Siden bekrefter når kontoen er koblet, og postene vises med en gang. Deretter går alt av seg selv.
+`<din-side>` må være den samme adressen som er registrert i appene, for eksempel `viggos-barbershop.netlify.app`.

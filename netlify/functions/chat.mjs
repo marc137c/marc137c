@@ -28,6 +28,7 @@ Tjenester og priser:
 
 Åpningstider: man–ons og fre 10–18, tor 10–20, lør 10–16, søndag stengt. Drop-in når det er ledig.
 Adresse: Svenskegata 2, 1776 Halden (Halden sentrum). Telefon: 409 63 911 (ring eller send SMS). E-post: kurtivigan1@gmail.com.
+Instagram: @viggos.barbershop. TikTok: @viggos.barbershop1. Facebook: Viggo's Barbershop.
 Barbershopen åpnet i 2026 og drives av Vigan Kurti, tidligere daglig leder i Halden Frisør.`;
 
 const json = (status, body) =>

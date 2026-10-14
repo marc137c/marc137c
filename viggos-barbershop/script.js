@@ -14,9 +14,9 @@ const fmt = (min) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(
 // Sosiale medier: lim inn lenkene her, så dukker ikonene opp på siden.
 // Tom streng = ikonet skjules.
 const SOCIAL = {
-  instagram: "",
-  tiktok: "",
-  facebook: "",
+  instagram: "https://www.instagram.com/viggos.barbershop/",
+  tiktok: "https://www.tiktok.com/@viggos.barbershop1",
+  facebook: "https://www.facebook.com/share/19enEU6x6Q/",
 };
 document.querySelectorAll("[data-social]").forEach((a) => {
   const url = SOCIAL[a.dataset.social];
