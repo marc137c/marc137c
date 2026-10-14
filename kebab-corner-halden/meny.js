@@ -6,15 +6,15 @@ window.MENY_DATA = {
     {
       "kategori": "Kebab",
       "retter": [
-        { "navn": "Kebab i pita", "pris": [109], "allergener": ["G", "SO"] },
-        { "navn": "Kebab rull", "pris": [119], "allergener": ["G", "SO"] },
-        { "navn": "Kebab tallerken", "pris": [149], "allergener": ["SO", "SE"] },
-        { "navn": "Kyllingkebab i pita", "pris": [145], "allergener": ["G"] },
-        { "navn": "Biffkebab i pita", "pris": [149], "allergener": ["G"] },
-        { "navn": "Kyllingrull", "pris": [155], "allergener": ["G"] },
-        { "navn": "Biffrull", "pris": [159], "allergener": ["G"] },
-        { "navn": "Kyllingkebab tallerken", "pris": [175], "allergener": ["SE"] },
-        { "navn": "Biffkebab tallerken", "pris": [179], "allergener": ["SE"] }
+        { "navn": "Kebab i pita", "tekst": "Med salat, tomat, agurk, løk og mais.", "pris": [109], "allergener": ["G", "SO"] },
+        { "navn": "Kebab rull", "tekst": "Med salat, tomat, agurk, løk og mais.", "pris": [119], "allergener": ["G", "SO"] },
+        { "navn": "Kebab tallerken", "tekst": "Med salat, tomat, agurk, løk og mais.", "pris": [149], "allergener": ["SO", "SE"] },
+        { "navn": "Kyllingkebab i pita", "tekst": "Med salat, tomat, agurk, løk og mais.", "pris": [145], "allergener": ["G"] },
+        { "navn": "Biffkebab i pita", "tekst": "Med salat, tomat, agurk, løk og mais.", "pris": [149], "allergener": ["G"] },
+        { "navn": "Kyllingrull", "tekst": "Med salat, tomat, agurk, løk og mais.", "pris": [155], "allergener": ["G"] },
+        { "navn": "Biffrull", "tekst": "Med salat, tomat, agurk, løk og mais.", "pris": [159], "allergener": ["G"] },
+        { "navn": "Kyllingkebab tallerken", "tekst": "Med salat, tomat, agurk, løk og mais.", "pris": [175], "allergener": ["SE"] },
+        { "navn": "Biffkebab tallerken", "tekst": "Med salat, tomat, agurk, løk og mais.", "pris": [179], "allergener": ["SE"] }
       ]
     },
     {
@@ -41,11 +41,12 @@ window.MENY_DATA = {
     {
       "kategori": "Burgere",
       "retter": [
-        { "navn": "Hamburger 100 g", "pris": [89], "allergener": ["G"] },
-        { "navn": "Hamburger 160 g", "pris": [139], "allergener": ["G"] },
-        { "navn": "Biffburger 200 g", "tekst": "Hjemmelaget.", "pris": [159], "allergener": ["G"] },
-        { "navn": "Løvbiff burger", "pris": [129] },
-        { "navn": "Döner burger", "pris": [99] },
+        { "navn": "Hamburger 100 g", "tekst": "Med salat, tomat, agurk, løk, hamburgerdressing og sterk saus om du vil.", "pris": [89], "allergener": ["G"] },
+        { "navn": "Hamburger 160 g", "tekst": "Med salat, tomat, agurk, løk, hamburgerdressing og sterk saus om du vil.", "pris": [139], "allergener": ["G"] },
+        { "navn": "Hamburger 320 g", "tekst": "Med salat, tomat, agurk, løk, hamburgerdressing og sterk saus om du vil.", "pris": [189], "allergener": ["G"] },
+        { "navn": "Biffburger 200 g", "tekst": "Hjemmelaget. Med salat, tomat, agurk, løk, hamburgerdressing og sterk saus om du vil.", "pris": [159], "allergener": ["G"] },
+        { "navn": "Løvbiff burger", "tekst": "Med salat, tomat, agurk, løk, hamburgerdressing og sterk saus om du vil.", "pris": [129] },
+        { "navn": "Döner burger", "tekst": "Burger med stekt döner, salat, tomat, agurk, løk, ost, hamburgerdressing og sterk saus om du vil.", "pris": [99] },
         { "navn": "Mexican burger", "tekst": "19 kr i tillegg til burgeren.", "pris": [19] },
         { "navn": "Hawaii burger", "tekst": "19 kr i tillegg til burgeren.", "pris": [19] },
         { "navn": "Barbecue burger", "tekst": "19 kr i tillegg til burgeren.", "pris": [19] },
@@ -55,13 +56,13 @@ window.MENY_DATA = {
     {
       "kategori": "Middag",
       "retter": [
-        { "navn": "Fish & chips", "pris": [169], "allergener": ["F", "SE", "H"] },
-        { "navn": "Biff snadder", "pris": [195], "allergener": ["SE"] },
-        { "navn": "Kylling snadder", "pris": [189], "allergener": ["SE"] },
-        { "navn": "Løvstek tallerken", "pris": [169], "allergener": ["SE"] },
-        { "navn": "Nuggets og pommes", "pris": [99], "allergener": ["H", "SE"] },
-        { "navn": "Falafelrull", "pris": [119], "allergener": ["H"] },
-        { "navn": "Falafeltallerken", "pris": [149], "allergener": ["H", "SE"] }
+        { "navn": "Fish & chips", "tekst": "Fritert fisk med pommes frites, salat, tomat, løk, agurk, mais og remulade.", "pris": [169], "allergener": ["F", "SE", "H"] },
+        { "navn": "Biff snadder", "tekst": "Biff med stekt paprika, løk og champignon. Serveres med salat.", "pris": [195], "allergener": ["SE"] },
+        { "navn": "Kylling snadder", "tekst": "Kylling med stekt paprika, løk og champignon. Serveres med salat.", "pris": [189], "allergener": ["SE"] },
+        { "navn": "Løvstek tallerken", "tekst": "Med salat, tomat, agurk, løk, mais og bearnaise.", "pris": [169], "allergener": ["SE"] },
+        { "navn": "Nuggets og pommes", "tekst": "8 nuggets med pommes frites.", "pris": [99], "allergener": ["H", "SE"] },
+        { "navn": "Falafelrull", "tekst": "Med salat, tomat, agurk, løk og mais. Jalapeños om du vil.", "pris": [119], "allergener": ["H"] },
+        { "navn": "Falafeltallerken", "tekst": "Med salat, tomat, agurk, løk og mais. Jalapeños om du vil.", "pris": [149], "allergener": ["H", "SE"] }
       ]
     },
     {
@@ -75,9 +76,9 @@ window.MENY_DATA = {
         { "navn": "Ost i kebaben", "pris": [19], "allergener": ["M"] },
         { "navn": "Ananas i kebaben", "pris": [19] },
         { "navn": "Ekstra saus i beger", "pris": [29] },
-        { "navn": "Drikke", "pris": [35, 40] },
-        { "navn": "Energidrikke", "pris": [40] },
-        { "navn": "Drikke 1,5 l", "pris": [60] }
+        { "navn": "Drikke", "tekst": "Cola, Cola Zero, Pepsi Max, Fanta Exotic, Solo, Villa, Urge, Fuze Tea Peach, Farris og Isklar.", "pris": [35, 40] },
+        { "navn": "Energidrikke", "tekst": "Red Bull, Monster og Prime i flere smaker.", "pris": [40] },
+        { "navn": "Drikke 1,5 l", "tekst": "Cola, Pepsi Max, Urge og Fanta Exotic.", "pris": [60] }
       ]
     }
   ],
