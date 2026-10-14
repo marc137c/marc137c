@@ -13,20 +13,10 @@ Bookingskjemaet bruker Netlify Forms – forespørsler dukker opp under **Forms*
 - Kilder: Brønnøysund via Proff.no, Gule Sider og Halden Arbeiderblad
 
 ## Må bekreftes / fylles inn
-- **Priser og tjenester:** står i `index.html` og i `SYSTEM` i `netlify/functions/chat.mjs`.
-- **Åpningstider:** står i tabellen i `index.html`, i `HOURS` øverst i `script.js` og i `chat.mjs`.
+- **Priser og tjenester:** står i `index.html`.
+- **Åpningstider:** står i tabellen i `index.html` og i `HOURS` øverst i `script.js`.
 - **Bookingvarsler:** i Netlify går du til **Forms → booking → Form notifications** og legger inn kurtivigan1@gmail.com, så kommer timeforespørslene på e-post.
 - **Omtaler:** seksjonen er fjernet til ekte omtaler finnes, for eksempel fra Google.
-
-## AI-stilrådgiver (Claude)
-Chat-knappen nede til høyre sender spørsmål til `/api/chat`, en Netlify Function (`netlify/functions/chat.mjs`)
-som kaller Claude via Anthropic sitt offisielle SDK. API-nøkkelen ligger kun på serveren – aldri i nettleseren.
-
-Oppsett i Netlify → **Site configuration → Environment variables**:
-- `ANTHROPIC_API_KEY` – nøkkel fra https://platform.claude.com (påkrevd)
-- `CLAUDE_MODEL` – valgfri, standard er `claude-fable-5-1`. Sett f.eks. `claude-haiku-5-5` for en mye billigere modell.
-
-Priser, åpningstider og regler for assistenten står i `SYSTEM`-teksten øverst i `chat.mjs` – oppdater den sammen med nettsiden.
 
 ## Språk (norsk / English)
 Siden finnes på norsk og engelsk. Bryteren **English / Norsk** øverst i menyen bytter språk på hele siden, og valget huskes.
@@ -34,9 +24,8 @@ Besøkende med nettleser på norsk får norsk, alle andre får engelsk. Lenke di
 
 - Norsk tekst står i `index.html`. Engelsk tekst står i `EN` i `i18n.js` (samme nøkkel som `data-i18n` i HTML-en).
 - Endrer du en tekst på norsk, oppdater den engelske også.
-- Tekster som lages av JavaScript (åpent/stengt, skjemameldinger, chat) står i `STRINGS` i `i18n.js`.
+- Tekster som lages av JavaScript (åpent/stengt, skjemameldinger) står i `STRINGS` i `i18n.js`.
 - Bookingskjemaet sender alltid tjenestenavnet på norsk, så forespørslene i Netlify blir like uansett språk.
-- AI-stilrådgiveren svarer på samme språk som kunden skriver på.
 
 ## Logo og profil
 Logoen er laget i kode slik at den er skarp på alle skjermer: «Viggo's» i skriveskrift (Google-fonten Great Vibes),
@@ -76,6 +65,6 @@ Fargene for begge temaene står som variabler øverst i `styles.css` (`:root` og
 Den animerte bakgrunnen i toppen bytter farger mykt sammen med temaet.
 
 ## Gyllent partikkel-snøfall
-`gold-snow.js` legger et stille snøfall av gullstøv over hele siden. Det tar ikke imot klikk og ligger under menyen og chatten.
+`gold-snow.js` legger et stille snøfall av gullstøv over hele siden. Det tar ikke imot klikk og ligger under menyen.
 Antall partikler tilpasses skjermstørrelsen, og ved «redusert bevegelse» i systeminnstillingene står støvet stille.
 Juster mengden i `resize()` (tallet `20000` – lavere tall gir flere partikler) eller farten i `makeFlake()`.

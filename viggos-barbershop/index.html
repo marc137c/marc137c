@@ -95,7 +95,6 @@
         <div class="hero-cta anim" style="--d:.75s">
           <a class="btn" href="#bestill" data-i18n="cta.book">Bestill time</a>
           <a class="btn btn-ghost" href="#tjenester" data-i18n="cta.prices">Se priser</a>
-          <button class="btn btn-ghost" type="button" data-open-chat data-i18n="cta.ai">✂ Finn din stil med AI</button>
         </div>
         <p class="status anim" style="--d:.9s" id="open-status" aria-live="polite"></p>
       </div>
@@ -284,33 +283,6 @@
       <a href="#top" data-i18n="totop">Til toppen ↑</a>
     </div>
   </footer>
-
-  <!-- AI-STILRÅDGIVER -->
-  <button class="chat-fab" id="chat-open" aria-controls="chat-panel" aria-expanded="false">
-    <span aria-hidden="true">✂</span> <span data-i18n="chat.fab">Spør stilrådgiveren</span>
-  </button>
-  <section class="chat-panel" id="chat-panel" data-i18n-attr="aria-label:chat.label" aria-label="AI-stilrådgiver" hidden>
-    <header class="chat-head">
-      <div>
-        <strong data-i18n="chat.title">Stilrådgiveren</strong>
-        <small data-i18n="chat.sub">AI-assistent · svarer på sekunder</small>
-      </div>
-      <button class="chat-close" id="chat-close" data-i18n-attr="aria-label:chat.close" aria-label="Lukk">×</button>
-    </header>
-    <div class="chat-log" id="chat-log" aria-live="polite">
-      <div class="msg bot" data-i18n="chat.hello">Hei! Fortell litt om håret, ansiktsformen eller stilen du ønsker, så foreslår jeg en klipp som passer deg.</div>
-    </div>
-    <div class="chat-chips" id="chat-chips">
-      <button type="button" data-i18n="chip.1">Hvilken fade passer meg?</button>
-      <button type="button" data-i18n="chip.2">Jeg har tynt hår – hva anbefaler du?</button>
-      <button type="button" data-i18n="chip.3">Hvordan holder jeg skjegget pent?</button>
-    </div>
-    <form class="chat-form" id="chat-form">
-      <input id="chat-input" maxlength="1000" placeholder="Skriv et spørsmål …" autocomplete="off" aria-label="Melding" data-i18n-attr="placeholder:chat.ph;aria-label:chat.msg">
-      <button type="submit" aria-label="Send">➤</button>
-    </form>
-    <p class="chat-disclaimer" data-i18n="chat.disc">Svarene er generert av AI og kan inneholde feil.</p>
-  </section>
 
   <script src="i18n.js"></script>
   <script src="shader-hero.js"></script>
