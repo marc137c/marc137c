@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#141010">
+<title>Kjøkken · Kebab Corner</title>
+<link rel="icon" href="bilder/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Kjøkkenskjerm: store knapper for nettbrett, tre kolonner (nye, lages, klar), mørkt som nettsiden. */
+:root{
+  --bg:#141010; --surface:#1E1817; --surface-2:#28211F;
+  --line:rgba(243,237,230,.11); --line-strong:rgba(243,237,230,.24);
+  --text:#F3EDE6; --muted:#A69C94;
+  --accent:#D42E23; --accent-text:#F0574A; --ok:#7FCB8C; --ok-bg:#163A22; --warn:#F2B35B;
+  --font-display:"Archivo","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --font-body:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --radius:8px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:400 1rem/1.5 var(--font-body);-webkit-font-smoothing:antialiased}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent-text);outline-offset:3px}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+.bar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;padding:.8rem clamp(1rem,3vw,2rem);background:rgba(20,16,16,.94);border-bottom:1px solid var(--line);backdrop-filter:blur(10px)}
+.bar img{width:2.3rem;height:2.3rem;border-radius:6px;background:#fff;object-fit:contain}
+.bar b{font-family:var(--font-display);font-stretch:80%;font-weight:800;text-transform:uppercase;font-size:1.25rem;letter-spacing:.01em}
+.bar .clock{font-family:var(--font-display);font-stretch:85%;font-weight:700;font-size:1.3rem;font-variant-numeric:tabular-nums;color:var(--muted)}
+.bar .sp{flex:1}
+.conn{display:inline-flex;align-items:center;gap:.45rem;font-size:.85rem;color:var(--muted)}
+.conn::before{content:"";width:.55rem;height:.55rem;border-radius:50%;background:var(--ok)}
+.conn.off::before{background:var(--accent-text)}
+.tbtn{min-height:2.6rem;padding:.4rem .9rem;border-radius:999px;border:1px solid var(--line-strong);background:transparent;cursor:pointer;font-weight:600;font-size:.9rem}
+.tbtn[aria-pressed="true"]{background:var(--surface-2);border-color:var(--text)}
+
+.login{max-width:26rem;margin:12vh auto;padding:0 1.25rem;display:grid;gap:1rem}
+.login h1{font-family:var(--font-display);font-stretch:74%;font-weight:800;text-transform:uppercase;font-size:clamp(2.6rem,9vw,3.6rem);line-height:.95;margin:0}
+.login p{color:var(--muted);margin:0}
+.login input[type=password]{width:100%;font:inherit;font-size:1.15rem;color:var(--text);background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius);padding:.9rem 1rem;letter-spacing:.05em}
+.login input:focus{outline:none;border-color:var(--accent-text)}
+.check{display:flex;align-items:center;gap:.55rem;color:var(--muted)}
+.check input{accent-color:var(--accent);width:1.1rem;height:1.1rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:3.4rem;padding:.7rem 1.3rem;border-radius:var(--radius);font-weight:700;font-size:1.05rem;border:1px solid transparent;cursor:pointer;transition:background .15s,transform .1s}
+.btn:active{transform:scale(.98)}
+.btn[disabled]{opacity:.5;cursor:wait}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#B9251B}
+.btn-ok{background:#2E7D46;color:#fff}
+.btn-ok:hover{background:#25683A}
+.btn-line{background:transparent;border-color:var(--line-strong)}
+.btn-line:hover{border-color:var(--text)}
+.btn-ghost{background:transparent;color:var(--muted);min-height:2.6rem;font-size:.92rem;font-weight:600;padding:.4rem .7rem}
+.btn-ghost:hover{color:var(--text)}
+.err{color:#FFB4AC;background:rgba(212,46,35,.14);border-radius:var(--radius);padding:.75rem 1rem;margin:0}
+
+.board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.25rem;padding:1.25rem clamp(1rem,3vw,2rem) 3rem;align-items:start}
+@media (max-width:980px){.board{grid-template-columns:1fr}}
+.col h2{display:flex;align-items:center;gap:.6rem;margin:0 0 .9rem;font-family:var(--font-display);font-stretch:80%;font-weight:800;text-transform:uppercase;font-size:1.4rem;letter-spacing:.01em}
+.col h2 .n{display:grid;place-items:center;min-width:1.9rem;height:1.9rem;padding:0 .5rem;border-radius:999px;background:var(--surface-2);font-family:var(--font-body);font-size:.95rem}
+.col.ny h2 .n{background:var(--accent);color:#fff}
+.col.klar h2 .n{background:#2E7D46;color:#fff}
+.list{display:grid;gap:1rem}
+.empty{color:var(--muted);border:1px dashed var(--line-strong);border-radius:var(--radius);padding:1.5rem;text-align:center;margin:0}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1.1rem 1.1rem 1rem;display:grid;gap:.85rem}
+.card.ny{border-color:rgba(240,87,74,.55)}
+.card.fresh{animation:fresh 1.2s ease 3}
+@keyframes fresh{50%{box-shadow:0 0 0 4px rgba(240,87,74,.45)}}
+@media (prefers-reduced-motion:reduce){.card.fresh{animation:none}}
+.card.klar{border-color:rgba(127,203,140,.5);background:linear-gradient(var(--ok-bg),var(--surface) 70%)}
+.head{display:flex;align-items:baseline;justify-content:space-between;gap:1rem}
+.num{font-family:var(--font-display);font-stretch:80%;font-weight:900;font-size:2.6rem;line-height:.9}
+.who{font-weight:700;font-size:1.1rem}
+.who a{color:var(--muted);font-weight:500;font-size:.95rem;margin-left:.4rem}
+.when{text-align:right;display:grid;gap:.15rem}
+.when b{font-size:1.05rem}
+.when b.asap{color:var(--warn)}
+.when small{color:var(--muted)}
+.items{list-style:none;margin:0;padding:0;display:grid;gap:.45rem}
+.items li{display:grid;grid-template-columns:2.4rem minmax(0,1fr) auto;gap:.6rem;align-items:baseline;font-size:1.08rem}
+.items .q{font-family:var(--font-display);font-stretch:85%;font-weight:800;font-size:1.3rem}
+.items .s{color:var(--muted);font-size:.92rem;margin-left:.3rem}
+.items .w{grid-column:2 / 4;color:var(--warn);font-weight:600;font-size:.98rem;margin-top:-.2rem}
+.items .p{color:var(--muted);font-variant-numeric:tabular-nums;font-size:.95rem}
+.note{margin:0;padding:.65rem .8rem;border-left:3px solid var(--warn);background:rgba(242,179,91,.08);border-radius:0 6px 6px 0;font-size:.98rem}
+.foot{display:flex;justify-content:space-between;align-items:baseline;color:var(--muted);font-size:.92rem;border-top:1px solid var(--line);padding-top:.7rem}
+.foot b{color:var(--text);font-size:1.15rem;font-family:var(--font-display);font-stretch:85%}
+.acts{display:grid;grid-template-columns:1fr auto;gap:.5rem}
+.done{padding:0 clamp(1rem,3vw,2rem) 3rem}
+.done summary{cursor:pointer;color:var(--muted);font-weight:600;padding:.5rem 0}
+.done ul{list-style:none;margin:.5rem 0 0;padding:0;display:grid;gap:.4rem}
+.done li{display:flex;gap:1rem;align-items:center;justify-content:space-between;padding:.6rem .9rem;background:var(--surface);border-radius:var(--radius);color:var(--muted)}
+.done li b{color:var(--text)}
+.toast{position:fixed;left:50%;bottom:1.25rem;translate:-50% 0;z-index:9;background:var(--surface-2);border:1px solid var(--line-strong);border-radius:999px;padding:.7rem 1.2rem;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <img src="bilder/logo.png" alt="">
+  <b>Kjøkken</b>
+  <span class="clock" id="clock"></span>
+  <span class="sp"></span>
+  <span class="conn" id="conn" hidden>Tilkoblet</span>
+  <button type="button" class="tbtn" id="sound" aria-pressed="false" hidden>Lyd av</button>
+  <button type="button" class="tbtn" id="awake" aria-pressed="false" hidden>Hold skjermen på</button>
+  <button type="button" class="tbtn" id="logout" hidden>Logg ut</button>
+</header>
+
+<main>
+  <form class="login" id="login" hidden>
+    <h1>Kjøkkenskjerm</h1>
+    <p>Skriv inn kjøkkenkoden. Her kommer nye bestillinger inn, og når du trykker «Klar», ser kunden at maten kan hentes.</p>
+    <label class="sr-only" for="code">Kjøkkenkode</label>
+    <input type="password" id="code" autocomplete="current-password" placeholder="Kjøkkenkode" required>
+    <label class="check" for="remember"><input type="checkbox" id="remember" checked> Husk koden på denne enheten</label>
+    <button type="submit" class="btn btn-primary" id="login-btn">Åpne kjøkkenskjermen</button>
+    <p class="err" id="login-err" role="alert" hidden></p>
+  </form>
+
+  <p class="err" id="setup" hidden style="margin:2rem">Nettbestilling er ikke satt opp. Legg inn Supabase-adressen og nøkkelen i <code>bestilling.js</code>.</p>
+
+  <div id="app" hidden>
+    <h1 class="sr-only">Bestillinger</h1>
+    <div class="board">
+      <section class="col ny" aria-labelledby="h-ny"><h2 id="h-ny">Nye <span class="n" id="n-ny">0</span></h2><div class="list" id="l-ny"></div></section>
+      <section class="col lager" aria-labelledby="h-lager"><h2 id="h-lager">Lages <span class="n" id="n-lager">0</span></h2><div class="list" id="l-lager"></div></section>
+      <section class="col klar" aria-labelledby="h-klar"><h2 id="h-klar">Klar til henting <span class="n" id="n-klar">0</span></h2><div class="list" id="l-klar"></div></section>
+    </div>
+    <details class="done"><summary id="done-sum">Ferdige i dag</summary><ul id="l-done"></ul></details>
+  </div>
+</main>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="bestilling.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const CFG = window.KC_BESTILLING || {};
+const KEY = "kc-kjokken-kode";
+let code = "";
+try { code = localStorage.getItem(KEY) || sessionStorage.getItem(KEY) || ""; } catch (e) {}
+
+async function rpc(fn, body) {
+  const headers = { "apikey": CFG.supabaseKey, "Content-Type": "application/json" };
+  if (/^eyJ/.test(CFG.supabaseKey)) headers.Authorization = "Bearer " + CFG.supabaseKey;
+  const res = await fetch(String(CFG.supabaseUrl).replace(/\/+$/, "") + "/rest/v1/rpc/" + fn, { method: "POST", headers, body: JSON.stringify(body) });
+  let out = null; try { out = await res.json(); } catch (e) {}
+  if (!res.ok) { const err = new Error((out && out.message) || "HTTP " + res.status); err.code = out && out.code; throw err; }
+  return out;
+}
+
+// Klokke
+const clock = () => { $("#clock").textContent = new Date().toLocaleTimeString("nb-NO", { timeZone: "Europe/Oslo", hour: "2-digit", minute: "2-digit" }); };
+clock(); setInterval(clock, 10000);
+
+function toast(t) { const el = $("#toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true; }, 3500); }
+
+// ---------- Innlogging ----------
+function visLogin(msg) {
+  $("#app").hidden = true; $("#login").hidden = false;
+  ["#sound", "#awake", "#logout", "#conn"].forEach(s => { $(s).hidden = true; });
+  $("#login-err").hidden = !msg; $("#login-err").textContent = msg || "";
+  $("#code").focus();
+}
+$("#login").addEventListener("submit", async e => {
+  e.preventDefault();
+  const c = $("#code").value.trim(); if (!c) return;
+  const btn = $("#login-btn"); btn.disabled = true;
+  try {
+    const ok = await rpc("kitchen_login", { p_code: c });
+    if (!ok) return visLogin("Feil kode. Prøv igjen.");
+    code = c;
+    try { ($("#remember").checked ? localStorage : sessionStorage).setItem(KEY, c); } catch (e) {}
+    $("#code").value = "";
+    start();
+  } catch (err) {
+    visLogin(/mange/.test(err.message) ? "For mange feil forsøk. Vent ti minutter og prøv igjen." : "Fikk ikke kontakt med bestillingssystemet. Sjekk nettet og prøv igjen.");
+  } finally { btn.disabled = false; }
+});
+$("#logout").addEventListener("click", () => {
+  try { localStorage.removeItem(KEY); sessionStorage.removeItem(KEY); } catch (e) {}
+  code = ""; clearInterval(timer); visLogin();
+});
+
+// ---------- Lyd ved ny bestilling ----------
+// Nettlesere spiller bare lyd etter at noen har trykket på siden, derfor en egen knapp.
+let audio = null, lyd = false;
+function pip() {
+  if (!lyd || !audio) return;
+  const t = audio.currentTime;
+  [0, .22, .44].forEach((d, i) => {
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.frequency.value = i === 2 ? 1175 : 880; o.type = "sine";
+    g.gain.setValueAtTime(0, t + d); g.gain.linearRampToValueAtTime(.35, t + d + .02); g.gain.exponentialRampToValueAtTime(.001, t + d + .2);
+    o.connect(g).connect(audio.destination); o.start(t + d); o.stop(t + d + .21);
+  });
+}
+$("#sound").addEventListener("click", () => {
+  lyd = !lyd;
+  if (lyd && !audio) { try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { lyd = false; } }
+  if (audio && audio.state === "suspended") audio.resume();
+  $("#sound").setAttribute("aria-pressed", String(lyd)); $("#sound").textContent = lyd ? "Lyd på" : "Lyd av";
+  if (lyd) pip();
+});
+
+// Skjermen slukker ikke mens siden er åpen (der nettleseren støtter det)
+let lock = null;
+$("#awake").addEventListener("click", async () => {
+  if (lock) { lock.release(); lock = null; }
+  else { try { lock = await navigator.wakeLock.request("screen"); lock.addEventListener("release", () => { lock = null; oppdaterAwake(); }); } catch (e) { toast("Skjermen kan ikke holdes på i denne nettleseren."); } }
+  oppdaterAwake();
+});
+function oppdaterAwake() { $("#awake").setAttribute("aria-pressed", String(!!lock)); $("#awake").textContent = lock ? "Skjermen holdes på" : "Hold skjermen på"; }
+
+// ---------- Bestillinger ----------
+const KNAPPER = {
+  ny: [["lager", "Start å lage", "btn-primary"], ["avvist", "Avvis", "btn-ghost"]],
+  lager: [["klar", "Klar til henting", "btn-ok"], ["ny", "Tilbake", "btn-ghost"]],
+  klar: [["hentet", "Hentet", "btn-line"], ["lager", "Tilbake", "btn-ghost"]]
+};
+const kl = d => new Date(d).toLocaleTimeString("nb-NO", { timeZone: "Europe/Oslo", hour: "2-digit", minute: "2-digit" });
+function siden(d) { const m = Math.max(0, Math.round((Date.now() - new Date(d)) / 60000)); return m < 1 ? "nå nettopp" : m < 60 ? `for ${m} min siden` : `for ${Math.floor(m / 60)} t ${m % 60} min siden`; }
+let sett = null, sist = [], timer = 0;
+
+function kort(o) {
+  const asap = o.pickup === "asap";
+  const items = (o.items || []).map(i => `<li><span class="q">${esc(i.antall)}×</span><span>${esc(i.navn)}${i.storrelse ? `<span class="s">${esc(i.storrelse)}</span>` : ""}</span><span class="p">${esc(i.antall * i.pris)} kr</span>${i.onske ? `<span class="w">${esc(i.onske)}</span>` : ""}</li>`).join("");
+  const tel = o.phone ? `<a href="tel:${esc(o.phone.replace(/[^\d+]/g, ""))}">${esc(o.phone)}</a>` : "";
+  return `<article class="card ${esc(o.status)}" data-id="${esc(o.id)}">
+    <div class="head"><div><div class="num">#${esc(o.number)}</div><div class="who">${esc(o.name)}${tel}</div></div>
+      <div class="when"><b class="${asap ? "asap" : ""}">${asap ? "Så snart som mulig" : "Kl. " + esc(o.pickup)}</b><small>Bestilt ${kl(o.created_at)}, ${siden(o.created_at)}</small></div></div>
+    <ul class="items">${items}</ul>
+    ${o.note ? `<p class="note">${esc(o.note)}</p>` : ""}
+    <div class="foot"><span>${o.payment === "betalt" ? "Betalt på nett" : "Betales ved henting"}${o.lang === "en" ? " · engelsk" : ""}</span><b>${esc(o.total)} kr</b></div>
+    <div class="acts">${(KNAPPER[o.status] || []).map(([s, t, c]) => `<button type="button" class="btn ${c}" data-set="${s}">${t}</button>`).join("")}</div>
+  </article>`;
+}
+function tegn(orders) {
+  const grupper = { ny: [], lager: [], klar: [] }, ferdige = [];
+  orders.forEach(o => (grupper[o.status] || ferdige).push(o));
+  // Nye og de som lages sorteres etter hentetid, "så snart som mulig" først
+  const nokkel = o => (o.pickup === "asap" ? "00:00" : o.pickup) + o.created_at;
+  ["ny", "lager"].forEach(k => grupper[k].sort((a, b) => nokkel(a) < nokkel(b) ? -1 : 1));
+  Object.keys(grupper).forEach(k => {
+    $("#n-" + k).textContent = grupper[k].length;
+    $("#l-" + k).innerHTML = grupper[k].length ? grupper[k].map(kort).join("") : `<p class="empty">${k === "ny" ? "Ingen nye bestillinger" : k === "lager" ? "Ingenting lages nå" : "Ingenting venter på henting"}</p>`;
+  });
+  $("#done-sum").textContent = `Ferdige i dag (${ferdige.length})`;
+  $("#l-done").innerHTML = ferdige.slice().reverse().map(o => `<li><span><b>#${esc(o.number)}</b> ${esc(o.name)} · ${esc(o.total)} kr · ${o.status === "avvist" ? "Avvist" : "Hentet"} ${kl(o.status_at)}</span><button type="button" class="btn btn-ghost" data-id="${esc(o.id)}" data-set="${o.status === "avvist" ? "ny" : "klar"}">Angre</button></li>`).join("");
+  const nye = grupper.ny.length;
+  document.title = (nye ? `(${nye}) ` : "") + "Kjøkken · Kebab Corner";
+}
+
+async function hent() {
+  try {
+    const orders = await rpc("kitchen_orders", { p_code: code });
+    $("#conn").hidden = false; $("#conn").className = "conn"; $("#conn").textContent = "Tilkoblet";
+    const nyeIder = orders.filter(o => o.status === "ny").map(o => o.id);
+    const ferske = sett ? nyeIder.filter(id => !sett.has(id)) : [];
+    if (sett === null) sett = new Set();
+    orders.forEach(o => sett.add(o.id));
+    sist = orders; tegn(orders);
+    ferske.forEach(id => { const el = document.querySelector(`.card[data-id="${CSS.escape(id)}"]`); if (el) el.classList.add("fresh"); });
+    if (ferske.length) { pip(); toast(ferske.length === 1 ? "Ny bestilling!" : `${ferske.length} nye bestillinger!`); }
+  } catch (err) {
+    if (err.code === "28000" || /kjøkkenkode/.test(err.message)) { try { localStorage.removeItem(KEY); sessionStorage.removeItem(KEY); } catch (e) {} clearInterval(timer); return visLogin("Koden er byttet eller feil. Logg inn på nytt."); }
+    $("#conn").hidden = false; $("#conn").className = "conn off"; $("#conn").textContent = "Ingen kontakt, prøver igjen";
+  }
+}
+
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-set]"); if (!b) return;
+  const id = b.dataset.id || b.closest("[data-id]").dataset.id, status = b.dataset.set;
+  const o = sist.find(x => x.id === id);
+  if (status === "avvist" && !confirm(`Avvise bestilling #${o ? o.number : ""}? Kunden får beskjed om å ringe dere.`)) return;
+  b.disabled = true;
+  try {
+    await rpc("kitchen_set_status", { p_code: code, p_id: id, p_status: status });
+    if (o) { o.status = status; o.status_at = new Date().toISOString(); tegn(sist); }
+    if (status === "klar") toast(`#${o ? o.number : ""} er klar. Kunden ser det nå.`);
+    hent();
+  } catch (err) { b.disabled = false; toast("Fikk ikke lagret. Sjekk nettet og prøv igjen."); }
+});
+
+function start() {
+  $("#login").hidden = true; $("#app").hidden = false;
+  ["#sound", "#logout"].forEach(s => { $(s).hidden = false; });
+  $("#awake").hidden = !("wakeLock" in navigator);
+  sett = null; hent();
+  clearInterval(timer); timer = setInterval(() => { if (!document.hidden) hent(); }, 5000);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden && code && !$("#app").hidden) hent(); });
+// Oppdater "for X min siden" uten å vente på nye data
+setInterval(() => { if (sist.length && !$("#app").hidden) tegn(sist); }, 30000);
+
+if (!CFG.supabaseUrl || !CFG.supabaseKey) $("#setup").hidden = false;
+else if (code) start();
+else visLogin();
+</script>
+</body>
+</html>
