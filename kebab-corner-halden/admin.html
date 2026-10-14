@@ -41,8 +41,8 @@ h1{font-family:var(--font-display);font-stretch:74%;font-weight:800;text-transfo
 .step h2 .n{display:grid;place-items:center;width:1.9rem;height:1.9rem;border-radius:50%;border:1px solid var(--line-strong);font-size:.8rem;color:var(--accent-text);flex:none}
 .hint{color:var(--muted);font-size:.9rem;margin:.6rem 0 0}
 label.field{display:grid;gap:.4rem;font-weight:600;font-size:.9rem}
-input[type=password],input[type=text],input[type=number],textarea{width:100%;font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line-strong);border-radius:var(--radius);padding:.7rem .85rem}
-input:focus,textarea:focus{outline:none;border-color:var(--accent-text)}
+input[type=password],input[type=text],input[type=number],textarea,select{width:100%;font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line-strong);border-radius:var(--radius);padding:.7rem .85rem}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent-text)}
 .check{display:flex;align-items:center;gap:.5rem;margin-top:.75rem;color:var(--muted);font-size:.9rem}
 .check input{accent-color:var(--accent);width:1rem;height:1rem}
 
@@ -78,16 +78,25 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent-text)}
 .found{display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:1rem;margin-bottom:1.5rem}
 .cat{border-top:1px solid var(--line-strong);padding-top:1rem;margin-top:1.25rem}
 .cat-head{display:flex;gap:.6rem;align-items:center;margin-bottom:.6rem}
-.cat-head input{font-family:var(--font-display);font-stretch:80%;font-weight:800;text-transform:uppercase;font-size:1.25rem;padding:.4rem .6rem}
+.cat-head .k-name{font-family:var(--font-display);font-stretch:80%;font-weight:800;text-transform:uppercase;font-size:1.25rem;padding:.4rem .6rem}
+.cat-head .k-sizes{max-width:14rem;padding:.5rem .6rem;font-size:.9rem}
 .row{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1fr) minmax(0,1fr) auto;gap:.5rem;align-items:center;padding-block:.35rem}
 .row.head{color:var(--muted);font-size:.75rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
-.row input{padding:.5rem .6rem;font-size:.95rem}
+.row input,.row select{padding:.5rem .6rem;font-size:.95rem}
+.row.item{border-bottom:1px solid var(--line);padding-bottom:.6rem}
+.row .r-desc{grid-column:1 / 3;font-size:.88rem;color:var(--muted)}
+.row .r-tag{grid-column:3 / 4;font-size:.88rem}
 .icon-btn{width:2.2rem;height:2.2rem;display:grid;place-items:center;border-radius:var(--radius);border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}
 .icon-btn:hover{color:var(--accent-text);border-color:var(--accent-text)}
 .icon-btn svg{width:1rem;height:1rem}
 @media (max-width:620px){
   .row{grid-template-columns:minmax(0,1fr) 5.5rem auto}
   .row .al{grid-column:1 / 3}
+  .row .r-desc{grid-column:1 / -1}
+  .row .r-tag{grid-column:1 / 3}
+  .cat-head{flex-wrap:wrap}
+  .cat-head .k-name{flex:1 1 100%}
+  .cat-head .k-sizes{flex:1;max-width:none}
   .row.head{display:none}
 }
 details{margin-top:1.25rem}
@@ -145,6 +154,7 @@ code{font:.9em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:v
       </label>
     </div>
     <div id="editor"></div>
+    <p class="hint" id="dropped" role="status" hidden></p>
     <div class="actions">
       <button type="button" class="btn btn-line btn-small" id="add-cat">Legg til kategori</button>
     </div>
@@ -216,7 +226,7 @@ async function addFiles(list) {
   hideStatus();
   for (const f of files) {
     try { images.push(await prepare(f)); }
-    catch (e) { showStatus("error", e.message); }
+    catch (e) { showStatus("error", esc(e.message)); }
   }
   renderThumbs();
 }
@@ -259,12 +269,13 @@ const SCHEMA = {
         storrelser: { type: "array", items: { type: "string" } },
         retter: { type: "array", items: {
           type: "object", additionalProperties: false,
-          required: ["navn", "tekst", "pris", "allergener"],
+          required: ["navn", "tekst", "pris", "allergener", "tag"],
           properties: {
             navn: { type: "string" },
             tekst: { type: "string" },
             pris: { type: "array", items: { type: "integer" } },
-            allergener: { type: "array", items: { type: "string" } }
+            allergener: { type: "array", items: { type: "string" } },
+            tag: { type: "string", enum: ["", "veg", "hot", "pop"] }
           }
         } }
       }
@@ -284,6 +295,7 @@ const PROMPT = `Bildene viser menyen til Kebab Corner, en kebab-, pizza- og burg
 - "tekst" er beskrivelsen under en rett. Er det ingen beskrivelse, bruk tom tekst.
 - "pris" er prisen i hele kroner, uten "kr" og ",-". Har en rett flere størrelser, skriv prisene i samme rekkefølge som størrelsene, og skriv navnene på størrelsene i "storrelser" for kategorien (for eksempel ["Liten", "Stor"]). Har kategorien bare én pris per rett, er "storrelser" en tom liste.
 - "allergener" for en rett er kodene som står ved retten, skrevet akkurat som på menyen. "allergener" på toppnivå er forklaringen av kodene hvis menyen har en.
+- "tag" er "hot" hvis retten er merket som sterk (for eksempel med en chili), "veg" hvis den er merket som vegetar, "pop" hvis den er merket som mest solgt eller populær, ellers tom tekst.
 - "telefon" er restaurantens telefonnummer hvis det står på bildene, ellers tom tekst.
 - Ikke gjett. Er en pris, et navn eller en kode uleselig eller usikker, skriv det du kan lese og legg til en kort forklaring i "merknader". Gjelder det ingenting, er "merknader" en tom liste.`;
 
@@ -347,22 +359,26 @@ $("#read").addEventListener("click", readMenu);
 
 // ---------- 3. Redigering ----------
 const TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>';
+const TAGS = [["", "Uten merke"], ["veg", "Vegetar"], ["hot", "Sterk"], ["pop", "Mest solgt"]];
 function catHtml(k) {
   const sizes = (k.storrelser || []).join(" / ");
-  return `<div class="cat" data-sizes="${esc(sizes)}">
+  return `<div class="cat">
     <div class="cat-head"><input type="text" class="k-name" value="${esc(k.kategori)}" aria-label="Kategorinavn">
+      <input type="text" class="k-sizes" value="${esc(sizes)}" placeholder="Størrelser, f.eks. Medium / Stor" aria-label="Størrelser, med skråstrek mellom">
       <button type="button" class="icon-btn del-cat" aria-label="Slett kategorien">${TRASH}</button></div>
-    <div class="row head"><span>Rett</span><span>Pris${sizes ? " (" + esc(sizes) + ")" : ""}</span><span>Allergener</span><span></span></div>
+    <div class="row head"><span>Rett</span><span>Pris</span><span>Allergener</span><span></span></div>
     <div class="items">${k.retter.map(itemHtml).join("")}</div>
     <button type="button" class="btn btn-line btn-small add-item">Legg til rett</button>
   </div>`;
 }
 function itemHtml(r) {
-  return `<div class="row item" data-tekst="${esc(r.tekst || "")}">
+  return `<div class="row item">
     <input type="text" class="r-name" value="${esc(r.navn)}" aria-label="Navn på retten">
-    <input type="text" class="r-price" value="${esc((r.pris || []).join(" / "))}" inputmode="numeric" aria-label="Pris i kroner">
-    <input type="text" class="al r-al" value="${esc((r.allergener || []).join(", "))}" aria-label="Allergenkoder">
+    <input type="text" class="r-price" value="${esc((r.pris || []).join(" / "))}" inputmode="numeric" aria-label="Pris i kroner, med skråstrek mellom størrelsene">
+    <input type="text" class="al r-al" value="${esc((r.allergener || []).join(", "))}" aria-label="Allergenkoder, med komma mellom">
     <button type="button" class="icon-btn del-item" aria-label="Slett retten">${TRASH}</button>
+    <input type="text" class="r-desc" value="${esc(r.tekst || "")}" placeholder="Beskrivelse (valgfri)" aria-label="Beskrivelse av retten">
+    <select class="r-tag" aria-label="Merke">${TAGS.map(([v, t]) => `<option value="${v}"${(r.tag || "") === v ? " selected" : ""}>${t}</option>`).join("")}</select>
   </div>`;
 }
 function showResult(p) {
@@ -386,6 +402,7 @@ $("#editor").addEventListener("click", e => {
   updateCode();
 });
 $("#editor").addEventListener("input", updateCode);
+$("#editor").addEventListener("change", updateCode);
 $("#tel").addEventListener("input", updateCode);
 $("#allergens").addEventListener("input", updateCode);
 $("#add-cat").addEventListener("click", () => {
@@ -396,27 +413,37 @@ $("#add-cat").addEventListener("click", () => {
 
 // Leser redigeringsfeltene og bygger samme form som SITE.meny på nettsiden
 function collect() {
+  let utenPris = 0;
   const meny = $$(".cat", $("#editor")).map(cat => {
-    const sizes = cat.dataset.sizes ? cat.dataset.sizes.split(" / ") : [];
+    const sizes = cat.querySelector(".k-sizes").value.split("/").map(x => x.trim()).filter(Boolean);
     const retter = $$(".item", cat).map(row => {
       const navn = row.querySelector(".r-name").value.trim();
       const pris = (row.querySelector(".r-price").value.match(/\d+/g) || []).map(Number);
-      const allergener = row.querySelector(".r-al").value.split(/[,\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
+      // Korte koder skrives med store bokstaver (g blir G). Hele navn står som de er skrevet.
+      const allergener = row.querySelector(".r-al").value.split(/[,;]+/).map(x => x.trim()).filter(Boolean)
+        .map(x => /^[a-zæøå]{1,3}$/i.test(x) ? x.toUpperCase() : x);
+      const tekst = row.querySelector(".r-desc").value.trim();
+      const tag = row.querySelector(".r-tag").value;
       const r = { navn: navn, pris: pris };
-      if (row.dataset.tekst) r.tekst = row.dataset.tekst;
+      if (tekst) r.tekst = tekst;
       if (allergener.length) r.allergener = allergener;
+      if (tag) r.tag = tag;
+      if (navn && !pris.length) utenPris++;
       return r;
     }).filter(r => r.navn && r.pris.length);
     const k = { kategori: cat.querySelector(".k-name").value.trim(), retter: retter };
     if (sizes.length > 1) k.storrelser = sizes;
     return k;
   }).filter(k => k.kategori);
+  // "G = Gluten (hvete, bygg), M = Melk": det deles bare på komma som står foran en ny "KODE ="
   const allergener = {};
-  $("#allergens").value.split(",").forEach(part => {
-    const m = part.split("=");
-    if (m.length === 2 && m[0].trim()) allergener[m[0].trim().toUpperCase()] = m[1].trim();
+  $("#allergens").value.split(/[,;\n](?=\s*[^,;=\n]{1,6}\s*=)/).forEach(part => {
+    const i = part.indexOf("=");
+    const kode = i > 0 ? part.slice(0, i).trim() : "";
+    if (kode) allergener[kode.toUpperCase()] = part.slice(i + 1).trim();
   });
   const out = { meny: meny };
+  Object.defineProperty(out, "utenPris", { value: utenPris }); // vises som advarsel, kommer ikke med i filen
   if (Object.keys(allergener).length) out.allergener = allergener;
   if ($("#tel").value.trim()) out.telefon = $("#tel").value.trim();
   return out;
@@ -424,7 +451,16 @@ function collect() {
 function fileText() {
   return "/* Menyen til Kebab Corner Halden.\n   Laget på admin.html " + new Date().toLocaleDateString("nb-NO") + ". Last ned en ny fil der og bytt ut denne.\n   Finnes ikke filen, bruker siden menyen som står i index.html. */\nwindow.MENY_DATA = " + JSON.stringify(collect(), null, 2) + ";\n";
 }
-function updateCode() { $("#code").value = fileText(); }
+function updateCode() {
+  const data = collect();
+  $("#code").value = fileText();
+  const retter = data.meny.reduce((n, k) => n + k.retter.length, 0);
+  const msg = [];
+  if (data.utenPris) msg.push(data.utenPris === 1 ? "1 rett mangler pris og blir ikke med i filen." : data.utenPris + " retter mangler pris og blir ikke med i filen.");
+  if (!retter) msg.push("Filen har ingen retter. Nettsiden viser da menyen den hadde fra før.");
+  $("#dropped").textContent = msg.join(" ");
+  $("#dropped").hidden = !msg.length;
+}
 
 $("#download").addEventListener("click", () => {
   const blob = new Blob([fileText()], { type: "text/javascript" });

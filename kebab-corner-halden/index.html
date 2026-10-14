@@ -7,8 +7,15 @@
 <meta name="description" content="Kebab Corner i Nedre Bankegate 6 i Halden: kebab, pizza og flammeburgere. Se hele menyen med priser, og ring for å bestille.">
 <meta property="og:title" content="Kebab Corner Halden">
 <meta property="og:description" content="Kebab, pizza og burgere i Halden. Ring oss, så ordner vi maten.">
-<meta property="og:type" content="restaurant">
-<meta property="og:image" content="bilder/mat.jpg">
+<meta property="og:type" content="website">
+<!-- Delingsbilder trenger full adresse. Bytt domenet her hvis siden flytter. -->
+<meta property="og:url" content="https://kebab-corner-halden.netlify.app/">
+<meta property="og:image" content="https://kebab-corner-halden.netlify.app/bilder/mat.jpg">
+<meta property="og:locale" content="nb_NO">
+<meta property="og:locale:alternate" content="en_GB">
+<link rel="alternate" hreflang="no" href="https://kebab-corner-halden.netlify.app/?lang=no">
+<link rel="alternate" hreflang="en" href="https://kebab-corner-halden.netlify.app/?lang=en">
+<link rel="alternate" hreflang="x-default" href="https://kebab-corner-halden.netlify.app/">
 <meta name="theme-color" content="#141010">
 <link rel="icon" href="bilder/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -146,9 +153,10 @@ section{padding-block:clamp(4rem,9vw,7rem)}
 .cat + .cat{margin-top:4rem}
 .cat-head{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;padding-bottom:1rem;border-bottom:1px solid var(--line-strong)}
 .cat-head h3{font-size:clamp(1.9rem,3.5vw,2.5rem)}
-.cat-head .count{color:var(--muted);font-size:.85rem;font-weight:600;white-space:nowrap}
+.cat-head .count{color:var(--muted);font-size:.85rem;font-weight:600;text-align:right}
+.cat{scroll-margin-top:1.5rem}
 .items{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:4.5rem}
-@media (max-width:860px){.items{grid-template-columns:1fr}}
+@media (max-width:860px){.items{grid-template-columns:minmax(0,1fr)}}
 .item{padding-block:1.35rem;border-bottom:1px solid var(--line);display:grid;gap:.3rem}
 .item .row{display:flex;align-items:baseline;gap:.75rem}
 .item .name{font-weight:700;font-size:1.1rem;display:flex;flex-wrap:wrap;align-items:center;gap:.35rem .6rem;min-width:0}
@@ -156,6 +164,8 @@ section{padding-block:clamp(4rem,9vw,7rem)}
 .item .price{font-family:var(--font-display);font-stretch:85%;font-weight:700;font-size:1.3rem;font-variant-numeric:tabular-nums;white-space:nowrap}
 .item .price small{font-family:var(--font-body);font-size:.68em;font-weight:500;color:var(--muted);margin-left:.25rem}
 .item .price .sep{color:var(--muted);margin-inline:.3rem;font-weight:400}
+.item .price.many{font-size:1.15rem}
+.item .price.many .sep{margin-inline:.15rem}
 .item .desc{color:var(--muted);font-size:.95rem;line-height:1.5;max-width:34rem}
 .item .all{color:var(--muted);font-size:.8rem;letter-spacing:.02em}
 .item .all b{font-weight:600;color:#C9BFB7}
@@ -343,7 +353,7 @@ footer .legal{flex-basis:100%;padding-top:1.5rem;border-top:1px solid var(--line
       <a href="#meny" data-en="Menu">Meny</a>
       <a href="#besok" data-en="Find us">Finn oss</a>
     </nav>
-    <a class="lang" id="lang" href="?lang=en" hreflang="en" lang="en" aria-label="Switch to English">EN</a>
+    <a class="lang" id="lang" href="?lang=en" hreflang="en" lang="en" aria-label="EN, switch to English">EN</a>
     <a class="btn btn-primary js-tel" href="#">
       <svg class="phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>
       <span data-en="Call to order">Ring og bestill</span>
@@ -400,7 +410,7 @@ footer .legal{flex-basis:100%;padding-top:1.5rem;border-top:1px solid var(--line
           <span class="dot"><svg class="phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg></span>
           <span class="n" data-en="STEP 2">STEG 2</span>
           <h3 data-en="Give us a call">Ring oss</h3>
-          <p data-en="Call &lt;a class=&quot;js-tel js-tel-text&quot; href=&quot;#&quot;&gt;&lt;/a&gt; and tell us what you would like.">Ring <a class="js-tel js-tel-text" href="#"></a> og si hva du vil ha.</p>
+          <p class="js-no-tel" data-en="Call &lt;a class=&quot;js-tel js-tel-text&quot; href=&quot;#&quot;&gt;&lt;/a&gt; and tell us what you would like.">Ring <a class="js-tel js-tel-text" href="#"></a> og si hva du vil ha.</p>
         </li>
         <li class="step">
           <span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
@@ -455,7 +465,7 @@ footer .legal{flex-basis:100%;padding-top:1.5rem;border-top:1px solid var(--line
         <h2 id="besok-h" data-en="Find us">Finn oss</h2>
         <dl class="facts-list">
           <div><dt data-en="Address">Adresse</dt><dd><a class="js-maps" href="#" target="_blank" rel="noopener" data-f="adresse"></a></dd></div>
-          <div><dt data-en="Phone">Telefon</dt><dd><a class="js-tel js-tel-text" href="#"></a></dd></div>
+          <div class="js-no-tel"><dt data-en="Phone">Telefon</dt><dd><a class="js-tel js-tel-text" href="#"></a></dd></div>
           <div id="hours-wrap"><dt data-en="Opening hours">Åpningstider</dt><dd><table class="hours" aria-label="Åpningstider" data-en-aria-label="Opening hours"><tbody id="hours"></tbody></table><p class="hours-note" data-f="tiderMerknad"></p></dd></div>
         </dl>
         <div class="cta">
@@ -506,8 +516,8 @@ const SITE = {
   telefon: "485 17 085",
   adresse: "Nedre Bankegate 6, Halden",
   kartSok: "Kebab Corner, Nedre Bankegate 6, Halden", // det som søkes etter i Google Maps
-  originalmeny: "",
-  foodora: "https://www.foodora.no/restaurant/mv2y/kebab-corner-mv2y", // lenke til levering på foodora. "" = skjult                      // lenke til originalmenyen (bilde eller PDF). "" = skjult
+  originalmeny: "",                      // lenke til originalmenyen (bilde eller PDF). "" = skjult
+  foodora: "https://www.foodora.no/restaurant/mv2y/kebab-corner-mv2y", // lenke til levering på foodora. "" = skjult
   heroAnimasjon: true,                   // svake glør bak teksten i toppen. false = helt rolig bakgrunn
   fakta: ["Kebab", "Pizza", "Flammeburgere"], // vises som liten linje over overskriften
   tilbud: null,                          // f.eks. { tittel: "Kebab i pita + brus", pris: 129, merknad: "Hele dagen" }
@@ -524,7 +534,8 @@ const SITE = {
     overskrift: { linje1: "Kebab,", linje2: "pizza & burgers." },
     ingress: "Hungry? Find your favourite on the menu. Give us a call and we will get your food ready.",
     fakta: ["Kebab", "Pizza", "Flame-grilled burgers"],
-    tiderMerknad: ""
+    tiderMerknad: "",
+    heroBilde: { alt: "Burgers, fries and kebab in pita" }
   },
   // Allergenkoder som brukes i menyen under, for eksempel { G: "Gluten", M: "Melk" }. {} = skjult
   allergener: {},
@@ -551,7 +562,7 @@ const SITE = {
 // Menyen i meny.js (lages på admin.html) brukes i stedet for menyen over når filen finnes
 if (window.MENY_DATA) {
   const M = window.MENY_DATA;
-  if (Array.isArray(M.meny) && M.meny.length) SITE.meny = M.meny;
+  if (Array.isArray(M.meny) && M.meny.some(c => c && Array.isArray(c.retter) && c.retter.length)) SITE.meny = M.meny;
   if (M.allergener && Object.keys(M.allergener).length) SITE.allergener = M.allergener;
   if (M.telefon) SITE.telefon = M.telefon;
 }
@@ -613,7 +624,6 @@ const EN_WORDS = {
   "Hvitløkssmør, ost, fersk champignon og løk.": "Garlic butter, cheese, fresh mushrooms and onion.",
   "Hjemmelaget.": "Homemade.", "19 kr i tillegg til burgeren.": "19 kr on top of the burger price.",
   "Liten eller stor.": "Small or large.",
-  "Hamburger 320 g": "Hamburger 320 g",
   "Med salat, tomat, agurk, løk og mais.": "With lettuce, tomato, cucumber, onion and corn.",
   "Med salat, tomat, agurk, løk, hamburgerdressing og sterk saus om du vil.": "With lettuce, tomato, cucumber, onion, burger dressing and hot sauce if you like.",
   "Hjemmelaget. Med salat, tomat, agurk, løk, hamburgerdressing og sterk saus om du vil.": "Homemade. With lettuce, tomato, cucumber, onion, burger dressing and hot sauce if you like.",
@@ -627,20 +637,22 @@ const EN_WORDS = {
   "Cola, Cola Zero, Pepsi Max, Fanta Exotic, Solo, Villa, Urge, Fuze Tea Peach, Farris og Isklar.": "Cola, Cola Zero, Pepsi Max, Fanta Exotic, Solo, Villa, Urge, Fuze Tea Peach, Farris and Isklar.",
   "Red Bull, Monster og Prime i flere smaker.": "Red Bull, Monster and Prime in several flavours.",
   "Cola, Pepsi Max, Urge og Fanta Exotic.": "Cola, Pepsi Max, Urge and Fanta Exotic.",
-  "Döner burger 200 g": "Döner burger 200 g",
   "Biffburger med stekt döner, salat, tomat, agurk, løk, ost, hamburgerdressing og sterk saus om du vil.": "Beef burger with fried döner, lettuce, tomato, cucumber, onion, cheese, burger dressing and hot sauce if you like.",
   "Liten porsjon. Stor kan også bestilles.": "Small portion. Large is also available.",
   "Tomatsaus, ost, marinert biff og fersk champignon, løk og paprika.": "Tomato sauce, cheese, marinated beef and fresh mushrooms, onion and bell pepper.",
   "Tomatsaus, ost, kebabkjøtt, pommes frites og fersk paprika og løk.": "Tomato sauce, cheese, kebab meat, fries and fresh bell pepper and onion.",
   "Tomatsaus, ost, mais, peppermix, oliven og fersk løk, paprika og champignon.": "Tomato sauce, cheese, corn, mixed peppers, olives and fresh onion, bell pepper and mushrooms.",
   "Chili-tomatsaus, ost, nachos chips, jalapeños, biff eller kylling og løk.": "Chili tomato sauce, cheese, nacho chips, jalapeños, beef or chicken and onion.",
+  "Pepperoni spesial pizza": "Pepperoni special pizza", "Kebab Corner spesial": "Kebab Corner special",
   "Brus 0,5 l": "Soft drink 0.5 l", "Brus 1,5 l": "Soft drink 1.5 l", "Vann 0,5 l": "Water 0.5 l",
   "Cola, Cola Zero, Pepsi Max, Fanta Exotic, Villa, Solo, Fuze Tea Peach og Urge.": "Cola, Cola Zero, Pepsi Max, Fanta Exotic, Villa, Solo, Fuze Tea Peach and Urge.",
   "Isklar uten kullsyre eller Farris med kullsyre.": "Isklar still or Farris sparkling.",
   "Original, Monarch, Mango Loco, Ultra Fiesta Mango, Ultra Gold, Ultra Rosa og Lewis Hamilton.": "Original, Monarch, Mango Loco, Ultra Fiesta Mango, Ultra Gold, Ultra Rosa and Lewis Hamilton.",
   "Lime, Blue Raspberry, Tropical Punch, Ice Pop og Jordbær Vannmelon.": "Lime, Blue Raspberry, Tropical Punch, Ice Pop and Strawberry Watermelon."
 };
-const tr = s => (EN && s && Object.prototype.hasOwnProperty.call(EN_WORDS, s)) ? EN_WORDS[s] : s;
+const tr = s => !EN || !s ? s
+  : Object.prototype.hasOwnProperty.call(EN_WORDS, s) ? EN_WORDS[s]
+  : String(s).replace(/(\d),(\d)/g, "$1.$2");
 
 // Faste tekster i siden og tekster som skriptet lager
 const T = EN ? {
@@ -652,7 +664,7 @@ const T = EN ? {
   opensOn: (d, o) => `Closed now, opens ${d} at ${o}`,
   dishes: n => n === 1 ? "1 dish" : n + " dishes",
   contains: "Contains", allergens: "Allergens",
-  price: p => `Price: ${p} kroner`, priceSizes: (a, b) => `Price: ${a}, ${b}`, priceTwo: (a, b) => `Price: ${a} or ${b} kroner`,
+  price: p => `Price: ${p} kroner`, priceSizes: list => `Price: ${list.join(", ")}`, priceTwo: list => `Price: ${list.join(" or ")} kroner`,
   noHits: q => `No dishes match <b>${q}</b>. Try another word, or give us a call.`,
   strength: n => `Strength ${n} of 3`,
   tags: { veg: "Vegetarian", pop: "Bestseller", hot: "Spicy" },
@@ -667,7 +679,7 @@ const T = EN ? {
   opensOn: (d, o) => `Stengt nå, åpner ${d.toLowerCase()} kl. ${o}`,
   dishes: n => n === 1 ? "1 rett" : n + " retter",
   contains: "Inneholder", allergens: "Allergener",
-  price: p => `Pris: ${p} kroner`, priceSizes: (a, b) => `Pris: ${a}, ${b}`, priceTwo: (a, b) => `Pris: ${a} eller ${b} kroner`,
+  price: p => `Pris: ${p} kroner`, priceSizes: list => `Pris: ${list.join(", ")}`, priceTwo: list => `Pris: ${list.join(" eller ")} kroner`,
   noHits: q => `Ingen retter passer til <b>${q}</b>. Prøv et annet ord, eller ring oss.`,
   strength: n => `Styrke ${n} av 3`,
   tags: { veg: "Vegetar", pop: "Mest solgt", hot: "Sterk" },
@@ -691,8 +703,9 @@ if (EN) {
   a.href = "?lang=" + other + location.hash;
   a.textContent = other.toUpperCase();
   a.setAttribute("hreflang", other); a.setAttribute("lang", other);
-  a.setAttribute("aria-label", EN ? "Bytt til norsk" : "Switch to English");
+  a.setAttribute("aria-label", EN ? "NO, bytt til norsk" : "EN, switch to English");
   a.addEventListener("click", () => {
+    a.href = "?lang=" + other + location.hash;
     try { localStorage.setItem("kc-lang", other); sessionStorage.setItem("kc-scroll", String(window.pageYOffset || 0)); } catch (e) {}
   });
   try { localStorage.setItem("kc-lang", LANG); } catch (e) {}
@@ -724,7 +737,11 @@ function setImg(img, src) {
 if (SITE.logo) setImg($("#logo"), SITE.logo);
 else $("#logo").hidden = true;
 const hb = typeof SITE.heroBilde === "string" ? { src: SITE.heroBilde, alt: "" } : SITE.heroBilde;
-if (hb && hb.src) { setImg($("#photo-img"), hb.src); if (hb.alt != null) $("#photo-img").alt = hb.alt; }
+if (hb && hb.src) {
+  setImg($("#photo-img"), hb.src);
+  const alt = EN ? pick(SITE.en || {}, "heroBilde.alt") : hb.alt; // uten engelsk tekst beholdes den i HTML-en
+  if (alt != null) $("#photo-img").alt = alt;
+}
 else { $("#photo").hidden = true; $(".hero").classList.add("no-photo"); }
 if (SITE.originalmeny) { $("#orig").href = SITE.originalmeny; $("#orig").hidden = false; }
 if (SITE.foodora) {
@@ -734,11 +751,14 @@ if (SITE.foodora) {
 }
 
 // Telefon og kart
-const telDigits = SITE.telefon.replace(/[^\d+]/g, "");
+const telText = SITE.telefon == null ? "" : String(SITE.telefon).trim();
+const telDigits = telText.replace(/[^\d+]/g, "");
 const telHref = "tel:" + (/^\d{8}$/.test(telDigits) ? "+47" + telDigits : telDigits); // norske nummer uten landkode får +47
 $$(".js-tel").forEach(a => a.href = telHref);
-$$(".js-tel-text").forEach(a => a.textContent = SITE.telefon);
-const q = encodeURIComponent(SITE.kartSok || (SITE.navn + " " + SITE.adresse));
+$$(".js-tel-text").forEach(a => a.textContent = telText);
+if (!telDigits) $$(".js-tel, .js-no-tel").forEach(el => { el.hidden = true; }); // uten nummer skjules ringeknappene
+const adresse = SITE.adresse ? String(SITE.adresse) : "";
+const q = encodeURIComponent(SITE.kartSok || [SITE.navn, adresse].filter(Boolean).join(" "));
 $$(".js-maps").forEach(a => a.href = "https://www.google.com/maps/search/?api=1&query=" + q);
 $("#map").src = "https://www.google.com/maps?q=" + q + "&output=embed";
 
@@ -761,30 +781,38 @@ if (Object.keys(ALL).length) {
 }
 
 // Meny (kategorier uten retter hoppes over)
-const kategorier = SITE.meny.filter(c => c.retter && c.retter.length);
-$("#chips").innerHTML = kategorier.map(c => `<a class="chip" href="#${slug(c.kategori)}">${esc(tr(c.kategori))}</a>`).join("");
+const kategorier = (Array.isArray(SITE.meny) ? SITE.meny : []).filter(c => c && Array.isArray(c.retter) && c.retter.length);
+// Hver kategori får en unik id. Samme navn to ganger, eller et navn som en annen del av siden bruker, får -2, -3 osv.
+const brukt = {};
+kategorier.forEach(c => {
+  const base = slug(String(c.kategori || "meny")) || "meny";
+  let id = base, i = 2;
+  while (brukt[id] || document.getElementById(id)) id = base + "-" + i++;
+  brukt[id] = true; c._id = id;
+});
+const fold = s => String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // "doner" finner "Döner"
+$("#chips").innerHTML = kategorier.map(c => `<a class="chip" href="#${c._id}">${esc(tr(c.kategori))}</a>`).join("");
 $(".tabs").hidden = kategorier.length < 2;
 $("#menu").innerHTML = kategorier.map(c => {
   const items = c.retter.map(r => {
     const tag = r.tag && TAGS[r.tag] ? `<span class="tag ${r.tag}">${TAGS[r.tag]}</span>` : "";
-    const pris = r.pris.length === 2
-      ? `${r.pris[0]}<span class="sep">/</span>${r.pris[1]}<small>kr</small>`
-      : `${r.pris[0]}<small>kr</small>`;
-    const sz = c.storrelser && c.storrelser.length === 2 ? c.storrelser.map(tr) : null;
-    const label = r.pris.length === 2
-      ? (sz ? T.priceSizes(`${sz[0]} ${r.pris[0]} kr`, `${sz[1]} ${r.pris[1]} kr`) : T.priceTwo(r.pris[0], r.pris[1]))
-      : T.price(r.pris[0]);
-    const al = r.allergener || [];
-    const sok = esc([r.navn, r.tekst || "", c.kategori, tr(r.navn), tr(r.tekst || ""), tr(c.kategori)].join(" ").toLowerCase());
+    const pr = [].concat(r.pris == null ? [] : r.pris).filter(x => x !== "" && x != null);
+    const pris = pr.length ? pr.map(esc).join('<span class="sep">/</span>') + "<small>kr</small>" : "";
+    const sz = Array.isArray(c.storrelser) && c.storrelser.length === pr.length ? c.storrelser.map(tr) : null;
+    const label = pr.length < 2 ? (pr.length ? T.price(pr[0]) : "")
+      : sz ? T.priceSizes(pr.map((p, i) => `${sz[i]} ${p} kr`))
+      : T.priceTwo(pr);
+    const al = Array.isArray(r.allergener) ? r.allergener : [];
+    const sok = esc(fold([r.navn, r.tekst || "", c.kategori, tr(r.navn), tr(r.tekst || ""), tr(c.kategori), r.tag && TAGS[r.tag] || ""].join(" ")));
     return `<li class="item" data-s="${sok}">
-      <div class="row"><span class="name">${esc(tr(r.navn))}${tag}</span><span class="leader" aria-hidden="true"></span><span class="price" aria-label="${label}">${pris}</span></div>
+      <div class="row"><span class="name">${esc(tr(r.navn))}${tag}</span><span class="leader" aria-hidden="true"></span><span class="price${pr.length > 2 ? " many" : ""}" aria-label="${esc(label)}">${pris}</span></div>
       ${r.tekst ? `<p class="desc">${esc(tr(r.tekst))}</p>` : ""}
       ${al.length ? `<p class="all">${T.contains} <b>${al.map(k => esc(kjent(k) ? tr(ALL[k]).toLowerCase() : k)).join(", ")}</b></p>` : ""}
     </li>`;
   }).join("");
-  const sizes = c.storrelser ? ` · ${c.storrelser.map(x => esc(tr(x))).join(" / ")}` : "";
+  const sizes = Array.isArray(c.storrelser) && c.storrelser.length ? ` · ${c.storrelser.map(x => esc(tr(x))).join(" / ")}` : "";
   const n = c.retter.length;
-  return `<div class="cat" id="${slug(c.kategori)}">
+  return `<div class="cat" id="${c._id}">
     <div class="cat-head"><h3>${esc(tr(c.kategori))}</h3><span class="count">${T.dishes(n)}${sizes}</span></div>
     <ul class="items">${items}</ul>
   </div>`;
@@ -874,7 +902,7 @@ if (document.fonts && document.fonts.ready) document.fonts.ready.then(moveInk);
 // Søk i menyen
 const qEl = $("#q");
 qEl.addEventListener("input", () => {
-  const term = qEl.value.trim().toLowerCase();
+  const term = fold(qEl.value.trim());
   let hits = 0;
   $$(".cat").forEach(cat => {
     let n = 0;
@@ -1052,8 +1080,8 @@ if (document.readyState === "complete") startFx(); else window.addEventListener(
 const ld = {
   "@context": "https://schema.org", "@type": "Restaurant",
   name: SITE.navn + " " + SITE.by, servesCuisine: ["Kebab","Pizza","Burger"],
-  telephone: SITE.telefon, priceRange: "kr", sameAs: SITE.foodora ? [SITE.foodora] : undefined, image: hb && hb.src ? new URL(hb.src, location.href).href : undefined,
-  address: { "@type": "PostalAddress", streetAddress: SITE.adresse.split(",")[0], addressLocality: SITE.by, addressCountry: "NO" },
+  telephone: telText || undefined, priceRange: "kr", sameAs: SITE.foodora ? [SITE.foodora] : undefined, image: hb && hb.src ? new URL(hb.src, location.href).href : undefined,
+  address: { "@type": "PostalAddress", streetAddress: adresse.split(",")[0], addressLocality: SITE.by, addressCountry: "NO" },
   openingHoursSpecification: (SITE.tider || []).map((d, i) => d && ({ "@type": "OpeningHoursSpecification",
     dayOfWeek: ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"][i], opens: d[0], closes: d[1] })).filter(Boolean),
 };
