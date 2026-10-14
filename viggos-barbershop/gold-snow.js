@@ -28,7 +28,7 @@
   }
   const SPRITES = {
     dark: makeSprite("rgba(255, 240, 200, 1)", "rgba(222, 180, 95, .35)"),
-    light: makeSprite("rgba(222, 176, 82, 1)", "rgba(222, 176, 82, .07)"),
+    light: makeSprite("rgba(196, 146, 52, 1)", "rgba(214, 168, 76, .2)"),
   };
 
   let W = 0, H = 0, dpr = 1, flakes = [];
@@ -40,7 +40,7 @@
       x: rand(0, W),
       y: top ? rand(-40, -5) : rand(0, H),
       r: 0.9 + depth * 2.1,                  // radius på kjernen
-      vy: 0.18 + depth * 0.55,               // fallhastighet
+      vy: 0.1 + depth * 0.32,                // fallhastighet (rolig)
       sway: rand(0.2, 0.9) * (0.4 + depth),  // sideveis vugging
       phase: rand(0, Math.PI * 2),
       spin: rand(0.004, 0.012),
@@ -86,8 +86,8 @@
       if (x < -20) f.x += W + 40; else if (x > W + 20) f.x -= W + 40;
 
       const shimmer = 0.65 + 0.35 * Math.sin(t * f.twinkle + f.phase * 3);
-      ctx.globalAlpha = Math.min(1, f.alpha * shimmer * (light ? 1.35 : 1));
-      const size = f.r * (light ? 4.4 : 7); // sprite inkluderer gløden rundt kjernen
+      ctx.globalAlpha = Math.min(1, f.alpha * shimmer * (light ? 2.3 : 1));
+      const size = f.r * (light ? 6 : 7); // sprite inkluderer gløden rundt kjernen
       ctx.drawImage(sprite, x - size / 2, f.y - size / 2, size, size);
     }
     ctx.globalAlpha = 1;
