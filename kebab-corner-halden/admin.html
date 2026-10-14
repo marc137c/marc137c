@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Meny fra bilde · Kebab Corner</title>
+<link rel="icon" href="bilder/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Samme uttrykk som nettsiden: mørkt, ett rødt aksent. Et verktøy i tre steg, lest ovenfra og ned. */
+:root{
+  --bg:#141010; --surface:#1E1817; --surface-2:#28211F;
+  --line:rgba(243,237,230,.11); --line-strong:rgba(243,237,230,.24);
+  --text:#F3EDE6; --muted:#A69C94;
+  --accent:#D42E23; --accent-text:#F0574A; --ok:#7FCB8C; --warn:#F2B35B;
+  --font-display:"Archivo","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --font-body:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --radius:6px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:400 1rem/1.55 var(--font-body);-webkit-font-smoothing:antialiased}
+[hidden]{display:none!important}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--accent-text);outline-offset:3px;border-radius:2px}
+.wrap{max-width:52rem;margin-inline:auto;padding-inline:clamp(1rem,4vw,2rem);padding-block:2rem 5rem}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+header.top{display:flex;align-items:center;gap:.8rem;padding-bottom:1.5rem;border-bottom:1px solid var(--line);margin-bottom:2.5rem}
+header.top img{width:2.4rem;height:2.4rem;border-radius:var(--radius);background:#fff;object-fit:contain}
+header.top b{font-family:var(--font-display);font-stretch:80%;font-weight:800;text-transform:uppercase;font-size:1.2rem;letter-spacing:.01em}
+header.top a{margin-left:auto;color:var(--muted);font-size:.9rem}
+h1{font-family:var(--font-display);font-stretch:74%;font-weight:800;text-transform:uppercase;font-size:clamp(2.4rem,7vw,3.8rem);line-height:.98;margin:0 0 .75rem;letter-spacing:-.01em}
+.lede{color:var(--muted);max-width:38rem;margin:0 0 2.5rem}
+
+.step{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);padding:1.5rem;margin-bottom:1.25rem}
+.step h2{display:flex;align-items:center;gap:.75rem;font-size:1.1rem;margin:0 0 1rem}
+.step h2 .n{display:grid;place-items:center;width:1.9rem;height:1.9rem;border-radius:50%;border:1px solid var(--line-strong);font-size:.8rem;color:var(--accent-text);flex:none}
+.hint{color:var(--muted);font-size:.9rem;margin:.6rem 0 0}
+label.field{display:grid;gap:.4rem;font-weight:600;font-size:.9rem}
+input[type=password],input[type=text],input[type=number],textarea,select{width:100%;font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line-strong);border-radius:var(--radius);padding:.7rem .85rem}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent-text)}
+.check{display:flex;align-items:center;gap:.5rem;margin-top:.75rem;color:var(--muted);font-size:.9rem}
+.check input{accent-color:var(--accent);width:1rem;height:1rem}
+
+.drop{display:grid;place-items:center;gap:.5rem;text-align:center;border:1.5px dashed var(--line-strong);border-radius:var(--radius);padding:2rem 1rem;cursor:pointer;transition:border-color .2s,background .2s}
+.drop:hover,.drop.over{border-color:var(--accent-text);background:rgba(212,46,35,.06)}
+.drop svg{width:2rem;height:2rem;color:var(--accent-text)}
+.drop b{font-weight:600}
+.drop span{color:var(--muted);font-size:.9rem}
+.thumbs{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1rem}
+.thumb{position:relative;width:6rem;height:6rem;border-radius:var(--radius);overflow:hidden;border:1px solid var(--line)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb button{position:absolute;top:.25rem;right:.25rem;width:1.6rem;height:1.6rem;border-radius:50%;border:0;background:rgba(20,16,16,.85);color:var(--text);cursor:pointer;font-size:1rem;line-height:1}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.55rem;min-height:2.9rem;padding:.7rem 1.3rem;border-radius:var(--radius);font:inherit;font-weight:700;border:1px solid transparent;cursor:pointer;text-decoration:none;transition:background .2s,border-color .2s}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#B9251B}
+.btn-primary[disabled]{opacity:.5;cursor:not-allowed}
+.btn-line{background:transparent;color:var(--text);border-color:var(--line-strong)}
+.btn-line:hover{border-color:var(--text)}
+.btn-small{min-height:2.2rem;padding:.35rem .75rem;font-size:.85rem}
+.actions{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:1.25rem}
+
+.status{display:flex;align-items:center;gap:.75rem;margin-top:1rem;padding:.85rem 1rem;border-radius:var(--radius);background:var(--surface-2);font-size:.95rem}
+.status.error{background:rgba(212,46,35,.14);color:#FFB4AC}
+.status.ok{background:rgba(127,203,140,.12);color:var(--ok)}
+.spinner{width:1.1rem;height:1.1rem;border-radius:50%;border:2px solid var(--line-strong);border-top-color:var(--accent-text);animation:spin .8s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spinner{animation-duration:2.4s}}
+
+.notes{margin:0 0 1.25rem;padding:.9rem 1rem;border-left:2px solid var(--warn);background:rgba(242,179,91,.08);font-size:.92rem}
+.notes b{color:var(--warn)}
+.notes ul{margin:.35rem 0 0;padding-left:1.1rem}
+.found{display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:1rem;margin-bottom:1.5rem}
+.cat{border-top:1px solid var(--line-strong);padding-top:1rem;margin-top:1.25rem}
+.cat-head{display:flex;gap:.6rem;align-items:center;margin-bottom:.6rem}
+.cat-head .k-name{font-family:var(--font-display);font-stretch:80%;font-weight:800;text-transform:uppercase;font-size:1.25rem;padding:.4rem .6rem}
+.cat-head .k-sizes{max-width:14rem;padding:.5rem .6rem;font-size:.9rem}
+.row{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1fr) minmax(0,1fr) auto;gap:.5rem;align-items:center;padding-block:.35rem}
+.row.head{color:var(--muted);font-size:.75rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.row input,.row select{padding:.5rem .6rem;font-size:.95rem}
+.row.item{border-bottom:1px solid var(--line);padding-bottom:.6rem}
+.row .r-desc{grid-column:1 / 3;font-size:.88rem;color:var(--muted)}
+.row .r-tag{grid-column:3 / 4;font-size:.88rem}
+.icon-btn{width:2.2rem;height:2.2rem;display:grid;place-items:center;border-radius:var(--radius);border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}
+.icon-btn:hover{color:var(--accent-text);border-color:var(--accent-text)}
+.icon-btn svg{width:1rem;height:1rem}
+@media (max-width:620px){
+  .row{grid-template-columns:minmax(0,1fr) 5.5rem auto}
+  .row .al{grid-column:1 / 3}
+  .row .r-desc{grid-column:1 / -1}
+  .row .r-tag{grid-column:1 / 3}
+  .cat-head{flex-wrap:wrap}
+  .cat-head .k-name{flex:1 1 100%}
+  .cat-head .k-sizes{flex:1;max-width:none}
+  .row.head{display:none}
+}
+details{margin-top:1.25rem}
+summary{cursor:pointer;color:var(--muted);font-size:.9rem}
+details textarea{margin-top:.75rem;min-height:14rem;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+ol.publish{margin:0;padding-left:1.2rem;display:grid;gap:.5rem;color:var(--muted)}
+ol.publish b{color:var(--text)}
+code{font:.9em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--surface-2);padding:.1rem .35rem;border-radius:4px;color:var(--text)}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header class="top">
+    <img src="bilder/logo.png" alt="">
+    <b>Kebab Corner</b>
+    <a href="./">Til nettsiden</a>
+  </header>
+
+  <h1>Meny fra bilde</h1>
+  <p class="lede">Ta bilde av menyen, så leser Claude av retter, priser og allergener. Du ser over og retter det som er feil, og laster ned en ny menyfil til nettsiden.</p>
+
+  <section class="step" aria-labelledby="s1">
+    <h2 id="s1"><span class="n">1</span>API-nøkkel</h2>
+    <label class="field" for="key">Din Claude API-nøkkel
+      <input type="password" id="key" autocomplete="off" spellcheck="false" placeholder="sk-ant-…">
+    </label>
+    <label class="check" for="remember"><input type="checkbox" id="remember"> Husk nøkkelen på denne enheten</label>
+    <p class="hint">Nøkkelen sendes bare til Claude, rett fra nettleseren din. Den lagres aldri på nettsiden. Du lager en på <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com</a>.</p>
+  </section>
+
+  <section class="step" aria-labelledby="s2">
+    <h2 id="s2"><span class="n">2</span>Bilder av menyen</h2>
+    <label class="drop" id="drop" for="files">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      <b>Velg bilder eller ta et bilde</b>
+      <span>Du kan legge til flere bilder hvis menyen går over flere sider. Skjermbilder fungerer også.</span>
+      <input type="file" id="files" accept="image/*" multiple class="sr-only">
+    </label>
+    <div class="thumbs" id="thumbs"></div>
+    <div class="actions">
+      <button type="button" class="btn btn-primary" id="read" disabled>Les av menyen</button>
+    </div>
+    <div class="status" id="status" role="status" hidden></div>
+  </section>
+
+  <section class="step" id="result" aria-labelledby="s3" hidden>
+    <h2 id="s3"><span class="n">3</span>Se over og rett</h2>
+    <div class="notes" id="notes" hidden></div>
+    <div class="found">
+      <label class="field" for="tel">Telefonnummer
+        <input type="text" id="tel" placeholder="Ikke funnet på bildet">
+      </label>
+      <label class="field" for="allergens">Allergenkoder (KODE = navn, med komma mellom)
+        <input type="text" id="allergens" placeholder="G = Gluten, M = Melk">
+      </label>
+    </div>
+    <div id="editor"></div>
+    <p class="hint" id="dropped" role="status" hidden></p>
+    <div class="actions">
+      <button type="button" class="btn btn-line btn-small" id="add-cat">Legg til kategori</button>
+    </div>
+    <details>
+      <summary>Vis innholdet i menyfilen</summary>
+      <label class="sr-only" for="code">Innholdet i meny.js</label>
+      <textarea id="code" readonly></textarea>
+    </details>
+    <div class="actions">
+      <button type="button" class="btn btn-primary" id="download">Last ned meny.js</button>
+      <button type="button" class="btn btn-line" id="copy">Kopier</button>
+    </div>
+  </section>
+
+  <section class="step" aria-labelledby="s4">
+    <h2 id="s4"><span class="n">4</span>Legg den ut på nettsiden</h2>
+    <ol class="publish">
+      <li>Last ned <b>meny.js</b> i steg 3.</li>
+      <li>Bytt ut filen med samme navn i mappen <code>kebab-corner-halden</code>. På GitHub velger du <b>Add file</b> og <b>Upload files</b> i mappen.</li>
+      <li>Netlify publiserer siden på nytt av seg selv etter et minutt.</li>
+    </ol>
+  </section>
+</main>
+
+<script>
+const MODEL = "claude-fable-5-1";
+const $ = s => document.querySelector(s);
+const $$ = (s, r = document) => Array.prototype.slice.call(r.querySelectorAll(s));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+// ---------- 1. Nøkkel ----------
+const keyEl = $("#key"), rememberEl = $("#remember");
+try { const k = localStorage.getItem("kc-api-key"); if (k) { keyEl.value = k; rememberEl.checked = true; } } catch (e) {}
+function saveKey() {
+  try {
+    if (rememberEl.checked && keyEl.value.trim()) localStorage.setItem("kc-api-key", keyEl.value.trim());
+    else localStorage.removeItem("kc-api-key");
+  } catch (e) {}
+}
+keyEl.addEventListener("change", saveKey);
+rememberEl.addEventListener("change", saveKey);
+
+// ---------- 2. Bilder ----------
+let images = []; // { name, url, data, media_type }
+const MAX_SIDE = 1568; // større bilder skaleres ned uten å miste lesbarhet
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => resolve({ img, url });
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(file.name + " kunne ikke åpnes som bilde.")); };
+    img.src = url;
+  });
+}
+async function prepare(file) {
+  const { img, url } = await loadImage(file);
+  const scale = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement("canvas");
+  c.width = Math.round(img.naturalWidth * scale);
+  c.height = Math.round(img.naturalHeight * scale);
+  c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+  const dataUrl = c.toDataURL("image/jpeg", 0.88);
+  return { name: file.name, url, data: dataUrl.split(",")[1], media_type: "image/jpeg" };
+}
+async function addFiles(list) {
+  const files = Array.prototype.filter.call(list, f => f.type.indexOf("image/") === 0);
+  if (!files.length) return showStatus("error", "Velg bildefiler, for eksempel JPG eller PNG.");
+  hideStatus();
+  for (const f of files) {
+    try { images.push(await prepare(f)); }
+    catch (e) { showStatus("error", esc(e.message)); }
+  }
+  renderThumbs();
+}
+function renderThumbs() {
+  $("#thumbs").innerHTML = images.map((im, i) =>
+    `<div class="thumb"><img src="${im.url}" alt="Bilde ${i + 1} av menyen"><button type="button" data-i="${i}" aria-label="Fjern bilde ${i + 1}">×</button></div>`).join("");
+  $("#read").disabled = !images.length;
+}
+$("#thumbs").addEventListener("click", e => {
+  const b = e.target.closest("button[data-i]");
+  if (!b) return;
+  URL.revokeObjectURL(images[+b.dataset.i].url);
+  images.splice(+b.dataset.i, 1);
+  renderThumbs();
+});
+$("#files").addEventListener("change", e => { addFiles(e.target.files); e.target.value = ""; });
+const drop = $("#drop");
+["dragenter", "dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => addFiles(e.dataTransfer.files));
+
+function showStatus(kind, html) {
+  const s = $("#status");
+  s.className = "status " + (kind || "");
+  s.innerHTML = (kind === "busy" ? '<span class="spinner" aria-hidden="true"></span>' : "") + "<span>" + html + "</span>";
+  s.hidden = false;
+}
+function hideStatus() { $("#status").hidden = true; }
+
+// ---------- Claude ----------
+const SCHEMA = {
+  type: "object", additionalProperties: false,
+  required: ["kategorier", "allergener", "telefon", "merknader"],
+  properties: {
+    kategorier: { type: "array", items: {
+      type: "object", additionalProperties: false,
+      required: ["kategori", "storrelser", "retter"],
+      properties: {
+        kategori: { type: "string" },
+        storrelser: { type: "array", items: { type: "string" } },
+        retter: { type: "array", items: {
+          type: "object", additionalProperties: false,
+          required: ["navn", "tekst", "pris", "allergener", "tag"],
+          properties: {
+            navn: { type: "string" },
+            tekst: { type: "string" },
+            pris: { type: "array", items: { type: "integer" } },
+            allergener: { type: "array", items: { type: "string" } },
+            tag: { type: "string", enum: ["", "veg", "hot", "pop"] }
+          }
+        } }
+      }
+    } },
+    allergener: { type: "array", items: {
+      type: "object", additionalProperties: false, required: ["kode", "navn"],
+      properties: { kode: { type: "string" }, navn: { type: "string" } }
+    } },
+    telefon: { type: "string" },
+    merknader: { type: "array", items: { type: "string" } }
+  }
+};
+
+const PROMPT = `Bildene viser menyen til Kebab Corner, en kebab-, pizza- og burgerrestaurant i Halden. Les av hele menyen slik den står, og fyll ut skjemaet.
+
+- Ta med alle kategorier og alle retter, i samme rekkefølge som på menyen. Skriv navnene nøyaktig slik de står.
+- "tekst" er beskrivelsen under en rett. Er det ingen beskrivelse, bruk tom tekst.
+- "pris" er prisen i hele kroner, uten "kr" og ",-". Har en rett flere størrelser, skriv prisene i samme rekkefølge som størrelsene, og skriv navnene på størrelsene i "storrelser" for kategorien (for eksempel ["Liten", "Stor"]). Har kategorien bare én pris per rett, er "storrelser" en tom liste.
+- "allergener" for en rett er kodene som står ved retten, skrevet akkurat som på menyen. "allergener" på toppnivå er forklaringen av kodene hvis menyen har en.
+- "tag" er "hot" hvis retten er merket som sterk (for eksempel med en chili), "veg" hvis den er merket som vegetar, "pop" hvis den er merket som mest solgt eller populær, ellers tom tekst.
+- "telefon" er restaurantens telefonnummer hvis det står på bildene, ellers tom tekst.
+- Ikke gjett. Er en pris, et navn eller en kode uleselig eller usikker, skriv det du kan lese og legg til en kort forklaring i "merknader". Gjelder det ingenting, er "merknader" en tom liste.`;
+
+async function readMenu() {
+  const key = keyEl.value.trim();
+  if (!key) { keyEl.focus(); return showStatus("error", "Lim inn API-nøkkelen i steg 1 først."); }
+  saveKey();
+  $("#read").disabled = true;
+  showStatus("busy", "Claude leser menyen. Det tar vanligvis under ett minutt.");
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "anthropic-beta": "server-side-fallback-2026-07-01",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 16000,
+        fallbacks: "default",
+        output_config: { effort: "medium", format: { type: "json_schema", schema: SCHEMA } },
+        messages: [{
+          role: "user",
+          content: images.map(im => ({ type: "image", source: { type: "base64", media_type: im.media_type, data: im.data } }))
+            .concat([{ type: "text", text: PROMPT }])
+        }]
+      })
+    });
+    let data = null;
+    try { data = await res.json(); } catch (e) {}
+    if (!res.ok) throw new Error(apiError(res.status, data));
+    if (data.stop_reason === "refusal") throw new Error("Claude ville ikke lese disse bildene. Prøv med et tydeligere bilde av selve menyen.");
+    if (data.stop_reason === "max_tokens") throw new Error("Menyen var for lang til å leses på én gang. Prøv med færre bilder om gangen.");
+    const text = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+    let parsed;
+    try { parsed = JSON.parse(text); } catch (e) { throw new Error("Svaret fra Claude kunne ikke leses. Prøv igjen."); }
+    const n = parsed.kategorier.reduce((sum, k) => sum + k.retter.length, 0);
+    if (!n) throw new Error("Fant ingen retter på bildene. Sjekk at bildene viser menyen, og at teksten er skarp.");
+    showResult(parsed);
+    showStatus("ok", `Fant ${n} retter i ${parsed.kategorier.length} kategorier. Se over dem i steg 3.`);
+    $("#result").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) {
+    showStatus("error", esc(e.message || "Noe gikk galt. Prøv igjen."));
+  } finally {
+    $("#read").disabled = !images.length;
+  }
+}
+function apiError(status, data) {
+  const msg = data && data.error && data.error.message ? " (" + data.error.message + ")" : "";
+  if (status === 401) return "API-nøkkelen ble avvist. Sjekk at du har limt inn hele nøkkelen.";
+  if (status === 403) return "Nøkkelen har ikke tilgang til denne modellen." + msg;
+  if (status === 413) return "Bildene er for store til sammen. Prøv med færre bilder om gangen.";
+  if (status === 429) return "For mange forespørsler akkurat nå. Vent litt og prøv igjen.";
+  if (status === 529 || status >= 500) return "Claude er opptatt akkurat nå. Prøv igjen om litt.";
+  return "Forespørselen ble avvist" + msg + ".";
+}
+$("#read").addEventListener("click", readMenu);
+
+// ---------- 3. Redigering ----------
+const TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>';
+const TAGS = [["", "Uten merke"], ["veg", "Vegetar"], ["hot", "Sterk"], ["pop", "Mest solgt"]];
+function catHtml(k) {
+  const sizes = (k.storrelser || []).join(" / ");
+  return `<div class="cat">
+    <div class="cat-head"><input type="text" class="k-name" value="${esc(k.kategori)}" aria-label="Kategorinavn">
+      <input type="text" class="k-sizes" value="${esc(sizes)}" placeholder="Størrelser, f.eks. Medium / Stor" aria-label="Størrelser, med skråstrek mellom">
+      <button type="button" class="icon-btn del-cat" aria-label="Slett kategorien">${TRASH}</button></div>
+    <div class="row head"><span>Rett</span><span>Pris</span><span>Allergener</span><span></span></div>
+    <div class="items">${k.retter.map(itemHtml).join("")}</div>
+    <button type="button" class="btn btn-line btn-small add-item">Legg til rett</button>
+  </div>`;
+}
+function itemHtml(r) {
+  return `<div class="row item">
+    <input type="text" class="r-name" value="${esc(r.navn)}" aria-label="Navn på retten">
+    <input type="text" class="r-price" value="${esc((r.pris || []).join(" / "))}" inputmode="numeric" aria-label="Pris i kroner, med skråstrek mellom størrelsene">
+    <input type="text" class="al r-al" value="${esc((r.allergener || []).join(", "))}" aria-label="Allergenkoder, med komma mellom">
+    <button type="button" class="icon-btn del-item" aria-label="Slett retten">${TRASH}</button>
+    <input type="text" class="r-desc" value="${esc(r.tekst || "")}" placeholder="Beskrivelse (valgfri)" aria-label="Beskrivelse av retten">
+    <select class="r-tag" aria-label="Merke">${TAGS.map(([v, t]) => `<option value="${v}"${(r.tag || "") === v ? " selected" : ""}>${t}</option>`).join("")}</select>
+  </div>`;
+}
+function showResult(p) {
+  $("#tel").value = p.telefon || "";
+  $("#allergens").value = (p.allergener || []).map(a => a.kode + " = " + a.navn).join(", ");
+  const notes = p.merknader || [];
+  $("#notes").innerHTML = notes.length ? "<b>Sjekk dette spesielt:</b><ul>" + notes.map(n => "<li>" + esc(n) + "</li>").join("") + "</ul>" : "";
+  $("#notes").hidden = !notes.length;
+  $("#editor").innerHTML = p.kategorier.map(catHtml).join("");
+  $("#result").hidden = false;
+  updateCode();
+}
+$("#editor").addEventListener("click", e => {
+  if (e.target.closest(".del-item")) e.target.closest(".item").remove();
+  else if (e.target.closest(".del-cat")) e.target.closest(".cat").remove();
+  else if (e.target.closest(".add-item")) {
+    const box = e.target.closest(".cat").querySelector(".items");
+    box.insertAdjacentHTML("beforeend", itemHtml({ navn: "", pris: [] }));
+    box.lastElementChild.querySelector("input").focus();
+  } else return;
+  updateCode();
+});
+$("#editor").addEventListener("input", updateCode);
+$("#editor").addEventListener("change", updateCode);
+$("#tel").addEventListener("input", updateCode);
+$("#allergens").addEventListener("input", updateCode);
+$("#add-cat").addEventListener("click", () => {
+  $("#editor").insertAdjacentHTML("beforeend", catHtml({ kategori: "Ny kategori", retter: [{ navn: "", pris: [] }] }));
+  $("#editor").lastElementChild.querySelector("input").select();
+  updateCode();
+});
+
+// Leser redigeringsfeltene og bygger samme form som SITE.meny på nettsiden
+function collect() {
+  let utenPris = 0;
+  const meny = $$(".cat", $("#editor")).map(cat => {
+    const sizes = cat.querySelector(".k-sizes").value.split("/").map(x => x.trim()).filter(Boolean);
+    const retter = $$(".item", cat).map(row => {
+      const navn = row.querySelector(".r-name").value.trim();
+      const pris = (row.querySelector(".r-price").value.match(/\d+/g) || []).map(Number);
+      // Korte koder skrives med store bokstaver (g blir G). Hele navn står som de er skrevet.
+      const allergener = row.querySelector(".r-al").value.split(/[,;]+/).map(x => x.trim()).filter(Boolean)
+        .map(x => /^[a-zæøå]{1,3}$/i.test(x) ? x.toUpperCase() : x);
+      const tekst = row.querySelector(".r-desc").value.trim();
+      const tag = row.querySelector(".r-tag").value;
+      const r = { navn: navn, pris: pris };
+      if (tekst) r.tekst = tekst;
+      if (allergener.length) r.allergener = allergener;
+      if (tag) r.tag = tag;
+      if (navn && !pris.length) utenPris++;
+      return r;
+    }).filter(r => r.navn && r.pris.length);
+    const k = { kategori: cat.querySelector(".k-name").value.trim(), retter: retter };
+    if (sizes.length > 1) k.storrelser = sizes;
+    return k;
+  }).filter(k => k.kategori);
+  // "G = Gluten (hvete, bygg), M = Melk": det deles bare på komma som står foran en ny "KODE ="
+  const allergener = {};
+  $("#allergens").value.split(/[,;\n](?=\s*[^,;=\n]{1,6}\s*=)/).forEach(part => {
+    const i = part.indexOf("=");
+    const kode = i > 0 ? part.slice(0, i).trim() : "";
+    if (kode) allergener[kode.toUpperCase()] = part.slice(i + 1).trim();
+  });
+  const out = { meny: meny };
+  Object.defineProperty(out, "utenPris", { value: utenPris }); // vises som advarsel, kommer ikke med i filen
+  if (Object.keys(allergener).length) out.allergener = allergener;
+  if ($("#tel").value.trim()) out.telefon = $("#tel").value.trim();
+  return out;
+}
+function fileText() {
+  return "/* Menyen til Kebab Corner Halden.\n   Laget på admin.html " + new Date().toLocaleDateString("nb-NO") + ". Last ned en ny fil der og bytt ut denne.\n   Finnes ikke filen, bruker siden menyen som står i index.html. */\nwindow.MENY_DATA = " + JSON.stringify(collect(), null, 2) + ";\n";
+}
+function updateCode() {
+  const data = collect();
+  $("#code").value = fileText();
+  const retter = data.meny.reduce((n, k) => n + k.retter.length, 0);
+  const msg = [];
+  if (data.utenPris) msg.push(data.utenPris === 1 ? "1 rett mangler pris og blir ikke med i filen." : data.utenPris + " retter mangler pris og blir ikke med i filen.");
+  if (!retter) msg.push("Filen har ingen retter. Nettsiden viser da menyen den hadde fra før.");
+  $("#dropped").textContent = msg.join(" ");
+  $("#dropped").hidden = !msg.length;
+}
+
+$("#download").addEventListener("click", () => {
+  const blob = new Blob([fileText()], { type: "text/javascript" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "meny.js";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$("#copy").addEventListener("click", async () => {
+  const b = $("#copy");
+  try { await navigator.clipboard.writeText(fileText()); b.textContent = "Kopiert"; }
+  catch (e) { const t = $("#code"); t.closest("details").open = true; t.select(); b.textContent = "Marker og kopier"; }
+  setTimeout(() => { b.textContent = "Kopier"; }, 2000);
+});
+</script>
+</body>
+</html>

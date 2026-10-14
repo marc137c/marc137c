@@ -1,0 +1,6 @@
+# Nettsiden ligger i mappen kebab-corner-halden. Adresser som ikke finnes som fil,
+# hentes derfra, så både / og /kebab-corner-halden/ viser siden.
+[[redirects]]
+  from = "/*"
+  to = "/kebab-corner-halden/:splat"
+  status = 200
