@@ -99,6 +99,26 @@ tabs.forEach((tab) => {
   });
 });
 
+// Klikk på en tjeneste i prislisten: gå til bookingskjemaet med tjenesten ferdig valgt
+document.querySelectorAll(".svc-link").forEach((link) => {
+  link.addEventListener("click", () => {
+    const form = document.getElementById("booking-form");
+    const select = form.querySelector('select[name="tjeneste"]');
+    select.value = link.dataset.service;
+    select.classList.add("picked");
+    const card = document.getElementById("bestill");
+    card.classList.remove("flash");
+    void card.offsetWidth; // start animasjonen på nytt
+    card.classList.add("flash");
+    // Neste felt som mangler, får fokus når rullingen er ferdig
+    setTimeout(() => {
+      const next = [...form.querySelectorAll("input:not([type=hidden]):not([name=bot-field])")].find((i) => !i.value);
+      next?.focus({ preventScroll: true });
+    }, 700);
+  });
+});
+document.querySelector('select[name="tjeneste"]').addEventListener("change", (e) => e.target.classList.remove("picked"));
+
 // Bookingskjema: ingen datoer i fortiden, ingen søndager, innsending via Netlify Forms
 const dateInput = document.getElementById("booking-date");
 const toISO = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);

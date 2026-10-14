@@ -117,6 +117,7 @@
         <header class="section-head">
           <p class="eyebrow" data-i18n="svc.eyebrow">Tjenester &amp; priser</p>
           <h2 data-i18n="svc.title">Hva kan vi gjøre for deg?</h2>
+          <p class="section-lead" data-i18n="svc.hint">Trykk på en tjeneste for å bestille time.</p>
         </header>
 
         <div class="tabs" role="tablist" data-i18n-attr="aria-label:svc.cats" aria-label="Kategorier">
@@ -127,14 +128,14 @@
         </div>
 
         <ul class="price-list">
-          <li data-cat="har"><div><h3 data-i18n="s.cut">Herreklipp</h3><p data-i18n="s.cut.d">Klipp med saks og/eller maskin, vask og styling.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="450">450,-</span></li>
-          <li data-cat="har"><div><h3 data-i18n="s.fade">Skin fade</h3><p data-i18n="s.fade.d">Presis fade helt ned til huden, med detaljert overgang.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="500">500,-</span></li>
-          <li data-cat="har"><div><h3 data-i18n="s.kids">Barneklipp</h3><p data-i18n="s.kids.d">For gutter under 12 år.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="300">300,-</span></li>
-          <li data-cat="har"><div><h3 data-i18n="s.clip">Maskinklipp</h3><p data-i18n="s.clip.d">Én lengde over hele hodet.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="250">250,-</span></li>
-          <li data-cat="skjegg"><div><h3 data-i18n="s.beard">Skjeggtrim</h3><p data-i18n="s.beard.d">Forming, trim og skarpe linjer med kniv.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="300">300,-</span></li>
-          <li data-cat="skjegg"><div><h3 data-i18n="s.shave">Varm håndklebarbering</h3><p data-i18n="s.shave.d">Tradisjonell barbering med kniv, varme håndklær og balm.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="400">400,-</span></li>
-          <li data-cat="pakke"><div><h3 data-i18n="s.combo">Klipp + skjegg</h3><p data-i18n="s.combo.d">Vår mest populære kombo.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="700">700,-</span></li>
-          <li data-cat="pakke"><div><h3 data-i18n="s.deluxe">Viggo's Deluxe</h3><p data-i18n="s.deluxe.d">Klipp, skjegg, varmt håndkle, ansiktsmaske og styling.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="950">950,-</span></li>
+          <li data-cat="har"><a class="svc-link" href="#bestill" data-service="Herreklipp"><div><h3 data-i18n="s.cut">Herreklipp</h3><p data-i18n="s.cut.d">Klipp med saks og/eller maskin, vask og styling.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="450">450,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+          <li data-cat="har"><a class="svc-link" href="#bestill" data-service="Skin fade"><div><h3 data-i18n="s.fade">Skin fade</h3><p data-i18n="s.fade.d">Presis fade helt ned til huden, med detaljert overgang.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="500">500,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+          <li data-cat="har"><a class="svc-link" href="#bestill" data-service="Barneklipp"><div><h3 data-i18n="s.kids">Barneklipp</h3><p data-i18n="s.kids.d">For gutter under 12 år.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="300">300,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+          <li data-cat="har"><a class="svc-link" href="#bestill" data-service="Maskinklipp"><div><h3 data-i18n="s.clip">Maskinklipp</h3><p data-i18n="s.clip.d">Én lengde over hele hodet.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="250">250,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+          <li data-cat="skjegg"><a class="svc-link" href="#bestill" data-service="Skjeggtrim"><div><h3 data-i18n="s.beard">Skjeggtrim</h3><p data-i18n="s.beard.d">Forming, trim og skarpe linjer med kniv.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="300">300,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+          <li data-cat="skjegg"><a class="svc-link" href="#bestill" data-service="Varm håndklebarbering"><div><h3 data-i18n="s.shave">Varm håndklebarbering</h3><p data-i18n="s.shave.d">Tradisjonell barbering med kniv, varme håndklær og balm.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="400">400,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+          <li data-cat="pakke"><a class="svc-link" href="#bestill" data-service="Klipp + skjegg"><div><h3 data-i18n="s.combo">Klipp + skjegg</h3><p data-i18n="s.combo.d">Vår mest populære kombo.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="700">700,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+          <li data-cat="pakke"><a class="svc-link" href="#bestill" data-service="Viggo's Deluxe"><div><h3 data-i18n="s.deluxe">Viggo's Deluxe</h3><p data-i18n="s.deluxe.d">Klipp, skjegg, varmt håndkle, ansiktsmaske og styling.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="950">950,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
         </ul>
       </div>
     </section>

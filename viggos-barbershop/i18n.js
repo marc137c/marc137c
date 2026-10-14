@@ -27,6 +27,7 @@
     "svc.eyebrow": "Services &amp; prices",
     "svc.title": "What can we do for you?",
     "svc.cats": "Categories",
+    "svc.hint": "Tap a service to book an appointment.",
     "tab.all": "All",
     "tab.hair": "Hair",
     "tab.beard": "Beard",
