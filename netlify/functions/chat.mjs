@@ -27,7 +27,8 @@ Tjenester og priser:
 - Viggo's Deluxe 950,- (klipp, skjegg, varmt håndkle, ansiktsmaske, styling)
 
 Åpningstider: man–ons og fre 10–18, tor 10–20, lør 10–16, søndag stengt. Drop-in når det er ledig.
-Telefon: 40 96 39 11. Instagram, TikTok og Facebook: Viggo's Barbershop.`;
+Adresse: Svenskegata 2, 1776 Halden (Halden sentrum). Telefon: 409 63 911 (ring eller send SMS).
+Barbershopen åpnet i 2026 og drives av Vigan Kurti, tidligere daglig leder i Halden Frisør.`;
 
 const json = (status, body) =>
   new Response(JSON.stringify(body), {

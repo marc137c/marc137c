@@ -373,3 +373,14 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 .socials-sm svg { width: 18px; height: 18px; }
 .site-footer .container { align-items: center; }
 .foot-tag { font-family: var(--caps); letter-spacing: .18em; font-size: .78rem; color: var(--gold); }
+
+/* Kontakt med kart */
+.contact-grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 40px; align-items: stretch; }
+.contact { display: grid; gap: 28px; align-content: start; }
+.contact h3 { margin-bottom: .3em; }
+.contact p { margin-bottom: .4em; }
+.map {
+  width: 100%; min-height: 320px; height: 100%; border: 1px solid var(--line); border-radius: 20px;
+  filter: grayscale(.4) contrast(1.05) brightness(.9);
+}
+@media (max-width: 760px) { .contact-grid { grid-template-columns: 1fr; } .map { min-height: 280px; } }

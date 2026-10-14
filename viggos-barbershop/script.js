@@ -11,6 +11,21 @@ const HOURS = {
 };
 const fmt = (min) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
 
+// Sosiale medier: lim inn lenkene her, så dukker ikonene opp på siden.
+// Tom streng = ikonet skjules.
+const SOCIAL = {
+  instagram: "",
+  tiktok: "",
+  facebook: "",
+};
+document.querySelectorAll("[data-social]").forEach((a) => {
+  const url = SOCIAL[a.dataset.social];
+  if (url) { a.href = url; a.hidden = false; }
+});
+document.querySelectorAll("[data-socials-wrap]").forEach((w) => {
+  w.hidden = !w.querySelector("[data-social]:not([hidden])");
+});
+
 // Mobilmeny
 const toggle = document.querySelector(".nav-toggle");
 const menu = document.getElementById("nav-menu");

@@ -6,13 +6,17 @@ Statisk nettside (HTML/CSS/JS, ingen avhengigheter). Åpne `index.html` i nettle
 `netlify.toml` i roten av repoet peker Netlify til denne mappen (`publish = "viggos-barbershop"`).
 Bookingskjemaet bruker Netlify Forms – forespørsler dukker opp under **Forms** i Netlify-dashbordet.
 
-## Må fylles inn før lansering (plassholdere)
-- Adresse (`Storgata 1, 0000 Oslo`)
-- E-post (`post@viggosbarbershop.no`)
-- Lenker til Instagram, TikTok og Facebook (peker nå bare til forsidene deres)
-- Priser og tjenester
-- Åpningstider – både tabellen i `index.html` og `HOURS` øverst i `script.js`
-- Omtaler og tall i «Om oss» (bruk ekte kundeomtaler)
+## Bedriftsinfo (bekreftet)
+- **Viggos Barbershop Kurti**, org.nr. 937 845 812, innehaver Vigan Kurti
+- Svenskegata 2, 1776 Halden – telefon 409 63 911
+- Kilder: Brønnøysund via Proff.no, Gule Sider og Halden Arbeiderblad
+
+## Må bekreftes / fylles inn
+- **Sosiale medier:** lim inn lenkene i `SOCIAL` øverst i `script.js`. Ikonene vises først når en lenke er lagt inn.
+- **Priser og tjenester:** står i `index.html` og i `SYSTEM` i `netlify/functions/chat.mjs`.
+- **Åpningstider:** står i tabellen i `index.html`, i `HOURS` øverst i `script.js` og i `chat.mjs`.
+- **Bookingvarsler:** i Netlify går du til **Forms → booking → Form notifications** og legger inn e-postadressen som skal få timeforespørslene.
+- **Omtaler:** seksjonen er fjernet til ekte omtaler finnes, for eksempel fra Google.
 
 ## AI-stilrådgiver (Claude)
 Chat-knappen nede til høyre sender spørsmål til `/api/chat`, en Netlify Function (`netlify/functions/chat.mjs`)
