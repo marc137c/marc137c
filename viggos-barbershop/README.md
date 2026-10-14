@@ -74,3 +74,8 @@ Instagram-kontoen må være en **profesjonell konto** (Bedrift eller Innholdsska
 Sol/måne-knappen øverst i menyen bytter mellom mørkt tema (standard) og lyst tema, og valget huskes.
 Fargene for begge temaene står som variabler øverst i `styles.css` (`:root` og `:root[data-theme="light"]`).
 Den animerte bakgrunnen i toppen bytter farger mykt sammen med temaet.
+
+## Gyllent partikkel-snøfall
+`gold-snow.js` legger et stille snøfall av gullstøv over hele siden. Det tar ikke imot klikk og ligger under menyen og chatten.
+Antall partikler tilpasses skjermstørrelsen, og ved «redusert bevegelse» i systeminnstillingene står støvet stille.
+Juster mengden i `resize()` (tallet `11000` – lavere tall gir flere partikler) eller farten i `makeFlake()`.
