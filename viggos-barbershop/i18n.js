@@ -1,0 +1,188 @@
+// Språkstøtte (norsk/engelsk). Norsk står direkte i index.html; her ligger engelsk
+// for elementer merket med data-i18n / data-i18n-attr, og tekster som lages i JS.
+(() => {
+  const EN = {
+    "meta.title": "Viggo's Barbershop – Barber in central Halden",
+    "meta.desc": "Viggo's Barbershop at Svenskegata 2 in central Halden, Norway. Men's haircuts, fades, beard trims and hot towel shaves. Call +47 409 63 911 or book online.",
+    "skip": "Skip to content",
+    "brand.label": "Viggo's Barbershop – back to top",
+    "nav.label": "Main menu",
+    "nav.services": "Services",
+    "nav.about": "About",
+    "nav.hours": "Opening hours",
+    "nav.contact": "Contact",
+    "cta.book": "Book now",
+    "cta.prices": "See prices",
+    "hero.badge": "Now open in central Halden · Svenskegata 2",
+    "hero.tag": "Sharp cuts. <em>Easy chair.</em>",
+    "hero.lead": "Classic barbering with modern precision. Drop by for a fade, a beard trim or a hot towel shave – and walk out a better version of yourself.",
+    "hl.label": "Why choose us",
+    "hl.1t": "Experienced barber",
+    "hl.1p": "Former manager of Halden Frisør, with industry experience both in Norway and abroad.",
+    "hl.2t": "No rush",
+    "hl.2p": "We take our time with every client. Drop by, have a chat and relax in the chair.",
+    "hl.3t": "Quality products",
+    "hl.3p": "We use professional hair and beard products.",
+    "svc.eyebrow": "Services &amp; prices",
+    "svc.title": "What can we do for you?",
+    "svc.cats": "Categories",
+    "svc.hint": "Tap a service to book an appointment.",
+    "tab.all": "All",
+    "tab.hair": "Hair",
+    "tab.beard": "Beard",
+    "tab.pkg": "Packages",
+    "s.cut": "Men's haircut",
+    "s.cut.d": "Scissor and/or clipper cut, wash and styling.",
+    "s.fade": "Skin fade",
+    "s.fade.d": "Precise fade all the way down to the skin, with a detailed blend.",
+    "s.kids": "Kids' haircut",
+    "s.kids.d": "For boys under 12.",
+    "s.clip": "Buzz cut",
+    "s.clip.d": "One length all over.",
+    "s.beard": "Beard trim",
+    "s.beard.d": "Shaping, trimming and sharp lines with a straight razor.",
+    "s.shave": "Hot towel shave",
+    "s.shave.d": "Traditional straight-razor shave with hot towels and balm.",
+    "s.combo": "Haircut + beard",
+    "s.combo.d": "Our most popular combo.",
+    "s.deluxe": "Viggo's Deluxe",
+    "s.deluxe.d": "Haircut, beard, hot towel, face mask and styling.",
+    "stat.opened": "opened in Halden",
+    "stat.dropin": "and appointments",
+    "c.sms": "Send a text",
+    "c.maptitle": "Map: Svenskegata 2, 1776 Halden",
+    "soc.eyebrow": "Social media",
+    "soc.title": "Fresh from the chair",
+    "soc.lead": "Our latest cuts from Instagram.",
+    "about.eyebrow": "About us",
+    "about.img": "Viggo's Barbershop gold sign on the window",
+    "about.title": "A place for good conversation and sharp lines",
+    "about.p1": "Viggo's Barbershop opened in 2026 right in the centre of Halden. Behind the chair is Vigan Kurti, former manager of Halden Frisør, who brings industry experience from both Norway and abroad. The goal is a place where people can drop by, have a chat and feel at home.",
+    "about.p2": "Whether you want a clean classic cut, a modern fade or just want your beard in shape – we take the time to find the style that suits you.",
+    "stat.n1": "Central",
+    "hours.eyebrow": "Opening hours",
+    "hours.title": "When can you come by?",
+    "day.0": "Sunday", "day.1": "Monday", "day.2": "Tuesday", "day.3": "Wednesday",
+    "day.4": "Thursday", "day.5": "Friday", "day.6": "Saturday",
+    "closed": "Closed",
+    "hours.note": "Walk-ins are welcome when we have a free chair, but we recommend booking.",
+    "book.title": "Book an appointment",
+    "book.lead": "Call us or send a request and we'll confirm your appointment as soon as we can.",
+    "f.name": "Name",
+    "f.phone": "Phone",
+    "f.service": "Service",
+    "f.choose": "Choose a service",
+    "f.date": "Date",
+    "f.time": "Preferred time",
+    "f.submit": "Send request",
+    "f.orcall": "or call",
+    "c.address": "Address",
+    "c.map": "Get directions →",
+    "c.follow": "Follow us",
+    "totop": "Back to top ↑",
+  };
+
+  // Tekster som brukes fra script.js
+  const STRINGS = {
+    no: {
+      days: ["søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"],
+      tomorrow: "i morgen",
+      openNow: (t) => `Åpent nå – stenger kl. ${t}`,
+      opensToday: (t) => `Stengt nå – åpner i dag kl. ${t}`,
+      opensOn: (when, t) => `Stengt nå – åpner ${when} kl. ${t}`,
+      sundayClosed: "Vi har stengt på søndager. Velg en annen dag.",
+      openBetween: (a, b) => `Den dagen har vi åpent ${a}–${b}.`,
+      sending: "Sender …",
+      sent: "Takk! Vi tar kontakt for å bekrefte timen.",
+      sendFailed: "Noe gikk galt. Ring oss gjerne i stedet.",
+      menuOpen: "Åpne meny",
+      menuClose: "Lukk meny",
+      price: (n) => `${n},-`,
+      switchTo: "Switch to English",
+      toLight: "Bytt til lyst tema",
+      toDark: "Bytt til mørkt tema",
+      followOn: (n) => `Følg oss på ${n}`,
+      openPost: (n) => `Åpne innlegget på ${n}`,
+    },
+    en: {
+      days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+      tomorrow: "tomorrow",
+      openNow: (t) => `Open now – closes at ${t}`,
+      opensToday: (t) => `Closed now – opens today at ${t}`,
+      opensOn: (when, t) => `Closed now – opens ${when} at ${t}`,
+      sundayClosed: "We're closed on Sundays. Please choose another day.",
+      openBetween: (a, b) => `That day we're open ${a}–${b}.`,
+      sending: "Sending …",
+      sent: "Thanks! We'll be in touch to confirm your appointment.",
+      sendFailed: "Something went wrong. Feel free to call us instead.",
+      menuOpen: "Open menu",
+      menuClose: "Close menu",
+      price: (n) => `NOK ${n}`,
+      switchTo: "Bytt til norsk",
+      toLight: "Switch to light mode",
+      toDark: "Switch to dark mode",
+      followOn: (n) => `Follow us on ${n}`,
+      openPost: (n) => `Open the post on ${n}`,
+    },
+  };
+
+  const NO = {}; // originalteksten fra HTML-en, fanges opp første gang
+  const listeners = [];
+  const store = {
+    get() { try { return localStorage.getItem("lang"); } catch { return null; } },
+    set(v) { try { localStorage.setItem("lang", v); } catch { /* privat modus */ } },
+  };
+
+  function detect() {
+    const param = new URLSearchParams(location.search).get("lang");
+    if (param === "en" || param === "no") return param;
+    const saved = store.get();
+    if (saved === "en" || saved === "no") return saved;
+    const langs = navigator.languages || [navigator.language || ""];
+    return langs.some((l) => /^(nb|nn|no)\b/i.test(l)) ? "no" : "en";
+  }
+
+  function apply(lang) {
+    document.documentElement.lang = lang;
+    document.querySelectorAll("[data-i18n]").forEach((el) => {
+      const key = el.dataset.i18n;
+      if (!(key in NO)) NO[key] = el.innerHTML;
+      el.innerHTML = lang === "en" ? EN[key] ?? NO[key] : NO[key];
+    });
+    document.querySelectorAll("[data-i18n-attr]").forEach((el) => {
+      el.dataset.i18nAttr.split(";").forEach((pair) => {
+        const [attr, key] = pair.split(":");
+        const id = `${key}@${attr}`;
+        if (!(id in NO)) NO[id] = el.getAttribute(attr);
+        el.setAttribute(attr, lang === "en" ? EN[key] ?? NO[id] : NO[id]);
+      });
+    });
+    const s = STRINGS[lang];
+    document.querySelectorAll("[data-price]").forEach((el) => { el.textContent = s.price(el.dataset.price); });
+
+    const btn = document.getElementById("lang-toggle");
+    if (btn) {
+      // Bryteren viser språket du bytter TIL: «English» på norsk side, «Norsk» på engelsk side
+      const label = btn.querySelector(".lang-label");
+      label.textContent = lang === "en" ? "Norsk" : "English";
+      label.lang = lang === "en" ? "no" : "en";
+      btn.classList.toggle("is-en", lang === "en");
+      btn.setAttribute("aria-label", s.switchTo);
+    }
+    I18N.lang = lang;
+    listeners.forEach((fn) => fn(lang));
+  }
+
+  const I18N = {
+    lang: "no",
+    s: () => STRINGS[I18N.lang],
+    onChange: (fn) => listeners.push(fn),
+    set(lang) { store.set(lang); apply(lang); },
+  };
+  window.I18N = I18N;
+
+  apply(detect());
+  document.getElementById("lang-toggle")?.addEventListener("click", () => {
+    I18N.set(I18N.lang === "en" ? "no" : "en");
+  });
+})();
