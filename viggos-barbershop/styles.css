@@ -412,8 +412,6 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 }
 .post-badge svg { width: 21px; height: 21px; }
 .post--instagram .post-badge { background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%); }
-.post--tiktok .post-badge { background: #010101; }
-.post--tiktok .post-badge svg { filter: drop-shadow(1.2px 1.2px 0 #fe2c55) drop-shadow(-1.2px -1.2px 0 #25f4ee); }
 
 .post-play {
   position: absolute; top: 50%; left: 50%; translate: -50% -50%;
@@ -466,3 +464,5 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
   .post--skeleton { animation: none; }
   .post, .post img { transition: none; }
 }
+.social-feed--single { grid-template-columns: minmax(0, 420px); justify-content: center; }
+.social-feed--single .post { aspect-ratio: 4 / 3; }

@@ -1,10 +1,10 @@
-// Engangskobling av Instagram- og TikTok-kontoen (OAuth).
-//   Start:    /api/connect/instagram?key=SOCIAL_ADMIN_KEY   (eller /tiktok)
-//   Callback: /api/connect/<plattform>/callback             (registreres i appen hos Meta/TikTok)
+// Engangskobling av Instagram-kontoen (OAuth).
+//   Start:    /api/connect/instagram?key=SOCIAL_ADMIN_KEY
+//   Callback: /api/connect/instagram/callback   (registreres i appen hos Meta)
 // Kun den som kjenner SOCIAL_ADMIN_KEY kan koble til en konto.
 import { getStore } from "@netlify/blobs";
 import { timingSafeEqual, randomBytes } from "node:crypto";
-import { buildFeed, exchangeTiktokCode } from "../lib/social.mjs";
+import { buildFeed } from "../lib/social.mjs";
 
 const page = (status, title, text) =>
   new Response(
@@ -23,7 +23,7 @@ const keyOk = (given, expected) => {
 export default async (req, context) => {
   const env = process.env;
   const platform = context.params.platform;
-  if (!["instagram", "tiktok"].includes(platform)) return page(404, "Ukjent plattform", "Bruk instagram eller tiktok.");
+  if (platform !== "instagram") return page(404, "Ukjent plattform", "Kun Instagram støttes.");
 
   const url = new URL(req.url);
   const redirectUri = `${url.origin}/api/connect/${platform}/callback`;
@@ -35,17 +35,10 @@ export default async (req, context) => {
     const state = randomBytes(24).toString("hex");
     await store.setJSON(`oauth-state-${state}`, { platform, created_at: Date.now() });
 
-    let auth;
-    if (platform === "instagram") {
-      auth = new URL("https://www.instagram.com/oauth/authorize");
-      auth.searchParams.set("client_id", env.INSTAGRAM_APP_ID);
-      auth.searchParams.set("scope", "instagram_business_basic");
-      auth.searchParams.set("enable_fb_login", "0");
-    } else {
-      auth = new URL("https://www.tiktok.com/v2/auth/authorize/");
-      auth.searchParams.set("client_key", env.TIKTOK_CLIENT_KEY);
-      auth.searchParams.set("scope", "user.info.basic,video.list");
-    }
+    const auth = new URL("https://www.instagram.com/oauth/authorize");
+    auth.searchParams.set("client_id", env.INSTAGRAM_APP_ID);
+    auth.searchParams.set("scope", "instagram_business_basic");
+    auth.searchParams.set("enable_fb_login", "0");
     auth.searchParams.set("redirect_uri", redirectUri);
     auth.searchParams.set("response_type", "code");
     auth.searchParams.set("state", state);
@@ -63,38 +56,33 @@ export default async (req, context) => {
   if (!code) return page(400, "Avbrutt", url.searchParams.get("error_description") || "Ingen kode mottatt.");
 
   try {
-    if (platform === "instagram") {
-      const res = await fetch("https://api.instagram.com/oauth/access_token", {
-        method: "POST",
-        body: new URLSearchParams({
-          client_id: env.INSTAGRAM_APP_ID,
-          client_secret: env.INSTAGRAM_APP_SECRET,
-          grant_type: "authorization_code",
-          redirect_uri: redirectUri,
-          code,
-        }),
-      });
-      const json = await res.json();
-      const short = json.data?.[0]?.access_token || json.access_token;
-      if (!short) throw new Error(json.error_message || "ingen token");
+    const res = await fetch("https://api.instagram.com/oauth/access_token", {
+      method: "POST",
+      body: new URLSearchParams({
+        client_id: env.INSTAGRAM_APP_ID,
+        client_secret: env.INSTAGRAM_APP_SECRET,
+        grant_type: "authorization_code",
+        redirect_uri: redirectUri,
+        code,
+      }),
+    });
+    const json = await res.json();
+    const short = json.data?.[0]?.access_token || json.access_token;
+    if (!short) throw new Error(json.error_message || "ingen token");
 
-      const ll = new URL("https://graph.instagram.com/access_token");
-      ll.searchParams.set("grant_type", "ig_exchange_token");
-      ll.searchParams.set("client_secret", env.INSTAGRAM_APP_SECRET);
-      ll.searchParams.set("access_token", short);
-      const long = await (await fetch(ll)).json();
-      if (!long.access_token) throw new Error(long.error?.message || "kunne ikke hente langtidstoken");
-      await store.setJSON("instagram-token", {
-        access_token: long.access_token,
-        refreshed_at: Date.now(),
-        expires_at: Date.now() + long.expires_in * 1000,
-      });
-    } else {
-      await store.setJSON("tiktok-token", await exchangeTiktokCode(env, code, redirectUri));
-    }
+    const ll = new URL("https://graph.instagram.com/access_token");
+    ll.searchParams.set("grant_type", "ig_exchange_token");
+    ll.searchParams.set("client_secret", env.INSTAGRAM_APP_SECRET);
+    ll.searchParams.set("access_token", short);
+    const long = await (await fetch(ll)).json();
+    if (!long.access_token) throw new Error(long.error?.message || "kunne ikke hente langtidstoken");
+    await store.setJSON("instagram-token", {
+      access_token: long.access_token,
+      refreshed_at: Date.now(),
+      expires_at: Date.now() + long.expires_in * 1000,
+    });
     const feed = await buildFeed(store, env);
-    const name = platform === "instagram" ? "Instagram" : "TikTok";
-    return page(200, `${name} er koblet til ✓`, `Fant ${feed[platform].length} nye poster. Feeden på forsiden oppdateres nå automatisk hver time.`);
+    return page(200, "Instagram er koblet til ✓", `Fant ${feed.instagram.length} nye poster. Feeden på forsiden oppdateres nå automatisk hver time.`);
   } catch (err) {
     console.error("connect:", err);
     return page(500, "Noe gikk galt", "Koblingen feilet. Sjekk at app-nøklene i Netlify stemmer, og prøv igjen.");

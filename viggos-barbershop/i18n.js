@@ -53,7 +53,7 @@
     "c.maptitle": "Map: Svenskegata 2, 1776 Halden",
     "soc.eyebrow": "Social media",
     "soc.title": "Fresh from the chair",
-    "soc.lead": "Our latest cuts from Instagram and TikTok.",
+    "soc.lead": "Our latest cuts from Instagram.",
     "about.eyebrow": "About us",
     "about.img": "Viggo's Barbershop gold sign on the window",
     "about.title": "A place for good conversation and sharp lines",

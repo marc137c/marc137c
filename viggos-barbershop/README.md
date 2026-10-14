@@ -43,37 +43,29 @@ Logoen er laget i kode slik at den er skarp på alle skjermer: «Viggo's» i skr
 «BARBERSHOP» i Cinzel, og ornamentlinjen med diamant som SVG (`--ornament` i `styles.css`). Fargene er dyp grønn og gull fra visittkortet.
 Bildet av gullskiltet ligger i `img/` (webp i to størrelser).
 
-## Instagram- og TikTok-feed (oppdateres automatisk)
-Seksjonen «Ferskt fra stolen» viser de 3 nyeste postene fra Instagram og de 3 nyeste fra TikTok (2 per rad, 3 rader).
+## Instagram-feed (oppdateres automatisk)
+Seksjonen «Ferskt fra stolen» viser de 6 nyeste Instagram-postene (2 per rad, 3 rader).
 
 Slik fungerer det:
-- `netlify/functions/social-refresh.mjs` kjører **hver time**. Den henter nye poster, fornyer tilgangsnøklene automatisk og lagrer feeden i Netlify Blobs.
+- `netlify/functions/social-refresh.mjs` kjører **hver time**. Den henter nye poster, fornyer tilgangsnøkkelen automatisk og lagrer feeden i Netlify Blobs.
 - `/api/social` (`netlify/functions/social.mjs`) leverer feeden til siden (`social-feed.js`).
-- Før kontoene er koblet til, vises «Følg oss»-kort med lenke til profilene.
+- Før kontoen er koblet til, vises et «Følg oss på Instagram»-kort.
 
-### Engangsoppsett (ca. 20 minutter)
-**1. Netlify → Site configuration → Environment variables:**
-| Variabel | Verdi |
-|---|---|
-| `SOCIAL_ADMIN_KEY` | Et langt, hemmelig passord du finner på selv. Beskytter koblingslenkene. |
-| `INSTAGRAM_APP_ID`, `INSTAGRAM_APP_SECRET` | Fra Meta-appen (steg 2) |
-| `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET` | Fra TikTok-appen (steg 3) |
+### Engangsoppsett (ca. 15 minutter)
+Instagram-kontoen må være en **profesjonell konto** (Bedrift eller Innholdsskaper). Det er gratis å bytte i Instagram-appen under Innstillinger → Kontotype.
 
-**2. Instagram** (kontoen må være en *profesjonell konto*: Bedrift eller Innholdsskaper)
-1. Opprett en app på developers.facebook.com → produktet **Instagram** → «API setup with Instagram login».
-2. Legg inn **Valid OAuth Redirect URI**: `https://<din-side>/api/connect/instagram/callback`
-3. Legg til @viggos.barbershop som Instagram-tester og godta invitasjonen i Instagram-appen.
-4. Kopier Instagram App ID og App Secret til Netlify.
+1. Gå til developers.facebook.com → **Create app** → velg «Other» → app-type **Business**.
+2. Legg til produktet **Instagram** → «API setup with Instagram login».
+3. Under «Set up Instagram business login» legger du inn **Redirect URL**:
+   `https://<din-side>/api/connect/instagram/callback`
+4. Under **Roles → Instagram testers** legger du til `viggos.barbershop`. Godta invitasjonen i Instagram (Innstillinger → Apper og nettsteder → Testerinvitasjoner).
+5. I **Netlify → Site configuration → Environment variables** legger du inn:
+   | Variabel | Verdi |
+   |---|---|
+   | `INSTAGRAM_APP_ID` | Instagram app ID (fra steg 2) |
+   | `INSTAGRAM_APP_SECRET` | Instagram app secret (fra steg 2) |
+   | `SOCIAL_ADMIN_KEY` | Et langt, hemmelig passord du finner på selv. Beskytter koblingslenken. |
+6. Publiser siden på nytt, og åpne `https://<din-side>/api/connect/instagram?key=<SOCIAL_ADMIN_KEY>`.
+   Logg inn med @viggos.barbershop og godkjenn. Siden bekrefter når kontoen er koblet, og postene vises med en gang.
 
-**3. TikTok**
-1. Opprett en app på developers.tiktok.com med **Login Kit** og **Display API** (scopes `user.info.basic` og `video.list`).
-2. Legg inn **Redirect URI**: `https://<din-side>/api/connect/tiktok/callback`
-3. Mens appen er i sandbox: legg @viggos.barbershop1 til som «target user».
-4. Kopier Client key og Client secret til Netlify.
-
-**4. Koble til kontoene** (etter at siden er publisert med variablene over):
-- `https://<din-side>/api/connect/instagram?key=<SOCIAL_ADMIN_KEY>`
-- `https://<din-side>/api/connect/tiktok?key=<SOCIAL_ADMIN_KEY>`
-
-Logg inn og godkjenn. Siden bekrefter når kontoen er koblet, og postene vises med en gang. Deretter går alt av seg selv.
-`<din-side>` må være den samme adressen som er registrert i appene, for eksempel `viggos-barbershop.netlify.app`.
+`<din-side>` må være den samme adressen som er registrert i steg 3, for eksempel `viggos-barbershop.netlify.app`.

@@ -1,4 +1,4 @@
-// GET /api/social – de nyeste postene fra Instagram og TikTok.
+// GET /api/social – de nyeste postene fra Instagram.
 // Leser ferdig feed fra Netlify Blobs (oppdateres hver time av social-refresh).
 import { getStore } from "@netlify/blobs";
 import { buildFeed, isStale, PROFILES } from "../lib/social.mjs";
@@ -13,7 +13,7 @@ export default async () => {
       console.error("social:", err);
     }
   }
-  return new Response(JSON.stringify(feed || { profiles: PROFILES, instagram: [], tiktok: [] }), {
+  return new Response(JSON.stringify(feed || { profiles: PROFILES, instagram: [] }), {
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "public, max-age=300",
