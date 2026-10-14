@@ -176,9 +176,11 @@
 
     const btn = document.getElementById("lang-toggle");
     if (btn) {
-      const other = lang === "en" ? "no" : "en";
-      btn.textContent = other.toUpperCase();
-      btn.lang = other;
+      // Bryteren viser språket du bytter TIL: «English» på norsk side, «Norsk» på engelsk side
+      const label = btn.querySelector(".lang-label");
+      label.textContent = lang === "en" ? "Norsk" : "English";
+      label.lang = lang === "en" ? "no" : "en";
+      btn.classList.toggle("is-en", lang === "en");
       btn.setAttribute("aria-label", s.switchTo);
     }
     I18N.lang = lang;

@@ -82,6 +82,7 @@ function updateStatus() {
 }
 updateStatus();
 setInterval(updateStatus, 60_000);
+toggle.setAttribute("aria-label", I18N.s().menuOpen);
 I18N.onChange(() => {
   updateStatus();
   toggle.setAttribute("aria-label", toggle.getAttribute("aria-expanded") === "true" ? I18N.s().menuClose : I18N.s().menuOpen);

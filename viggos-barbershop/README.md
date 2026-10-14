@@ -29,7 +29,7 @@ Oppsett i Netlify → **Site configuration → Environment variables**:
 Priser, åpningstider og regler for assistenten står i `SYSTEM`-teksten øverst i `chat.mjs` – oppdater den sammen med nettsiden.
 
 ## Språk (norsk / English)
-Siden finnes på norsk og engelsk. Knappen **EN/NO** i menyen bytter språk, og valget huskes.
+Siden finnes på norsk og engelsk. Bryteren **English / Norsk** øverst i menyen bytter språk på hele siden, og valget huskes.
 Besøkende med nettleser på norsk får norsk, alle andre får engelsk. Lenke direkte til en versjon med `?lang=en` eller `?lang=no`.
 
 - Norsk tekst står i `index.html`. Engelsk tekst står i `EN` i `i18n.js` (samme nøkkel som `data-i18n` i HTML-en).
