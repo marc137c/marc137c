@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/", "destination": "/kebab-corner-halden/index.html" },
+    { "source": "/:path*", "destination": "/kebab-corner-halden/:path*" }
+  ]
+}
