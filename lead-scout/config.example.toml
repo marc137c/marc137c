@@ -1,0 +1,35 @@
+# Copy to config.toml and adjust. API keys go in environment variables, not here.
+
+# Municipality numbers to scan. Default: all of Østfold.
+# 3101 Halden, 3103 Moss, 3105 Sarpsborg, 3107 Fredrikstad, 3110 Hvaler, 3112 Råde,
+# 3114 Våler, 3116 Skiptvet, 3118 Indre Østfold, 3120 Rakkestad, 3122 Marker, 3124 Aremark
+kommuner = ["3101", "3103", "3105", "3107", "3110", "3112", "3114", "3116", "3118", "3120", "3122", "3124"]
+
+# "Decent size": minimum registered employees.
+min_employees = 5
+
+# Company types. ENK (sole proprietorship) is left out on purpose: under
+# markedsføringsloven § 15 they count as private persons, and cold email needs consent.
+org_forms = ["AS", "ANS", "DA", "SA", "NUF"]
+
+# Only report leads at or above this score (0–100).
+min_score = 50
+
+# Leads without any email go to the database as "no_email" instead of the list.
+require_email = true
+
+# If the email is on the company's own domain and that domain serves a site, they already have a website.
+drop_if_email_domain_has_site = true
+
+# Open search result pages (directories etc.) to look for emails, not just the snippets.
+fetch_result_pages = true
+
+# How often to re-check businesses that were rejected or had no email.
+recheck_after_days = 30
+
+# Caps paid API usage per run. Remaining businesses are picked up next run.
+max_candidates_per_run = 400
+
+request_delay_seconds = 1.0
+data_dir = "data"
+output_dir = "output"
