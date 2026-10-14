@@ -8,14 +8,14 @@ Bookingskjemaet bruker Netlify Forms – forespørsler dukker opp under **Forms*
 
 ## Bedriftsinfo (bekreftet)
 - **Viggos Barbershop Kurti**, org.nr. 937 845 812, innehaver Vigan Kurti
-- Svenskegata 2, 1776 Halden – telefon 409 63 911
+- Svenskegata 2, 1776 Halden – telefon 409 63 911 – e-post kurtivigan1@gmail.com
 - Kilder: Brønnøysund via Proff.no, Gule Sider og Halden Arbeiderblad
 
 ## Må bekreftes / fylles inn
 - **Sosiale medier:** lim inn lenkene i `SOCIAL` øverst i `script.js`. Ikonene vises først når en lenke er lagt inn.
 - **Priser og tjenester:** står i `index.html` og i `SYSTEM` i `netlify/functions/chat.mjs`.
 - **Åpningstider:** står i tabellen i `index.html`, i `HOURS` øverst i `script.js` og i `chat.mjs`.
-- **Bookingvarsler:** i Netlify går du til **Forms → booking → Form notifications** og legger inn e-postadressen som skal få timeforespørslene.
+- **Bookingvarsler:** i Netlify går du til **Forms → booking → Form notifications** og legger inn kurtivigan1@gmail.com, så kommer timeforespørslene på e-post.
 - **Omtaler:** seksjonen er fjernet til ekte omtaler finnes, for eksempel fra Google.
 
 ## AI-stilrådgiver (Claude)
