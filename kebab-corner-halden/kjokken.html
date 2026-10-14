@@ -180,7 +180,7 @@ $("#login").addEventListener("submit", async e => {
     code = c;
     try { ($("#remember").checked ? localStorage : sessionStorage).setItem(KEY, c); } catch (e) {}
     $("#code").value = "";
-    start();
+    start(true);
   } catch (err) {
     visLogin(/mange/.test(err.message) ? "For mange feil forsøk. Vent ti minutter og prøv igjen." : "Fikk ikke kontakt med bestillingssystemet. Sjekk nettet og prøv igjen.");
   } finally { btn.disabled = false; }
@@ -283,14 +283,25 @@ document.addEventListener("click", async e => {
   if (status === "avvist" && !confirm(`Avvise bestilling #${o ? o.number : ""}? Kunden får beskjed om å ringe dere.`)) return;
   b.disabled = true;
   try {
-    await rpc("kitchen_set_status", { p_code: code, p_id: id, p_status: status });
+    const lagret = await rpc("kitchen_set_status", { p_code: code, p_id: id, p_status: status });
+    if (lagret === false) { b.disabled = false; return sjekkKode(); }
     if (o) { o.status = status; o.status_at = new Date().toISOString(); tegn(sist); }
     if (status === "klar") toast(`#${o ? o.number : ""} er klar. Kunden ser det nå.`);
     hent();
   } catch (err) { b.disabled = false; toast("Fikk ikke lagret. Sjekk nettet og prøv igjen."); }
 });
 
-function start() {
+// Koden kan være byttet siden sist. Da sendes kjøkkenet tilbake til innloggingen.
+async function sjekkKode() {
+  try {
+    if (await rpc("kitchen_login", { p_code: code })) return true;
+    try { localStorage.removeItem(KEY); sessionStorage.removeItem(KEY); } catch (e) {}
+    clearInterval(timer); visLogin("Koden virker ikke lenger. Logg inn på nytt.");
+    return false;
+  } catch (e) { return true; } // uten nett prøver tavlen igjen av seg selv
+}
+async function start(sjekket) {
+  if (!sjekket && !(await sjekkKode())) return;
   $("#login").hidden = true; $("#app").hidden = false;
   ["#sound", "#logout"].forEach(s => { $(s).hidden = false; });
   $("#awake").hidden = !("wakeLock" in navigator);

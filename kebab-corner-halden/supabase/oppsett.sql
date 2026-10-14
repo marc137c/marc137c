@@ -42,60 +42,76 @@ drop function if exists public.kc_ping();
 drop function if exists public.kc_t2(text);
 drop function if exists public.kc_t3(text);
 drop function if exists public.kc_t4(text);
+drop function if exists public.kc_t5(text);
+drop function if exists public.kitchen_change_code(text, text);
+drop function if exists public.kitchen_set_status(text, uuid, text);  -- returnerte void i første utgave
 
--- Sjekker kjøkkenkoden. Etter 20 feil på 10 minutter stoppes alle forsøk en stund.
-create or replace function public._kitchen_ok(p_code text)
-returns boolean language plpgsql security definer set search_path = '' as $$
-declare h text;
+-- Funksjonene er delt i små hjelpefunksjoner uten DECLARE. Supabase-verktøyet som satte opp
+-- databasen, stoppet lengre funksjonskropper, og slik kan filen kjøres både der og i SQL-editoren.
+
+-- Kjøkkenkoden: riktig kode, logg feil forsøk, og stopp etter 20 feil på 10 minutter
+create or replace function public.kc_a(p text) returns boolean language sql security definer set search_path = '' as $$
+  select exists (select 1 from public.kitchen_keys k where k.id = 1 and k.hash = extensions.crypt(p, k.hash))
+$$;
+create or replace function public.kc_b() returns void language plpgsql security definer set search_path = '' as $$
+begin insert into public.kitchen_fails default values; end $$;
+create or replace function public.kc_c() returns void language plpgsql security definer set search_path = '' as $$
 begin
   if (select count(*) from public.kitchen_fails where at > now() - interval '10 minutes') >= 20 then
-    raise exception 'for mange forsøk, vent litt' using errcode = 'P0001';
+    raise exception 'vent litt' using errcode = 'P0001';
   end if;
-  select hash into h from public.kitchen_keys where id = 1;
-  if h is not null and p_code is not null and extensions.crypt(p_code, h) = h then
-    return true;
-  end if;
-  insert into public.kitchen_fails default values;
-  delete from public.kitchen_fails where at < now() - interval '1 day';
+end $$;
+create or replace function public.kc_d() returns void language plpgsql security definer set search_path = '' as $$
+begin delete from public.kitchen_fails where at < now() - interval '1 day'; end $$;
+create or replace function public._kitchen_ok(p_code text) returns boolean language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.kc_c();
+  if p_code is not null and public.kc_a(p_code) then return true; end if;
+  perform public.kc_b(); perform public.kc_d();
   return false;
 end $$;
+
+-- Bestillingen: sjekk rettene, rydd dem, regn ut sum og neste hentenummer
+create or replace function public.kc_items_ok(p_items jsonb) returns boolean language sql immutable set search_path = '' as $$
+  select jsonb_typeof(p_items) = 'array' and jsonb_array_length(p_items) between 1 and 50
+    and not exists (select 1 from jsonb_array_elements(p_items) it(v) where
+      jsonb_typeof(it.v->'navn') is distinct from 'string' or char_length(it.v->>'navn') not between 1 and 80
+      or jsonb_typeof(it.v->'antall') is distinct from 'number' or jsonb_typeof(it.v->'pris') is distinct from 'number'
+      or char_length(coalesce(it.v->>'storrelse', '')) > 30 or char_length(coalesce(it.v->>'onske', '')) > 120)
+    and not exists (select 1 from jsonb_array_elements(p_items) it(v) where
+      (it.v->>'antall')::numeric not between 1 and 20 or (it.v->>'pris')::numeric not between 0 and 5000
+      or (it.v->>'antall')::numeric <> floor((it.v->>'antall')::numeric) or (it.v->>'pris')::numeric <> floor((it.v->>'pris')::numeric))
+$$;
+create or replace function public.kc_items_clean(p_items jsonb) returns jsonb language sql immutable set search_path = '' as $$
+  select jsonb_agg(jsonb_strip_nulls(jsonb_build_object('navn', it.v->>'navn', 'storrelse', nullif(it.v->>'storrelse', ''),
+    'antall', (it.v->>'antall')::int, 'pris', (it.v->>'pris')::int, 'onske', nullif(trim(it.v->>'onske'), ''))) order by it.n)
+  from jsonb_array_elements(p_items) with ordinality it(v, n)
+$$;
+create or replace function public.kc_items_total(p_items jsonb) returns int language sql immutable set search_path = '' as $$
+  select coalesce(sum((it.v->>'antall')::int * (it.v->>'pris')::int), 0)::int from jsonb_array_elements(p_items) it(v)
+$$;
+create or replace function public.kc_next_number() returns int language sql stable set search_path = '' as $$
+  select coalesce(max(o.number), 0) + 1 from public.orders o
+  where (o.created_at at time zone 'Europe/Oslo')::date = (now() at time zone 'Europe/Oslo')::date
+$$;
+create or replace function public.kc_cleanup() returns void language plpgsql security definer set search_path = '' as $$
+begin delete from public.orders o where o.created_at < now() - interval '30 days'; end $$;  -- personopplysninger slettes etter 30 dager
+create or replace function public.kc_rate_ok() returns boolean language sql stable security definer set search_path = '' as $$
+  select (select count(*) from public.orders o where o.created_at > now() - interval '1 minute') < 30
+$$;
 
 -- Kunden sender en bestilling. Svarer med id, hemmelig token og hentenummer.
 create or replace function public.place_order(p_name text, p_pickup text, p_items jsonb, p_phone text default null, p_note text default null, p_lang text default 'no')
 returns table (id uuid, token uuid, number int) language plpgsql security definer set search_path = '' as $$
-declare
-  v_total int := 0; it jsonb; v_num int; v_day date := (now() at time zone 'Europe/Oslo')::date;
-  v_items jsonb := '[]'::jsonb;
 begin
-  if (select count(*) from public.orders o where o.created_at > now() - interval '1 minute') >= 30 then
-    raise exception 'for mange bestillinger akkurat nå' using errcode = 'P0001';
-  end if;
-  if jsonb_typeof(p_items) is distinct from 'array' or jsonb_array_length(p_items) not between 1 and 50 then
-    raise exception 'ugyldig bestilling' using errcode = 'P0001';
-  end if;
-  for it in select * from jsonb_array_elements(p_items) loop
-    if jsonb_typeof(it->'navn') is distinct from 'string' or char_length(it->>'navn') not between 1 and 80
-       or jsonb_typeof(it->'antall') is distinct from 'number' or (it->>'antall')::numeric not between 1 and 20
-       or jsonb_typeof(it->'pris') is distinct from 'number' or (it->>'pris')::numeric not between 0 and 5000
-       or char_length(coalesce(it->>'storrelse', '')) > 30
-       or char_length(coalesce(it->>'onske', '')) > 120 then
-      raise exception 'ugyldig rett i bestillingen' using errcode = 'P0001';
-    end if;
-    v_items := v_items || jsonb_build_array(jsonb_strip_nulls(jsonb_build_object(
-      'navn', it->>'navn', 'storrelse', nullif(it->>'storrelse', ''), 'antall', (it->>'antall')::int,
-      'pris', (it->>'pris')::int, 'onske', nullif(trim(it->>'onske'), ''))));
-    v_total := v_total + (it->>'antall')::int * (it->>'pris')::int;
-  end loop;
-
+  if not public.kc_rate_ok() then raise exception 'for mange bestillinger akkurat naa' using errcode = 'P0001'; end if;
+  if not coalesce(public.kc_items_ok(p_items), false) then raise exception 'ugyldig bestilling' using errcode = 'P0001'; end if;
   perform pg_advisory_xact_lock(hashtext('kc-order-number'));
-  select coalesce(max(o.number), 0) + 1 into v_num from public.orders o
-    where (o.created_at at time zone 'Europe/Oslo')::date = v_day;
-
-  delete from public.orders o where o.created_at < now() - interval '30 days';  -- personopplysninger slettes etter 30 dager
-
+  perform public.kc_cleanup();
   return query insert into public.orders as o (number, name, phone, pickup, items, total, note, lang)
-    values (v_num, trim(p_name), nullif(trim(coalesce(p_phone, '')), ''), p_pickup, v_items, v_total,
-            nullif(trim(coalesce(p_note, '')), ''), case when p_lang = 'en' then 'en' else 'no' end)
+    values (public.kc_next_number(), trim(p_name), nullif(trim(coalesce(p_phone, '')), ''), p_pickup,
+            public.kc_items_clean(p_items), public.kc_items_total(p_items), nullif(trim(coalesce(p_note, '')), ''),
+            case when p_lang = 'en' then 'en' else 'no' end)
     returning o.id, o.token, o.number;
 end $$;
 
@@ -103,75 +119,40 @@ end $$;
 create or replace function public.order_status(p_id uuid, p_token uuid)
 returns table (number int, status text, status_at timestamptz, pickup text, total int, created_at timestamptz)
 language sql stable security definer set search_path = '' as $$
-  select o.number, o.status, o.status_at, o.pickup, o.total, o.created_at
-  from public.orders o where o.id = p_id and o.token = p_token;
+  select o.number, o.status, o.status_at, o.pickup, o.total, o.created_at from public.orders o where o.id = p_id and o.token = p_token
 $$;
 
--- Kjøkkenet: sjekk koden
-create or replace function public.kitchen_login(p_code text)
-returns boolean language plpgsql security definer set search_path = '' as $$
-begin
-  return public._kitchen_ok(p_code);
-end $$;
+-- Kjøkkenet. Feil kode gir false eller tom liste (ikke feilmelding), så forsøket blir lagret og telt.
+create or replace function public.kitchen_login(p_code text) returns boolean language plpgsql security definer set search_path = '' as $$
+begin return public._kitchen_ok(p_code); end $$;
 
--- Kjøkkenet: bestillinger fra de siste 20 timene
 create or replace function public.kitchen_orders(p_code text)
 returns table (id uuid, number int, created_at timestamptz, name text, phone text, pickup text, items jsonb,
                total int, note text, lang text, status text, status_at timestamptz, payment text)
 language plpgsql security definer set search_path = '' as $$
 begin
-  if not public._kitchen_ok(p_code) then
-    raise exception 'feil kjøkkenkode' using errcode = '28000';
-  end if;
+  if not public._kitchen_ok(p_code) then return; end if;
   return query select o.id, o.number, o.created_at, o.name, o.phone, o.pickup, o.items, o.total, o.note, o.lang,
                       o.status, o.status_at, o.payment
-    from public.orders o
-    where o.created_at > now() - interval '20 hours'
-    order by o.created_at;
+    from public.orders o where o.created_at > now() - interval '20 hours' order by o.created_at;
 end $$;
 
--- Kjøkkenet: endre status (ny, lager, klar, hentet, avvist)
 create or replace function public.kitchen_set_status(p_code text, p_id uuid, p_status text)
-returns void language plpgsql security definer set search_path = '' as $$
+returns boolean language plpgsql security definer set search_path = '' as $$
 begin
-  if not public._kitchen_ok(p_code) then
-    raise exception 'feil kjøkkenkode' using errcode = '28000';
-  end if;
-  if p_status not in ('ny', 'lager', 'klar', 'hentet', 'avvist') then
-    raise exception 'ugyldig status' using errcode = 'P0001';
-  end if;
-  update public.orders set status = p_status, status_at = now() where orders.id = p_id;
+  if p_status not in ('ny', 'lager', 'klar', 'hentet', 'avvist') then raise exception 'ugyldig status' using errcode = 'P0001'; end if;
+  if not public._kitchen_ok(p_code) then return false; end if;
+  update public.orders o set status = p_status, status_at = now() where o.id = p_id;
+  return found;
 end $$;
 
--- Kjøkkenet: bytt kode. Første gang (ingen kode lagret) settes koden uten å oppgi den gamle.
-create or replace function public.kitchen_change_code(p_code text, p_new text)
-returns void language plpgsql security definer set search_path = '' as $$
-begin
-  if char_length(coalesce(p_new, '')) < 10 then
-    raise exception 'den nye koden må ha minst 10 tegn' using errcode = 'P0001';
-  end if;
-  if not exists (select 1 from public.kitchen_keys) then
-    raise exception 'ingen kjøkkenkode er satt ennå' using errcode = 'P0001';
-  end if;
-  if not public._kitchen_ok(p_code) then
-    raise exception 'feil kjøkkenkode' using errcode = '28000';
-  end if;
-  update public.kitchen_keys set hash = extensions.crypt(p_new, extensions.gen_salt('bf')), updated_at = now() where id = 1;
-end $$;
-
-revoke all on function public._kitchen_ok(text) from public, anon, authenticated;
-revoke all on function public.place_order(text, text, jsonb, text, text, text) from public;
-revoke all on function public.order_status(uuid, uuid) from public;
-revoke all on function public.kitchen_login(text) from public;
-revoke all on function public.kitchen_orders(text) from public;
-revoke all on function public.kitchen_set_status(text, uuid, text) from public;
-revoke all on function public.kitchen_change_code(text, text) from public;
-grant execute on function public.place_order(text, text, jsonb, text, text, text) to anon, authenticated;
-grant execute on function public.order_status(uuid, uuid) to anon, authenticated;
-grant execute on function public.kitchen_login(text) to anon, authenticated;
-grant execute on function public.kitchen_orders(text) to anon, authenticated;
-grant execute on function public.kitchen_set_status(text, uuid, text) to anon, authenticated;
-grant execute on function public.kitchen_change_code(text, text) to anon, authenticated;
+revoke all on function public._kitchen_ok(text), public.kc_a(text), public.kc_b(), public.kc_c(), public.kc_d(),
+  public.kc_items_ok(jsonb), public.kc_items_clean(jsonb), public.kc_items_total(jsonb), public.kc_next_number(),
+  public.kc_cleanup(), public.kc_rate_ok() from public, anon, authenticated;
+revoke all on function public.place_order(text, text, jsonb, text, text, text), public.order_status(uuid, uuid),
+  public.kitchen_login(text), public.kitchen_orders(text), public.kitchen_set_status(text, uuid, text) from public;
+grant execute on function public.place_order(text, text, jsonb, text, text, text), public.order_status(uuid, uuid),
+  public.kitchen_login(text), public.kitchen_orders(text), public.kitchen_set_status(text, uuid, text) to anon, authenticated;
 
 -- Til slutt: sett kjøkkenkoden. Bytt ut teksten mellom de enkle anførselstegnene med en lang kode
 -- (minst 10 tegn) og kjør bare denne linjen. Koden skrives inn én gang på kjøkkenskjermen.
