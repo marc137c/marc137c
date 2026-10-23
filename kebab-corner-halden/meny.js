@@ -1,5 +1,7 @@
 /* Menyen til Kebab Corner Halden, hentet fra restaurantens meny på foodora.
-   Lag en ny fil på admin.html (meny fra bilde) og bytt ut denne når menyen endres.
+   Menyen og prisene endres nå på admin.html og publiseres til databasen (database.js).
+   Denne filen er reserve: siden bruker den når databasen ikke svarer eller ikke har noen meny ennå.
+   En ny utgave kan lastes ned på admin.html (Reservekopi) og legges inn i stedet for denne.
    Finnes ikke filen, bruker siden menyen som står i index.html. */
 window.MENY_DATA = {
   "meny": [

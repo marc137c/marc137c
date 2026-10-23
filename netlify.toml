@@ -1,3 +1,25 @@
+# Kjøkkenskjermen er tatt bort. Gamle lenker til den sendes til forsiden i stedet for å gi en feilside.
+# Disse må stå først, fordi Netlify bruker den første regelen som passer.
+[[redirects]]
+  from = "/kjokken.html"
+  to = "/"
+  status = 301
+
+[[redirects]]
+  from = "/kjokken"
+  to = "/"
+  status = 301
+
+[[redirects]]
+  from = "/kebab-corner-halden/kjokken.html"
+  to = "/"
+  status = 301
+
+[[redirects]]
+  from = "/kebab-corner-halden/kjokken"
+  to = "/"
+  status = 301
+
 # Nettsiden ligger i mappen kebab-corner-halden. Adresser som ikke finnes som fil,
 # hentes derfra, så både / og /kebab-corner-halden/ viser siden.
 [[redirects]]

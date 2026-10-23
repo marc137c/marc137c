@@ -4,47 +4,57 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>Meny fra bilde · Kebab Corner</title>
+<meta name="theme-color" content="#141010">
+<title>Endre meny og priser · Kebab Corner</title>
 <link rel="icon" href="bilder/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Figtree:wght@400;500;600;700&display=swap">
 <style>
-/* Samme uttrykk som nettsiden: mørkt, ett rødt aksent. Et verktøy i tre steg, lest ovenfra og ned. */
+/* Samme uttrykk som nettsiden: mørkt, ett rødt aksent. Eierens verktøy for menyen, laget for mobil først og lest ovenfra og ned. */
 :root{
   --bg:#141010; --surface:#1E1817; --surface-2:#28211F;
   --line:rgba(243,237,230,.11); --line-strong:rgba(243,237,230,.24);
   --text:#F3EDE6; --muted:#A69C94;
-  --accent:#D42E23; --accent-text:#F0574A; --ok:#7FCB8C; --warn:#F2B35B;
+  --accent:#D42E23; --accent-text:#F0574A; --ok:#7FCB8C; --warn:#F2B35B; --err:#FFB4AC;
   --font-display:"Archivo","Arial Narrow","Helvetica Neue",Arial,sans-serif;
   --font-body:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --radius:6px;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
+html{scroll-padding-bottom:9rem}
 body{margin:0;background:var(--bg);color:var(--text);font:400 1rem/1.55 var(--font-body);-webkit-font-smoothing:antialiased}
 [hidden]{display:none!important}
 a{color:inherit}
+button{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent-text);outline-offset:3px;border-radius:2px}
+[tabindex="-1"]:focus{outline:none} /* overskrift og statuslinjer som får fokus etter innlogging og publisering */
 .wrap{max-width:52rem;margin-inline:auto;padding-inline:clamp(1rem,4vw,2rem);padding-block:2rem 5rem}
+body.med-bar .wrap{padding-bottom:12rem}
 .sr-only{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 
-header.top{display:flex;align-items:center;gap:.8rem;padding-bottom:1.5rem;border-bottom:1px solid var(--line);margin-bottom:2.5rem}
+header.top{display:flex;flex-wrap:wrap;align-items:center;gap:.8rem;padding-bottom:1.5rem;border-bottom:1px solid var(--line);margin-bottom:2.5rem}
 header.top img{width:2.4rem;height:2.4rem;border-radius:var(--radius);background:#fff;object-fit:contain}
 header.top b{font-family:var(--font-display);font-stretch:80%;font-weight:800;text-transform:uppercase;font-size:1.2rem;letter-spacing:.01em}
-header.top a{margin-left:auto;color:var(--muted);font-size:.9rem}
-h1{font-family:var(--font-display);font-stretch:74%;font-weight:800;text-transform:uppercase;font-size:clamp(2.4rem,7vw,3.8rem);line-height:.98;margin:0 0 .75rem;letter-spacing:-.01em}
-.lede{color:var(--muted);max-width:38rem;margin:0 0 2.5rem}
+header.top .links{margin-left:auto;display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1rem}
+header.top a{display:inline-flex;align-items:center;min-height:2.75rem;color:var(--muted);font-size:.9rem}
+h1{font-family:var(--font-display);font-stretch:74%;font-weight:800;text-transform:uppercase;font-size:clamp(2.4rem,7vw,3.8rem);line-height:.98;margin:0 0 .75rem;letter-spacing:-.01em;overflow-wrap:anywhere}
+.lede{color:var(--muted);max-width:38rem;margin:0 0 2rem}
+.notice{margin:0 0 1.5rem;padding:.9rem 1rem;border-left:2px solid var(--accent-text);background:var(--surface);font-size:.95rem}
 
 .step{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);padding:1.5rem;margin-bottom:1.25rem}
-.step h2{display:flex;align-items:center;gap:.75rem;font-size:1.1rem;margin:0 0 1rem}
-.step h2 .n{display:grid;place-items:center;width:1.9rem;height:1.9rem;border-radius:50%;border:1px solid var(--line-strong);font-size:.8rem;color:var(--accent-text);flex:none}
+.step h2{font-size:1.15rem;margin:0 0 .5rem}
+.sub-h{display:flex;align-items:center;gap:.75rem;font-weight:700;margin:1.5rem 0 .9rem}
+.sub-h .n{display:grid;place-items:center;width:1.9rem;height:1.9rem;border-radius:50%;border:1px solid var(--line-strong);font-size:.8rem;color:var(--accent-text);flex:none}
 .hint{color:var(--muted);font-size:.9rem;margin:.6rem 0 0}
 label.field{display:grid;gap:.4rem;font-weight:600;font-size:.9rem}
-input[type=password],input[type=text],input[type=number],textarea,select{width:100%;font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line-strong);border-radius:var(--radius);padding:.7rem .85rem}
-input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent-text)}
-.check{display:flex;align-items:center;gap:.5rem;margin-top:.75rem;color:var(--muted);font-size:.9rem}
-.check input{accent-color:var(--accent);width:1rem;height:1rem}
+input[type=password],input[type=text],textarea,select{width:100%;min-height:2.75rem;font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line-strong);border-radius:var(--radius);padding:.6rem .8rem}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent-text);box-shadow:0 0 0 1px var(--accent-text)}
+input::placeholder,textarea::placeholder{color:#857B74}
+[aria-invalid="true"]{border-color:#FF8A80!important}
+.check{display:flex;align-items:center;gap:.6rem;min-height:2.75rem;margin-top:.25rem;color:var(--muted);font-size:.95rem;cursor:pointer}
+.check input{accent-color:var(--accent);width:1.15rem;height:1.15rem;flex:none}
 
 .drop{display:grid;place-items:center;gap:.5rem;text-align:center;border:1.5px dashed var(--line-strong);border-radius:var(--radius);padding:2rem 1rem;cursor:pointer;transition:border-color .2s,background .2s}
 .drop:hover,.drop.over{border-color:var(--accent-text);background:rgba(212,46,35,.06)}
@@ -52,59 +62,132 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent-t
 .drop b{font-weight:600}
 .drop span{color:var(--muted);font-size:.9rem}
 .thumbs{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1rem}
+.thumbs:empty{display:none}
 .thumb{position:relative;width:6rem;height:6rem;border-radius:var(--radius);overflow:hidden;border:1px solid var(--line)}
 .thumb img{width:100%;height:100%;object-fit:cover;display:block}
-.thumb button{position:absolute;top:.25rem;right:.25rem;width:1.6rem;height:1.6rem;border-radius:50%;border:0;background:rgba(20,16,16,.85);color:var(--text);cursor:pointer;font-size:1rem;line-height:1}
+.thumb button{position:absolute;top:.15rem;right:.15rem;width:2.75rem;height:2.75rem;border-radius:50%;border:0;background:rgba(20,16,16,.85);color:var(--text);cursor:pointer;font-size:1.1rem;line-height:1}
 
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:.55rem;min-height:2.9rem;padding:.7rem 1.3rem;border-radius:var(--radius);font:inherit;font-weight:700;border:1px solid transparent;cursor:pointer;text-decoration:none;transition:background .2s,border-color .2s}
+.btn svg{width:1.1rem;height:1.1rem;flex:none}
 .btn-primary{background:var(--accent);color:#fff}
 .btn-primary:hover{background:#B9251B}
-.btn-primary[disabled]{opacity:.5;cursor:not-allowed}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn-primary[disabled]:hover{background:var(--accent)}
 .btn-line{background:transparent;color:var(--text);border-color:var(--line-strong)}
 .btn-line:hover{border-color:var(--text)}
-.btn-small{min-height:2.2rem;padding:.35rem .75rem;font-size:.85rem}
+.btn-small{min-height:2.75rem;padding:.4rem .9rem;font-size:.9rem}
+.btn-add{width:100%;background:transparent;color:var(--text);border:1.5px dashed var(--line-strong)}
+.btn-add:hover{border-color:var(--accent-text)}
 .actions{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:1.25rem}
+.tbtn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;min-height:2.75rem;min-width:2.75rem;padding:.35rem .85rem;border-radius:var(--radius);border:1px solid var(--line-strong);background:transparent;color:var(--text);cursor:pointer;font-weight:600;font-size:.9rem}
+.tbtn:hover{border-color:var(--text)}
+.tbtn.icon{padding:0;width:2.75rem}
+.tbtn.danger:hover{border-color:var(--accent-text);color:var(--accent-text)}
+.tbtn[aria-disabled="true"]{opacity:.35;cursor:default}
+.tbtn[aria-disabled="true"]:hover{border-color:var(--line-strong);color:var(--text)}
+.tbtn svg{width:1.05rem;height:1.05rem;flex:none}
 
-.status{display:flex;align-items:center;gap:.75rem;margin-top:1rem;padding:.85rem 1rem;border-radius:var(--radius);background:var(--surface-2);font-size:.95rem}
-.status.error{background:rgba(212,46,35,.14);color:#FFB4AC}
+.status{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;margin:1rem 0 0;padding:.85rem 1rem;border-radius:var(--radius);background:var(--surface-2);font-size:.95rem}
+.status.error{background:rgba(212,46,35,.14);color:var(--err)}
 .status.ok{background:rgba(127,203,140,.12);color:var(--ok)}
+.status .tbtn{color:var(--text)}
 .spinner{width:1.1rem;height:1.1rem;border-radius:50%;border:2px solid var(--line-strong);border-top-color:var(--accent-text);animation:spin .8s linear infinite;flex:none}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.spinner{animation-duration:2.4s}}
 
-.notes{margin:0 0 1.25rem;padding:.9rem 1rem;border-left:2px solid var(--warn);background:rgba(242,179,91,.08);font-size:.92rem}
+.login-form{display:grid;gap:.9rem;max-width:26rem}
+.login-form .actions{margin-top:.25rem}
+.login-form .status{margin:0}
+
+/* Sammenleggbare deler */
+details.panel{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);margin-bottom:1.25rem}
+details.panel>summary,details.cat>summary,details.sub>summary{list-style:none;cursor:pointer;position:relative}
+details.panel>summary::-webkit-details-marker,details.cat>summary::-webkit-details-marker,details.sub>summary::-webkit-details-marker{display:none}
+details.panel>summary::after,details.cat>summary::after,details.sub>summary::after{content:"";position:absolute;right:1.25rem;top:50%;width:.55rem;height:.55rem;margin-top:-.4rem;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);transition:transform .2s}
+details[open]>summary::after{transform:rotate(-135deg);margin-top:-.1rem}
+details.panel>summary{display:flex;align-items:center;min-height:3.5rem;padding:.9rem 3rem .9rem 1.5rem;font-weight:700;font-size:1.05rem}
+details.panel>summary .opt{color:var(--muted);font-weight:500}
+details.panel>.body{padding:0 1.5rem 1.5rem}
+details.sub{margin-top:1.25rem;border-top:1px solid var(--line)}
+details.sub>summary{display:flex;align-items:center;min-height:2.9rem;padding:.5rem 2.5rem .5rem 0;color:var(--muted);font-size:.92rem;font-weight:600}
+details.sub>summary::after{right:.5rem}
+details.sub textarea{margin-top:.5rem;min-height:14rem;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+/* Menyen: én sammenleggbar boks per kategori, ett kort per rett */
+.notes{margin:1rem 0 0;padding:.9rem 1rem;border-left:2px solid var(--warn);background:rgba(242,179,91,.08);font-size:.92rem}
 .notes b{color:var(--warn)}
 .notes ul{margin:.35rem 0 0;padding-left:1.1rem}
-.found{display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:1rem;margin-bottom:1.5rem}
-.cat{border-top:1px solid var(--line-strong);padding-top:1rem;margin-top:1.25rem}
-.cat-head{display:flex;gap:.6rem;align-items:center;margin-bottom:.6rem}
-.cat-head .k-name{font-family:var(--font-display);font-stretch:80%;font-weight:800;text-transform:uppercase;font-size:1.25rem;padding:.4rem .6rem}
-.cat-head .k-sizes{max-width:14rem;padding:.5rem .6rem;font-size:.9rem}
-.row{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1fr) minmax(0,1fr) auto;gap:.5rem;align-items:center;padding-block:.35rem}
-.row.head{color:var(--muted);font-size:.75rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
-.row input,.row select{padding:.5rem .6rem;font-size:.95rem}
-.row.item{border-bottom:1px solid var(--line);padding-bottom:.6rem}
-.row .r-desc{grid-column:1 / 3;font-size:.88rem;color:var(--muted)}
-.row .r-tag{grid-column:3 / 4;font-size:.88rem}
-.icon-btn{width:2.2rem;height:2.2rem;display:grid;place-items:center;border-radius:var(--radius);border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}
-.icon-btn:hover{color:var(--accent-text);border-color:var(--accent-text)}
-.icon-btn svg{width:1rem;height:1rem}
-@media (max-width:620px){
-  .row{grid-template-columns:minmax(0,1fr) 5.5rem auto}
-  .row .al{grid-column:1 / 3}
-  .row .r-desc{grid-column:1 / -1}
-  .row .r-tag{grid-column:1 / 3}
-  .cat-head{flex-wrap:wrap}
-  .cat-head .k-name{flex:1 1 100%}
-  .cat-head .k-sizes{flex:1;max-width:none}
-  .row.head{display:none}
+.cats{display:grid;gap:.6rem;margin-top:1.25rem}
+details.cat{border:1px solid var(--line-strong);border-radius:var(--radius);background:var(--bg)}
+details.cat>summary{display:flex;flex-wrap:wrap;align-items:baseline;gap:.15rem .8rem;min-height:3.5rem;padding:.75rem 3rem .75rem 1rem}
+details.cat[open]>summary{border-bottom:1px solid var(--line)}
+.c-name{font-family:var(--font-display);font-stretch:80%;font-weight:800;text-transform:uppercase;font-size:1.3rem;line-height:1.15;overflow-wrap:anywhere}
+.c-meta{color:var(--muted);font-size:.88rem;overflow-wrap:anywhere}
+.cat-body{display:grid;gap:1rem;padding:1rem}
+.cat-top{display:grid;gap:.6rem}
+.tools{display:flex;flex-wrap:wrap;gap:.5rem}
+.tools .danger{margin-left:auto}
+.f{display:grid;gap:.3rem;min-width:0}
+.f>span:first-child{font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.f i{font-style:normal;font-weight:500;letter-spacing:0;text-transform:none}
+fieldset.sizes{margin:0;min-width:0;padding:.6rem 1rem 1rem;border:1px solid var(--line);border-radius:var(--radius)}
+fieldset.sizes legend{padding:0 .35rem;font-weight:700;font-size:.92rem}
+.sizes .s-hint{margin:0 0 .75rem}
+.size-list{list-style:none;margin:0 0 .75rem;padding:0;display:grid;gap:.5rem}
+.size-list:empty{display:none}
+.size{display:flex;align-items:flex-end;gap:.5rem}
+.size .f{flex:1}
+.items{display:grid;gap:.75rem}
+.items:empty{display:none}
+.item{display:grid;gap:.7rem;padding:.9rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+.r-name{font-weight:700}
+.prices{display:grid;grid-template-columns:repeat(auto-fill,minmax(5.5rem,1fr));gap:.5rem}
+.kr{position:relative;display:block}
+.kr input{padding-right:2.3rem;font-variant-numeric:tabular-nums}
+.kr span{position:absolute;right:.75rem;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+textarea.r-desc{min-height:4.4rem;max-height:14rem;resize:vertical;field-sizing:content}
+.more{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:.5rem}
+.field-err{margin:0;color:var(--err);font-size:.9rem;font-weight:600}
+.gone{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.5rem 1rem;padding:.55rem .9rem;border:1px dashed var(--line-strong);border-radius:var(--radius);color:var(--muted);font-size:.92rem}
+.gone p{margin:0}
+.found{display:grid;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));gap:1rem;margin-top:.5rem}
+@media (min-width:700px){
+  .item{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);align-items:start;column-gap:1rem}
+  .item .tools{grid-column:1 / -1}
 }
-details{margin-top:1.25rem}
-summary{cursor:pointer;color:var(--muted);font-size:.9rem}
-details textarea{margin-top:.75rem;min-height:14rem;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media (max-width:480px){
+  .step{padding:1.1rem 1rem}
+  details.panel>summary{padding-left:1rem}
+  details.panel>.body{padding:0 1rem 1.25rem}
+  .cat-body{padding:.75rem}
+  .item{padding:.75rem}
+  fieldset.sizes{padding:.5rem .75rem .75rem}
+}
+
+/* Tidligere versjoner */
+.hist{list-style:none;margin:.9rem 0 0;padding:0;display:grid;gap:.5rem}
+.hist li{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.5rem 1rem;padding:.6rem .6rem .6rem .9rem;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+.hist b{display:block}
+.hist span{color:var(--muted);font-size:.9rem}
+
 ol.publish{margin:0;padding-left:1.2rem;display:grid;gap:.5rem;color:var(--muted)}
 ol.publish b{color:var(--text)}
 code{font:.9em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--surface-2);padding:.1rem .35rem;border-radius:4px;color:var(--text)}
+
+/* Fast linje nederst med publiseringsknappen */
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:20;max-height:100vh;max-height:100dvh;overflow-y:auto;overscroll-behavior:contain;background:var(--bg);border-top:1px solid var(--line-strong);box-shadow:0 -10px 30px rgba(0,0,0,.35);padding:.75rem clamp(1rem,4vw,2rem) calc(.75rem + env(safe-area-inset-bottom,0px))}
+.bar-in{max-width:calc(52rem - 2 * clamp(1rem,4vw,2rem));margin-inline:auto;display:flex;flex-wrap:wrap;align-items:center;gap:.6rem 1rem}
+.bar-status{flex:1 1 15rem;display:flex;align-items:center;gap:.6rem;min-height:1.5rem;margin:0;color:var(--muted);font-size:.92rem}
+.bar-status.dirty{color:var(--warn)}
+.bar-status.dirty::before{content:"";width:.55rem;height:.55rem;border-radius:50%;background:var(--warn);flex:none}
+.bar-status.ok{color:var(--ok)}
+.bar-status.error{color:var(--err)}
+.bar-status a{font-weight:700;white-space:nowrap}
+.bar .btn-primary{flex:0 0 auto}
+.konflikt{flex:1 1 100%;padding:.8rem 1rem;border-left:2px solid var(--warn);background:rgba(242,179,91,.1);font-size:.92rem}
+.konflikt p{margin:0 0 .5rem}
+.konflikt .actions{margin-top:.5rem}
+@media (max-width:520px){.bar .btn-primary{flex:1 1 100%}}
 </style>
 </head>
 <body>
@@ -112,80 +195,306 @@ code{font:.9em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:v
   <header class="top">
     <img src="bilder/logo.png" alt="">
     <b>Kebab Corner</b>
-    <a href="./">Til nettsiden</a>
+    <div class="links">
+      <a href="./">Til nettsiden</a>
+      <button type="button" class="tbtn" id="logout" hidden>Logg ut</button>
+    </div>
   </header>
 
-  <h1>Meny fra bilde</h1>
-  <p class="lede">Ta bilde av menyen, så leser Claude av retter, priser og allergener. Du ser over og retter det som er feil, og laster ned en ny menyfil til nettsiden.</p>
+  <h1>Endre meny og priser</h1>
+  <p class="lede" id="lede">Her endrer du priser, retter og kategorier. Når du trykker «Publiser endringer», vises endringene på nettsiden med en gang.</p>
 
-  <section class="step" aria-labelledby="s1">
-    <h2 id="s1"><span class="n">1</span>API-nøkkel</h2>
-    <label class="field" for="key">Din Claude API-nøkkel
-      <input type="password" id="key" autocomplete="off" spellcheck="false" placeholder="sk-ant-…">
-    </label>
-    <label class="check" for="remember"><input type="checkbox" id="remember"> Husk nøkkelen på denne enheten</label>
-    <p class="hint">Nøkkelen sendes bare til Claude, rett fra nettleseren din. Den lagres aldri på nettsiden. Du lager en på <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com</a>.</p>
+  <p class="notice" id="setup" tabindex="-1" hidden>Publisering rett på nettsiden er ikke satt opp, fordi filen <code>database.js</code> mangler. Du kan likevel endre menyen her og laste ned en ny <b>meny.js</b> nederst på siden.</p>
+
+  <div class="status" id="booting" role="status" hidden></div>
+
+  <section class="step" id="login" aria-labelledby="login-h" hidden>
+    <h2 id="login-h">Logg inn</h2>
+    <form class="login-form" id="login-form" novalidate>
+      <input type="text" autocomplete="username" value="Kebab Corner" hidden>
+      <label class="field" for="owner-code">Eierkode
+        <input type="password" id="owner-code" autocomplete="current-password" spellcheck="false" autocapitalize="off">
+      </label>
+      <label class="check" for="remember-me"><input type="checkbox" id="remember-me"> Husk meg på denne enheten</label>
+      <div class="actions">
+        <button type="submit" class="btn btn-primary" id="login-btn">Logg inn</button>
+        <button type="button" class="btn btn-line" id="retry" hidden>Prøv igjen</button>
+        <button type="button" class="btn btn-line uten-db" hidden>Fortsett uten database</button>
+      </div>
+      <p class="status" id="login-msg" role="status" hidden></p>
+    </form>
   </section>
 
-  <section class="step" aria-labelledby="s2">
-    <h2 id="s2"><span class="n">2</span>Bilder av menyen</h2>
-    <label class="drop" id="drop" for="files">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-      <b>Velg bilder eller ta et bilde</b>
-      <span>Du kan legge til flere bilder hvis menyen går over flere sider. Skjermbilder fungerer også.</span>
-      <input type="file" id="files" accept="image/*" multiple class="sr-only">
-    </label>
-    <div class="thumbs" id="thumbs"></div>
-    <div class="actions">
-      <button type="button" class="btn btn-primary" id="read" disabled>Les av menyen</button>
-    </div>
-    <div class="status" id="status" role="status" hidden></div>
-  </section>
-
-  <section class="step" id="result" aria-labelledby="s3" hidden>
-    <h2 id="s3"><span class="n">3</span>Se over og rett</h2>
-    <div class="notes" id="notes" hidden></div>
-    <div class="found">
-      <label class="field" for="tel">Telefonnummer
-        <input type="text" id="tel" placeholder="Ikke funnet på bildet">
-      </label>
-      <label class="field" for="allergens">Allergenkoder (KODE = navn, med komma mellom)
-        <input type="text" id="allergens" placeholder="G = Gluten, M = Melk">
-      </label>
-    </div>
-    <div id="editor"></div>
-    <p class="hint" id="dropped" role="status" hidden></p>
-    <div class="actions">
-      <button type="button" class="btn btn-line btn-small" id="add-cat">Legg til kategori</button>
-    </div>
-    <details>
-      <summary>Vis innholdet i menyfilen</summary>
-      <label class="sr-only" for="code">Innholdet i meny.js</label>
-      <textarea id="code" readonly></textarea>
+  <div id="app" hidden>
+    <details class="panel" id="photo">
+      <summary><span>Les inn menyen fra bilder <span class="opt">(valgfritt)</span></span></summary>
+      <div class="body">
+        <p class="hint">Ta bilde av menyen, så leser Claude av retter, priser og allergener og fyller inn skjemaet under. Du ser over og retter det som er feil. Ingenting vises på nettsiden før du publiserer.</p>
+        <p class="sub-h"><span class="n">1</span>API-nøkkel</p>
+        <label class="field" for="key">Din Claude API-nøkkel
+          <input type="password" id="key" autocomplete="off" spellcheck="false" placeholder="sk-ant-…">
+        </label>
+        <label class="check" for="remember"><input type="checkbox" id="remember"> Husk nøkkelen på denne enheten</label>
+        <p class="hint">Nøkkelen sendes bare til Claude, rett fra nettleseren din. Den lagres aldri på nettsiden eller i databasen. Du lager en på <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com</a>.</p>
+        <p class="sub-h"><span class="n">2</span>Bilder av menyen</p>
+        <label class="drop" id="drop" for="files">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <b>Velg bilder eller ta et bilde</b>
+          <span>Du kan legge til flere bilder hvis menyen går over flere sider. Skjermbilder fungerer også.</span>
+          <input type="file" id="files" accept="image/*" multiple class="sr-only">
+        </label>
+        <div class="thumbs" id="thumbs"></div>
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="read" disabled>Les av menyen</button>
+        </div>
+        <div class="status" id="status" role="status" hidden></div>
+      </div>
     </details>
-    <div class="actions">
-      <button type="button" class="btn btn-primary" id="download">Last ned meny.js</button>
-      <button type="button" class="btn btn-line" id="copy">Kopier</button>
-    </div>
-  </section>
 
-  <section class="step" aria-labelledby="s4">
-    <h2 id="s4"><span class="n">4</span>Legg den ut på nettsiden</h2>
-    <ol class="publish">
-      <li>Last ned <b>meny.js</b> i steg 3.</li>
-      <li>Bytt ut filen med samme navn i mappen <code>kebab-corner-halden</code>. På GitHub velger du <b>Add file</b> og <b>Upload files</b> i mappen.</li>
-      <li>Netlify publiserer siden på nytt av seg selv etter et minutt.</li>
-    </ol>
-  </section>
+    <section class="step" id="menu-step" aria-labelledby="menu-h">
+      <h2 id="menu-h" tabindex="-1">Menyen</h2>
+      <p class="hint" id="menu-hint">Trykk på en kategori for å åpne den, og skriv rett i feltene. Ingenting endres på nettsiden før du trykker «Publiser endringer».</p>
+      <p class="hint" id="pub-info" hidden></p>
+      <div class="notes" id="notes" hidden></div>
+      <div class="cats" id="editor"></div>
+      <div class="actions">
+        <button type="button" class="btn btn-add" id="add-cat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Legg til kategori</button>
+      </div>
+      <p class="hint" id="cat-limit" hidden>Menyen kan ha høyst 40 kategorier.</p>
+      <details class="sub" id="extra">
+        <summary>Telefonnummer og allergenkoder</summary>
+        <div class="found">
+          <label class="field" for="tel">Telefonnummer
+            <input type="text" id="tel" inputmode="tel" autocomplete="off" placeholder="Som på nettsiden fra før">
+          </label>
+          <label class="field" for="allergens">Allergenkoder (KODE = navn, med komma mellom)
+            <input type="text" id="allergens" placeholder="G = Gluten, M = Melk">
+          </label>
+        </div>
+        <p class="hint">La telefonnummeret stå tomt for å bruke nummeret som står på nettsiden fra før. Allergenkodene forklares under menyen på nettsiden.</p>
+      </details>
+    </section>
+
+    <details class="panel" id="history" data-db>
+      <summary>Tidligere versjoner</summary>
+      <div class="body">
+        <p class="hint" id="hist-now">Her ligger de siste menyene som har vært publisert. Gjenoppretter du en, vises den på nettsiden med en gang.</p>
+        <p class="status" id="hist-msg" role="status" tabindex="-1" hidden></p>
+        <ul class="hist" id="hist-list"></ul>
+      </div>
+    </details>
+
+    <details class="panel" id="code-panel" data-db>
+      <summary>Bytt eierkode</summary>
+      <div class="body">
+        <form class="login-form" id="code-form" novalidate>
+          <input type="text" autocomplete="username" value="Kebab Corner" hidden>
+          <label class="field" for="new-code">Ny eierkode
+            <input type="password" id="new-code" autocomplete="new-password" spellcheck="false" autocapitalize="off" aria-describedby="new-code-hint">
+          </label>
+          <label class="field" for="new-code-2">Skriv den nye koden en gang til
+            <input type="password" id="new-code-2" autocomplete="new-password" spellcheck="false" autocapitalize="off">
+          </label>
+          <p class="hint" id="new-code-hint">Minst 10 tegn. Noen ord med tall imellom er lett å huske og vanskelig å gjette.</p>
+          <div class="actions"><button type="submit" class="btn btn-primary" id="code-btn">Bytt kode</button></div>
+          <p class="status" id="code-msg" role="status" hidden></p>
+        </form>
+      </div>
+    </details>
+
+    <details class="panel" id="backup">
+      <summary id="backup-sum">Reservekopi (meny.js)</summary>
+      <div class="body">
+        <p class="hint" data-db>Nettsiden henter menyen fra databasen. Filen meny.js brukes bare når databasen ikke har noen meny. Last ned en kopi hvis du vil ta vare på menyen slik den står i skjemaet nå.</p>
+        <p class="hint" id="dropped" role="status" hidden></p>
+        <details class="sub">
+          <summary>Vis innholdet i menyfilen</summary>
+          <label class="sr-only" for="code">Innholdet i meny.js</label>
+          <textarea id="code" readonly></textarea>
+        </details>
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="download">Last ned meny.js</button>
+          <button type="button" class="btn btn-line" id="copy">Kopier</button>
+        </div>
+        <p class="sub-h" data-uten-db hidden>Slik legger du filen ut på nettsiden</p>
+        <ol class="publish" data-uten-db hidden>
+          <li>Last ned <b>meny.js</b> over.</li>
+          <li>Bytt ut filen med samme navn i mappen <code>kebab-corner-halden</code>. På GitHub velger du <b>Add file</b> og <b>Upload files</b> i mappen.</li>
+          <li>Netlify publiserer siden på nytt av seg selv etter et minutt.</li>
+        </ol>
+      </div>
+    </details>
+  </div>
+
+  <div class="bar" id="bar" hidden>
+    <div class="bar-in">
+      <div class="konflikt" id="konflikt" role="alert" hidden></div>
+      <p class="bar-status" id="pub-status" role="status" tabindex="-1"></p>
+      <button type="button" class="btn btn-primary" id="publish" title="Snarvei: Ctrl+S (Cmd+S på Mac)" aria-keyshortcuts="Control+S Meta+S" disabled>Publiser endringer</button>
+    </div>
+  </div>
+  <p class="sr-only" id="live" role="status"></p>
 </main>
 
+<script src="database.js"></script>
+<script src="meny.js"></script>
 <script>
 const MODEL = "claude-fable-5-1";
 const $ = s => document.querySelector(s);
 const $$ = (s, r = document) => Array.prototype.slice.call(r.querySelectorAll(s));
-const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const glatt = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+const editor = $("#editor");
 
-// ---------- 1. Nøkkel ----------
+// ---------- Databasen ----------
+// Adressen og den publiserbare nøkkelen står i database.js. KC_BESTILLING er det gamle navnet fra bestilling.js.
+// Uten dem virker siden som før: les av bilder, rett i skjemaet og last ned meny.js.
+const DB = window.KC_DATABASE || window.KC_BESTILLING || null;
+const HAR_DB = !!(DB && DB.supabaseUrl && DB.supabaseKey && window.fetch);
+let utenDb = !HAR_DB; // true: endringene lastes ned som meny.js i stedet for å publiseres (også når databasen er nede)
+const KODE_KEY = "kc-eier-kode";
+let kode = "";        // eierkoden. Sendes bare i selve forespørselen, aldri i adressen, konsollen eller en melding
+let versjon = 0;      // versjonen i databasen som skjemaet bygger på (0 = databasen har ingen meny ennå)
+let publisert = null; // når den versjonen ble publisert
+let lastet = false;   // skjemaet har en meny
+let grunnlag = "";    // skjemaet slik det sist ble hentet eller publisert, for å se om noe er endret
+let opptatt = false;  // publiserer akkurat nå
+
+async function rpc(fn, body) {
+  const headers = { apikey: DB.supabaseKey, "Content-Type": "application/json" };
+  if (/^eyJ/.test(DB.supabaseKey)) headers.Authorization = "Bearer " + DB.supabaseKey; // gammel JWT-nøkkel
+  let res;
+  try {
+    res = await fetch(String(DB.supabaseUrl).replace(/\/+$/, "") + "/rest/v1/rpc/" + fn, { method: "POST", headers, body: JSON.stringify(body || {}) });
+  } catch (e) { const err = new Error("nett"); err.nett = true; throw err; }
+  let out = null; try { out = await res.json(); } catch (e) {}
+  if (!res.ok) { const err = new Error("http " + res.status); err.status = res.status; err.vent = /vent litt/i.test((out && out.message) || ""); throw err; }
+  return out;
+}
+// Teksten fra databasen vises aldri rett, så koden aldri kan havne i en melding
+function feiltekst(err) {
+  if (err && err.vent) return "For mange feil forsøk med eierkoden. Vent 10 minutter og prøv igjen.";
+  if (err && err.nett) return "Fikk ikke kontakt med databasen. Sjekk nettforbindelsen og prøv igjen.";
+  return "Databasen svarte ikke som den skulle. Prøv igjen om litt.";
+}
+// Databasen svarer ikke. Da kan eieren likevel endre menyen og laste ned meny.js, som uten database.js.
+const nede = err => !!err && !err.vent;
+const UTEN_DB = '<button type="button" class="tbtn uten-db">Fortsett uten database</button>';
+// Statusboks: tekst escapes, html er fast markering som legges til (lenke eller knapp)
+function melding(el, kind, tekst, html) {
+  el.className = "status " + (kind || "");
+  el.innerHTML = (kind === "busy" ? '<span class="spinner" aria-hidden="true"></span>' : "") + "<span>" + esc(tekst) + "</span>" + (html || "");
+  el.hidden = false;
+}
+// Kort beskjed til skjermleser (flyttet, slettet, lagt til)
+function si(t) { const l = $("#live"); l.textContent = ""; setTimeout(() => { l.textContent = t; }, 60); }
+const tid = d => { try { return new Date(d).toLocaleString("nb-NO", { timeZone: "Europe/Oslo", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } };
+
+// ---------- Innlogging ----------
+function lesKode() {
+  try {
+    const l = localStorage.getItem(KODE_KEY);
+    if (l) { $("#remember-me").checked = true; return l; }
+    return sessionStorage.getItem(KODE_KEY) || "";
+  } catch (e) { return ""; }
+}
+function lagreKode(c, husk) {
+  try {
+    if (husk) { localStorage.setItem(KODE_KEY, c); sessionStorage.removeItem(KODE_KEY); }
+    else { sessionStorage.setItem(KODE_KEY, c); localStorage.removeItem(KODE_KEY); }
+  } catch (e) {}
+}
+function glemKode() { try { localStorage.removeItem(KODE_KEY); sessionStorage.removeItem(KODE_KEY); } catch (e) {} }
+function huskes() { try { return !!localStorage.getItem(KODE_KEY); } catch (e) { return false; } }
+
+function visLogin(tekst, kind, igjen, err) {
+  $("#app").hidden = true; $("#bar").hidden = true; document.body.classList.remove("med-bar");
+  $("#logout").hidden = true; $("#booting").hidden = true;
+  $("#login").hidden = false; $("#retry").hidden = !igjen;
+  $("#login .uten-db").hidden = !nede(err);
+  if (tekst) melding($("#login-msg"), kind || "error", tekst); else $("#login-msg").hidden = true;
+  $("#owner-code").focus();
+}
+$("#login-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const c = $("#owner-code").value.trim();
+  if (!c) return visLogin("Skriv inn eierkoden.");
+  const btn = $("#login-btn"); btn.disabled = true;
+  melding($("#login-msg"), "busy", "Logger inn …");
+  try {
+    if (await rpc("owner_login", { p_code: c }) !== true) { visLogin("Feil kode. Prøv igjen."); $("#owner-code").select(); return; }
+    kode = c; lagreKode(c, $("#remember-me").checked);
+    $("#owner-code").value = "";
+    await inn();
+    if (!$("#app").hidden) $("#menu-h").focus(); // skjemaet er klart: fokus dit, så tastatur og skjermleser ikke havner øverst
+  } catch (err) { visLogin(feiltekst(err), "error", false, err); }
+  finally { btn.disabled = false; }
+});
+// Lagret kode prøves ved oppstart. Er den feil, slettes den. Uten nett blir den liggende.
+async function provLagretKode() {
+  $("#login").hidden = true;
+  melding($("#booting"), "busy", "Logger inn …");
+  try {
+    if (await rpc("owner_login", { p_code: kode }) === true) return inn();
+    glemKode(); kode = "";
+    visLogin("Den lagrede koden virker ikke lenger. Skriv inn eierkoden.");
+  } catch (err) { visLogin(feiltekst(err), "error", true, err); }
+}
+$("#retry").addEventListener("click", () => { kode = lesKode(); if (kode) provLagretKode(); else visLogin(); });
+document.addEventListener("click", e => { if (e.target.closest(".uten-db")) startUtenDb(true); });
+
+async function inn() {
+  $("#login").hidden = true; $("#login-msg").hidden = true; $("#logout").hidden = false;
+  if (lastet && erEndret()) { $("#booting").hidden = true; return visApp(); } // logget inn på nytt: endringene i skjemaet beholdes
+  await startMeny();
+}
+function visApp() {
+  $("#app").hidden = false;
+  if (!utenDb) { $("#bar").hidden = false; document.body.classList.add("med-bar"); }
+  oppdaterBar();
+}
+// Koden virker ikke lenger (byttet på en annen enhet). Skjemaet blir liggende som det er.
+function utlogget(tekst) {
+  glemKode(); kode = ""; $("#konflikt").hidden = true;
+  visLogin(tekst);
+  window.scrollTo(0, 0);
+}
+$("#logout").addEventListener("click", () => {
+  if (lastet && erEndret() && !confirm("Du har endringer som ikke er publisert. Vil du logge ut likevel? Endringene går tapt.")) return;
+  glemKode(); kode = ""; lastet = false; grunnlag = ""; versjon = 0; editor.innerHTML = "";
+  $("#history").open = false; $("#hist-list").innerHTML = ""; $("#konflikt").hidden = true;
+  visLogin("Du er logget ut.", "ok");
+});
+
+// ---------- Hent menyen ----------
+// Menyen i databasen hvis den finnes, ellers meny.js (versjon 0), ellers en tom kategori
+const gyldigFil = () => { const M = window.MENY_DATA; return !!(M && Array.isArray(M.meny) && M.meny.some(c => c && Array.isArray(c.retter) && c.retter.length)); };
+const menyRad = rader => Array.isArray(rader) ? rader.find(r => r && r.key === "meny") || null : null;
+async function hentMeny(rader) { // rader = svaret fra get_site_content, hvis det allerede er hentet
+  const rad = menyRad(rader || await rpc("get_site_content", {}));
+  const iDb = !!(rad && rad.data && Array.isArray(rad.data.meny) && rad.data.meny.length);
+  let d = iDb ? rad.data : gyldigFil() ? window.MENY_DATA : null;
+  // Uten allergenkoder i databasen viser nettsiden kodene i meny.js. Da står de her også, så de ikke forsvinner ved publisering.
+  if (iDb && !erObj(d.allergener) && gyldigFil() && erObj(window.MENY_DATA.allergener)) d = Object.assign({}, d, { allergener: window.MENY_DATA.allergener });
+  lastInn(d);
+  versjon = rad ? Number(rad.version) || 0 : 0;
+  publisert = iDb ? rad.updated_at : null;
+  visPubInfo();
+  settGrunnlag();
+}
+async function startMeny() {
+  melding($("#booting"), "busy", "Henter menyen …");
+  try { await hentMeny(); $("#booting").hidden = true; visApp(); }
+  catch (err) { melding($("#booting"), "error", "Fikk ikke hentet menyen. " + feiltekst(err), '<button type="button" class="tbtn" id="hent-igjen">Prøv igjen</button>' + (nede(err) ? UTEN_DB : "")); }
+}
+$("#booting").addEventListener("click", e => { if (e.target.closest("#hent-igjen")) startMeny(); });
+function visPubInfo() {
+  const p = $("#pub-info");
+  p.textContent = versjon && publisert ? `Nettsiden viser versjon ${versjon}, publisert ${tid(publisert)}.` : "";
+  p.hidden = !p.textContent;
+}
+
+// ---------- 1. Nøkkel (bilder) ----------
 const keyEl = $("#key"), rememberEl = $("#remember");
 try { const k = localStorage.getItem("kc-api-key"); if (k) { keyEl.value = k; rememberEl.checked = true; } } catch (e) {}
 function saveKey() {
@@ -301,7 +610,7 @@ const PROMPT = `Bildene viser menyen til Kebab Corner, en kebab-, pizza- og burg
 
 async function readMenu() {
   const key = keyEl.value.trim();
-  if (!key) { keyEl.focus(); return showStatus("error", "Lim inn API-nøkkelen i steg 1 først."); }
+  if (!key) { keyEl.focus(); return showStatus("error", "Lim inn API-nøkkelen først."); }
   saveKey();
   $("#read").disabled = true;
   showStatus("busy", "Claude leser menyen. Det tar vanligvis under ett minutt.");
@@ -338,8 +647,9 @@ async function readMenu() {
     const n = parsed.kategorier.reduce((sum, k) => sum + k.retter.length, 0);
     if (!n) throw new Error("Fant ingen retter på bildene. Sjekk at bildene viser menyen, og at teksten er skarp.");
     showResult(parsed);
-    showStatus("ok", `Fant ${n} retter i ${parsed.kategorier.length} kategorier. Se over dem i steg 3.`);
-    $("#result").scrollIntoView({ behavior: "smooth", block: "start" });
+    showStatus("ok", `Fant ${n} retter i ${parsed.kategorier.length} kategorier, og menyen under er byttet ut med dem. Se over alt${!utenDb ? " og trykk «Publiser endringer»" : " og last ned meny.js"} når det stemmer.`);
+    $("#status").insertAdjacentHTML("beforeend", '<button type="button" class="tbtn" id="angre-bilde">Angre</button>');
+    $("#menu-step").scrollIntoView({ behavior: glatt(), block: "start" });
   } catch (e) {
     showStatus("error", esc(e.message || "Noe gikk galt. Prøv igjen."));
   } finally {
@@ -357,84 +667,372 @@ function apiError(status, data) {
 }
 $("#read").addEventListener("click", readMenu);
 
-// ---------- 3. Redigering ----------
-const TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>';
-const TAGS = [["", "Uten merke"], ["veg", "Vegetar"], ["hot", "Sterk"], ["pop", "Mest solgt"]];
-function catHtml(k) {
-  const sizes = (k.storrelser || []).join(" / ");
-  return `<div class="cat">
-    <div class="cat-head"><input type="text" class="k-name" value="${esc(k.kategori)}" aria-label="Kategorinavn">
-      <input type="text" class="k-sizes" value="${esc(sizes)}" placeholder="Størrelser, f.eks. Medium / Stor" aria-label="Størrelser, med skråstrek mellom">
-      <button type="button" class="icon-btn del-cat" aria-label="Slett kategorien">${TRASH}</button></div>
-    <div class="row head"><span>Rett</span><span>Pris</span><span>Allergener</span><span></span></div>
-    <div class="items">${k.retter.map(itemHtml).join("")}</div>
-    <button type="button" class="btn btn-line btn-small add-item">Legg til rett</button>
-  </div>`;
+// Svaret fra Claude ({ kategorier, allergener: [{kode, navn}], telefon }) til samme form som nettsiden bruker
+function fraApi(p) {
+  const out = { meny: (p.kategorier || []).map(k => {
+    const kat = { kategori: k.kategori || "", retter: (k.retter || []).map(r => {
+      const x = { navn: r.navn || "", pris: Array.isArray(r.pris) ? r.pris : [] };
+      if (r.tekst) x.tekst = r.tekst;
+      if (r.allergener && r.allergener.length) x.allergener = r.allergener;
+      if (r.tag) x.tag = r.tag;
+      return x;
+    }) };
+    if (k.storrelser && k.storrelser.length) kat.storrelser = k.storrelser;
+    return kat;
+  }) };
+  const all = {};
+  (p.allergener || []).forEach(a => { if (a && a.kode) all[String(a.kode).trim().toUpperCase()] = a.navn || ""; });
+  if (Object.keys(all).length) out.allergener = all;
+  if (p.telefon) out.telefon = p.telefon;
+  return out;
 }
-function itemHtml(r) {
-  return `<div class="row item">
-    <input type="text" class="r-name" value="${esc(r.navn)}" aria-label="Navn på retten">
-    <input type="text" class="r-price" value="${esc((r.pris || []).join(" / "))}" inputmode="numeric" aria-label="Pris i kroner, med skråstrek mellom størrelsene">
-    <input type="text" class="al r-al" value="${esc((r.allergener || []).join(", "))}" aria-label="Allergenkoder, med komma mellom">
-    <button type="button" class="icon-btn del-item" aria-label="Slett retten">${TRASH}</button>
-    <input type="text" class="r-desc" value="${esc(r.tekst || "")}" placeholder="Beskrivelse (valgfri)" aria-label="Beskrivelse av retten">
-    <select class="r-tag" aria-label="Merke">${TAGS.map(([v, t]) => `<option value="${v}"${(r.tag || "") === v ? " selected" : ""}>${t}</option>`).join("")}</select>
-  </div>`;
-}
+// Det som stod i skjemaet før bildene ble lest, så «Angre» kan legge det tilbake
+let forrige = null;
 function showResult(p) {
-  $("#tel").value = p.telefon || "";
-  $("#allergens").value = (p.allergener || []).map(a => a.kode + " = " + a.navn).join(", ");
+  forrige = { noder: Array.prototype.slice.call(editor.childNodes), extra: editor._extra, tel: $("#tel").value, all: $("#allergens").value };
+  lastInn(fraApi(p));
   const notes = p.merknader || [];
   $("#notes").innerHTML = notes.length ? "<b>Sjekk dette spesielt:</b><ul>" + notes.map(n => "<li>" + esc(n) + "</li>").join("") + "</ul>" : "";
   $("#notes").hidden = !notes.length;
-  $("#editor").innerHTML = p.kategorier.map(catHtml).join("");
-  $("#result").hidden = false;
-  updateCode();
+  $$(".cat", editor).forEach(c => { c.open = true; });
 }
-$("#editor").addEventListener("click", e => {
-  if (e.target.closest(".del-item")) e.target.closest(".item").remove();
-  else if (e.target.closest(".del-cat")) e.target.closest(".cat").remove();
-  else if (e.target.closest(".add-item")) {
-    const box = e.target.closest(".cat").querySelector(".items");
-    box.insertAdjacentHTML("beforeend", itemHtml({ navn: "", pris: [] }));
-    box.lastElementChild.querySelector("input").focus();
-  } else return;
-  updateCode();
-});
-$("#editor").addEventListener("input", updateCode);
-$("#editor").addEventListener("change", updateCode);
-$("#tel").addEventListener("input", updateCode);
-$("#allergens").addEventListener("input", updateCode);
-$("#add-cat").addEventListener("click", () => {
-  $("#editor").insertAdjacentHTML("beforeend", catHtml({ kategori: "Ny kategori", retter: [{ navn: "", pris: [] }] }));
-  $("#editor").lastElementChild.querySelector("input").select();
-  updateCode();
+$("#status").addEventListener("click", e => {
+  if (!e.target.closest("#angre-bilde") || !forrige) return;
+  editor.innerHTML = "";
+  forrige.noder.forEach(n => editor.appendChild(n));
+  editor._extra = forrige.extra; $("#tel").value = forrige.tel; $("#allergens").value = forrige.all;
+  $("#notes").hidden = true; forrige = null;
+  oppdaterAlt();
+  showStatus("ok", "Menyen er satt tilbake slik den var før bildene ble lest.");
 });
 
-// Leser redigeringsfeltene og bygger samme form som SITE.meny på nettsiden
-function collect() {
-  let utenPris = 0;
-  const meny = $$(".cat", $("#editor")).map(cat => {
-    const sizes = cat.querySelector(".k-sizes").value.split("/").map(x => x.trim()).filter(Boolean);
-    const retter = $$(".item", cat).map(row => {
-      const navn = row.querySelector(".r-name").value.trim();
-      const pris = (row.querySelector(".r-price").value.match(/\d+/g) || []).map(Number);
+// ---------- 3. Redigering ----------
+const TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>';
+const UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
+const DOWN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>';
+const PLUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+const TAGS = [["", "Uten merke"], ["veg", "Vegetar"], ["hot", "Sterk"], ["pop", "Mest solgt"]];
+const MENY_FELT = ["meny", "allergener", "telefon"], KAT_FELT = ["kategori", "storrelser", "retter"], RETT_FELT = ["navn", "tekst", "pris", "allergener", "tag"];
+const erObj = x => !!x && typeof x === "object" && !Array.isArray(x);
+// Felt redigeringen ikke kjenner, tas vare på og lagres tilbake uendret
+const resten = (o, felt) => { const x = {}; Object.keys(o || {}).forEach(k => { if (felt.indexOf(k) < 0) x[k] = o[k]; }); return x; };
+const priser = r => [].concat(r.pris == null ? [] : r.pris);
+function lagEl(html) { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstElementChild; }
+
+function catHtml(navn, sizes) {
+  return `<details class="cat">
+    <summary><span class="c-name"></span><span class="c-meta"></span></summary>
+    <div class="cat-body">
+      <div class="cat-top">
+        <label class="f"><span>Navn på kategorien</span><input type="text" class="k-name" maxlength="60" value="${esc(navn)}" placeholder="F.eks. Salater"></label>
+        <div class="tools">
+          <button type="button" class="tbtn icon mv-cat" data-dir="-1" title="Flytt kategorien opp">${UP}</button>
+          <button type="button" class="tbtn icon mv-cat" data-dir="1" title="Flytt kategorien ned">${DOWN}</button>
+          <button type="button" class="tbtn danger del-cat">${TRASH}Slett kategori</button>
+        </div>
+      </div>
+      <fieldset class="sizes">
+        <legend>Størrelser</legend>
+        <p class="hint s-hint"></p>
+        <ol class="size-list">${sizes.map(sizeHtml).join("")}</ol>
+        <button type="button" class="tbtn add-size">${PLUS}Legg til størrelse</button>
+      </fieldset>
+      <div class="items"></div>
+      <button type="button" class="btn btn-add add-item">${PLUS}Legg til rett</button>
+    </div>
+  </details>`;
+}
+function sizeHtml(navn) {
+  return `<li class="size">
+    <label class="f"><span class="s-lab"></span><input type="text" class="s-name" maxlength="30" value="${esc(navn)}"></label>
+    <button type="button" class="tbtn icon mv-size" title="Flytt størrelsen opp">${UP}</button>
+    <button type="button" class="tbtn icon danger del-size" title="Slett størrelsen">${TRASH}</button>
+  </li>`;
+}
+// Ett prisfelt per størrelse. Etiketten (størrelsens navn eller «Pris») settes i oppdaterKat.
+const prisHtml = v => `<label class="f price"><span><span class="p-pre sr-only"></span><span class="pn"></span></span><span class="kr"><input type="text" class="r-price" inputmode="numeric" autocomplete="off" value="${esc(v == null ? "" : v)}"><span aria-hidden="true">kr</span></span></label>`;
+function itemHtml(r, sizes) {
+  const pr = priser(r), n = Math.max(1, sizes.length);
+  const tag = r.tag == null ? "" : String(r.tag);
+  const tags = TAGS.some(t => t[0] === tag) ? TAGS : TAGS.concat([[tag, tag]]); // ukjent merke beholdes
+  const al = Array.isArray(r.allergener) ? r.allergener.join(", ") : (r.allergener == null ? "" : String(r.allergener));
+  let p = "";
+  for (let i = 0; i < n; i++) p += prisHtml(pr[i]);
+  return `<div class="item" role="group">
+    <label class="f f-name"><span>Navn på retten</span><input type="text" class="r-name" maxlength="80" value="${esc(r.navn)}"></label>
+    <div class="prices">${p}</div>
+    <label class="f f-desc"><span>Beskrivelse <i>(valgfri)</i></span><textarea class="r-desc" rows="2" maxlength="400">${esc(r.tekst)}</textarea></label>
+    <div class="more">
+      <label class="f"><span>Merke</span><select class="r-tag">${tags.map(([v, t]) => `<option value="${esc(v)}"${tag === v ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
+      <label class="f"><span>Allergener <i>(koder)</i></span><input type="text" class="r-al" value="${esc(al)}" placeholder="F.eks. G, M"></label>
+    </div>
+    <div class="tools">
+      <button type="button" class="tbtn icon mv-item" data-dir="-1" title="Flytt opp">${UP}</button>
+      <button type="button" class="tbtn icon mv-item" data-dir="1" title="Flytt ned">${DOWN}</button>
+      <button type="button" class="tbtn danger del-item">${TRASH}Slett</button>
+    </div>
+  </div>`;
+}
+function lagRett(r, sizes) { const el = lagEl(itemHtml(r || {}, sizes)); el._extra = resten(r, RETT_FELT); return el; }
+function lagKat(k) {
+  const retter = (Array.isArray(k.retter) ? k.retter : []).filter(erObj);
+  let sizes = Array.isArray(k.storrelser) ? k.storrelser.map(s => s == null ? "" : String(s)) : [];
+  // Har en rett flere priser enn kategorien har størrelser, får de ekstra prisene en størrelse uten navn
+  const flest = retter.reduce((n, r) => Math.max(n, priser(r).length), 0);
+  if (flest > Math.max(1, sizes.length)) sizes = sizes.concat(Array(flest - sizes.length).fill(""));
+  const c = lagEl(catHtml(k.kategori == null ? "" : String(k.kategori), sizes));
+  const box = c.querySelector(".items");
+  retter.forEach(r => box.appendChild(lagRett(r, sizes)));
+  c._extra = resten(k, KAT_FELT);
+  return c;
+}
+// Nettsideformen ({ meny, allergener: {G: "Gluten"}, telefon }, som window.MENY_DATA) inn i redigeringen
+function lastInn(d) {
+  d = erObj(d) ? d : {};
+  const meny = (Array.isArray(d.meny) ? d.meny : []).filter(erObj);
+  // Kategorier som var åpne, er åpne også etter at menyen er hentet på nytt
+  const apne = $$(".cat", editor).filter(c => c.open).map(c => c.querySelector(".k-name").value.trim());
+  editor.innerHTML = "";
+  (meny.length ? meny : [{ kategori: "", retter: [{}] }]).forEach(k => {
+    const c = lagKat(k);
+    if (apne.indexOf(c.querySelector(".k-name").value.trim()) >= 0) c.open = true;
+    editor.appendChild(c);
+  });
+  editor._extra = resten(d, MENY_FELT);
+  $("#tel").value = d.telefon == null ? "" : String(d.telefon);
+  $("#allergens").value = erObj(d.allergener) ? Object.keys(d.allergener).map(k => k + " = " + d.allergener[k]).join(", ") : "";
+  $("#notes").hidden = true; $("#notes").innerHTML = "";
+  lastet = true;
+  oppdaterAlt();
+}
+
+// Etiketter, tellere og knapper som avhenger av navn og rekkefølge
+const storrelser = cat => $$(".s-name", cat).map(i => i.value.trim());
+const sNavn = (s, i) => s || "Størrelse " + (i + 1);
+// Rettene i kategorien. Med slettet = true også de som kan hentes tilbake med «Angre», så de passer til størrelsene.
+function rader(cat, medSlettet) {
+  const r = $$(".item", cat);
+  return medSlettet ? r.concat($$(".gone", cat).map(g => g._el).filter(Boolean)) : r;
+}
+function merkRett(row, forst, sist) {
+  const n = row.querySelector(".r-name").value.trim() || "ny rett";
+  row.setAttribute("aria-label", n);
+  const mv = $$(".mv-item", row);
+  mv[0].setAttribute("aria-label", `Flytt ${n} opp`);
+  mv[1].setAttribute("aria-label", `Flytt ${n} ned`);
+  if (forst != null) { mv[0].setAttribute("aria-disabled", String(forst)); mv[1].setAttribute("aria-disabled", String(sist)); }
+  row.querySelector(".del-item").setAttribute("aria-label", `Slett ${n}`);
+}
+function oppdaterKat(cat) {
+  const navn = cat.querySelector(".k-name").value.trim() || "Ny kategori";
+  const sizes = storrelser(cat), rows = rader(cat);
+  cat.querySelector(".c-name").textContent = navn;
+  cat.querySelector(".c-meta").textContent = (rows.length === 1 ? "1 rett" : rows.length + " retter") + (sizes.length ? " · " + sizes.map(sNavn).join(" / ") : "");
+  $$(".size", cat).forEach((li, i) => {
+    const n = sNavn(sizes[i], i);
+    li.querySelector(".s-lab").textContent = "Størrelse " + (i + 1);
+    li.querySelector(".s-name").placeholder = i === 0 ? "F.eks. Liten" : "F.eks. Stor";
+    const mv = li.querySelector(".mv-size");
+    mv.setAttribute("aria-label", `Flytt ${n} opp`); mv.setAttribute("aria-disabled", String(i === 0));
+    li.querySelector(".del-size").setAttribute("aria-label", `Slett ${n}`);
+  });
+  const full = sizes.length >= 6;
+  cat.querySelector(".s-hint").textContent = !sizes.length ? "Rettene har én pris hver. Selges de i flere størrelser, for eksempel Liten og Stor, trykker du «Legg til størrelse»."
+    : "Hver rett har ett prisfelt per størrelse, i samme rekkefølge som her. Finnes ikke retten i de siste størrelsene, lar du de prisene stå tomme." + (full ? " Høyst 6 størrelser." : "");
+  cat.querySelector(".add-size").setAttribute("aria-disabled", String(full));
+  rader(cat, true).forEach(row => $$(".price", row).forEach((lab, i) => {
+    lab.querySelector(".p-pre").textContent = sizes.length ? "Pris for " : "";
+    lab.querySelector(".pn").textContent = sizes.length ? sNavn(sizes[i], i) : "Pris";
+  }));
+  rows.forEach((row, i) => merkRett(row, i === 0, i === rows.length - 1));
+  cat.querySelector('.mv-cat[data-dir="-1"]').setAttribute("aria-label", `Flytt kategorien ${navn} opp`);
+  cat.querySelector('.mv-cat[data-dir="1"]').setAttribute("aria-label", `Flytt kategorien ${navn} ned`);
+  cat.querySelector(".del-cat").setAttribute("aria-label", `Slett kategori ${navn}`);
+}
+function oppdaterAlt() {
+  const kats = $$(".cat", editor);
+  kats.forEach((c, i) => {
+    oppdaterKat(c);
+    c.querySelector('.mv-cat[data-dir="-1"]').setAttribute("aria-disabled", String(i === 0));
+    c.querySelector('.mv-cat[data-dir="1"]').setAttribute("aria-disabled", String(i === kats.length - 1));
+  });
+  $("#add-cat").disabled = kats.length >= 40;
+  $("#cat-limit").hidden = kats.length < 40;
+  endret();
+}
+
+// Flytter et element forbi neste av samme slag (slettede retter hoppes over)
+function flytt(el, dir, sel) {
+  let s = dir < 0 ? el.previousElementSibling : el.nextElementSibling;
+  while (s && !s.matches(sel)) s = dir < 0 ? s.previousElementSibling : s.nextElementSibling;
+  if (!s) return false;
+  if (dir < 0) s.before(el); else s.after(el);
+  return true;
+}
+// Slettet rett eller kategori blir stående som en linje med «Angre» der den var, til menyen publiseres
+function slett(el, tekst) {
+  const g = lagEl(`<div class="gone"><p>${esc(tekst)}</p><button type="button" class="tbtn undo">Angre</button></div>`);
+  g._el = el;
+  el.replaceWith(g);
+  g.querySelector(".undo").focus();
+  si(tekst + " Trykk Angre for å hente den tilbake.");
+}
+function angre(g) {
+  const el = g._el;
+  g.replaceWith(el);
+  if (el.matches(".cat")) { oppdaterAlt(); el.querySelector("summary").focus(); }
+  else { oppdaterKat(el.closest(".cat")); endret(); el.querySelector(".r-name").focus(); }
+  si("Hentet tilbake.");
+}
+
+editor.addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b || !editor.contains(b)) return;
+  const cat = b.closest(".cat");
+  if (b.classList.contains("undo")) return angre(b.closest(".gone"));
+  if (b.getAttribute("aria-disabled") === "true") {
+    if (b.classList.contains("add-size")) si("En kategori kan ha høyst 6 størrelser.");
+    return;
+  }
+  if (b.classList.contains("add-item")) {
+    const row = lagRett({}, storrelser(cat));
+    cat.querySelector(".items").appendChild(row);
+    oppdaterKat(cat); endret();
+    row.querySelector(".r-name").focus({ preventScroll: true });
+    row.scrollIntoView({ block: "center", behavior: glatt() });
+    si("Ny rett lagt til nederst i kategorien.");
+  } else if (b.classList.contains("del-item")) {
+    const row = b.closest(".item"), n = row.querySelector(".r-name").value.trim();
+    slett(row, n ? `«${n}» er slettet.` : "Retten er slettet.");
+    oppdaterKat(cat); endret();
+  } else if (b.classList.contains("mv-item")) {
+    if (flytt(b.closest(".item"), +b.dataset.dir, ".item")) { oppdaterKat(cat); endret(); b.focus(); b.scrollIntoView({ block: "nearest" }); si(+b.dataset.dir < 0 ? "Flyttet opp." : "Flyttet ned."); }
+  } else if (b.classList.contains("mv-cat")) {
+    if (flytt(cat, +b.dataset.dir, ".cat")) { oppdaterAlt(); b.focus(); b.scrollIntoView({ block: "nearest" }); si(+b.dataset.dir < 0 ? "Kategorien er flyttet opp." : "Kategorien er flyttet ned."); }
+  } else if (b.classList.contains("del-cat")) {
+    const n = cat.querySelector(".k-name").value.trim(), k = rader(cat).length;
+    slett(cat, `Kategorien ${n ? "«" + n + "»" : "uten navn"}${k ? " med " + (k === 1 ? "1 rett" : k + " retter") : ""} er slettet.`);
+    oppdaterAlt();
+  } else if (b.classList.contains("add-size")) {
+    // Første gang blir prisene rettene har nå, den første størrelsen, og en ny kommer i tillegg
+    const list = cat.querySelector(".size-list"), forst = !list.children.length;
+    list.insertAdjacentHTML("beforeend", forst ? sizeHtml("") + sizeHtml("") : sizeHtml(""));
+    rader(cat, true).forEach(r => r.querySelector(".prices").insertAdjacentHTML("beforeend", prisHtml(null)));
+    oppdaterKat(cat); endret();
+    (forst ? list.firstElementChild : list.lastElementChild).querySelector(".s-name").focus();
+    si(forst ? "To størrelser er lagt til. Skriv navnene. Prisene rettene har nå, hører til den første." : "Ny størrelse er lagt til nederst. Skriv navnet, og fyll inn prisen på hver rett.");
+  } else if (b.classList.contains("del-size")) {
+    const li = b.closest(".size"), list = li.parentNode, i = Array.prototype.indexOf.call(list.children, li);
+    const s = storrelser(cat)[i], navn = s ? "«" + s + "»" : "størrelse " + (i + 1);
+    const alle = rader(cat, true), flere = list.children.length > 1;
+    const fylt = flere ? alle.filter(r => { const p = $$(".r-price", r)[i]; return p && p.value.trim(); }).length : 0;
+    if (fylt && !confirm(`Slette ${navn}? Prisen for den forsvinner fra ${fylt === 1 ? "1 rett" : fylt + " retter"}.`)) return;
+    if (flere) alle.forEach(r => { const p = $$(".price", r)[i]; if (p) p.remove(); });
+    li.remove();
+    if (list.children.length === 1) list.firstElementChild.remove(); // én størrelse igjen: da er det bare «Pris»
+    oppdaterKat(cat); endret();
+    const neste = list.children[Math.min(i, list.children.length - 1)];
+    (neste ? neste.querySelector(".s-name") : cat.querySelector(".add-size")).focus();
+    si(list.children.length ? "Størrelsen er slettet." : "Størrelsen er slettet. Rettene har nå én pris hver.");
+  } else if (b.classList.contains("mv-size")) {
+    const li = b.closest(".size"), i = Array.prototype.indexOf.call(li.parentNode.children, li);
+    if (i < 1) return;
+    li.previousElementSibling.before(li);
+    rader(cat, true).forEach(r => { const p = $$(".price", r); if (p[i] && p[i - 1]) p[i - 1].before(p[i]); });
+    oppdaterKat(cat); endret(); b.focus();
+    si("Størrelsen er flyttet opp.");
+  }
+});
+editor.addEventListener("input", e => {
+  const t = e.target, cat = t.closest(".cat");
+  fjernFeil(t);
+  if (cat && t.matches(".k-name, .s-name")) oppdaterKat(cat);
+  else if (t.matches(".r-name")) merkRett(t.closest(".item"));
+  endret();
+});
+editor.addEventListener("change", e => {
+  // «149,-» og «kr 149» skrives om til 149 når feltet forlates
+  if (e.target.matches(".r-price")) { const v = tilPris(e.target.value); if (v != null && !isNaN(v)) e.target.value = String(v); }
+  endret();
+});
+$("#tel").addEventListener("input", endret);
+$("#allergens").addEventListener("input", endret);
+$("#add-cat").addEventListener("click", () => {
+  const c = lagKat({ kategori: "", retter: [{}] });
+  c.open = true;
+  editor.appendChild(c);
+  oppdaterAlt();
+  c.querySelector(".k-name").focus({ preventScroll: true });
+  c.scrollIntoView({ block: "start", behavior: glatt() });
+  si("Ny kategori lagt til nederst. Skriv navnet.");
+});
+
+// «149», «149,-», «kr 149» og «1 490» godtas. Tomt felt gir null, alt som ikke er hele kroner gir NaN.
+function tilPris(s) {
+  const t = String(s).replace(/\s+/g, "").replace(/^kr\.?/i, "").replace(/(kr\.?|,-|\.-|[,.]00)$/i, "");
+  if (!t) return null;
+  return /^\d{1,7}$/.test(t) ? Number(t) : NaN;
+}
+
+// Leser skjemaet og bygger samme form som menyen på nettsiden (window.MENY_DATA).
+// streng = true (publisering): alt tas med, og første feil pekes ut, etter de samme grensene som databasen.
+// streng = false (meny.js): retter uten navn eller pris hoppes over, som før, og telles i utenPris.
+function collect(streng) {
+  let utenPris = 0, feil = null;
+  const galt = (el, msg, hvor) => { if (!feil) feil = { el: el, msg: msg, hvor: hvor }; };
+  const kats = $$(".cat", editor);
+  if (streng && !kats.length) galt($("#add-cat"), "Menyen må ha minst én kategori. Trykk «Legg til kategori».");
+  if (streng && kats.length > 40) galt(kats[40].querySelector(".k-name"), "Menyen kan ha høyst 40 kategorier. Slett eller slå sammen noen.");
+  const meny = [];
+  kats.forEach(cat => {
+    const kEl = cat.querySelector(".k-name"), kategori = kEl.value.trim(), kn = kategori || "Kategori uten navn";
+    if (streng) {
+      if (!kategori) galt(kEl, "Skriv navnet på kategorien.", kn);
+      else if (kategori.length > 60) galt(kEl, `Navnet er for langt. Bruk høyst 60 tegn (nå ${kategori.length}).`, kn);
+    }
+    const sEls = $$(".s-name", cat), sizes = sEls.map(i => i.value.trim());
+    // Har noen av størrelsene navn, må alle ha det. Har ingen navn (som i eldre menyfiler), lagres prisene uten størrelser.
+    if (streng && sizes.some(Boolean)) sEls.forEach((el, i) => { if (!sizes[i]) galt(el, "Gi størrelsen et navn, for eksempel Liten eller Stor.", kn); });
+    const retter = [];
+    $$(".item", cat).forEach(row => {
+      const nEl = row.querySelector(".r-name"), navn = nEl.value.trim();
+      const pEls = $$(".r-price", row), verdier = pEls.map(el => tilPris(el.value));
+      const dEl = row.querySelector(".r-desc"), tekst = dEl.value.trim();
+      const tag = row.querySelector(".r-tag").value;
       // Korte koder skrives med store bokstaver (g blir G). Hele navn står som de er skrevet.
       const allergener = row.querySelector(".r-al").value.split(/[,;]+/).map(x => x.trim()).filter(Boolean)
         .map(x => /^[a-zæøå]{1,3}$/i.test(x) ? x.toUpperCase() : x);
-      const tekst = row.querySelector(".r-desc").value.trim();
-      const tag = row.querySelector(".r-tag").value;
-      const r = { navn: navn, pris: pris };
+      if (streng) {
+        const hvor = navn ? kn + " › " + navn : kn;
+        if (!navn) galt(nEl, verdier.every(v => v == null) && !tekst ? "Retten er tom. Skriv navn og pris, eller slett retten." : "Skriv navnet på retten.", hvor);
+        else if (navn.length > 80) galt(nEl, `Navnet er for langt. Bruk høyst 80 tegn (nå ${navn.length}).`, hvor);
+        // Den første prisen må stå. Tomme felt til slutt er lov (retten finnes ikke i de siste størrelsene),
+        // men ikke foran en pris, for da havner prisene på feil størrelse.
+        const sist = verdier.reduce((n, v, i) => v != null ? i : n, 0);
+        pEls.forEach((el, i) => {
+          const v = verdier[i], hva = sizes.length ? "prisen for " + sNavn(sizes[i], i) : "prisen";
+          if (v == null) { if (i <= sist) galt(el, i ? `Skriv ${hva}. Bare de siste prisene kan stå tomme.` : `Skriv ${hva}.`, hvor); }
+          else if (isNaN(v)) galt(el, `Skriv ${hva} som et tall i hele kroner, for eksempel 149.`, hvor);
+          else if (v > 20000) galt(el, "Prisen kan ikke være over 20 000 kr.", hvor);
+        });
+        if (pEls.length > 6) galt(pEls[6], "En rett kan ha høyst 6 priser. Slett noen av størrelsene.", hvor);
+        if (tekst.length > 400) galt(dEl, `Beskrivelsen er for lang. Bruk høyst 400 tegn (nå ${tekst.length}).`, hvor);
+      }
+      const pris = verdier.filter(v => v != null && !isNaN(v));
+      if (!streng) { if (navn && !pris.length) utenPris++; if (!navn || !pris.length) return; }
+      const r = Object.assign({}, row._extra, { navn: navn });
       if (tekst) r.tekst = tekst;
+      r.pris = pris;
       if (allergener.length) r.allergener = allergener;
       if (tag) r.tag = tag;
-      if (navn && !pris.length) utenPris++;
-      return r;
-    }).filter(r => r.navn && r.pris.length);
-    const k = { kategori: cat.querySelector(".k-name").value.trim(), retter: retter };
-    if (sizes.length > 1) k.storrelser = sizes;
-    return k;
-  }).filter(k => k.kategori);
+      retter.push(r);
+    });
+    if (!streng && !kategori) return;
+    const k = Object.assign({}, cat._extra, { kategori: kategori });
+    if (sizes.length && sizes.every(Boolean)) k.storrelser = sizes;
+    k.retter = retter;
+    meny.push(k);
+  });
   // "G = Gluten (hvete, bygg), M = Melk": det deles bare på komma som står foran en ny "KODE ="
   const allergener = {};
   $("#allergens").value.split(/[,;\n](?=\s*[^,;=\n]{1,6}\s*=)/).forEach(part => {
@@ -442,26 +1040,255 @@ function collect() {
     const kode = i > 0 ? part.slice(0, i).trim() : "";
     if (kode) allergener[kode.toUpperCase()] = part.slice(i + 1).trim();
   });
-  const out = { meny: meny };
-  Object.defineProperty(out, "utenPris", { value: utenPris }); // vises som advarsel, kommer ikke med i filen
-  if (Object.keys(allergener).length) out.allergener = allergener;
-  if ($("#tel").value.trim()) out.telefon = $("#tel").value.trim();
-  return out;
+  const data = Object.assign({}, editor._extra, { meny: meny });
+  // Ved publisering sendes kodene alltid, også ingen, så eieren kan ta bort forklaringen på nettsiden
+  if (streng || Object.keys(allergener).length) data.allergener = allergener;
+  if ($("#tel").value.trim()) data.telefon = $("#tel").value.trim();
+  // Databasen tar under 300 000 byte. Utskrift med innrykk er alltid større enn databasens egen, så grensen holder.
+  if (streng && new Blob([JSON.stringify(data, null, 1)]).size >= 300000) galt(null, "Menyen er for stor til å lagres. Gjør noen av beskrivelsene kortere.");
+  return { data: data, feil: feil, utenPris: utenPris };
 }
+
+// ---------- Endret, publisert eller feil ----------
+function bilde() {
+  return JSON.stringify([$("#tel").value.trim(), $("#allergens").value.trim(), $$(".cat", editor).map(c =>
+    [c.querySelector(".k-name").value.trim(), storrelser(c), $$(".item", c).map(r => $$("input, textarea, select", r).map(x => x.value.trim()))])]);
+}
+const erEndret = () => lastet && bilde() !== grunnlag;
+function settGrunnlag() { grunnlag = bilde(); oppdaterBar(true); }
+let fast = false; // en melding (publisert eller feil) står til noe endres
+function settStatus(kind, tekst, html) {
+  const s = $("#pub-status");
+  const inn = (kind === "busy" ? '<span class="spinner" aria-hidden="true"></span>' : "") + "<span>" + esc(tekst) + (html || "") + "</span>";
+  if (s._sist !== inn) { s.innerHTML = inn; s._sist = inn; } // samme tekst leses ikke opp på nytt
+  s.className = "bar-status " + (kind || "");
+}
+function barMelding(kind, tekst, html) { fast = kind !== "busy"; settStatus(kind, tekst, html); }
+function oppdaterBar(nullstill) {
+  if (utenDb) return;
+  if (nullstill) fast = false;
+  const nytt = erEndret();
+  $("#publish").disabled = opptatt || !lastet || !(nytt || versjon === 0);
+  if (fast || opptatt) return;
+  if (nytt) settStatus("dirty", "Du har endringer som ikke er publisert.");
+  else if (versjon === 0) settStatus("dirty", "Menyen er ikke lagret i databasen ennå. Trykk «Publiser endringer» for å lagre den.");
+  else settStatus("", "Alt er publisert.");
+}
+function endret() {
+  oppdaterBar(true);
+  if ($("#backup").open) updateCode();
+}
+window.addEventListener("beforeunload", e => {
+  if (!utenDb && erEndret()) { e.preventDefault(); e.returnValue = ""; }
+});
+
+// Peker ut feltet med feil: åpner kategorien, setter fokus, ruller dit og skriver hva som mangler
+let feilNr = 0;
+function fjernFeil(el) {
+  if (!el || el.getAttribute("aria-invalid") !== "true") return;
+  el.removeAttribute("aria-invalid");
+  const p = document.getElementById(el.getAttribute("aria-describedby") || "");
+  if (p) p.remove();
+  el.removeAttribute("aria-describedby");
+}
+function visFeil(f) {
+  $$('[aria-invalid="true"]', editor).forEach(fjernFeil);
+  const el = f.el;
+  if (el) {
+    for (let d = el.closest("details"); d; d = d.parentElement && d.parentElement.closest("details")) d.open = true;
+    if (el.matches("input, textarea, select")) {
+      const p = document.createElement("p");
+      p.className = "field-err"; p.id = "feil-" + (++feilNr); p.textContent = f.msg;
+      (el.closest(".prices") || el.closest(".size-list") || el.closest("label") || el).after(p);
+      el.setAttribute("aria-invalid", "true"); el.setAttribute("aria-describedby", p.id);
+    }
+    el.focus({ preventScroll: true });
+    el.scrollIntoView({ block: "center", behavior: glatt() });
+  }
+  barMelding("error", (f.hvor ? f.hvor + ": " : "") + f.msg);
+}
+
+// ---------- 4. Publiser ----------
+const SE_SIDEN = ' <a href="./" target="_blank" rel="noopener">Se nettsiden</a>';
+let nyesteVersjon = 0; // versjonen i databasen da konflikten ble oppdaget
+// mot = versjonen det publiseres over. Bare «Publiser mine endringer likevel» gir en annen enn den skjemaet bygger på.
+async function publiser(mot) {
+  if (opptatt) return;
+  const s = collect(true);
+  if (s.feil) return visFeil(s.feil);
+  opptatt = true; oppdaterBar();
+  barMelding("busy", "Publiserer …");
+  $("#konflikt").hidden = true;
+  try {
+    const res = await rpc("owner_save", { p_code: kode, p_key: "meny", p_data: s.data, p_version: mot == null ? versjon : mot });
+    if (res && res.ok === true) {
+      versjon = Number(res.version) || versjon + 1;
+      publisert = new Date().toISOString();
+      $$(".gone", editor).forEach(g => g.remove());
+      opptatt = false;
+      oppdaterAlt(); settGrunnlag(); visPubInfo();
+      barMelding("ok", "Publisert. Nettsiden viser de nye prisene nå.", SE_SIDEN);
+      if ($("#history").open) hentHistorikk();
+      return;
+    }
+    const f = res && res.feil;
+    if (f === "kode") return utlogget("Eierkoden virker ikke lenger. Skriv inn koden på nytt. Endringene dine er tatt vare på.");
+    if (f === "konflikt") return visKonflikt(res.version);
+    barMelding("error", f === "ugyldig" ? "Databasen godtok ikke menyen. Sjekk at alle retter har navn og pris, og prøv igjen." : "Menyen ble ikke publisert. Prøv igjen.");
+  } catch (err) {
+    barMelding("error", feiltekst(err) + " Menyen er ikke publisert.");
+  } finally {
+    opptatt = false; oppdaterBar();
+    // Knappen var låst mens den publiserte, så fokus kan ha falt ut av siden
+    const a = document.activeElement, p = $("#publish");
+    if (!a || a === document.body || a === p) (p.disabled ? $("#pub-status a") || $("#pub-status") : p).focus();
+  }
+}
+$("#publish").addEventListener("click", () => publiser());
+// Ctrl+S (Cmd+S på Mac) publiserer, så tastaturet slipper å gå gjennom hele skjemaet til knappen nederst
+document.addEventListener("keydown", e => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || String(e.key).toLowerCase() !== "s" || utenDb || $("#bar").hidden) return;
+  e.preventDefault();
+  if (!$("#publish").disabled) publiser();
+  else if (!opptatt) si("Ingen endringer å publisere.");
+});
+// Noen har publisert fra et annet sted siden menyen ble hentet her.
+// sjekk = true: oppdaget da siden ble vist igjen, før eieren trykket «Publiser endringer».
+function visKonflikt(nv, sjekk) {
+  nyesteVersjon = Number(nv) || 0;
+  const k = $("#konflikt");
+  k.innerHTML = `<p><b>Menyen er endret et annet sted</b>, for eksempel på en annen telefon, etter at du åpnet den her. ${sjekk ? "Endringene dine her er ikke publisert ennå." : "Derfor ble endringene dine ikke publisert."}</p>
+    <p>Last inn den nyeste menyen og gjør endringene på nytt, eller publiser dine endringer likevel. Da forsvinner det som ble endret det andre stedet, fra nettsiden, men det ligger under «Tidligere versjoner».</p>
+    <div class="actions"><button type="button" class="btn btn-primary btn-small" id="hent-nyeste">Last inn den nyeste menyen</button><button type="button" class="btn btn-line btn-small" id="publiser-likevel">Publiser mine endringer likevel</button><button type="button" class="btn btn-line btn-small" id="lukk-konflikt">Ikke nå</button></div>`;
+  k.hidden = false;
+  $("#hent-nyeste").focus({ preventScroll: true }); // feltet som forlates, kan melde «endret»: meldingen settes etterpå
+  $("#bar").scrollTop = 0; // med stor tekst kan linjen bli like høy som skjermen: overskriften skal synes først
+  barMelding("error", sjekk ? "Menyen er endret et annet sted." : "Menyen ble ikke publisert.");
+}
+$("#konflikt").addEventListener("click", async e => {
+  if (e.target.closest("#lukk-konflikt")) { $("#konflikt").hidden = true; $("#publish").focus(); return; }
+  if (e.target.closest("#publiser-likevel")) {
+    if (!confirm("Publisere endringene dine likevel? Det som ble endret det andre stedet, forsvinner fra nettsiden.")) return;
+    return publiser(nyesteVersjon); // er det publisert på nytt i mellomtiden, kommer valget tilbake
+  }
+  const b = e.target.closest("#hent-nyeste"); if (!b) return;
+  b.disabled = true;
+  try {
+    await hentMeny();
+    $("#konflikt").hidden = true;
+    barMelding("ok", "Den nyeste menyen er lastet inn. Gjør endringene på nytt, og trykk «Publiser endringer».");
+    $("#menu-h").scrollIntoView({ behavior: glatt() });
+  } catch (err) { b.disabled = false; barMelding("error", "Fikk ikke hentet den nyeste menyen. " + feiltekst(err)); }
+});
+// Når siden vises igjen (en annen fane, telefonen låst opp), sjekkes det om menyen er publisert et annet sted.
+// Uten endringer her lastes den nyeste inn. Med endringer vises valget med en gang, ikke først ved publisering.
+let sjekker = false;
+async function sjekkNyere() {
+  if (sjekker || document.hidden || utenDb || !kode || !lastet || opptatt || $("#app").hidden) return;
+  sjekker = true;
+  try {
+    let rader;
+    try { rader = await rpc("get_site_content", {}); } catch (err) { return; } // prøves igjen neste gang siden vises
+    const rad = menyRad(rader), nv = rad ? Number(rad.version) || 0 : 0;
+    if (nv === versjon || opptatt || !$("#konflikt").hidden || $("#app").hidden) return;
+    if (erEndret()) return visKonflikt(nv, true);
+    await hentMeny(rader);
+    barMelding("ok", "Menyen er oppdatert fra et annet sted.");
+  } finally { sjekker = false; }
+}
+document.addEventListener("visibilitychange", sjekkNyere);
+window.addEventListener("pageshow", e => { if (e.persisted) sjekkNyere(); });
+
+// ---------- Tidligere versjoner ----------
+let historikk = [];
+const antallRetter = d => (d && Array.isArray(d.meny) ? d.meny : []).reduce((n, k) => n + (k && Array.isArray(k.retter) ? k.retter.length : 0), 0);
+$("#history").addEventListener("toggle", () => { if ($("#history").open) hentHistorikk(); });
+async function hentHistorikk(beskjed) {
+  const m = $("#hist-msg");
+  melding(m, "busy", "Henter tidligere versjoner …");
+  try {
+    const rows = await rpc("owner_history", { p_code: kode, p_key: "meny" });
+    historikk = Array.isArray(rows) ? rows : [];
+    // saved_at er når versjonen ble byttet ut av den neste, altså hvor lenge den lå ute
+    $("#hist-list").innerHTML = historikk.map(r => `<li><div><b>Versjon ${esc(r.version)}</b><span>Vist til ${esc(tid(r.saved_at))} · ${esc(antallRetter(r.data))} retter</span></div>
+      <button type="button" class="tbtn" data-restore="${esc(r.version)}" aria-label="Gjenopprett versjon ${esc(r.version)}">Gjenopprett</button></li>`).join("");
+    if (beskjed) melding(m, "ok", beskjed);
+    else if (historikk.length) m.hidden = true;
+    else melding(m, "", "Ingen tidligere versjoner ennå. De kommer her etter hvert som du publiserer.");
+  } catch (err) { melding(m, "error", feiltekst(err)); }
+}
+let sjekkerVersjon = false;
+$("#hist-list").addEventListener("click", async e => {
+  const b = e.target.closest("[data-restore]"); if (!b || sjekkerVersjon) return;
+  const v = Number(b.dataset.restore), r = historikk.find(x => Number(x.version) === v);
+  // Er menyen publisert et annet sted etter at den ble hentet her, sier bekreftelsen fra om det
+  let nv = versjon;
+  sjekkerVersjon = true;
+  try { const rad = menyRad(await rpc("get_site_content", {})); nv = rad ? Number(rad.version) || 0 : 0; } catch (err) {}
+  sjekkerVersjon = false;
+  const annet = nv !== versjon ? ` Obs: Menyen er publisert på nytt et annet sted (versjon ${nv}) etter at du åpnet den her. Gjenoppretter du versjon ${v}, forsvinner de endringene fra nettsiden.` : "";
+  if (!confirm(`Gjenopprette versjon ${v}${r ? " (vist til " + tid(r.saved_at) + ")" : ""}? Den vises på nettsiden med en gang.` + annet + (erEndret() ? " Endringene du ikke har publisert, går tapt." : ""))) {
+    if (annet) { await hentHistorikk(); const ny = $(`#hist-list [data-restore="${v}"]`); if (ny) ny.focus(); } // listen får med versjonen som ble byttet ut
+    return;
+  }
+  b.disabled = true;
+  melding($("#hist-msg"), "busy", "Gjenoppretter …");
+  try {
+    const res = await rpc("owner_restore", { p_code: kode, p_key: "meny", p_version: v });
+    if (res && res.ok === true) {
+      try { await hentMeny(); barMelding("ok", `Versjon ${v} er gjenopprettet. Nettsiden viser den nå.`, SE_SIDEN); }
+      catch (err) { barMelding("error", "Versjonen er gjenopprettet, men menyen kunne ikke hentes. Last siden på nytt."); }
+      return await hentHistorikk(`Versjon ${v} er gjenopprettet og publisert som versjon ${res.version}.`);
+    }
+    if (res && res.feil === "kode") return utlogget("Eierkoden virker ikke lenger. Skriv inn koden på nytt.");
+    melding($("#hist-msg"), "error", res && res.feil === "finnes_ikke" ? "Fant ikke den versjonen. Lukk og åpne listen for å hente den på nytt." : "Versjonen ble ikke gjenopprettet. Prøv igjen.");
+  } catch (err) { melding($("#hist-msg"), "error", feiltekst(err)); }
+  finally {
+    b.disabled = false;
+    // Knappen var låst, eller listen er tegnet på nytt: fokus til beskjeden, så det ikke havner øverst på siden
+    const a = document.activeElement;
+    if ((!a || a === document.body || a === b) && !$("#hist-msg").hidden) $("#hist-msg").focus();
+  }
+});
+
+// ---------- Bytt eierkode ----------
+$("#code-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const a = $("#new-code"), a2 = $("#new-code-2"), m = $("#code-msg"), ny = a.value.trim();
+  if (ny.length < 10) { melding(m, "error", "Den nye koden må ha minst 10 tegn."); return a.focus(); }
+  if (ny !== a2.value.trim()) { melding(m, "error", "Kodene er ikke like. Skriv den samme nye koden i begge feltene."); return a2.focus(); }
+  const btn = $("#code-btn"); btn.disabled = true;
+  melding(m, "busy", "Bytter kode …");
+  try {
+    const res = await rpc("owner_change_code", { p_code: kode, p_which: "eier", p_new: ny });
+    if (res && res.ok === true) {
+      const husk = huskes();
+      kode = ny; lagreKode(ny, husk);
+      a.value = ""; a2.value = "";
+      return melding(m, "ok", "Eierkoden er byttet. Bruk den nye koden neste gang du logger inn, også på andre enheter.");
+    }
+    const f = res && res.feil;
+    if (f === "kode") return utlogget("Eierkoden virker ikke lenger. Logg inn på nytt for å bytte kode.");
+    melding(m, "error", f === "kort" ? "Den nye koden må ha minst 10 tegn." : "Den nye koden kan ikke brukes. Prøv en annen.");
+  } catch (err) { melding(m, "error", feiltekst(err)); }
+  finally { btn.disabled = false; }
+});
+
+// ---------- Reservekopi (meny.js) ----------
 function fileText() {
-  return "/* Menyen til Kebab Corner Halden.\n   Laget på admin.html " + new Date().toLocaleDateString("nb-NO") + ". Last ned en ny fil der og bytt ut denne.\n   Finnes ikke filen, bruker siden menyen som står i index.html. */\nwindow.MENY_DATA = " + JSON.stringify(collect(), null, 2) + ";\n";
+  return "/* Menyen til Kebab Corner Halden.\n   Laget på admin.html " + new Date().toLocaleDateString("nb-NO") + ". Nettsiden bruker menyen i databasen når den finnes, ellers denne filen.\n   Finnes ikke filen heller, bruker siden menyen som står i index.html. */\nwindow.MENY_DATA = " + JSON.stringify(collect(false).data, null, 2) + ";\n";
 }
 function updateCode() {
-  const data = collect();
+  const data = collect(false);
   $("#code").value = fileText();
-  const retter = data.meny.reduce((n, k) => n + k.retter.length, 0);
+  const retter = data.data.meny.reduce((n, k) => n + k.retter.length, 0);
   const msg = [];
   if (data.utenPris) msg.push(data.utenPris === 1 ? "1 rett mangler pris og blir ikke med i filen." : data.utenPris + " retter mangler pris og blir ikke med i filen.");
   if (!retter) msg.push("Filen har ingen retter. Nettsiden viser da menyen den hadde fra før.");
   $("#dropped").textContent = msg.join(" ");
   $("#dropped").hidden = !msg.length;
 }
-
+$("#backup").addEventListener("toggle", () => { if ($("#backup").open) updateCode(); });
 $("#download").addEventListener("click", () => {
   const blob = new Blob([fileText()], { type: "text/javascript" });
   const a = document.createElement("a");
@@ -476,6 +1303,30 @@ $("#copy").addEventListener("click", async () => {
   catch (e) { const t = $("#code"); t.closest("details").open = true; t.select(); b.textContent = "Marker og kopier"; }
   setTimeout(() => { b.textContent = "Kopier"; }, 2000);
 });
+
+// ---------- Start ----------
+// Uten database.js: som før, med menyen fra meny.js i skjemaet og nedlasting av en ny fil.
+// nede = true: databasen finnes, men svarer ikke («Fortsett uten database»). Det gir ingen ny tilgang.
+function startUtenDb(nede) {
+  utenDb = true;
+  $("#login").hidden = true; $("#booting").hidden = true; $("#logout").hidden = true;
+  $("#bar").hidden = true; document.body.classList.remove("med-bar");
+  if (nede) $("#setup").innerHTML = "Databasen svarer ikke akkurat nå, så du kan ikke publisere herfra. Du kan likevel endre menyen og laste ned en ny <b>meny.js</b> nederst på siden. Skjemaet viser menyen i meny.js, som kan være eldre enn den på nettsiden. Når databasen svarer igjen, viser nettsiden menyen derfra. Last da denne siden på nytt og publiser endringene.";
+  $("#setup").hidden = false;
+  $("#lede").textContent = "Her endrer du priser, retter og kategorier, og laster ned en ny menyfil til nettsiden.";
+  $("#menu-hint").textContent = "Trykk på en kategori for å åpne den, og skriv rett i feltene. Når alt stemmer, laster du ned meny.js nederst og bytter ut filen på nettsiden.";
+  $("#backup-sum").textContent = "Last ned menyfilen (meny.js)";
+  $$("[data-db]").forEach(el => { el.hidden = true; });
+  $$("[data-uten-db]").forEach(el => { el.hidden = false; });
+  if (!lastet) lastInn(gyldigFil() ? window.MENY_DATA : null); // har skjemaet en meny fra før, beholdes den med endringene
+  settGrunnlag();
+  $("#photo").open = true; $("#backup").open = true;
+  updateCode();
+  $("#app").hidden = false;
+  if (nede) $("#setup").focus(); // knappen som ble trykket, er borte
+}
+if (!HAR_DB) startUtenDb();
+else { kode = lesKode(); if (kode) provLagretKode(); else visLogin(); }
 </script>
 </body>
 </html>
