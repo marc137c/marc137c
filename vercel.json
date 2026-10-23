@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
+    { "source": "/kjokken.html", "destination": "/", "statusCode": 301 },
+    { "source": "/kjokken", "destination": "/", "statusCode": 301 },
+    { "source": "/kebab-corner-halden/kjokken.html", "destination": "/", "statusCode": 301 },
+    { "source": "/kebab-corner-halden/kjokken", "destination": "/", "statusCode": 301 }
+  ],
+  "rewrites": [
+    { "source": "/", "destination": "/kebab-corner-halden/index.html" },
+    { "source": "/:path*", "destination": "/kebab-corner-halden/:path*" }
+  ]
+}
