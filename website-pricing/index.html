@@ -9,48 +9,73 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: a rate card. Option lists on the left, a sticky quote slip on the right; one column on phones with the total pinned to the bottom. */
+/* Layout: a dark fjord band carries the title and key rates. Below it, option panels with a sticky section menu on the left
+   and a ticket-style quote on the right. One column on phones, with the total pinned to the bottom. */
 :root {
-  --paper: #f2f5f5;
+  --paper: #edf2f1;
   --surface: #ffffff;
   --ink: #142028;
-  --muted: #586872;
-  --line: #d9e1e3;
-  --hover: #f0f5f4;
+  --muted: #566a70;
+  --line: #d6e0e0;
+  --hover: #f3f8f7;
   --accent: #0b6e66;
   --on-accent: #ffffff;
-  --tint: #e2f0ed;
+  --tint: #e0f0ec;
   --minus: #a8402c;
+  --band: #0e2e30;
+  --band-fg: #e9f4f2;
+  --band-muted: #a3c2bd;
+  --band-line: rgba(233, 244, 242, .12);
+  --band-accent: #74d6c8;
+  --ticket: #0b6e66;
+  --on-ticket: #ffffff;
+  --shadow: 0 1px 2px rgba(16, 40, 40, .06), 0 12px 32px -16px rgba(16, 40, 40, .28);
   --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
   --body: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
   --num: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #0d1417;
-    --surface: #141d21;
+    --paper: #0c1316;
+    --surface: #131c20;
     --ink: #e3eaec;
-    --muted: #8e9fa6;
-    --line: #25333a;
-    --hover: #172428;
+    --muted: #8fa1a8;
+    --line: #24323a;
+    --hover: #172227;
     --accent: #4cbfb2;
     --on-accent: #062320;
-    --tint: #11302c;
+    --tint: #10302c;
     --minus: #e88c76;
+    --band: #0a2326;
+    --band-fg: #e3f0ee;
+    --band-muted: #8fb3ad;
+    --band-line: rgba(227, 240, 238, .09);
+    --band-accent: #5fcdbf;
+    --ticket: #15514b;
+    --on-ticket: #e6f4f1;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 14px 36px -16px rgba(0, 0, 0, .7);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --paper: #0d1417;
-  --surface: #141d21;
+  --paper: #0c1316;
+  --surface: #131c20;
   --ink: #e3eaec;
-  --muted: #8e9fa6;
-  --line: #25333a;
-  --hover: #172428;
+  --muted: #8fa1a8;
+  --line: #24323a;
+  --hover: #172227;
   --accent: #4cbfb2;
   --on-accent: #062320;
-  --tint: #11302c;
+  --tint: #10302c;
   --minus: #e88c76;
+  --band: #0a2326;
+  --band-fg: #e3f0ee;
+  --band-muted: #8fb3ad;
+  --band-line: rgba(227, 240, 238, .09);
+  --band-accent: #5fcdbf;
+  --ticket: #15514b;
+  --on-ticket: #e6f4f1;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 14px 36px -16px rgba(0, 0, 0, .7);
   color-scheme: dark;
 }
 
@@ -62,6 +87,15 @@ body {
   color: var(--ink);
   font: 15px/1.5 var(--body);
   -webkit-font-smoothing: antialiased;
+  transition: background-color .25s, color .25s;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 10;
+  background: var(--paper);
 }
 button, input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -73,120 +107,281 @@ button, input, select, textarea { font: inherit; color: inherit; }
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 
-/* Header */
-.top { padding-block: 40px 28px; display: grid; gap: 10px; }
+/* ---------- Header band ---------- */
+.band { position: relative; overflow: hidden; background: var(--band); color: var(--band-fg); }
+.band::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-radial-gradient(circle at 94% 118%, transparent 0 21px, var(--band-line) 21px 22.5px);
+  -webkit-mask-image: radial-gradient(circle at 94% 118%, #000 12%, transparent 70%);
+  mask-image: radial-gradient(circle at 94% 118%, #000 12%, transparent 70%);
+}
+.band-in { position: relative; padding-block: 26px 34px; display: grid; gap: 14px; }
+.band-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .eyebrow {
   margin: 0;
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: .08em;
+  letter-spacing: .1em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--band-muted);
 }
 h1 {
-  margin: 0;
-  font: 700 clamp(32px, 5vw, 46px)/1.05 var(--display);
-  letter-spacing: -.02em;
+  margin: 6px 0 0;
+  font: 700 clamp(36px, 6.4vw, 60px)/1 var(--display);
+  letter-spacing: -.025em;
   text-wrap: balance;
 }
-.lede { margin: 0; max-width: 62ch; color: var(--muted); }
-code {
+.lede { margin: 0; max-width: 58ch; color: var(--band-muted); font-size: 16px; }
+.lede code {
   font-family: var(--num);
-  font-size: .88em;
-  background: var(--tint);
-  color: var(--ink);
-  padding: 1px 5px;
+  font-size: .86em;
+  background: var(--band-line);
+  color: var(--band-fg);
+  padding: 1px 6px;
   border-radius: 4px;
 }
+.facts { display: flex; flex-wrap: wrap; margin: 8px 0 0; padding: 0; }
+.facts div { display: grid; gap: 3px; padding: 2px 24px 2px 0; margin-right: 24px; border-right: 1px solid var(--band-line); }
+.facts div:last-child { border-right: 0; margin-right: 0; }
+.facts dt { font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--band-muted); }
+.facts dd { margin: 0; font: 500 19px/1.2 var(--num); font-variant-numeric: tabular-nums; color: var(--band-fg); white-space: nowrap; }
 
-/* Two columns */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 14px 5px 5px;
+  border-radius: 999px;
+  border: 1px solid var(--band-line);
+  background: transparent;
+  color: var(--band-fg);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.theme-toggle:hover { border-color: var(--band-muted); }
+.theme-toggle:focus-visible { outline-color: var(--band-accent); }
+.tt-track { position: relative; width: 40px; height: 24px; border-radius: 999px; background: var(--band-line); transition: background-color .2s; }
+.tt-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--band-fg);
+  transition: transform .2s ease, background-color .2s;
+}
+.tt-knob::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 6px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--band-accent);
+  opacity: 0;
+  transition: opacity .2s;
+}
+.theme-toggle[aria-pressed="true"] .tt-track { background: var(--band-accent); }
+.theme-toggle[aria-pressed="true"] .tt-knob { transform: translateX(16px); background: var(--band); }
+.theme-toggle[aria-pressed="true"] .tt-knob::after { opacity: 1; }
+
+/* ---------- Two columns ---------- */
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 48px;
+  grid-template-columns: minmax(0, 1fr) 370px;
+  gap: 44px;
   align-items: start;
-  padding-block: 8px 72px;
+  padding-block: 0 80px;
 }
-.picker { display: grid; gap: 44px; min-width: 0; }
-.sec { display: grid; gap: 14px; min-width: 0; }
-.sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-h2 { margin: 0; font: 600 23px/1.2 var(--display); letter-spacing: -.01em; }
+.picker, .stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; min-width: 0; }
+
+/* Section menu */
+.secnav {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 5;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  padding-block: 12px;
+  margin-bottom: -12px;
+  transition: background-color .25s;
+}
+.secnav ul { list-style: none; margin: 0; padding: 0; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.secnav ul::-webkit-scrollbar { display: none; }
+.secnav ul.more {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+}
+.secnav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color .15s, color .15s;
+}
+.secnav a:hover { color: var(--ink); background: var(--hover); }
+.secnav a.current { background: var(--ink); color: var(--paper); }
+.secnav .n {
+  font: 500 11px/1 var(--num);
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: var(--tint);
+  color: var(--accent);
+}
+.secnav .n:empty { display: none; }
+.secnav a.current .n { background: var(--accent); color: var(--on-accent); }
+
+.sec { display: grid; gap: 14px; min-width: 0; scroll-margin-top: 76px; }
+.sec-head { display: flex; align-items: center; gap: 12px; }
+.sec-icon {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--tint);
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+}
+.sec-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+h2 { flex: 1; margin: 0; font: 600 24px/1.2 var(--display); letter-spacing: -.01em; }
 .count {
   font-size: 12px;
   font-weight: 600;
   letter-spacing: .06em;
   text-transform: uppercase;
   color: var(--accent);
+  white-space: nowrap;
 }
 .sec-note { margin: 0; color: var(--muted); max-width: 65ch; }
 .num { font-family: var(--num); font-weight: 500; font-size: .93em; white-space: nowrap; color: var(--ink); }
 
-/* Packages */
+/* ---------- Packages ---------- */
 .pkgs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .pkg {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 16px 18px 18px;
+  gap: 8px;
+  padding: 18px 20px 20px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 14px;
   background: var(--surface);
   cursor: pointer;
-  transition: border-color .15s, background-color .15s;
+  transition: border-color .15s, background-color .15s, transform .15s, box-shadow .15s;
 }
-.pkg:hover { border-color: var(--muted); }
+.pkg:hover { border-color: var(--muted); transform: translateY(-1px); box-shadow: var(--shadow); }
 .pkg input { position: absolute; opacity: 0; pointer-events: none; }
 .pkg:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .pkg.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--tint); }
-.pkg-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.pkg-name { font: 600 17px/1.25 var(--display); }
-.pkg-pages { font-size: 12px; color: var(--muted); white-space: nowrap; }
-.pkg-price { font: 500 20px/1.2 var(--num); font-variant-numeric: tabular-nums; }
+.pkg-check {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  display: grid;
+  place-items: center;
+  transition: background-color .15s, border-color .15s;
+}
+.pkg-check::after {
+  content: "";
+  width: 10px;
+  height: 5px;
+  border-left: 2px solid var(--on-accent);
+  border-bottom: 2px solid var(--on-accent);
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+  transition: transform .15s;
+}
+.pkg.on .pkg-check { background: var(--accent); border-color: var(--accent); }
+.pkg.on .pkg-check::after { transform: translateY(-1px) rotate(-45deg) scale(1); }
+.pkg-name { font: 600 18px/1.25 var(--display); padding-right: 32px; }
+.pkg-price { font: 500 24px/1.15 var(--num); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.pkg-pages { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.glyphs { display: inline-flex; gap: 3px; }
+.glyphs i { display: block; width: 8px; height: 11px; border: 1.5px solid currentColor; border-radius: 2px; opacity: .65; }
+.pkg.on .glyphs { color: var(--accent); }
+.pkg.on .glyphs i { opacity: 1; }
 .pkg-desc { font-size: 13.5px; color: var(--muted); }
-.pkg-none { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); cursor: pointer; justify-self: start; }
+.pkg-none { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); cursor: pointer; justify-self: start; font-size: 14px; }
 .pkg-none input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
 
-/* Languages */
-.lang-main { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+/* ---------- Languages ---------- */
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
 .field-label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 select, input[type="text"], input[type="number"] {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 8px 10px;
+  border-radius: 9px;
+  padding: 9px 11px;
   min-width: 0;
+  transition: border-color .15s;
 }
+select:hover, input[type="text"]:hover, input[type="number"]:hover { border-color: var(--muted); }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip {
-  padding: 8px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 13px 5px 5px;
   border-radius: 999px;
   border: 1px solid var(--line);
   background: var(--surface);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color .15s, border-color .15s;
+  transition: background-color .15s, border-color .15s, color .15s;
 }
-.chip::before { content: "+ "; color: var(--muted); }
 .chip:hover { border-color: var(--muted); }
+.chip .code {
+  min-width: 28px;
+  padding: 4px 5px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font: 500 10.5px/1 var(--num);
+  letter-spacing: .04em;
+  text-align: center;
+  color: var(--muted);
+}
 .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-.chip[aria-pressed="true"]::before { content: "✓ "; color: inherit; }
+.chip[aria-pressed="true"] .code { border-color: currentColor; color: inherit; }
 .chip.primary, .chip.primary:hover { background: var(--tint); border-color: var(--accent); color: var(--ink); cursor: default; }
-.chip.primary::before { content: ""; }
-.chip.primary::after { content: " · main"; color: var(--muted); }
+.chip.primary .code { border-color: var(--accent); color: var(--accent); }
+.chip.primary::after { content: "main"; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
 .lang-calc { margin: 0; font-size: 13.5px; color: var(--muted); }
 
-/* Item rows */
-.items { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
-.items > li { border-bottom: 1px solid var(--line); }
+/* ---------- Item panels ---------- */
+.items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.items > li + li { border-top: 1px solid var(--line); }
 .item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 8.5rem 6.75rem;
   grid-template-areas: "text price ctl";
   gap: 4px 20px;
   align-items: center;
-  padding: 14px 12px;
+  padding: 15px 18px;
   transition: background-color .15s;
 }
 label.item { cursor: pointer; }
@@ -204,8 +399,37 @@ label.item.off, label.item.inc { cursor: default; }
 .inc .amt { text-decoration: line-through; color: var(--muted); }
 .per { font-size: 12px; color: var(--muted); }
 .ctl { grid-area: ctl; justify-self: end; display: inline-flex; align-items: center; }
-.ctl input[type="checkbox"] { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); cursor: inherit; }
-.stepper { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+
+.check {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  border: 1.5px solid var(--muted);
+  border-radius: 6px;
+  background: var(--surface);
+  display: grid;
+  place-content: center;
+  cursor: inherit;
+  transition: background-color .15s, border-color .15s;
+}
+.check::after {
+  content: "";
+  width: 11px;
+  height: 6px;
+  border-left: 2px solid var(--on-accent);
+  border-bottom: 2px solid var(--on-accent);
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+  transition: transform .15s;
+}
+.check:checked { background: var(--accent); border-color: var(--accent); }
+.check:checked::after { transform: translateY(-1px) rotate(-45deg) scale(1); }
+.check.sm { width: 18px; height: 18px; border-radius: 5px; }
+.check.sm::after { width: 9px; height: 5px; }
+
+.stepper { border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
 .stepper button {
   width: 32px;
   height: 34px;
@@ -214,9 +438,9 @@ label.item.off, label.item.inc { cursor: default; }
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
-  border-radius: 7px;
+  border-radius: 8px;
 }
-.stepper button:hover:not(:disabled) { background: var(--hover); }
+.stepper button:hover:not(:disabled) { background: var(--hover); color: var(--accent); }
 .stepper button:disabled { cursor: default; }
 .stepper input {
   width: 2.75rem;
@@ -232,18 +456,19 @@ label.item.off, label.item.inc { cursor: default; }
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
-/* Adjustments */
-.adjust { display: grid; gap: 14px; }
+/* ---------- Adjustments ---------- */
+.adjust { display: grid; gap: 14px; padding: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
 .money { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
 .money input { width: 7rem; font-family: var(--num); color: var(--ink); }
 .discount input { width: 5rem; }
 .clines { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.clines:empty { display: none; }
 .cline { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
 .x {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--surface);
   font-size: 18px;
   line-height: 1;
@@ -251,74 +476,71 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   cursor: pointer;
 }
 .x:hover { color: var(--minus); border-color: var(--minus); }
-
-/* Quote slip */
-.quote {
-  position: sticky;
-  top: calc(env(safe-area-inset-top, 0px) + 20px);
-  max-height: calc(100vh - 40px - env(safe-area-inset-top, 0px));
-  overflow: auto;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 22px;
-  display: grid;
-  gap: 18px;
-  scroll-margin-top: 16px;
-}
-.q-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-.q-date { font: 400 12px/1 var(--num); color: var(--muted); }
-.field { display: grid; gap: 6px; }
-.field input { width: 100%; }
-.example {
-  margin: 0;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--tint);
-  font-size: 13px;
-}
-.q-sub {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.qlines { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.qline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 12px; align-items: baseline; }
-.qline .lab { font-weight: 500; min-width: 0; }
-.qline .det { grid-column: 1; font-size: 12.5px; color: var(--muted); }
-.qamt { font-family: var(--num); font-size: 13.5px; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
-.qempty { color: var(--muted); font-size: 13.5px; }
-.sums { display: grid; gap: 6px; padding-top: 14px; border-top: 1px dashed var(--line); }
-.sum { display: flex; justify-content: space-between; gap: 12px; }
-.sum.minus .qamt { color: var(--minus); }
-.vat-toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13.5px; }
-.vat-toggle input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
-.grand { display: grid; gap: 2px; padding-top: 12px; border-top: 2px solid var(--ink); }
-.grand-amt {
-  font: 700 38px/1.1 var(--display);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -.02em;
-}
-.grand-note { font-size: 12.5px; color: var(--muted); }
-.ongoing { display: grid; gap: 10px; padding-top: 14px; border-top: 1px dashed var(--line); }
-.actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .btn {
   padding: 11px 16px;
-  border-radius: 9px;
+  border-radius: 10px;
   border: 1px solid var(--line);
   background: var(--surface);
   font-weight: 600;
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
+  transition: border-color .15s, filter .15s;
 }
 .btn:hover { border-color: var(--ink); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .btn.primary:hover { filter: brightness(1.08); }
 .btn.armed { border-color: var(--minus); color: var(--minus); }
+.foot { margin: 0; font-size: 13px; color: var(--muted); max-width: 65ch; }
+
+/* ---------- Quote ticket ---------- */
+.quote {
+  position: sticky;
+  top: calc(env(safe-area-inset-top, 0px) + 20px);
+  margin-top: 20px;
+  max-height: calc(100vh - 40px - env(safe-area-inset-top, 0px));
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  scroll-margin-top: 16px;
+}
+.q-band {
+  display: grid;
+  gap: 2px;
+  padding: 20px 22px 30px;
+  background: var(--ticket);
+  color: var(--on-ticket);
+  -webkit-mask: radial-gradient(circle at 8px 100%, transparent 5.5px, #000 6px) 0 0 / 16px 100% repeat-x;
+  mask: radial-gradient(circle at 8px 100%, transparent 5.5px, #000 6px) 0 0 / 16px 100% repeat-x;
+  transition: background-color .25s;
+}
+.q-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+.q-head h2 { font: 600 13px/1 var(--body); letter-spacing: .12em; text-transform: uppercase; }
+.q-date { font: 12px/1 var(--num); opacity: .8; }
+.grand-label { font-size: 13px; opacity: .85; }
+.grand-amt { font: 700 46px/1.05 var(--display); font-variant-numeric: tabular-nums; letter-spacing: -.025em; }
+.grand-note { font-size: 13px; opacity: .85; }
+.q-body { display: grid; gap: 18px; padding: 18px 22px 22px; }
+.field { display: grid; gap: 6px; }
+.field input { width: 100%; }
+.example { margin: 0; padding: 10px 12px; border-radius: 9px; background: var(--tint); font-size: 13px; }
+.q-sub { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.qgroup { display: grid; gap: 10px; }
+.qlines { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.qline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 12px; align-items: baseline; }
+.qline .lab { font-weight: 500; min-width: 0; }
+.qline .det { grid-column: 1; font-size: 12.5px; color: var(--muted); }
+.qamt { font-family: var(--num); font-size: 13.5px; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.qempty { color: var(--muted); font-size: 13.5px; }
+.sums { display: grid; gap: 6px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.sums:empty { display: none; }
+.sum { display: flex; justify-content: space-between; gap: 12px; }
+.sum.minus .qamt { color: var(--minus); }
+.sum.strong { font-weight: 600; }
+.vat-toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13.5px; justify-self: start; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .status { margin: 0; font-size: 13px; color: var(--muted); min-height: 1.5em; }
 .copy-fallback {
   width: 100%;
@@ -326,21 +548,20 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   font: 12.5px/1.5 var(--num);
   background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 9px;
   padding: 10px;
 }
-.foot { margin: 0; font-size: 13px; color: var(--muted); max-width: 65ch; }
 
-/* Phone total bar */
+/* ---------- Phone total bar ---------- */
 .mbar { display: none; }
 
 @media (max-width: 1100px) {
-  .layout { grid-template-columns: minmax(0, 1fr) 320px; gap: 32px; }
+  .layout { grid-template-columns: minmax(0, 1fr) 330px; gap: 32px; }
 }
 @media (max-width: 900px) {
   .layout { grid-template-columns: minmax(0, 1fr); }
-  .quote { position: static; max-height: none; overflow: visible; }
-  body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+  .quote { position: static; max-height: none; overflow: visible; margin-top: 0; }
+  body { padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)); }
   .mbar {
     display: block;
     position: fixed;
@@ -348,39 +569,42 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
     right: 0;
     bottom: 0;
     z-index: 20;
-    background: var(--ink);
-    color: var(--paper);
+    background: var(--band);
+    color: var(--band-fg);
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-shadow: 0 -8px 24px -12px rgba(0, 0, 0, .35);
     transition: transform .2s ease;
   }
   .quote-visible .mbar { transform: translateY(110%); }
-  .mbar-in { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 10px; }
+  .mbar-in { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 11px; }
   .mbar-total { display: grid; line-height: 1.2; }
-  .mbar-total b { font: 700 20px/1.2 var(--display); font-variant-numeric: tabular-nums; }
-  .mbar-total span { font-size: 12px; opacity: .75; }
+  .mbar-total b { font: 700 21px/1.2 var(--display); font-variant-numeric: tabular-nums; }
+  .mbar-total span { font-size: 12px; color: var(--band-muted); }
   .mbar a {
-    color: var(--paper);
+    color: var(--band); background: var(--band-accent);
     font-weight: 600;
     font-size: 14px;
-    padding: 9px 14px;
-    border: 1px solid currentColor;
-    border-radius: 9px;
+    padding: 10px 16px;
+    border-radius: 10px;
     text-decoration: none;
     white-space: nowrap;
   }
 }
 @media (max-width: 560px) {
+  .facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .facts div { border-right: 0; margin-right: 0; padding: 0; }
   .pkgs { grid-template-columns: minmax(0, 1fr); }
   .item {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas: "text ctl" "price ctl";
     gap: 6px 16px;
-    padding-inline: 8px;
+    padding-inline: 14px;
   }
   .item-price { justify-items: start; text-align: left; grid-auto-flow: column; justify-content: start; gap: 8px; align-items: baseline; }
   .cline { grid-template-columns: minmax(0, 1fr) auto; }
   .cline .money { grid-row: 2; }
   .cline .x { grid-row: 1 / span 2; grid-column: 2; }
+  .grand-amt { font-size: 40px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; }
@@ -389,26 +613,40 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 </head>
 <body>
 
-<header class="top wrap">
-  <p class="eyebrow">Internal · NOK eks. mva · <span id="updated"></span></p>
-  <h1>Website price list</h1>
-  <p class="lede">Tick what the client wants and the quote adds it up. To change a price, edit the <code>PRICES</code> list at the top of the script in this file.</p>
+<header class="band">
+  <div class="wrap band-in">
+    <div class="band-top">
+      <p class="eyebrow">Internal price list · NOK eks. mva · <span id="updated"></span></p>
+      <button type="button" class="theme-toggle" id="theme" aria-pressed="false" title="Preview the night mode we sell as an add-on">
+        <span class="tt-track" aria-hidden="true"><span class="tt-knob"></span></span>Night mode
+      </button>
+    </div>
+    <h1>Website price list</h1>
+    <p class="lede">Tick what the client wants and the quote adds it up. To change a price, edit the <code>PRICES</code> list at the top of the script in this file.</p>
+    <dl class="facts">
+      <div><dt>Packages from</dt><dd id="f-from"></dd></div>
+      <div><dt>Extra language</dt><dd id="f-lang"></dd></div>
+      <div id="f-dark-wrap"><dt>Night mode</dt><dd id="f-dark"></dd></div>
+      <div id="f-hour-wrap"><dt>Hourly rate</dt><dd id="f-hour"></dd></div>
+    </dl>
+  </div>
 </header>
 
 <main class="wrap layout">
   <div class="picker">
+    <nav class="secnav" aria-label="Sections"><ul id="secnav"></ul></nav>
 
-    <section class="sec" aria-labelledby="h-pkg">
-      <div class="sec-head"><h2 id="h-pkg">Package</h2></div>
+    <section class="sec" id="sec-pkg" aria-labelledby="h-pkg">
+      <div class="sec-head"><span class="sec-icon" data-icon="layers"></span><h2 id="h-pkg">Package</h2></div>
       <p class="sec-note">The base price for design and build. Extra pages and languages below are added on top.</p>
       <div class="pkgs" id="packages"></div>
       <label class="pkg-none" for="pkg-none"><input type="radio" name="pkg" id="pkg-none" value="none">No package, only add-ons or ongoing services</label>
     </section>
 
-    <section class="sec" aria-labelledby="h-lang">
-      <div class="sec-head"><h2 id="h-lang">Languages</h2><span class="count" id="lang-count"></span></div>
+    <section class="sec" id="sec-lang" aria-labelledby="h-lang">
+      <div class="sec-head"><span class="sec-icon" data-icon="globe"></span><h2 id="h-lang">Languages</h2><span class="count" id="lang-count"></span></div>
       <p class="sec-note" id="lang-note"></p>
-      <div class="lang-main">
+      <div class="row">
         <label class="field-label" for="primary">Main language</label>
         <select id="primary"></select>
       </div>
@@ -422,21 +660,21 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
               <span class="item-desc">Leave this off if the client sends finished translations.</span>
             </span>
             <span class="item-price"><span class="amt" id="translate-price"></span><span class="per">per page, per language</span></span>
-            <span class="ctl"><input type="checkbox" id="translate"></span>
+            <span class="ctl"><input type="checkbox" class="check" id="translate"></span>
           </label>
         </li>
       </ul>
       <p class="lang-calc" id="translate-note"></p>
     </section>
 
-    <div id="groups" class="picker"></div>
+    <div id="groups" class="stack"></div>
 
-    <section class="sec" aria-labelledby="h-adjust">
-      <div class="sec-head"><h2 id="h-adjust">Adjustments</h2></div>
+    <section class="sec" id="sec-adjust" aria-labelledby="h-adjust">
+      <div class="sec-head"><span class="sec-icon" data-icon="sliders"></span><h2 id="h-adjust">Adjustments</h2></div>
       <div class="adjust">
-        <div class="lang-main discount">
+        <div class="row discount">
           <label class="field-label" for="discount">Discount on one-time price</label>
-          <span class="money"><input type="number" id="discount" min="0" max="100" step="1" inputmode="numeric"><span>%</span></span>
+          <span class="money"><input type="number" id="discount" min="0" max="100" step="1" inputmode="numeric" placeholder="0"><span>%</span></span>
         </div>
         <div class="field-label">Custom lines</div>
         <ul class="clines" id="custom"></ul>
@@ -448,52 +686,56 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   </div>
 
   <aside class="quote" id="quote" aria-labelledby="h-quote">
-    <div class="q-head"><h2 id="h-quote">Quote</h2><span class="q-date" id="q-date"></span></div>
-    <p class="example" id="example" hidden>This is an example quote. Press Clear to start a new one.</p>
-    <div class="field">
-      <label class="field-label" for="client">Client or project</label>
-      <input type="text" id="client" placeholder="e.g. Fjordkafé AS" autocomplete="off">
-    </div>
-
-    <p class="q-sub">One-time</p>
-    <ul class="qlines" id="qlines"></ul>
-
-    <div class="sums">
-      <div class="sum" id="row-sub"><span>Subtotal</span><span class="qamt" id="t-sub"></span></div>
-      <div class="sum minus" id="row-discount"><span id="t-discount-label"></span><span class="qamt" id="t-discount"></span></div>
-      <div class="sum" id="row-net"><span>Total eks. mva</span><span class="qamt" id="t-net"></span></div>
-      <div class="sum" id="row-vat"><span>MVA 25%</span><span class="qamt" id="t-vat"></span></div>
-      <label class="vat-toggle" for="vat"><input type="checkbox" id="vat">Add 25% MVA</label>
-    </div>
-
-    <div class="grand">
-      <span class="q-sub" id="grand-label"></span>
+    <div class="q-band">
+      <div class="q-head"><h2 id="h-quote">Quote</h2><span class="q-date" id="q-date"></span></div>
+      <span class="grand-label" id="grand-label"></span>
       <span class="grand-amt" id="t-total"></span>
+      <span class="grand-note" id="grand-note"></span>
     </div>
-
-    <div class="ongoing">
-      <p class="q-sub">Ongoing, eks. mva</p>
-      <ul class="qlines" id="olines"></ul>
-      <div class="sums" id="o-sums">
-        <div class="sum" id="row-month"><span>Per month</span><span class="qamt" id="t-month"></span></div>
-        <div class="sum" id="row-year"><span>Per year</span><span class="qamt" id="t-year"></span></div>
-        <div class="sum"><span id="first-year-label"></span><span class="qamt" id="t-first-year"></span></div>
+    <div class="q-body">
+      <p class="example" id="example" hidden>This is an example quote. Press Clear to start a new one.</p>
+      <div class="field">
+        <label class="field-label" for="client">Client or project</label>
+        <input type="text" id="client" placeholder="e.g. Fjordkafé AS" autocomplete="off">
       </div>
-    </div>
 
-    <div class="actions">
-      <button type="button" class="btn primary" id="copy">Copy quote as text</button>
-      <button type="button" class="btn" id="clear">Clear</button>
+      <div class="qgroup">
+        <p class="q-sub">One-time</p>
+        <ul class="qlines" id="qlines"></ul>
+        <div class="sums">
+          <div class="sum" id="row-sub"><span>Subtotal</span><span class="qamt" id="t-sub"></span></div>
+          <div class="sum minus" id="row-discount"><span id="t-discount-label"></span><span class="qamt" id="t-discount"></span></div>
+          <div class="sum" id="row-net"><span>Total eks. mva</span><span class="qamt" id="t-net"></span></div>
+          <div class="sum" id="row-vat"><span>MVA 25%</span><span class="qamt" id="t-vat"></span></div>
+          <div class="sum strong" id="row-gross"><span>Total inkl. mva</span><span class="qamt" id="t-gross"></span></div>
+          <label class="vat-toggle" for="vat"><input type="checkbox" class="check sm" id="vat">Add 25% MVA</label>
+        </div>
+      </div>
+
+      <div class="qgroup">
+        <p class="q-sub">Ongoing, eks. mva</p>
+        <ul class="qlines" id="olines"></ul>
+        <div class="sums" id="o-sums">
+          <div class="sum" id="row-month"><span>Per month</span><span class="qamt" id="t-month"></span></div>
+          <div class="sum" id="row-year"><span>Per year</span><span class="qamt" id="t-year"></span></div>
+          <div class="sum strong"><span id="first-year-label"></span><span class="qamt" id="t-first-year"></span></div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="btn primary" id="copy">Copy quote as text</button>
+        <button type="button" class="btn" id="clear">Clear</button>
+      </div>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+      <textarea class="copy-fallback" id="copy-fallback" readonly hidden aria-label="Quote text"></textarea>
     </div>
-    <p class="status" id="status" role="status" aria-live="polite"></p>
-    <textarea class="copy-fallback" id="copy-fallback" readonly hidden aria-label="Quote text"></textarea>
   </aside>
 </main>
 
 <div class="mbar" aria-hidden="true">
   <div class="wrap mbar-in">
     <span class="mbar-total"><b id="m-total"></b><span id="m-sub"></span></span>
-    <a href="#quote" tabindex="-1">See quote</a>
+    <a href="#quote" data-target="quote" tabindex="-1">See quote</a>
   </div>
 </div>
 
@@ -541,7 +783,7 @@ const PRICES = {
   },
   groups: [
     {
-      id: 'features', title: 'Features', items: [
+      id: 'features', title: 'Features', icon: 'toggle', items: [
         { id: 'dark', name: 'Night mode', price: 2500, desc: 'Dark theme with a light/dark switch. Follows the visitor’s phone or computer setting and remembers their choice.' },
         { id: 'contact', name: 'Contact form', price: 1500, desc: 'Sends enquiries to the client’s email, with spam protection.' },
         { id: 'booking', name: 'Booking system', price: 5000, desc: 'Visitors book appointments or tables online, synced to a calendar.' },
@@ -560,7 +802,7 @@ const PRICES = {
       ],
     },
     {
-      id: 'content', title: 'Content and branding', items: [
+      id: 'content', title: 'Content and branding', short: 'Content', icon: 'pen', items: [
         { id: 'logo', name: 'Logo design', price: 4000, desc: 'Three concepts, two rounds of changes, files for web and print.' },
         { id: 'brand', name: 'Colours and fonts guide', price: 2000, desc: 'One-page guide the client can reuse for social media and print.' },
         { id: 'copy', name: 'Copywriting', price: 1200, qty: true, unit: 'page', desc: 'We write the text.' },
@@ -569,7 +811,7 @@ const PRICES = {
       ],
     },
     {
-      id: 'tech', title: 'Technical and launch', items: [
+      id: 'tech', title: 'Technical and launch', short: 'Technical', icon: 'code', items: [
         { id: 'seo', name: 'SEO setup', price: 2500, desc: 'Page titles and descriptions, sitemap and Google Search Console.' },
         { id: 'gbp', name: 'Google Business Profile', price: 1000, desc: 'Set up or tidy the listing that shows in Google Search and Maps.' },
         { id: 'analytics', name: 'Visitor statistics', price: 1000, desc: 'Google Analytics or Plausible, with a short how-to for the client.' },
@@ -580,13 +822,13 @@ const PRICES = {
       ],
     },
     {
-      id: 'other', title: 'Other work', items: [
+      id: 'other', title: 'Other work', short: 'Other', icon: 'clock', items: [
         { id: 'hours', name: 'Extra work', price: 750, qty: true, unit: 'hour', desc: 'Anything not on this list, at the hourly rate.' },
         { id: 'rush', name: 'Rush delivery', percent: 25, desc: 'Launch within 2 weeks. Adds a percentage to the one-time price.' },
       ],
     },
     {
-      id: 'ongoing', title: 'Ongoing services', note: 'Billed monthly or yearly. Not part of the one-time price.', items: [
+      id: 'ongoing', title: 'Ongoing services', short: 'Ongoing', icon: 'repeat', note: 'Billed monthly or yearly. Not part of the one-time price.', items: [
         { id: 'hosting', name: 'Hosting', price: 150, period: 'month', desc: 'Fast hosting with SSL and daily backups.' },
         { id: 'maint', name: 'Maintenance and small edits', price: 500, period: 'month', desc: 'Updates, security checks and up to 30 minutes of edits each month.' },
         { id: 'mailbox', name: 'Email account', price: 75, period: 'month', qty: true, unit: 'mailbox', desc: 'Google Workspace or similar.' },
@@ -608,6 +850,19 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const toQty = v => Math.max(0, Math.min(999, Math.floor(Number(v) || 0)));
 const toPct = v => Math.max(0, Math.min(100, Number(v) || 0));
 const PERIOD = { month: 'monthly', year: 'yearly' };
+const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const ICONS = {
+  layers: '<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3Z"/>',
+  toggle: '<rect x="2" y="7" width="20" height="10" rx="5"/><circle cx="16" cy="12" r="2.5"/>',
+  pen: '<path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/>',
+  code: '<path d="m8 8-4 4 4 4"/><path d="m16 8 4 4-4 4"/><path d="m13.5 5-3 14"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  repeat: '<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20v-4h-4"/>',
+  sliders: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+};
+const icon = name => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ICONS.layers}</svg>`;
 
 const ITEMS = Object.fromEntries(PRICES.groups.flatMap(g => g.items).map(it => [it.id, it]));
 const LANGS = Object.fromEntries(PRICES.languages.list.map(l => [l.id, l]));
@@ -616,6 +871,7 @@ const PKGS = Object.fromEntries(PRICES.packages.map(p => [p.id, p]));
 const EMPTY = { pkg: 'none', primary: 'nb', langs: [], translate: true, items: {}, discount: 0, custom: [], vat: true, client: '' };
 const EXAMPLE = { ...EMPTY, pkg: 'basic', langs: ['en'], items: { dark: 1, contact: 1, seo: 1, hosting: 1, maint: 1, domainyr: 1 } };
 const KEY = 'website-price-list:v1';
+const THEME_KEY = 'website-price-list:theme';
 
 let isExample = false;
 let state = load();
@@ -734,17 +990,36 @@ function itemRow(it) {
         <button type="button" data-step="1" data-id="${it.id}" aria-label="More: ${esc(it.name)}">+</button>
       </span></div></li>`;
   }
-  return `<li><label class="item" data-item="${it.id}" for="c-${it.id}">${text}${price}<span class="ctl"><input type="checkbox" id="c-${it.id}" data-check="${it.id}"></span></label></li>`;
+  return `<li><label class="item" data-item="${it.id}" for="c-${it.id}">${text}${price}<span class="ctl"><input type="checkbox" class="check" id="c-${it.id}" data-check="${it.id}"></span></label></li>`;
 }
 
 function renderPicker() {
   const L = PRICES.languages;
   $('#updated').textContent = PRICES.updated;
+  $('#f-from').textContent = kr(Math.min(...PRICES.packages.map(p => p.price)));
+  $('#f-lang').textContent = kr(L.perLanguage);
+  $('#f-dark-wrap').hidden = !ITEMS.dark;
+  if (ITEMS.dark) $('#f-dark').textContent = kr(ITEMS.dark.price);
+  $('#f-hour-wrap').hidden = !ITEMS.hours;
+  if (ITEMS.hours) $('#f-hour').textContent = kr(ITEMS.hours.price);
+
+  document.querySelectorAll('[data-icon]').forEach(el => { el.innerHTML = icon(el.dataset.icon); });
+
+  const nav = [
+    { id: 'pkg', label: 'Package' },
+    { id: 'lang', label: 'Languages' },
+    ...PRICES.groups.map(g => ({ id: g.id, label: g.short || g.title })),
+    { id: 'adjust', label: 'Adjustments' },
+  ];
+  $('#secnav').innerHTML = nav.map(n => `<li><a href="#sec-${n.id}" data-target="sec-${n.id}">${esc(n.label)}<b class="n" id="n-${n.id}"></b></a></li>`).join('');
+
   $('#packages').innerHTML = PRICES.packages.map(p => `
     <label class="pkg" for="pkg-${p.id}">
       <input type="radio" name="pkg" id="pkg-${p.id}" value="${p.id}">
-      <span class="pkg-top"><span class="pkg-name">${esc(p.name)}</span><span class="pkg-pages">${plural(p.pages, 'page', 'pages')}</span></span>
+      <span class="pkg-check" aria-hidden="true"></span>
+      <span class="pkg-name">${esc(p.name)}</span>
       <span class="pkg-price">${kr(p.price)}</span>
+      <span class="pkg-pages"><span class="glyphs" aria-hidden="true">${'<i></i>'.repeat(Math.min(p.pages, 10))}</span>${plural(p.pages, 'page', 'pages')} included</span>
       <span class="pkg-desc">${esc(p.desc)}</span>
     </label>`).join('');
 
@@ -752,12 +1027,12 @@ function renderPicker() {
   $('#lang-note').innerHTML = `The main language is included. Each extra language adds a language switcher and a full copy of the site for <span class="num">${kr(L.perLanguage)}</span> per language.`
     + (rtlNames ? ` ${esc(rtlNames)} also needs a right-to-left layout: <span class="num">${kr(L.rtlLayout)}</span>.` : '');
   $('#primary').innerHTML = L.list.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('');
-  $('#chips').innerHTML = L.list.map(l => `<button type="button" class="chip" id="lang-${l.id}" data-lang="${l.id}" aria-pressed="false">${esc(l.name)}</button>`).join('');
+  $('#chips').innerHTML = L.list.map(l => `<button type="button" class="chip" id="lang-${l.id}" data-lang="${l.id}" aria-pressed="false"><span class="code" aria-hidden="true">${esc(l.id.toUpperCase())}</span>${esc(l.name)}</button>`).join('');
   $('#translate-price').textContent = kr(L.translatePerPage);
 
   $('#groups').innerHTML = PRICES.groups.map(g => `
-    <section class="sec" aria-labelledby="h-${g.id}">
-      <div class="sec-head"><h2 id="h-${g.id}">${esc(g.title)}</h2><span class="count" id="count-${g.id}"></span></div>
+    <section class="sec" id="sec-${g.id}" aria-labelledby="h-${g.id}">
+      <div class="sec-head"><span class="sec-icon">${icon(g.icon)}</span><h2 id="h-${g.id}">${esc(g.title)}</h2><span class="count" id="count-${g.id}"></span></div>
       ${g.note ? `<p class="sec-note">${esc(g.note)}</p>` : ''}
       <ul class="items">${g.items.map(itemRow).join('')}</ul>
     </section>`).join('');
@@ -783,6 +1058,7 @@ function sync() {
     input.closest('.pkg').classList.toggle('on', input.checked);
   }
   $('#pkg-none').checked = state.pkg === 'none';
+  $('#n-pkg').textContent = PKGS[state.pkg] ? '✓' : '';
 
   $('#primary').value = state.primary;
   for (const l of PRICES.languages.list) {
@@ -795,6 +1071,7 @@ function sync() {
   const extra = extraLangs();
   const pages = pageCount();
   $('#lang-count').textContent = extra.length ? `${extra.length} extra` : '';
+  $('#n-lang').textContent = extra.length ? `+${extra.length}` : '';
   $('#translate').checked = state.translate;
   $('#translate-row').classList.toggle('on', state.translate && extra.length > 0);
   $('#translate-note').textContent = !extra.length
@@ -829,12 +1106,30 @@ function sync() {
       }
     }
     $('#count-' + g.id).textContent = picked ? `${picked} selected` : '';
+    $('#n-' + g.id).textContent = picked || '';
   }
+  const adjustments = (state.discount ? 1 : 0) + state.custom.length;
+  $('#n-adjust').textContent = adjustments || '';
 
   setValue($('#discount'), state.discount || '');
   setValue($('#client'), state.client);
   $('#vat').checked = state.vat;
   $('#example').hidden = !isExample;
+}
+
+const tweens = new Map();
+function showKr(el, to) {
+  const from = el.dataset.v === undefined ? to : Number(el.dataset.v);
+  el.dataset.v = to;
+  cancelAnimationFrame(tweens.get(el));
+  if (REDUCE || from === to) { el.textContent = kr(to); return; }
+  const start = performance.now();
+  const step = now => {
+    const t = Math.min(1, (now - start) / 350);
+    el.textContent = kr(from + (to - from) * (1 - Math.pow(1 - t, 3)));
+    if (t < 1) tweens.set(el, requestAnimationFrame(step));
+  };
+  tweens.set(el, requestAnimationFrame(step));
 }
 
 function lineHTML(l, suffix = '') {
@@ -844,6 +1139,13 @@ function lineHTML(l, suffix = '') {
 function renderQuote() {
   const c = compute();
   $('#q-date').textContent = new Date().toLocaleDateString('nb-NO');
+  $('#grand-label').textContent = state.vat ? 'Total inkl. mva' : 'Total, no MVA';
+  showKr($('#t-total'), c.total);
+  const notes = [];
+  if (c.monthly) notes.push(`+ ${kr(c.monthly)} per month`);
+  if (c.yearly) notes.push(`+ ${kr(c.yearly)} per year`);
+  $('#grand-note').textContent = notes.length ? notes.join(' · ') + ' eks. mva' : 'No ongoing costs';
+
   $('#qlines').innerHTML = c.once.length
     ? c.once.map(l => lineHTML(l)).join('')
     : '<li class="qempty">Nothing selected yet. Pick a package or some add-ons.</li>';
@@ -857,8 +1159,8 @@ function renderQuote() {
   $('#t-net').textContent = kr(c.net);
   $('#row-vat').hidden = !state.vat;
   $('#t-vat').textContent = kr(c.vat);
-  $('#grand-label').textContent = state.vat ? 'Total inkl. mva' : 'Total, no MVA';
-  $('#t-total').textContent = kr(c.total);
+  $('#row-gross').hidden = !state.vat;
+  $('#t-gross').textContent = kr(c.total);
 
   $('#olines').innerHTML = c.ongoing.length
     ? c.ongoing.map(l => lineHTML(l, l.period === 'month' ? '/mo' : '/yr')).join('')
@@ -871,7 +1173,7 @@ function renderQuote() {
   $('#first-year-label').textContent = `First year in total, ${state.vat ? 'inkl.' : 'eks.'} mva`;
   $('#t-first-year').textContent = kr(c.firstYear);
 
-  $('#m-total').textContent = kr(c.total);
+  showKr($('#m-total'), c.total);
   $('#m-sub').textContent = (state.vat ? 'inkl. mva' : 'no MVA') + (c.monthly ? ` · + ${kr(c.monthly)}/mo` : '');
 }
 
@@ -914,6 +1216,26 @@ function changed() {
   renderQuote();
 }
 
+// ---------- Night mode switch ----------
+
+const root = document.documentElement;
+const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+const isDark = () => (root.dataset.theme ? root.dataset.theme === 'dark' : darkQuery.matches);
+const syncTheme = () => $('#theme').setAttribute('aria-pressed', String(isDark()));
+try {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved === 'dark' || saved === 'light') root.dataset.theme = saved;
+} catch (e) { /* follow the system setting */ }
+if (darkQuery.addEventListener) darkQuery.addEventListener('change', syncTheme);
+new MutationObserver(syncTheme).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+
+function toggleTheme() {
+  const next = isDark() ? 'light' : 'dark';
+  root.dataset.theme = next;
+  try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* not remembered */ }
+  syncTheme();
+}
+
 // ---------- Events ----------
 
 document.addEventListener('change', e => {
@@ -945,9 +1267,20 @@ document.addEventListener('input', e => {
 
 let clearTimer;
 document.addEventListener('click', e => {
+  const link = e.target.closest('a[data-target]');
+  if (link) {
+    const target = document.getElementById(link.dataset.target);
+    if (target) {
+      e.preventDefault();
+      target.scrollIntoView({ behavior: REDUCE ? 'auto' : 'smooth', block: 'start' });
+    }
+    return;
+  }
   const b = e.target.closest('button');
   if (!b) return;
-  if (b.dataset.step) {
+  if (b.id === 'theme') {
+    toggleTheme();
+  } else if (b.dataset.step) {
     const id = b.dataset.id;
     state.items[id] = toQty((state.items[id] || 0) + Number(b.dataset.step));
     changed();
@@ -1006,16 +1339,52 @@ function copyQuote() {
   }
 }
 
-if ('IntersectionObserver' in window) {
-  new IntersectionObserver(([entry]) => {
-    document.body.classList.toggle('quote-visible', entry.isIntersecting);
-  }, { threshold: 0.1 }).observe($('#quote'));
+// ---------- Section menu and phone bar ----------
+
+function watchSections() {
+  if (!('IntersectionObserver' in window)) return;
+  const links = [...document.querySelectorAll('.secnav a')];
+  const sections = links.map(a => document.getElementById(a.dataset.target)).filter(Boolean);
+  const visible = new Set();
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(en => (en.isIntersecting ? visible.add(en.target.id) : visible.delete(en.target.id)));
+    const current = sections.find(s => visible.has(s.id));
+    links.forEach(a => {
+      const on = !!current && a.dataset.target === current.id;
+      a.classList.toggle('current', on);
+      if (on) {
+        const list = a.closest('ul');
+        const left = a.offsetLeft - list.offsetLeft;
+        if (left < list.scrollLeft || left + a.offsetWidth > list.scrollLeft + list.clientWidth) {
+          list.scrollTo({ left: Math.max(0, left - 16), behavior: REDUCE ? 'auto' : 'smooth' });
+        }
+      }
+    });
+  }, { rootMargin: '-80px 0px -55% 0px' });
+  sections.forEach(s => observer.observe(s));
+}
+
+function watchMenuEdge() {
+  const list = $('#secnav');
+  const update = () => list.classList.toggle('more', list.scrollLeft + list.clientWidth < list.scrollWidth - 2);
+  list.addEventListener('scroll', update, { passive: true });
+  window.addEventListener('resize', update);
+  update();
 }
 
 renderPicker();
 renderCustom();
 sync();
 renderQuote();
+syncTheme();
+watchSections();
+watchMenuEdge();
+
+if ('IntersectionObserver' in window) {
+  new IntersectionObserver(([entry]) => {
+    document.body.classList.toggle('quote-visible', entry.isIntersecting);
+  }, { threshold: 0.1 }).observe($('#quote'));
+}
 </script>
 </body>
 </html>
