@@ -6,6 +6,7 @@ Internal price list and quote calculator for the websites we build. Open `index.
 - Languages: pick the main language and any extra languages (English, Norwegian, Sámi, German and more), with optional translation per page
 - Planning and design: kickoff workshop, competitor review, wireframes, clickable prototype
 - Features: night mode, contact form, booking, blog, live chat, AI chat assistant, event calendar, job listings and more
+- Vipps: Vipps payment, Log in with Vipps, recurring payments with Vipps, Vipps Checkout for webshops
 - Webshop extras: shipping (Bring, PostNord, Helthjem), Klarna, accounting integration (Fiken, Tripletex), variants, subscriptions
 - Content and branding: logo, copywriting, photo shoot, product photos, promo video, social media templates
 - Technical and launch: SEO, rich results, universal design, accessibility statement, security, redirects, client training
