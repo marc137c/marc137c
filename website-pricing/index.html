@@ -1,0 +1,1938 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Website Price List</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a dark fjord band carries the title and key rates. Below it, option panels with a sticky section menu on the left
+   and a ticket-style quote on the right. One column on phones, with the total pinned to the bottom. */
+:root {
+  --paper: #edf2f1;
+  --surface: #ffffff;
+  --ink: #142028;
+  --muted: #566a70;
+  --line: #d6e0e0;
+  --hover: #f3f8f7;
+  --accent: #0b6e66;
+  --on-accent: #ffffff;
+  --tint: #e0f0ec;
+  --minus: #a8402c;
+  --band: #0e2e30;
+  --band-fg: #e9f4f2;
+  --band-muted: #a3c2bd;
+  --band-line: rgba(233, 244, 242, .12);
+  --band-accent: #74d6c8;
+  --ticket: #0b6e66;
+  --on-ticket: #ffffff;
+  --shadow: 0 1px 2px rgba(16, 40, 40, .06), 0 12px 32px -16px rgba(16, 40, 40, .28);
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --num: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0c1316;
+    --surface: #131c20;
+    --ink: #e3eaec;
+    --muted: #8fa1a8;
+    --line: #24323a;
+    --hover: #172227;
+    --accent: #4cbfb2;
+    --on-accent: #062320;
+    --tint: #10302c;
+    --minus: #e88c76;
+    --band: #0a2326;
+    --band-fg: #e3f0ee;
+    --band-muted: #8fb3ad;
+    --band-line: rgba(227, 240, 238, .09);
+    --band-accent: #5fcdbf;
+    --ticket: #15514b;
+    --on-ticket: #e6f4f1;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 14px 36px -16px rgba(0, 0, 0, .7);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0c1316;
+  --surface: #131c20;
+  --ink: #e3eaec;
+  --muted: #8fa1a8;
+  --line: #24323a;
+  --hover: #172227;
+  --accent: #4cbfb2;
+  --on-accent: #062320;
+  --tint: #10302c;
+  --minus: #e88c76;
+  --band: #0a2326;
+  --band-fg: #e3f0ee;
+  --band-muted: #8fb3ad;
+  --band-line: rgba(227, 240, 238, .09);
+  --band-accent: #5fcdbf;
+  --ticket: #15514b;
+  --on-ticket: #e6f4f1;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 14px 36px -16px rgba(0, 0, 0, .7);
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px/1.5 var(--body);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color .25s, color .25s;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 10;
+  background: var(--paper);
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.wrap {
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* ---------- Header band ---------- */
+.band { position: relative; overflow: hidden; background: var(--band); color: var(--band-fg); }
+.band::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-radial-gradient(circle at 94% 118%, transparent 0 21px, var(--band-line) 21px 22.5px);
+  -webkit-mask-image: radial-gradient(circle at 94% 118%, #000 12%, transparent 70%);
+  mask-image: radial-gradient(circle at 94% 118%, #000 12%, transparent 70%);
+}
+.band-in { position: relative; padding-block: 26px 34px; display: grid; gap: 14px; }
+.band-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.eyebrow {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--band-muted);
+}
+h1 {
+  margin: 6px 0 0;
+  font: 700 clamp(36px, 6.4vw, 60px)/1 var(--display);
+  letter-spacing: -.025em;
+  text-wrap: balance;
+}
+.lede { margin: 0; max-width: 58ch; color: var(--band-muted); font-size: 16px; }
+.lede code {
+  font-family: var(--num);
+  font-size: .86em;
+  background: var(--band-line);
+  color: var(--band-fg);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.facts { display: flex; flex-wrap: wrap; margin: 8px 0 0; padding: 0; }
+.facts div { display: grid; gap: 3px; padding: 2px 24px 2px 0; margin-right: 24px; border-right: 1px solid var(--band-line); }
+.facts div:last-child { border-right: 0; margin-right: 0; }
+.facts dt { font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--band-muted); }
+.facts dd { margin: 0; font: 500 19px/1.2 var(--num); font-variant-numeric: tabular-nums; color: var(--band-fg); white-space: nowrap; }
+
+.band-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lang-switch { display: inline-flex; padding: 3px; border-radius: 999px; border: 1px solid var(--band-line); }
+.lang-switch button {
+  border: 0;
+  background: transparent;
+  color: var(--band-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  line-height: 1;
+  padding: 8px 11px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color .15s, color .15s;
+}
+.lang-switch button:hover { color: var(--band-fg); }
+.lang-switch button[aria-pressed="true"] { background: var(--band-fg); color: var(--band); }
+.lang-switch button:focus-visible { outline-color: var(--band-accent); }
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 14px 5px 5px;
+  border-radius: 999px;
+  border: 1px solid var(--band-line);
+  background: transparent;
+  color: var(--band-fg);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.theme-toggle:hover { border-color: var(--band-muted); }
+.theme-toggle:focus-visible { outline-color: var(--band-accent); }
+.tt-track { position: relative; width: 40px; height: 24px; border-radius: 999px; background: var(--band-line); transition: background-color .2s; }
+.tt-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--band-fg);
+  transition: transform .2s ease, background-color .2s;
+}
+.tt-knob::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 6px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--band-accent);
+  opacity: 0;
+  transition: opacity .2s;
+}
+.theme-toggle[aria-pressed="true"] .tt-track { background: var(--band-accent); }
+.theme-toggle[aria-pressed="true"] .tt-knob { transform: translateX(16px); background: var(--band); }
+.theme-toggle[aria-pressed="true"] .tt-knob::after { opacity: 1; }
+
+/* ---------- Two columns ---------- */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 370px;
+  gap: 44px;
+  align-items: start;
+  padding-block: 0 80px;
+}
+.picker, .stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; min-width: 0; }
+
+/* Section menu */
+.secnav {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 5;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  padding-block: 12px;
+  margin-bottom: -12px;
+  transition: background-color .25s;
+}
+.secnav ul { list-style: none; margin: 0; padding: 0; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.secnav ul::-webkit-scrollbar { display: none; }
+.secnav ul {
+  --fade-left: #000;
+  --fade-right: #000;
+  -webkit-mask-image: linear-gradient(to right, var(--fade-left), #000 40px, #000 calc(100% - 40px), var(--fade-right));
+  mask-image: linear-gradient(to right, var(--fade-left), #000 40px, #000 calc(100% - 40px), var(--fade-right));
+}
+.secnav ul.more-left { --fade-left: transparent; }
+.secnav ul.more-right { --fade-right: transparent; }
+.secnav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color .15s, color .15s;
+}
+.secnav a:hover { color: var(--ink); background: var(--hover); }
+.secnav a.current { background: var(--ink); color: var(--paper); }
+.secnav .n {
+  font: 500 11px/1 var(--num);
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: var(--tint);
+  color: var(--accent);
+}
+.secnav .n:empty { display: none; }
+.secnav a.current .n { background: var(--accent); color: var(--on-accent); }
+
+.sec { display: grid; gap: 14px; min-width: 0; scroll-margin-top: 76px; }
+.sec-head { display: flex; align-items: center; gap: 12px; }
+.sec-icon {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--tint);
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+}
+.sec-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+h2 { flex: 1; margin: 0; font: 600 24px/1.2 var(--display); letter-spacing: -.01em; }
+.count {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.sec-note { margin: 0; color: var(--muted); max-width: 65ch; }
+.sec-note.need { color: var(--accent); font-weight: 600; font-size: 14px; }
+.num { font-family: var(--num); font-weight: 500; font-size: .93em; white-space: nowrap; color: var(--ink); }
+
+/* ---------- Packages ---------- */
+.pkgs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.pkg {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px 20px 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color .15s, background-color .15s, transform .15s, box-shadow .15s;
+}
+.pkg:hover { border-color: var(--muted); transform: translateY(-1px); box-shadow: var(--shadow); }
+.pkg input { position: absolute; opacity: 0; pointer-events: none; }
+.pkg:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pkg.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--tint); }
+.pkg-check {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  display: grid;
+  place-items: center;
+  transition: background-color .15s, border-color .15s;
+}
+.pkg-check::after {
+  content: "";
+  width: 10px;
+  height: 5px;
+  border-left: 2px solid var(--on-accent);
+  border-bottom: 2px solid var(--on-accent);
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+  transition: transform .15s;
+}
+.pkg.on .pkg-check { background: var(--accent); border-color: var(--accent); }
+.pkg.on .pkg-check::after { transform: translateY(-1px) rotate(-45deg) scale(1); }
+.pkg-name { font: 600 18px/1.25 var(--display); padding-right: 32px; }
+.pkg-price { font: 500 24px/1.15 var(--num); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.pkg-pages { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.glyphs { display: inline-flex; gap: 3px; }
+.glyphs i { display: block; width: 8px; height: 11px; border: 1.5px solid currentColor; border-radius: 2px; opacity: .65; }
+.pkg.on .glyphs { color: var(--accent); }
+.pkg.on .glyphs i { opacity: 1; }
+.pkg-desc { font-size: 13.5px; color: var(--muted); }
+.pkg-none { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); cursor: pointer; justify-self: start; font-size: 14px; }
+.pkg-none input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+
+/* ---------- Languages ---------- */
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.field-label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+select, input[type="text"], input[type="number"] {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 9px 11px;
+  min-width: 0;
+  transition: border-color .15s;
+}
+select:hover, input[type="text"]:hover, input[type="number"]:hover { border-color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 13px 5px 5px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color .15s, border-color .15s, color .15s;
+}
+.chip:hover { border-color: var(--muted); }
+.chip .code {
+  min-width: 28px;
+  padding: 4px 5px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font: 500 10.5px/1 var(--num);
+  letter-spacing: .04em;
+  text-align: center;
+  color: var(--muted);
+}
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.chip[aria-pressed="true"] .code { border-color: currentColor; color: inherit; }
+.chip.primary, .chip.primary:hover { background: var(--tint); border-color: var(--accent); color: var(--ink); cursor: default; }
+.chip.primary .code { border-color: var(--accent); color: var(--accent); }
+.chip.primary::after { content: attr(data-main); font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.lang-calc { margin: 0; font-size: 13.5px; color: var(--muted); }
+
+/* ---------- Item panels ---------- */
+.items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.items > li + li { border-top: 1px solid var(--line); }
+.item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8.5rem 6.75rem;
+  grid-template-areas: "text price ctl";
+  gap: 4px 20px;
+  align-items: center;
+  padding: 15px 18px;
+  transition: background-color .15s;
+}
+label.item { cursor: pointer; }
+label.item:hover { background: var(--hover); }
+.item.on, label.item.on:hover { background: var(--tint); }
+.item.off { opacity: .45; }
+label.item.off, label.item.inc { cursor: default; }
+.item-text { grid-area: text; min-width: 0; display: grid; gap: 2px; }
+.item-name { font-weight: 600; }
+.item-desc { font-size: 13.5px; color: var(--muted); }
+.item-flag { font-size: 12px; font-weight: 600; color: var(--accent); }
+.item-flag:empty { display: none; }
+.item-price { grid-area: price; display: grid; justify-items: end; text-align: right; }
+.amt { font-family: var(--num); font-size: 14.5px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.inc .amt { text-decoration: line-through; color: var(--muted); }
+.per { font-size: 12px; color: var(--muted); }
+.ctl { grid-area: ctl; justify-self: end; display: inline-flex; align-items: center; }
+
+.check {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  border: 1.5px solid var(--muted);
+  border-radius: 6px;
+  background: var(--surface);
+  display: grid;
+  place-content: center;
+  cursor: inherit;
+  transition: background-color .15s, border-color .15s;
+}
+.check::after {
+  content: "";
+  width: 11px;
+  height: 6px;
+  border-left: 2px solid var(--on-accent);
+  border-bottom: 2px solid var(--on-accent);
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+  transition: transform .15s;
+}
+.check:checked { background: var(--accent); border-color: var(--accent); }
+.check:checked::after { transform: translateY(-1px) rotate(-45deg) scale(1); }
+.check.sm { width: 18px; height: 18px; border-radius: 5px; }
+.check.sm::after { width: 9px; height: 5px; }
+
+.stepper { border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
+.stepper button {
+  width: 32px;
+  height: 34px;
+  border: 0;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.stepper button:hover:not(:disabled) { background: var(--hover); color: var(--accent); }
+.stepper button:disabled { cursor: default; }
+.stepper input {
+  width: 2.75rem;
+  border: 0;
+  border-radius: 0;
+  padding: 6px 0;
+  background: transparent;
+  text-align: center;
+  font-family: var(--num);
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* ---------- Adjustments ---------- */
+.adjust { display: grid; gap: 14px; padding: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.money { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.money input { width: 7rem; font-family: var(--num); color: var(--ink); }
+.discount input { width: 5rem; }
+.clines { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.clines:empty { display: none; }
+.cline { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+.x {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  font-size: 18px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+.x:hover { color: var(--minus); border-color: var(--minus); }
+.btn {
+  padding: 11px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color .15s, filter .15s;
+}
+.btn:hover { border-color: var(--ink); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.armed { border-color: var(--minus); color: var(--minus); }
+.foot { margin: 0; font-size: 13px; color: var(--muted); max-width: 65ch; }
+
+/* ---------- Quote ticket ---------- */
+.quote {
+  position: sticky;
+  top: calc(env(safe-area-inset-top, 0px) + 20px);
+  margin-top: 20px;
+  max-height: calc(100vh - 40px - env(safe-area-inset-top, 0px));
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  scroll-margin-top: 16px;
+}
+.q-band {
+  display: grid;
+  gap: 2px;
+  padding: 20px 22px 30px;
+  background: var(--ticket);
+  color: var(--on-ticket);
+  -webkit-mask: radial-gradient(circle at 8px 100%, transparent 5.5px, #000 6px) 0 0 / 16px 100% repeat-x;
+  mask: radial-gradient(circle at 8px 100%, transparent 5.5px, #000 6px) 0 0 / 16px 100% repeat-x;
+  transition: background-color .25s;
+}
+.q-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+.q-head h2 { font: 600 13px/1 var(--body); letter-spacing: .12em; text-transform: uppercase; }
+.q-date { font: 12px/1 var(--num); opacity: .8; }
+.grand-label { font-size: 13px; opacity: .85; }
+.grand-amt { font: 700 46px/1.05 var(--display); font-variant-numeric: tabular-nums; letter-spacing: -.025em; }
+.grand-note { font-size: 13px; opacity: .85; }
+.q-body { display: grid; gap: 18px; padding: 18px 22px 22px; }
+.field { display: grid; gap: 6px; }
+.field input { width: 100%; }
+.example { margin: 0; padding: 10px 12px; border-radius: 9px; background: var(--tint); font-size: 13px; }
+.q-sub { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.qgroup { display: grid; gap: 10px; }
+.qlines { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.qline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 12px; align-items: baseline; }
+.qline .lab { font-weight: 500; min-width: 0; }
+.qline .det { grid-column: 1; font-size: 12.5px; color: var(--muted); }
+.qamt { font-family: var(--num); font-size: 13.5px; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.qempty { color: var(--muted); font-size: 13.5px; }
+.sums { display: grid; gap: 6px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.sums:empty { display: none; }
+.sum { display: flex; justify-content: space-between; gap: 12px; }
+.sum.minus .qamt { color: var(--minus); }
+.sum.strong { font-weight: 600; }
+.vat-toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13.5px; justify-self: start; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.status { margin: 0; font-size: 13px; color: var(--muted); min-height: 1.5em; }
+.copy-fallback {
+  width: 100%;
+  min-height: 160px;
+  font: 12.5px/1.5 var(--num);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 10px;
+}
+
+/* ---------- Phone total bar ---------- */
+.mbar { display: none; }
+
+@media (max-width: 1100px) {
+  .layout { grid-template-columns: minmax(0, 1fr) 330px; gap: 32px; }
+}
+@media (max-width: 900px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .quote { position: static; max-height: none; overflow: visible; margin-top: 0; }
+  body { padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)); }
+  .mbar {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    background: var(--band);
+    color: var(--band-fg);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-shadow: 0 -8px 24px -12px rgba(0, 0, 0, .35);
+    transition: transform .2s ease;
+  }
+  .quote-visible .mbar { transform: translateY(110%); }
+  .mbar-in { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 11px; }
+  .mbar-total { display: grid; line-height: 1.2; }
+  .mbar-total b { font: 700 21px/1.2 var(--display); font-variant-numeric: tabular-nums; }
+  .mbar-total span { font-size: 12px; color: var(--band-muted); }
+  .mbar a {
+    color: var(--band); background: var(--band-accent);
+    font-weight: 600;
+    font-size: 14px;
+    padding: 10px 16px;
+    border-radius: 10px;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+}
+@media (max-width: 560px) {
+  .facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .facts div { border-right: 0; margin-right: 0; padding: 0; }
+  .pkgs { grid-template-columns: minmax(0, 1fr); }
+  .item {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "text ctl" "price ctl";
+    gap: 6px 16px;
+    padding-inline: 14px;
+  }
+  .item-price { justify-items: start; text-align: left; grid-auto-flow: column; justify-content: start; gap: 8px; align-items: baseline; }
+  .cline { grid-template-columns: minmax(0, 1fr) auto; }
+  .cline .money { grid-row: 2; }
+  .cline .x { grid-row: 1 / span 2; grid-column: 2; }
+  .grand-amt { font-size: 40px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; }
+}
+</style>
+</head>
+
+<body>
+
+<header class="band">
+  <div class="wrap band-in">
+    <div class="band-top">
+      <p class="eyebrow"><span data-t="eyebrow"></span> · <span id="updated"></span></p>
+      <div class="band-tools">
+        <div class="lang-switch" role="group" data-t-aria="langSwitch">
+          <button type="button" data-ui="no" aria-pressed="false" lang="nb">NO</button>
+          <button type="button" data-ui="en" aria-pressed="false" lang="en">EN</button>
+        </div>
+        <button type="button" class="theme-toggle" id="theme" aria-pressed="false" data-t-title="nightModeTitle">
+          <span class="tt-track" aria-hidden="true"><span class="tt-knob"></span></span><span data-t="nightMode"></span>
+        </button>
+      </div>
+    </div>
+    <h1 data-t="title"></h1>
+    <p class="lede" data-t-html="lede"></p>
+    <dl class="facts">
+      <div><dt data-t="factFrom"></dt><dd id="f-from"></dd></div>
+      <div><dt data-t="factLang"></dt><dd id="f-lang"></dd></div>
+      <div id="f-dark-wrap"><dt data-t="factDark"></dt><dd id="f-dark"></dd></div>
+      <div id="f-hour-wrap"><dt data-t="factHour"></dt><dd id="f-hour"></dd></div>
+    </dl>
+  </div>
+</header>
+
+<main class="wrap layout">
+  <div class="picker">
+    <nav class="secnav" data-t-aria="navLabel"><ul id="secnav"></ul></nav>
+
+    <section class="sec" id="sec-pkg" aria-labelledby="h-pkg">
+      <div class="sec-head"><span class="sec-icon" data-icon="layers"></span><h2 id="h-pkg" data-t="package"></h2></div>
+      <p class="sec-note" data-t="packageNote"></p>
+      <div class="pkgs" id="packages"></div>
+      <label class="pkg-none" for="pkg-none"><input type="radio" name="pkg" id="pkg-none" value="none"><span data-t="noPackage"></span></label>
+    </section>
+
+    <section class="sec" id="sec-lang" aria-labelledby="h-lang">
+      <div class="sec-head"><span class="sec-icon" data-icon="globe"></span><h2 id="h-lang" data-t="languages"></h2><span class="count" id="lang-count"></span></div>
+      <p class="sec-note" id="lang-note"></p>
+      <div class="row">
+        <label class="field-label" for="primary" data-t="mainLanguage"></label>
+        <select id="primary"></select>
+      </div>
+      <div class="field-label" id="chips-label" data-t="extraLanguages"></div>
+      <div class="chips" id="chips" role="group" aria-labelledby="chips-label"></div>
+      <ul class="items">
+        <li>
+          <label class="item" id="translate-row" for="translate">
+            <span class="item-text">
+              <span class="item-name" data-t="translateName"></span>
+              <span class="item-desc" data-t="translateDesc"></span>
+            </span>
+            <span class="item-price"><span class="amt" id="translate-price"></span><span class="per" data-t="translatePer"></span></span>
+            <span class="ctl"><input type="checkbox" class="check" id="translate"></span>
+          </label>
+        </li>
+      </ul>
+      <p class="lang-calc" id="translate-note"></p>
+    </section>
+
+    <div id="groups" class="stack"></div>
+
+    <section class="sec" id="sec-adjust" aria-labelledby="h-adjust">
+      <div class="sec-head"><span class="sec-icon" data-icon="sliders"></span><h2 id="h-adjust" data-t="adjustments"></h2></div>
+      <div class="adjust">
+        <div class="row discount">
+          <label class="field-label" for="discount" data-t="discountLabel"></label>
+          <span class="money"><input type="number" id="discount" min="0" max="100" step="1" inputmode="numeric" placeholder="0"><span>%</span></span>
+        </div>
+        <div class="field-label" data-t="customLines"></div>
+        <ul class="clines" id="custom"></ul>
+        <div><button type="button" class="btn" id="add-line" data-t="addLine"></button></div>
+      </div>
+    </section>
+
+    <p class="foot" data-t="foot"></p>
+  </div>
+
+  <aside class="quote" id="quote" aria-labelledby="h-quote">
+    <div class="q-band">
+      <div class="q-head"><h2 id="h-quote" data-t="quote"></h2><span class="q-date" id="q-date"></span></div>
+      <span class="grand-label" id="grand-label"></span>
+      <span class="grand-amt" id="t-total"></span>
+      <span class="grand-note" id="grand-note"></span>
+    </div>
+    <div class="q-body">
+      <p class="example" id="example" data-t="example" hidden></p>
+      <div class="field">
+        <label class="field-label" for="client" data-t="client"></label>
+        <input type="text" id="client" data-t-ph="clientPh" autocomplete="off">
+      </div>
+
+      <div class="qgroup">
+        <p class="q-sub" data-t="oneTime"></p>
+        <ul class="qlines" id="qlines"></ul>
+        <div class="sums">
+          <div class="sum" id="row-sub"><span data-t="subtotal"></span><span class="qamt" id="t-sub"></span></div>
+          <div class="sum minus" id="row-discount"><span id="t-discount-label"></span><span class="qamt" id="t-discount"></span></div>
+          <div class="sum" id="row-net"><span data-t="totalEx"></span><span class="qamt" id="t-net"></span></div>
+          <div class="sum" id="row-vat"><span data-t="vat"></span><span class="qamt" id="t-vat"></span></div>
+          <div class="sum strong" id="row-gross"><span data-t="totalInc"></span><span class="qamt" id="t-gross"></span></div>
+          <label class="vat-toggle" for="vat"><input type="checkbox" class="check sm" id="vat"><span data-t="addVat"></span></label>
+        </div>
+      </div>
+
+      <div class="qgroup">
+        <p class="q-sub" data-t="ongoingEx"></p>
+        <ul class="qlines" id="olines"></ul>
+        <div class="sums" id="o-sums">
+          <div class="sum" id="row-month"><span data-t="perMonth"></span><span class="qamt" id="t-month"></span></div>
+          <div class="sum" id="row-year"><span data-t="perYear"></span><span class="qamt" id="t-year"></span></div>
+          <div class="sum strong"><span id="first-year-label"></span><span class="qamt" id="t-first-year"></span></div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="btn primary" id="copy" data-t="copy"></button>
+        <button type="button" class="btn" id="clear" data-t="clear"></button>
+      </div>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+      <textarea class="copy-fallback" id="copy-fallback" readonly hidden data-t-aria="quoteTextLabel"></textarea>
+    </div>
+  </aside>
+</main>
+
+<div class="mbar" aria-hidden="true">
+  <div class="wrap mbar-in">
+    <span class="mbar-total"><b id="m-total"></b><span id="m-sub"></span></span>
+    <a href="#quote" data-target="quote" tabindex="-1" data-t="seeQuote"></a>
+  </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------
+// PRICES: edit the numbers here to change the price list.
+// All amounts are NOK excluding MVA. Text has an English (en)
+// and a Norwegian (no) version.
+//   qty: true        -> has a +/- counter instead of a checkbox
+//   unit             -> what the counter counts ("page", "hour")
+//   period           -> "month" or "year" for ongoing services
+//   percent          -> adds a % of the one-time price
+//   requires         -> only available with that package (on an item or a whole group)
+//   includedWith     -> free (already included) with those packages
+// New add-on prices are estimated as hours of work × the hourly rate.
+// ---------------------------------------------------------------
+const PRICES = {
+  updated: { en: 'Prices set October 2026', no: 'Priser satt oktober 2026' },
+  vatRate: 0.25,
+  packages: [
+    { id: 'landing', price: 6000, pages: 1,
+      name: { en: 'Landing page', no: 'Landingsside' },
+      desc: { en: 'One scrolling page with intro, services and contact info. Good for small businesses and events.', no: 'Én side med intro, tjenester og kontaktinfo. Passer for små bedrifter og arrangementer.' } },
+    { id: 'basic', price: 15000, pages: 5,
+      name: { en: 'Basic website', no: 'Enkel nettside' },
+      desc: { en: 'Up to 5 pages, for example Home, About, Services, Gallery and Contact.', no: 'Opptil 5 sider, for eksempel Hjem, Om oss, Tjenester, Galleri og Kontakt.' } },
+    { id: 'business', price: 28000, pages: 10,
+      name: { en: 'Business website', no: 'Bedriftsnettside' },
+      desc: { en: 'Up to 10 pages with a fully custom design.', no: 'Opptil 10 sider med helt eget design.' } },
+    { id: 'shop', price: 45000, pages: 6,
+      name: { en: 'Webshop', no: 'Nettbutikk' },
+      desc: { en: 'Online store with up to 50 products, cart and checkout with Vipps and card.', no: 'Nettbutikk med opptil 50 produkter, handlekurv og kasse med Vipps og kort.' } },
+  ],
+  languages: {
+    perLanguage: 2500,     // language switcher and setup, per extra language
+    translatePerPage: 400, // when we translate: per page, per extra language
+    rtlLayout: 3000,       // right-to-left layout for Arabic and similar
+    list: [
+      { id: 'nb', name: { en: 'Norwegian (Bokmål)', no: 'Norsk (bokmål)' } },
+      { id: 'nn', name: { en: 'Norwegian (Nynorsk)', no: 'Norsk (nynorsk)' } },
+      { id: 'en', name: { en: 'English', no: 'Engelsk' } },
+      { id: 'se', name: { en: 'Northern Sámi', no: 'Nordsamisk' } },
+      { id: 'sv', name: { en: 'Swedish', no: 'Svensk' } },
+      { id: 'da', name: { en: 'Danish', no: 'Dansk' } },
+      { id: 'fi', name: { en: 'Finnish', no: 'Finsk' } },
+      { id: 'de', name: { en: 'German', no: 'Tysk' } },
+      { id: 'fr', name: { en: 'French', no: 'Fransk' } },
+      { id: 'es', name: { en: 'Spanish', no: 'Spansk' } },
+      { id: 'it', name: { en: 'Italian', no: 'Italiensk' } },
+      { id: 'pl', name: { en: 'Polish', no: 'Polsk' } },
+      { id: 'lt', name: { en: 'Lithuanian', no: 'Litauisk' } },
+      { id: 'uk', name: { en: 'Ukrainian', no: 'Ukrainsk' } },
+      { id: 'ar', name: { en: 'Arabic', no: 'Arabisk' }, rtl: true },
+    ],
+  },
+  groups: [
+    {
+      id: 'planning', icon: 'frame',
+      title: { en: 'Planning and design', no: 'Planlegging og design' },
+      short: { en: 'Planning', no: 'Planlegging' },
+      items: [
+        { id: 'kickoff', price: 1500,
+          name: { en: 'Kickoff workshop', no: 'Oppstartsmøte' },
+          desc: { en: 'Two-hour meeting to agree on goals, pages, content and who does what.', no: 'Møte på to timer der vi blir enige om mål, sider, innhold og hvem som gjør hva.' } },
+        { id: 'research', price: 2000,
+          name: { en: 'Competitor review', no: 'Konkurrentanalyse' },
+          desc: { en: 'Short report on what similar businesses do online and where the client can stand out.', no: 'Kort rapport om hva lignende bedrifter gjør på nett, og hvor kunden kan skille seg ut.' } },
+        { id: 'wireframes', price: 3000,
+          name: { en: 'Wireframes', no: 'Skisser (wireframes)' },
+          desc: { en: 'Simple sketch of every page so the structure is agreed before design starts.', no: 'Enkle skisser av hver side, så strukturen er avklart før designet starter.' } },
+        { id: 'prototype', price: 4500,
+          name: { en: 'Clickable prototype', no: 'Klikkbar prototype' },
+          desc: { en: 'The client clicks through the finished design in Figma before we build it.', no: 'Kunden klikker seg gjennom det ferdige designet i Figma før vi bygger.' } },
+        { id: 'round', price: 2000, qty: true, unit: { en: 'round', no: 'runde' },
+          name: { en: 'Extra design round', no: 'Ekstra designrunde' },
+          desc: { en: 'Another round of design changes after the design is approved.', no: 'En ny runde med designendringer etter at designet er godkjent.' } },
+      ],
+    },
+    {
+      id: 'features', icon: 'toggle',
+      title: { en: 'Features', no: 'Funksjoner' },
+      items: [
+        { id: 'dark', price: 2500,
+          name: { en: 'Night mode', no: 'Nattmodus' },
+          desc: { en: 'Dark theme with a light/dark switch. Follows the visitor’s phone or computer setting and remembers their choice.', no: 'Mørkt tema med lys/mørk-bryter. Følger innstillingen på den besøkendes telefon eller PC og husker valget.' } },
+        { id: 'contact', price: 1500,
+          name: { en: 'Contact form', no: 'Kontaktskjema' },
+          desc: { en: 'Sends enquiries to the client’s email, with spam protection.', no: 'Sender henvendelser til kundens e-post, med spambeskyttelse.' } },
+        { id: 'forms', price: 2500,
+          name: { en: 'Advanced forms', no: 'Avanserte skjemaer' },
+          desc: { en: 'Multi-step forms, file uploads and quote requests.', no: 'Skjemaer i flere steg, filopplasting og tilbudsforespørsler.' } },
+        { id: 'booking', price: 5000,
+          name: { en: 'Booking system', no: 'Bookingsystem' },
+          desc: { en: 'Visitors book appointments or tables online, synced to a calendar.', no: 'Besøkende bestiller time eller bord på nett, synkronisert med en kalender.' } },
+        { id: 'blog', price: 4000,
+          name: { en: 'Blog or news section', no: 'Blogg eller nyheter' },
+          desc: { en: 'Post list, article pages and categories.', no: 'Oversikt over innlegg, artikkelsider og kategorier.' } },
+        { id: 'cms', price: 5000,
+          name: { en: 'Client can edit content', no: 'Kunden kan endre innhold' },
+          desc: { en: 'Admin panel so the client can change text and images without us.', no: 'Adminpanel så kunden kan endre tekst og bilder uten oss.' } },
+        { id: 'gallery', price: 1500,
+          name: { en: 'Image gallery', no: 'Bildegalleri' },
+          desc: { en: 'Photo grid with a full-screen viewer.', no: 'Bilderutenett med visning i fullskjerm.' } },
+        { id: 'portfolio', price: 2500,
+          name: { en: 'Portfolio or case studies', no: 'Portefølje eller kundecaser' },
+          desc: { en: 'Project pages with images, text and results.', no: 'Prosjektsider med bilder, tekst og resultater.' } },
+        { id: 'menu', price: 1500,
+          name: { en: 'Menu or price list page', no: 'Meny eller prisliste' },
+          desc: { en: 'Restaurant menu or service prices the client can update.', no: 'Restaurantmeny eller priser på tjenester som kunden kan oppdatere.' } },
+        { id: 'events', price: 3000,
+          name: { en: 'Event calendar', no: 'Arrangementskalender' },
+          desc: { en: 'Upcoming events with dates, details and sign-up.', no: 'Kommende arrangementer med dato, detaljer og påmelding.' } },
+        { id: 'jobs', price: 3000,
+          name: { en: 'Job listings', no: 'Stillingsannonser' },
+          desc: { en: 'Job ads with an application form.', no: 'Stillingsannonser med søknadsskjema.' } },
+        { id: 'reviews', price: 1000,
+          name: { en: 'Customer reviews', no: 'Kundeomtaler' },
+          desc: { en: 'Google reviews or testimonials shown on the site.', no: 'Google-anmeldelser eller sitater fra kunder på nettsiden.' } },
+        { id: 'faq', price: 800,
+          name: { en: 'FAQ section', no: 'Ofte stilte spørsmål' },
+          desc: { en: 'Questions and answers that open and close.', no: 'Spørsmål og svar som kan åpnes og lukkes.' } },
+        { id: 'map', price: 800,
+          name: { en: 'Map and opening hours', no: 'Kart og åpningstider' },
+          desc: { en: 'Address, map link and opening hours.', no: 'Adresse, kartlenke og åpningstider.' } },
+        { id: 'video', price: 1000,
+          name: { en: 'Video', no: 'Video' },
+          desc: { en: 'Video background or embedded films, set up so the page stays fast.', no: 'Video i bakgrunnen eller innebygde filmer, satt opp så siden fortsatt er rask.' } },
+        { id: 'newsletter', price: 1500,
+          name: { en: 'Newsletter signup', no: 'Påmelding til nyhetsbrev' },
+          desc: { en: 'Signup form connected to Mailchimp or similar.', no: 'Påmeldingsskjema koblet til Mailchimp eller lignende.' } },
+        { id: 'social', price: 1000,
+          name: { en: 'Social media', no: 'Sosiale medier' },
+          desc: { en: 'Links, share buttons and an Instagram feed.', no: 'Lenker, delingsknapper og Instagram-feed.' } },
+        { id: 'popup', price: 800,
+          name: { en: 'Pop-up or campaign banner', no: 'Pop-up eller kampanjebanner' },
+          desc: { en: 'Announce offers, opening hours changes or news.', no: 'Varsle om tilbud, endrede åpningstider eller nyheter.' } },
+        { id: 'chat', price: 1500,
+          name: { en: 'Live chat', no: 'Livechat' },
+          desc: { en: 'Chat bubble (Tidio, Crisp or similar) that reaches the client by email or phone.', no: 'Chatboble (Tidio, Crisp eller lignende) som når kunden på e-post eller telefon.' } },
+        { id: 'ai', price: 6000,
+          name: { en: 'AI chat assistant', no: 'AI-chatassistent' },
+          desc: { en: 'Answers visitor questions from the site’s own content. The provider’s usage fee comes on top.', no: 'Svarer på spørsmål fra besøkende ut fra innholdet på nettsiden. Bruksavgiften til leverandøren kommer i tillegg.' } },
+        { id: 'animations', price: 3000,
+          name: { en: 'Animations', no: 'Animasjoner' },
+          desc: { en: 'Scroll effects and page transitions.', no: 'Effekter når man scroller, og overganger mellom sider.' } },
+        { id: 'search', price: 2500,
+          name: { en: 'Site search', no: 'Søk på nettsiden' },
+          desc: { en: 'Search across pages and posts.', no: 'Søk i sider og innlegg.' } },
+        { id: 'members', price: 8000,
+          name: { en: 'Member login', no: 'Medlemsinnlogging' },
+          desc: { en: 'User accounts and pages only members can see.', no: 'Brukerkontoer og sider som bare medlemmer kan se.' } },
+        { id: 'payments', price: 4000, includedWith: ['shop'],
+          name: { en: 'Online payments', no: 'Betaling på nett' },
+          desc: { en: 'Vipps and card payments for services, deposits or gift cards.', no: 'Vipps og kortbetaling for tjenester, depositum eller gavekort.' } },
+        { id: 'pwa', price: 4000,
+          name: { en: 'Installable app', no: 'Installerbar app' },
+          desc: { en: 'Visitors can add the site to their home screen and open it like an app.', no: 'Besøkende kan legge nettsiden på hjemskjermen og åpne den som en app.' } },
+        { id: 'pages', price: 1500, qty: true, unit: { en: 'page', no: 'side' },
+          name: { en: 'Extra pages', no: 'Ekstra sider' },
+          desc: { en: 'Pages beyond what the package includes.', no: 'Sider utover det pakken inkluderer.' } },
+      ],
+    },
+    {
+      id: 'shop', icon: 'cart', requires: 'shop',
+      title: { en: 'Webshop extras', no: 'Tillegg for nettbutikk' },
+      short: { en: 'Webshop', no: 'Nettbutikk' },
+      items: [
+        { id: 'products', price: 1500, qty: true, unit: { en: '25 products', no: '25 produkter' },
+          name: { en: 'Extra products', no: 'Ekstra produkter' },
+          desc: { en: 'Adding products beyond the 50 in the webshop package.', no: 'Legge inn produkter utover de 50 i nettbutikkpakken.' } },
+        { id: 'variants', price: 2500,
+          name: { en: 'Variants and filters', no: 'Varianter og filtre' },
+          desc: { en: 'Sizes and colours on products, and filters on the product list.', no: 'Størrelser og farger på produkter, og filtre i produktlisten.' } },
+        { id: 'shipping', price: 3000,
+          name: { en: 'Shipping integration', no: 'Fraktintegrasjon' },
+          desc: { en: 'Live shipping prices and labels from Bring/Posten, PostNord or Helthjem.', no: 'Fraktpriser og etiketter fra Bring/Posten, PostNord eller Helthjem.' } },
+        { id: 'klarna', price: 2000,
+          name: { en: 'Klarna', no: 'Klarna' },
+          desc: { en: 'Pay later and instalments at checkout, alongside Vipps and card.', no: 'Betal senere og delbetaling i kassen, i tillegg til Vipps og kort.' } },
+        { id: 'accounting', price: 3000,
+          name: { en: 'Accounting integration', no: 'Kobling til regnskap' },
+          desc: { en: 'Orders and payments sent to Fiken, Tripletex or PowerOffice.', no: 'Ordre og betalinger sendes til Fiken, Tripletex eller PowerOffice.' } },
+        { id: 'discounts', price: 1500,
+          name: { en: 'Discount codes and gift cards', no: 'Rabattkoder og gavekort' },
+          desc: { en: 'Campaign codes and gift cards the client can create.', no: 'Kampanjekoder og gavekort som kunden kan lage selv.' } },
+        { id: 'feeds', price: 2000,
+          name: { en: 'Google Shopping and Meta catalogue', no: 'Google Shopping og Meta-katalog' },
+          desc: { en: 'Product feeds so products can appear in Google Shopping, Facebook and Instagram.', no: 'Produktfeeder så produktene kan vises i Google Shopping, på Facebook og Instagram.' } },
+        { id: 'subscriptions', price: 5000,
+          name: { en: 'Subscriptions', no: 'Abonnement' },
+          desc: { en: 'Recurring orders, for example coffee or flowers every month.', no: 'Faste bestillinger, for eksempel kaffe eller blomster hver måned.' } },
+      ],
+    },
+    {
+      id: 'content', icon: 'pen',
+      title: { en: 'Content and branding', no: 'Innhold og profil' },
+      short: { en: 'Content', no: 'Innhold' },
+      items: [
+        { id: 'logo', price: 4000,
+          name: { en: 'Logo design', no: 'Logodesign' },
+          desc: { en: 'Three concepts, two rounds of changes, files for web and print.', no: 'Tre forslag, to runder med endringer og filer for web og trykk.' } },
+        { id: 'brand', price: 2000,
+          name: { en: 'Colours and fonts guide', no: 'Guide for farger og fonter' },
+          desc: { en: 'One-page guide the client can reuse for social media and print.', no: 'Kort guide på én side som kunden kan bruke videre i sosiale medier og på trykk.' } },
+        { id: 'illustrations', price: 3000,
+          name: { en: 'Icons and illustrations', no: 'Ikoner og illustrasjoner' },
+          desc: { en: 'Custom icon set or illustrations in the brand style.', no: 'Egne ikoner eller illustrasjoner i stilen til merkevaren.' } },
+        { id: 'copy', price: 1200, qty: true, unit: { en: 'page', no: 'side' },
+          name: { en: 'Copywriting', no: 'Tekstforfatting' },
+          desc: { en: 'We write the text.', no: 'Vi skriver teksten.' } },
+        { id: 'proofread', price: 300, qty: true, unit: { en: 'page', no: 'side' },
+          name: { en: 'Proofreading', no: 'Korrektur' },
+          desc: { en: 'We check spelling and flow in text the client wrote.', no: 'Vi sjekker rettskriving og flyt i tekst kunden har skrevet.' } },
+        { id: 'photos', price: 1000,
+          name: { en: 'Stock photos', no: 'Stockbilder' },
+          desc: { en: 'Up to 10 licensed photos, chosen and cropped to fit.', no: 'Opptil 10 lisensierte bilder, valgt ut og beskåret.' } },
+        { id: 'shoot', price: 4500,
+          name: { en: 'Photo shoot', no: 'Fotografering' },
+          desc: { en: 'Half a day of photos on site: people, premises and work in progress. Edited for web.', no: 'En halv dag med foto på stedet: folk, lokaler og arbeid. Redigert for web.' } },
+        { id: 'productphotos', price: 1500, qty: true, unit: { en: '10 products', no: '10 produkter' },
+          name: { en: 'Product photos', no: 'Produktbilder' },
+          desc: { en: 'Clean product photos on a white or styled background.', no: 'Rene produktbilder på hvit eller stylet bakgrunn.' } },
+        { id: 'promo', price: 8000,
+          name: { en: 'Promo video', no: 'Reklamevideo' },
+          desc: { en: '30–60 second film for the front page and social media.', no: 'Film på 30–60 sekunder til forsiden og sosiale medier.' } },
+        { id: 'somekit', price: 2000,
+          name: { en: 'Social media templates', no: 'Maler for sosiale medier' },
+          desc: { en: 'Post and story templates in Canva that match the website.', no: 'Maler for innlegg og stories i Canva som passer til nettsiden.' } },
+        { id: 'print', price: 1500,
+          name: { en: 'Business cards and print', no: 'Visittkort og trykksaker' },
+          desc: { en: 'Business card, letterhead or flyer in the same style.', no: 'Visittkort, brevark eller flyer i samme stil.' } },
+        { id: 'migrate', price: 3000,
+          name: { en: 'Move content from old site', no: 'Flytte innhold fra gammel side' },
+          desc: { en: 'Copy text and images over from the client’s current website.', no: 'Kopiere tekst og bilder fra kundens nåværende nettside.' } },
+      ],
+    },
+    {
+      id: 'tech', icon: 'code',
+      title: { en: 'Technical and launch', no: 'Teknisk og lansering' },
+      short: { en: 'Technical', no: 'Teknisk' },
+      items: [
+        { id: 'seo', price: 2500,
+          name: { en: 'SEO setup', no: 'SEO-oppsett' },
+          desc: { en: 'Page titles and descriptions, sitemap and Google Search Console.', no: 'Sidetitler og beskrivelser, sitemap og Google Search Console.' } },
+        { id: 'schema', price: 1500,
+          name: { en: 'Rich results in Google', no: 'Utvidede resultater i Google' },
+          desc: { en: 'Structured data so Google can show opening hours, reviews, events or prices.', no: 'Strukturerte data så Google kan vise åpningstider, anmeldelser, arrangementer eller priser.' } },
+        { id: 'gbp', price: 1000,
+          name: { en: 'Google Business Profile', no: 'Google-bedriftsprofil' },
+          desc: { en: 'Set up or tidy the listing that shows in Google Search and Maps.', no: 'Opprette eller rydde oppføringen som vises i Google Søk og Maps.' } },
+        { id: 'analytics', price: 1000,
+          name: { en: 'Visitor statistics', no: 'Besøksstatistikk' },
+          desc: { en: 'Google Analytics or Plausible, with a short how-to for the client.', no: 'Google Analytics eller Plausible, med en kort veiledning til kunden.' } },
+        { id: 'cookies', price: 1500,
+          name: { en: 'Cookie banner and privacy policy', no: 'Cookie-banner og personvernerklæring' },
+          desc: { en: 'GDPR consent banner and a privacy page.', no: 'Samtykkebanner etter GDPR og en side om personvern.' } },
+        { id: 'a11y', price: 3500,
+          name: { en: 'Universal design (WCAG)', no: 'Universell utforming (WCAG)' },
+          desc: { en: 'Built and tested for screen readers, keyboard use and contrast. Norwegian rules on universell utforming cover most business websites.', no: 'Bygget og testet for skjermleser, tastatur og kontrast. Reglene om universell utforming gjelder de fleste bedriftsnettsider.' } },
+        { id: 'a11ystatement', price: 1000,
+          name: { en: 'Accessibility statement', no: 'Tilgjengelighetserklæring' },
+          desc: { en: 'Tilgjengelighetserklæring through Uutilsynet’s tool. Required for public-sector websites.', no: 'Laget i Uutilsynets verktøy. Påkrevd for offentlige nettsider.' } },
+        { id: 'speed', price: 2000,
+          name: { en: 'Speed optimisation', no: 'Hastighetsoptimalisering' },
+          desc: { en: 'Image compression and caching, aiming for a Lighthouse score above 90.', no: 'Bildekomprimering og caching, med mål om over 90 i Lighthouse.' } },
+        { id: 'security', price: 1500,
+          name: { en: 'Security setup', no: 'Sikkerhetsoppsett' },
+          desc: { en: 'Firewall, two-step login for admins and automatic off-site backups.', no: 'Brannmur, totrinnsinnlogging for administratorer og automatisk sikkerhetskopi et annet sted.' } },
+        { id: 'redirects', price: 1500,
+          name: { en: 'Redirects from old site', no: 'Videresending fra gammel side' },
+          desc: { en: 'Old links keep working, so the client keeps their Google rankings.', no: 'Gamle lenker fungerer fortsatt, så kunden beholder plasseringene i Google.' } },
+        { id: 'automation', price: 3000,
+          name: { en: 'CRM and automation', no: 'CRM og automatisering' },
+          desc: { en: 'Send form leads to HubSpot, Pipedrive or a spreadsheet through Zapier or Make.', no: 'Send henvendelser fra skjema til HubSpot, Pipedrive eller et regneark via Zapier eller Make.' } },
+        { id: 'domain', price: 1000,
+          name: { en: 'Domain and email setup', no: 'Oppsett av domene og e-post' },
+          desc: { en: 'Connect the domain and set up the email addresses.', no: 'Koble til domenet og sette opp e-postadressene.' } },
+        { id: 'signature', price: 500,
+          name: { en: 'Email signatures', no: 'E-postsignaturer' },
+          desc: { en: 'Matching email signatures for the whole team.', no: 'Like e-postsignaturer for hele teamet.' } },
+        { id: 'training', price: 1500,
+          name: { en: 'Client training', no: 'Opplæring av kunden' },
+          desc: { en: 'One-hour session showing the client how to update the site, plus a short written guide.', no: 'Én time der vi viser kunden hvordan nettsiden oppdateres, pluss en kort skriftlig veiledning.' } },
+      ],
+    },
+    {
+      id: 'other', icon: 'clock',
+      title: { en: 'Other work', no: 'Annet arbeid' },
+      short: { en: 'Other', no: 'Annet' },
+      items: [
+        { id: 'hours', price: 750, qty: true, unit: { en: 'hour', no: 'time' },
+          name: { en: 'Extra work', no: 'Ekstra arbeid' },
+          desc: { en: 'Anything not on this list, at the hourly rate.', no: 'Alt som ikke står på listen, til timepris.' } },
+        { id: 'rush', percent: 25,
+          name: { en: 'Rush delivery', no: 'Hastelevering' },
+          desc: { en: 'Launch within 2 weeks. Adds a percentage to the one-time price.', no: 'Lansering innen 2 uker. Legger en prosent til engangsprisen.' } },
+      ],
+    },
+    {
+      id: 'ongoing', icon: 'repeat',
+      title: { en: 'Ongoing services', no: 'Løpende tjenester' },
+      short: { en: 'Ongoing', no: 'Løpende' },
+      note: { en: 'Billed monthly or yearly. Not part of the one-time price.', no: 'Faktureres månedlig eller årlig. Ikke med i engangsprisen.' },
+      items: [
+        { id: 'hosting', price: 150, period: 'month',
+          name: { en: 'Hosting', no: 'Hosting' },
+          desc: { en: 'Fast hosting with SSL and daily backups.', no: 'Rask hosting med SSL og daglig sikkerhetskopi.' } },
+        { id: 'maint', price: 500, period: 'month',
+          name: { en: 'Maintenance and small edits', no: 'Vedlikehold og små endringer' },
+          desc: { en: 'Updates, security checks and up to 30 minutes of edits each month.', no: 'Oppdateringer, sikkerhetssjekk og opptil 30 minutter med endringer hver måned.' } },
+        { id: 'shopmaint', price: 1000, period: 'month', requires: 'shop',
+          name: { en: 'Webshop maintenance', no: 'Vedlikehold av nettbutikk' },
+          desc: { en: 'Plugin updates, checkout and payment checks, and help with products.', no: 'Oppdatering av utvidelser, sjekk av kasse og betaling, og hjelp med produkter.' } },
+        { id: 'uptime', price: 100, period: 'month',
+          name: { en: 'Uptime monitoring', no: 'Overvåking av oppetid' },
+          desc: { en: 'We get an alert if the site goes down and fix it.', no: 'Vi får varsel hvis nettsiden går ned, og fikser det.' } },
+        { id: 'priority', price: 300, period: 'month',
+          name: { en: 'Priority support', no: 'Prioritert support' },
+          desc: { en: 'Answer within 4 working hours instead of 2 working days.', no: 'Svar innen 4 arbeidstimer i stedet for 2 arbeidsdager.' } },
+        { id: 'mailbox', price: 75, period: 'month', qty: true, unit: { en: 'mailbox', no: 'e-postkonto' },
+          name: { en: 'Email account', no: 'E-postkonto' },
+          desc: { en: 'Google Workspace or similar.', no: 'Google Workspace eller lignende.' } },
+        { id: 'domainyr', price: 200, period: 'year',
+          name: { en: 'Domain renewal (.no)', no: 'Fornyelse av domene (.no)' },
+          desc: { en: 'Yearly registration of the .no domain.', no: 'Årlig registrering av .no-domenet.' } },
+      ],
+    },
+    {
+      id: 'marketing', icon: 'trend',
+      title: { en: 'Marketing', no: 'Markedsføring' },
+      note: { en: 'Billed monthly. Not part of the one-time price. Ad spend is paid by the client.', no: 'Faktureres månedlig. Ikke med i engangsprisen. Annonsebudsjettet betaler kunden.' },
+      items: [
+        { id: 'seomonthly', price: 2500, period: 'month',
+          name: { en: 'SEO every month', no: 'SEO hver måned' },
+          desc: { en: 'Keyword tracking, content tweaks and technical fixes, with a short report.', no: 'Sporing av søkeord, justering av innhold og tekniske rettelser, med en kort rapport.' } },
+        { id: 'ads', price: 3000, period: 'month',
+          name: { en: 'Google Ads management', no: 'Styring av Google Ads' },
+          desc: { en: 'We set up and run the campaigns and adjust them every week.', no: 'Vi setter opp og drifter kampanjene og justerer dem hver uke.' } },
+        { id: 'some', price: 4000, period: 'month',
+          name: { en: 'Social media management', no: 'Drift av sosiale medier' },
+          desc: { en: 'Up to 8 posts a month on two channels.', no: 'Opptil 8 innlegg i måneden på to kanaler.' } },
+        { id: 'posts', price: 1500, period: 'month', qty: true, unit: { en: 'post', no: 'innlegg' },
+          name: { en: 'Blog posts', no: 'Blogginnlegg' },
+          desc: { en: 'We write and publish articles that help the site rank.', no: 'Vi skriver og publiserer artikler som hjelper siden å rangere i Google.' } },
+        { id: 'newsletters', price: 1500, period: 'month',
+          name: { en: 'Newsletter', no: 'Nyhetsbrev' },
+          desc: { en: 'We write and send one newsletter a month.', no: 'Vi skriver og sender ett nyhetsbrev i måneden.' } },
+        { id: 'report', price: 400, period: 'month',
+          name: { en: 'Monthly report', no: 'Månedsrapport' },
+          desc: { en: 'Visitors, top pages and enquiries in a short email.', no: 'Besøkende, mest leste sider og henvendelser i en kort e-post.' } },
+      ],
+    },
+  ],
+};
+
+// ---------------------------------------------------------------
+// Page text in English and Norwegian
+// ---------------------------------------------------------------
+const UI = {
+  en: {
+    langSwitch: 'Page language',
+    eyebrow: 'Internal price list · NOK eks. mva',
+    nightMode: 'Night mode',
+    nightModeTitle: 'Preview the night mode we sell as an add-on',
+    title: 'Website price list',
+    lede: 'Tick what the client wants and the quote adds it up. To change a price, edit the <code>PRICES</code> list at the top of the script in this file.',
+    factFrom: 'Packages from',
+    factLang: 'Extra language',
+    factDark: 'Night mode',
+    factHour: 'Hourly rate',
+    navLabel: 'Sections',
+    package: 'Package',
+    packageNote: 'The base price for design and build. Extra pages and languages below are added on top.',
+    noPackage: 'No package, only add-ons or ongoing services',
+    languages: 'Languages',
+    mainLanguage: 'Main language',
+    extraLanguages: 'Extra languages',
+    main: 'main',
+    translateName: 'We translate the content',
+    translateDesc: 'Leave this off if the client sends finished translations.',
+    translatePer: 'per page, per language',
+    tNoExtra: 'Pick an extra language to see the translation cost.',
+    tOff: 'Translation not included. The client provides the text.',
+    tNoPages: 'Pick a package or add extra pages to count the pages to translate.',
+    adjustments: 'Adjustments',
+    discountLabel: 'Discount on one-time price',
+    customLines: 'Custom lines',
+    addLine: 'Add custom line',
+    customPlaceholder: 'Description, e.g. Product photos',
+    customName: 'Custom line description',
+    customAmount: 'Custom line amount in kr',
+    removeLine: 'Remove custom line',
+    customDefault: 'Custom line',
+    foot: 'All prices are in NOK excluding 25% MVA. Ongoing services and marketing are billed monthly or yearly and are not part of the one-time price. Add-on prices are based on roughly how many hours each takes at the hourly rate.',
+    quote: 'Quote',
+    example: 'This is an example quote. Press Clear to start a new one.',
+    client: 'Client or project',
+    clientPh: 'e.g. Fjordkafé AS',
+    oneTime: 'One-time',
+    subtotal: 'Subtotal',
+    totalEx: 'Total eks. mva',
+    vat: 'MVA 25%',
+    totalInc: 'Total inkl. mva',
+    addVat: 'Add 25% MVA',
+    totalNoVat: 'Total, no MVA',
+    ongoingEx: 'Ongoing, eks. mva',
+    perMonth: 'Per month',
+    perYear: 'Per year',
+    noOngoing: 'No ongoing services.',
+    nothing: 'Nothing selected yet. Pick a package or some add-ons.',
+    noteEx: ' eks. mva',
+    noOngoingCosts: 'No ongoing costs',
+    copy: 'Copy quote as text',
+    clear: 'Clear',
+    clearConfirm: 'Press again to clear',
+    cleared: 'Cleared. Pick a package to start.',
+    copied: 'Quote copied. Paste it into an email or message.',
+    copyBlocked: 'Copying is blocked here. The text below is selected: press Ctrl+C or ⌘C.',
+    quoteTextLabel: 'Quote text',
+    seeQuote: 'See quote',
+    mInc: 'inkl. mva',
+    mNoVat: 'no MVA',
+    mo: '/mo',
+    yr: '/yr',
+    monthly: 'monthly',
+    yearly: 'yearly',
+    ofOneTime: 'of the one-time price',
+    translation: 'Translation',
+    rtl: 'Right-to-left layout',
+    quoteTitle: 'Website quote',
+    noOneTime: 'No one-time work',
+    ongoingTitle: 'Ongoing (eks. mva):',
+    perMonthText: ' per month',
+    perYearText: ' per year',
+    totalText: 'Total',
+    pct: p => `${p}%`,
+    pages: n => `${n} ${n === 1 ? 'page' : 'pages'}`,
+    langs: n => `${n} ${n === 1 ? 'language' : 'languages'}`,
+    pagesIncluded: n => `${n} ${n === 1 ? 'page' : 'pages'} included`,
+    langNote: per => `The main language is included. Each extra language adds a language switcher and a full copy of the site for ${per} per language.`,
+    rtlNote: (names, price) => ` ${names} also needs a right-to-left layout: ${price}.`,
+    extraCount: n => `${n} extra`,
+    selected: n => `${n} selected`,
+    onlyWith: name => `Only with ${name}`,
+    onlyWithGroup: name => `Only with the ${name} package. Pick it above to add these.`,
+    includedIn: name => `Included in ${name}`,
+    discount: p => `Discount ${p}%`,
+    firstYear: vat => `First year in total, ${vat ? 'inkl.' : 'eks.'} mva`,
+    noteMonth: v => `+ ${v} per month`,
+    noteYear: v => `+ ${v} per year`,
+    mMonth: v => ` · + ${v}/mo`,
+    unitPer: u => `per ${u}`,
+    percentOf: (p, v) => `+${p}% of ${v}`,
+    extraLanguage: n => (n === 1 ? 'Extra language' : 'Extra languages'),
+    fewer: n => `Fewer: ${n}`,
+    more: n => `More: ${n}`,
+    qty: n => `Quantity: ${n}`,
+  },
+  no: {
+    langSwitch: 'Språk på siden',
+    eyebrow: 'Intern prisliste · NOK eks. mva',
+    nightMode: 'Nattmodus',
+    nightModeTitle: 'Forhåndsvis nattmodusen vi selger som tillegg',
+    title: 'Prisliste for nettsider',
+    lede: 'Kryss av for det kunden vil ha, så regner tilbudet ut prisen. Vil du endre en pris, redigerer du <code>PRICES</code>-listen øverst i skriptet i denne filen.',
+    factFrom: 'Pakker fra',
+    factLang: 'Ekstra språk',
+    factDark: 'Nattmodus',
+    factHour: 'Timepris',
+    navLabel: 'Seksjoner',
+    package: 'Pakke',
+    packageNote: 'Grunnprisen for design og utvikling. Ekstra sider og språk nedenfor kommer i tillegg.',
+    noPackage: 'Ingen pakke, bare tillegg eller løpende tjenester',
+    languages: 'Språk',
+    mainLanguage: 'Hovedspråk',
+    extraLanguages: 'Ekstra språk',
+    main: 'hoved',
+    translateName: 'Vi oversetter innholdet',
+    translateDesc: 'La denne stå av hvis kunden sender ferdige oversettelser.',
+    translatePer: 'per side, per språk',
+    tNoExtra: 'Velg et ekstra språk for å se hva oversettelsen koster.',
+    tOff: 'Oversettelse er ikke med. Kunden leverer teksten.',
+    tNoPages: 'Velg en pakke eller legg til ekstra sider for å telle sidene som skal oversettes.',
+    adjustments: 'Justeringer',
+    discountLabel: 'Rabatt på engangsprisen',
+    customLines: 'Egne linjer',
+    addLine: 'Legg til egen linje',
+    customPlaceholder: 'Beskrivelse, f.eks. Produktbilder',
+    customName: 'Beskrivelse av egen linje',
+    customAmount: 'Beløp for egen linje i kr',
+    removeLine: 'Fjern egen linje',
+    customDefault: 'Egen linje',
+    foot: 'Alle priser er i NOK eksklusive 25 % mva. Løpende tjenester og markedsføring faktureres månedlig eller årlig og er ikke med i engangsprisen. Prisene på tillegg bygger på omtrent hvor mange timer hvert tillegg tar, ganget med timeprisen.',
+    quote: 'Tilbud',
+    example: 'Dette er et eksempeltilbud. Trykk Tøm for å starte et nytt.',
+    client: 'Kunde eller prosjekt',
+    clientPh: 'f.eks. Fjordkafé AS',
+    oneTime: 'Engangspris',
+    subtotal: 'Delsum',
+    totalEx: 'Totalt eks. mva',
+    vat: 'MVA 25 %',
+    totalInc: 'Totalt inkl. mva',
+    addVat: 'Legg til 25 % mva',
+    totalNoVat: 'Totalt, uten mva',
+    ongoingEx: 'Løpende, eks. mva',
+    perMonth: 'Per måned',
+    perYear: 'Per år',
+    noOngoing: 'Ingen løpende tjenester.',
+    nothing: 'Ingenting valgt ennå. Velg en pakke eller noen tillegg.',
+    noteEx: ' eks. mva',
+    noOngoingCosts: 'Ingen løpende kostnader',
+    copy: 'Kopier tilbudet som tekst',
+    clear: 'Tøm',
+    clearConfirm: 'Trykk igjen for å tømme',
+    cleared: 'Tømt. Velg en pakke for å starte.',
+    copied: 'Tilbudet er kopiert. Lim det inn i en e-post eller melding.',
+    copyBlocked: 'Kopiering er blokkert her. Teksten under er markert: trykk Ctrl+C eller ⌘C.',
+    quoteTextLabel: 'Tilbudstekst',
+    seeQuote: 'Se tilbud',
+    mInc: 'inkl. mva',
+    mNoVat: 'uten mva',
+    mo: '/mnd',
+    yr: '/år',
+    monthly: 'månedlig',
+    yearly: 'årlig',
+    ofOneTime: 'av engangsprisen',
+    translation: 'Oversettelse',
+    rtl: 'Oppsett fra høyre mot venstre',
+    quoteTitle: 'Tilbud på nettside',
+    noOneTime: 'Ingen engangsarbeid',
+    ongoingTitle: 'Løpende (eks. mva):',
+    perMonthText: ' per måned',
+    perYearText: ' per år',
+    totalText: 'Totalt',
+    pct: p => `${p} %`,
+    pages: n => `${n} ${n === 1 ? 'side' : 'sider'}`,
+    langs: n => `${n} språk`,
+    pagesIncluded: n => `${n} ${n === 1 ? 'side' : 'sider'} inkludert`,
+    langNote: per => `Hovedspråket er inkludert. Hvert ekstra språk gir en språkvelger og en full kopi av nettsiden for ${per} per språk.`,
+    rtlNote: (names, price) => ` ${names} trenger også oppsett fra høyre mot venstre: ${price}.`,
+    extraCount: n => `${n} ekstra`,
+    selected: n => `${n} valgt`,
+    onlyWith: name => `Bare med ${name}`,
+    onlyWithGroup: name => `Bare med pakken ${name}. Velg den over for å legge til disse.`,
+    includedIn: name => `Inkludert i ${name}`,
+    discount: p => `Rabatt ${p} %`,
+    firstYear: vat => `Første år totalt, ${vat ? 'inkl.' : 'eks.'} mva`,
+    noteMonth: v => `+ ${v} per måned`,
+    noteYear: v => `+ ${v} per år`,
+    mMonth: v => ` · + ${v}/mnd`,
+    unitPer: u => `per ${u}`,
+    percentOf: (p, v) => `+${p} % av ${v}`,
+    extraLanguage: () => 'Ekstra språk',
+    fewer: n => `Færre: ${n}`,
+    more: n => `Flere: ${n}`,
+    qty: n => `Antall: ${n}`,
+  },
+};
+
+// ---------------------------------------------------------------
+// Calculator
+// ---------------------------------------------------------------
+const $ = (s, root = document) => root.querySelector(s);
+const NUM = new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 });
+const kr = n => NUM.format(Math.round(n)) + ' kr';
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const sum = lines => lines.reduce((t, l) => t + l.amount, 0);
+const toQty = v => Math.max(0, Math.min(999, Math.floor(Number(v) || 0)));
+const toPct = v => Math.max(0, Math.min(100, Number(v) || 0));
+const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const ICONS = {
+  layers: '<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3Z"/>',
+  toggle: '<rect x="2" y="7" width="20" height="10" rx="5"/><circle cx="16" cy="12" r="2.5"/>',
+  pen: '<path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/>',
+  code: '<path d="m8 8-4 4 4 4"/><path d="m16 8 4 4-4 4"/><path d="m13.5 5-3 14"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  repeat: '<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20v-4h-4"/>',
+  sliders: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+  frame: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M9 9v11"/>',
+  cart: '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.6 12.2a2 2 0 0 0 2 1.6h8.3a2 2 0 0 0 2-1.5L22 8H6"/>',
+  trend: '<path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+};
+const icon = name => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ICONS.layers}</svg>`;
+
+// Items in a group that requires a package inherit that requirement.
+const ITEMS = Object.fromEntries(PRICES.groups.flatMap(g => g.items.map(it => {
+  if (g.requires && !it.requires) it.requires = g.requires;
+  return [it.id, it];
+})));
+const LANGS = Object.fromEntries(PRICES.languages.list.map(l => [l.id, l]));
+const PKGS = Object.fromEntries(PRICES.packages.map(p => [p.id, p]));
+
+const EMPTY = { pkg: 'none', primary: 'nb', langs: [], translate: true, items: {}, discount: 0, custom: [], vat: true, client: '' };
+const EXAMPLE = { ...EMPTY, pkg: 'basic', langs: ['en'], items: { dark: 1, contact: 1, seo: 1, hosting: 1, maint: 1, domainyr: 1 } };
+const KEY = 'website-price-list:v1';
+const THEME_KEY = 'website-price-list:theme';
+const UI_KEY = 'website-price-list:lang';
+
+function pickLang() {
+  try {
+    const saved = localStorage.getItem(UI_KEY);
+    if (saved === 'en' || saved === 'no') return saved;
+  } catch (e) { /* fall back to the browser language */ }
+  const prefs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en'];
+  return prefs.some(l => /^(nb|nn|no)\b/i.test(l)) ? 'no' : 'en';
+}
+
+let lang = pickLang();
+let T = UI[lang];
+// Text in PRICES is either a plain string or { en, no }.
+const tr = x => (x && typeof x === 'object' ? (x[lang] ?? x.en) : x);
+
+let isExample = false;
+let state = load();
+
+function clean(s) {
+  const out = JSON.parse(JSON.stringify(EMPTY));
+  if (!s || typeof s !== 'object') return out;
+  if (s.pkg === 'none' || PKGS[s.pkg]) out.pkg = s.pkg;
+  if (LANGS[s.primary]) out.primary = s.primary;
+  if (Array.isArray(s.langs)) out.langs = s.langs.filter(id => LANGS[id] && id !== out.primary);
+  out.translate = s.translate !== false;
+  if (s.items && typeof s.items === 'object') {
+    for (const [id, q] of Object.entries(s.items)) if (ITEMS[id]) out.items[id] = toQty(q);
+  }
+  out.discount = toPct(s.discount);
+  if (Array.isArray(s.custom)) {
+    out.custom = s.custom.filter(c => c && typeof c === 'object').map(c => ({ name: String(c.name ?? ''), amount: Number(c.amount) || 0 }));
+  }
+  out.vat = s.vat !== false;
+  out.client = typeof s.client === 'string' ? s.client : '';
+  return out;
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) return clean(JSON.parse(raw));
+  } catch (e) { /* storage unavailable: start from the example */ }
+  isExample = true;
+  return clean(EXAMPLE);
+}
+
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* not saved, still works */ }
+}
+
+const available = it => !it.requires || it.requires === state.pkg;
+const included = it => !!(it.includedWith && it.includedWith.includes(state.pkg));
+const extraLangs = () => state.langs.filter(id => id !== state.primary);
+
+function pageCount() {
+  const pkg = PKGS[state.pkg];
+  return (pkg ? pkg.pages : 0) + (state.items.pages || 0);
+}
+
+function compute() {
+  const once = [];
+  const ongoing = [];
+  const pkg = PKGS[state.pkg];
+  const L = PRICES.languages;
+  if (pkg) once.push({ label: tr(pkg.name), detail: T.pagesIncluded(pkg.pages), amount: pkg.price });
+
+  const extra = extraLangs();
+  const pages = pageCount();
+  if (extra.length) {
+    once.push({
+      label: T.extraLanguage(extra.length),
+      detail: `${extra.map(id => tr(LANGS[id].name)).join(', ')} · ${extra.length} × ${kr(L.perLanguage)}`,
+      amount: extra.length * L.perLanguage,
+    });
+    if (state.translate && pages > 0) {
+      once.push({
+        label: T.translation,
+        detail: `${T.pages(pages)} × ${T.langs(extra.length)} × ${kr(L.translatePerPage)}`,
+        amount: pages * extra.length * L.translatePerPage,
+      });
+    }
+  }
+  const rtl = [state.primary, ...extra].filter(id => LANGS[id].rtl);
+  if (rtl.length) once.push({ label: T.rtl, detail: rtl.map(id => tr(LANGS[id].name)).join(', '), amount: L.rtlLayout });
+
+  const percents = [];
+  for (const it of Object.values(ITEMS)) {
+    const q = state.items[it.id] || 0;
+    if (!q || !available(it) || included(it)) continue;
+    if (it.percent) { percents.push(it); continue; }
+    const line = { label: tr(it.name), detail: it.qty ? `${q} × ${kr(it.price)}` : '', amount: q * it.price, period: it.period };
+    (it.period ? ongoing : once).push(line);
+  }
+  for (const c of state.custom) {
+    if (c.name.trim() || c.amount) once.push({ label: c.name.trim() || T.customDefault, detail: '', amount: c.amount });
+  }
+
+  const work = sum(once);
+  const adds = percents.map(it => ({ label: tr(it.name), detail: T.percentOf(it.percent, kr(work)), amount: Math.round(work * it.percent / 100) }));
+  const subtotal = work + sum(adds);
+  const discount = Math.round(subtotal * state.discount / 100);
+  const net = subtotal - discount;
+  const vat = state.vat ? Math.round(net * PRICES.vatRate) : 0;
+  const monthly = sum(ongoing.filter(l => l.period === 'month'));
+  const yearly = sum(ongoing.filter(l => l.period === 'year'));
+  const firstYearNet = net + monthly * 12 + yearly;
+  const firstYear = state.vat ? Math.round(firstYearNet * (1 + PRICES.vatRate)) : firstYearNet;
+  return { once: [...once, ...adds], ongoing, subtotal, discount, net, vat, total: net + vat, monthly, yearly, firstYear };
+}
+
+// ---------- Rendering ----------
+
+function applyStatic() {
+  document.documentElement.lang = lang === 'no' ? 'nb' : 'en';
+  document.querySelectorAll('[data-t]').forEach(el => { el.textContent = T[el.dataset.t]; });
+  document.querySelectorAll('[data-t-html]').forEach(el => { el.innerHTML = T[el.dataset.tHtml]; });
+  document.querySelectorAll('[data-t-ph]').forEach(el => { el.placeholder = T[el.dataset.tPh]; });
+  document.querySelectorAll('[data-t-title]').forEach(el => { el.title = T[el.dataset.tTitle]; });
+  document.querySelectorAll('[data-t-aria]').forEach(el => { el.setAttribute('aria-label', T[el.dataset.tAria]); });
+  document.querySelectorAll('[data-ui]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.ui === lang)));
+}
+
+function priceSub(it) {
+  if (it.percent) return T.ofOneTime;
+  const parts = [];
+  if (it.unit) parts.push(T.unitPer(tr(it.unit)));
+  if (it.period) parts.push(it.period === 'month' ? T.monthly : T.yearly);
+  return parts.join(', ');
+}
+
+function itemRow(it) {
+  const name = tr(it.name);
+  const sub = priceSub(it);
+  const price = `<span class="item-price"><span class="amt">${it.percent ? '+' + T.pct(it.percent) : kr(it.price)}</span>${sub ? `<span class="per">${esc(sub)}</span>` : ''}</span>`;
+  const text = `<span class="item-text"><span class="item-name">${esc(name)}</span><span class="item-desc">${esc(tr(it.desc))}</span><span class="item-flag" id="flag-${it.id}"></span></span>`;
+  if (it.qty) {
+    return `<li><div class="item" data-item="${it.id}">${text}${price}
+      <span class="ctl stepper">
+        <button type="button" data-step="-1" data-id="${it.id}" aria-label="${esc(T.fewer(name))}">−</button>
+        <input type="number" inputmode="numeric" min="0" max="999" id="q-${it.id}" data-qty="${it.id}" aria-label="${esc(T.qty(name))}">
+        <button type="button" data-step="1" data-id="${it.id}" aria-label="${esc(T.more(name))}">+</button>
+      </span></div></li>`;
+  }
+  return `<li><label class="item" data-item="${it.id}" for="c-${it.id}">${text}${price}<span class="ctl"><input type="checkbox" class="check" id="c-${it.id}" data-check="${it.id}"></span></label></li>`;
+}
+
+function renderPicker() {
+  const L = PRICES.languages;
+  $('#updated').textContent = tr(PRICES.updated);
+  $('#f-from').textContent = kr(Math.min(...PRICES.packages.map(p => p.price)));
+  $('#f-lang').textContent = kr(L.perLanguage);
+  $('#f-dark-wrap').hidden = !ITEMS.dark;
+  if (ITEMS.dark) $('#f-dark').textContent = kr(ITEMS.dark.price);
+  $('#f-hour-wrap').hidden = !ITEMS.hours;
+  if (ITEMS.hours) $('#f-hour').textContent = kr(ITEMS.hours.price);
+
+  document.querySelectorAll('[data-icon]').forEach(el => { el.innerHTML = icon(el.dataset.icon); });
+
+  const nav = [
+    { id: 'pkg', label: T.package },
+    { id: 'lang', label: T.languages },
+    ...PRICES.groups.map(g => ({ id: g.id, label: tr(g.short || g.title) })),
+    { id: 'adjust', label: T.adjustments },
+  ];
+  $('#secnav').innerHTML = nav.map(n => `<li><a href="#sec-${n.id}" data-target="sec-${n.id}">${esc(n.label)}<b class="n" id="n-${n.id}"></b></a></li>`).join('');
+
+  $('#packages').innerHTML = PRICES.packages.map(p => `
+    <label class="pkg" for="pkg-${p.id}">
+      <input type="radio" name="pkg" id="pkg-${p.id}" value="${p.id}">
+      <span class="pkg-check" aria-hidden="true"></span>
+      <span class="pkg-name">${esc(tr(p.name))}</span>
+      <span class="pkg-price">${kr(p.price)}</span>
+      <span class="pkg-pages"><span class="glyphs" aria-hidden="true">${'<i></i>'.repeat(Math.min(p.pages, 10))}</span>${esc(T.pagesIncluded(p.pages))}</span>
+      <span class="pkg-desc">${esc(tr(p.desc))}</span>
+    </label>`).join('');
+
+  const rtlNames = L.list.filter(l => l.rtl).map(l => tr(l.name)).join(', ');
+  $('#lang-note').innerHTML = esc(T.langNote('\u0000')).replace('\u0000', `<span class="num">${kr(L.perLanguage)}</span>`)
+    + (rtlNames ? esc(T.rtlNote(rtlNames, '\u0000')).replace('\u0000', `<span class="num">${kr(L.rtlLayout)}</span>`) : '');
+  $('#primary').innerHTML = L.list.map(l => `<option value="${l.id}">${esc(tr(l.name))}</option>`).join('');
+  $('#chips').innerHTML = L.list.map(l => `<button type="button" class="chip" id="lang-${l.id}" data-lang="${l.id}" aria-pressed="false"><span class="code" aria-hidden="true">${esc(l.id.toUpperCase())}</span>${esc(tr(l.name))}</button>`).join('');
+  $('#translate-price').textContent = kr(L.translatePerPage);
+
+  $('#groups').innerHTML = PRICES.groups.map(g => `
+    <section class="sec" id="sec-${g.id}" aria-labelledby="h-${g.id}">
+      <div class="sec-head"><span class="sec-icon">${icon(g.icon)}</span><h2 id="h-${g.id}">${esc(tr(g.title))}</h2><span class="count" id="count-${g.id}"></span></div>
+      ${g.note ? `<p class="sec-note">${esc(tr(g.note))}</p>` : ''}
+      ${g.requires ? `<p class="sec-note need" id="need-${g.id}">${esc(T.onlyWithGroup(tr(PKGS[g.requires].name)))}</p>` : ''}
+      <ul class="items">${g.items.map(itemRow).join('')}</ul>
+    </section>`).join('');
+}
+
+function renderCustom() {
+  $('#custom').innerHTML = state.custom.map((c, i) => `
+    <li class="cline">
+      <input type="text" id="cl-name-${i}" data-custom="name" data-idx="${i}" value="${esc(c.name)}" placeholder="${esc(T.customPlaceholder)}" aria-label="${esc(T.customName)}">
+      <span class="money"><input type="number" id="cl-amt-${i}" data-custom="amount" data-idx="${i}" value="${c.amount || ''}" placeholder="0" inputmode="numeric" aria-label="${esc(T.customAmount)}"><span>kr</span></span>
+      <button type="button" class="x" data-remove="${i}" aria-label="${esc(T.removeLine)}">×</button>
+    </li>`).join('');
+}
+
+function setValue(input, value) {
+  if (document.activeElement !== input) input.value = value;
+}
+
+function sync() {
+  for (const p of PRICES.packages) {
+    const input = $('#pkg-' + p.id);
+    input.checked = state.pkg === p.id;
+    input.closest('.pkg').classList.toggle('on', input.checked);
+  }
+  $('#pkg-none').checked = state.pkg === 'none';
+  $('#n-pkg').textContent = PKGS[state.pkg] ? '✓' : '';
+
+  $('#primary').value = state.primary;
+  for (const l of PRICES.languages.list) {
+    const chip = $('#lang-' + l.id);
+    const isMain = l.id === state.primary;
+    chip.disabled = isMain;
+    chip.classList.toggle('primary', isMain);
+    chip.dataset.main = T.main;
+    chip.setAttribute('aria-pressed', String(isMain || state.langs.includes(l.id)));
+  }
+  const extra = extraLangs();
+  const pages = pageCount();
+  $('#lang-count').textContent = extra.length ? T.extraCount(extra.length) : '';
+  $('#n-lang').textContent = extra.length ? `+${extra.length}` : '';
+  $('#translate').checked = state.translate;
+  $('#translate-row').classList.toggle('on', state.translate && extra.length > 0);
+  $('#translate-note').textContent = !extra.length
+    ? T.tNoExtra
+    : !state.translate
+      ? T.tOff
+      : pages
+        ? `${T.pages(pages)} × ${T.langs(extra.length)} × ${kr(PRICES.languages.translatePerPage)} = ${kr(pages * extra.length * PRICES.languages.translatePerPage)}`
+        : T.tNoPages;
+
+  for (const g of PRICES.groups) {
+    let picked = 0;
+    for (const it of g.items) {
+      const row = document.querySelector(`.item[data-item="${it.id}"]`);
+      const ok = available(it);
+      const inc = included(it);
+      const q = state.items[it.id] || 0;
+      if (ok && !inc && q > 0) picked++;
+      row.classList.toggle('off', !ok);
+      row.classList.toggle('inc', inc);
+      row.classList.toggle('on', ok && (inc || q > 0));
+      $('#flag-' + it.id).textContent = !ok && !g.requires ? T.onlyWith(tr(PKGS[it.requires].name)) : inc ? T.includedIn(tr(PKGS[state.pkg].name)) : '';
+      if (it.qty) {
+        const input = $('#q-' + it.id);
+        setValue(input, q);
+        input.disabled = !ok;
+        row.querySelectorAll('button').forEach(b => { b.disabled = !ok; });
+      } else {
+        const box = $('#c-' + it.id);
+        box.checked = inc || q > 0;
+        box.disabled = !ok || inc;
+      }
+    }
+    if (g.requires) $('#need-' + g.id).hidden = g.requires === state.pkg;
+    $('#count-' + g.id).textContent = picked ? T.selected(picked) : '';
+    $('#n-' + g.id).textContent = picked || '';
+  }
+  const adjustments = (state.discount ? 1 : 0) + state.custom.length;
+  $('#n-adjust').textContent = adjustments || '';
+
+  setValue($('#discount'), state.discount || '');
+  setValue($('#client'), state.client);
+  $('#vat').checked = state.vat;
+  $('#example').hidden = !isExample;
+}
+
+const tweens = new Map();
+function showKr(el, to) {
+  const from = el.dataset.v === undefined ? to : Number(el.dataset.v);
+  el.dataset.v = to;
+  cancelAnimationFrame(tweens.get(el));
+  if (REDUCE || from === to) { el.textContent = kr(to); return; }
+  const start = performance.now();
+  const step = now => {
+    const t = Math.min(1, (now - start) / 350);
+    el.textContent = kr(from + (to - from) * (1 - Math.pow(1 - t, 3)));
+    if (t < 1) tweens.set(el, requestAnimationFrame(step));
+  };
+  tweens.set(el, requestAnimationFrame(step));
+}
+
+function lineHTML(l, suffix = '') {
+  return `<li class="qline"><span class="lab">${esc(l.label)}</span><span class="qamt">${kr(l.amount)}${suffix}</span>${l.detail ? `<span class="det">${esc(l.detail)}</span>` : ''}</li>`;
+}
+
+function renderQuote() {
+  const c = compute();
+  $('#q-date').textContent = new Date().toLocaleDateString('nb-NO');
+  $('#grand-label').textContent = state.vat ? T.totalInc : T.totalNoVat;
+  showKr($('#t-total'), c.total);
+  const notes = [];
+  if (c.monthly) notes.push(T.noteMonth(kr(c.monthly)));
+  if (c.yearly) notes.push(T.noteYear(kr(c.yearly)));
+  $('#grand-note').textContent = notes.length ? notes.join(' · ') + T.noteEx : T.noOngoingCosts;
+
+  $('#qlines').innerHTML = c.once.length
+    ? c.once.map(l => lineHTML(l)).join('')
+    : `<li class="qempty">${esc(T.nothing)}</li>`;
+
+  $('#row-sub').hidden = !c.discount;
+  $('#t-sub').textContent = kr(c.subtotal);
+  $('#row-discount').hidden = !c.discount;
+  $('#t-discount-label').textContent = T.discount(state.discount);
+  $('#t-discount').textContent = '−' + kr(c.discount);
+  $('#row-net').hidden = !c.discount && !state.vat;
+  $('#t-net').textContent = kr(c.net);
+  $('#row-vat').hidden = !state.vat;
+  $('#t-vat').textContent = kr(c.vat);
+  $('#row-gross').hidden = !state.vat;
+  $('#t-gross').textContent = kr(c.total);
+
+  $('#olines').innerHTML = c.ongoing.length
+    ? c.ongoing.map(l => lineHTML(l, l.period === 'month' ? T.mo : T.yr)).join('')
+    : `<li class="qempty">${esc(T.noOngoing)}</li>`;
+  $('#o-sums').hidden = !c.ongoing.length;
+  $('#row-month').hidden = !c.monthly;
+  $('#t-month').textContent = kr(c.monthly);
+  $('#row-year').hidden = !c.yearly;
+  $('#t-year').textContent = kr(c.yearly);
+  $('#first-year-label').textContent = T.firstYear(state.vat);
+  $('#t-first-year').textContent = kr(c.firstYear);
+
+  showKr($('#m-total'), c.total);
+  $('#m-sub').textContent = (state.vat ? T.mInc : T.mNoVat) + (c.monthly ? T.mMonth(kr(c.monthly)) : '');
+}
+
+function quoteText() {
+  const c = compute();
+  const out = [];
+  const name = state.client.trim();
+  const fmtLine = (l, suffix = '') => `${l.label}${l.detail ? ` (${l.detail})` : ''}: ${kr(l.amount)}${suffix}`;
+  out.push(`${T.quoteTitle}${name ? ' – ' + name : ''}`);
+  out.push(new Date().toLocaleDateString('nb-NO'));
+  out.push('');
+  if (c.once.length) c.once.forEach(l => out.push(fmtLine(l)));
+  else out.push(T.noOneTime);
+  out.push('');
+  if (c.discount) {
+    out.push(`${T.subtotal}: ${kr(c.subtotal)}`);
+    out.push(`${T.discount(state.discount)}: −${kr(c.discount)}`);
+  }
+  if (state.vat) {
+    out.push(`${T.totalEx}: ${kr(c.net)}`);
+    out.push(`${T.vat}: ${kr(c.vat)}`);
+    out.push(`${T.totalInc}: ${kr(c.total)}`);
+  } else {
+    out.push(`${T.totalText}: ${kr(c.total)}`);
+  }
+  if (c.ongoing.length) {
+    out.push('');
+    out.push(T.ongoingTitle);
+    c.ongoing.forEach(l => out.push(fmtLine(l, l.period === 'month' ? T.perMonthText : T.perYearText)));
+    out.push(`${T.firstYear(state.vat)}: ${kr(c.firstYear)}`);
+  }
+  return out.join('\n');
+}
+
+function changed() {
+  isExample = false;
+  $('#status').textContent = '';
+  save();
+  sync();
+  renderQuote();
+}
+
+// ---------- Page language ----------
+
+function renderAll() {
+  applyStatic();
+  renderPicker();
+  renderCustom();
+  sync();
+  renderQuote();
+  watchSections();
+  updateMenuEdge();
+}
+
+function setLang(next) {
+  if (next === lang || !UI[next]) return;
+  lang = next;
+  T = UI[lang];
+  try { localStorage.setItem(UI_KEY, lang); } catch (e) { /* not remembered */ }
+  resetClear();
+  $('#status').textContent = '';
+  $('#copy-fallback').hidden = true;
+  renderAll();
+}
+
+// ---------- Night mode switch ----------
+
+const root = document.documentElement;
+const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+const isDark = () => (root.dataset.theme ? root.dataset.theme === 'dark' : darkQuery.matches);
+const syncTheme = () => $('#theme').setAttribute('aria-pressed', String(isDark()));
+try {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved === 'dark' || saved === 'light') root.dataset.theme = saved;
+} catch (e) { /* follow the system setting */ }
+if (darkQuery.addEventListener) darkQuery.addEventListener('change', syncTheme);
+new MutationObserver(syncTheme).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+
+function toggleTheme() {
+  const next = isDark() ? 'light' : 'dark';
+  root.dataset.theme = next;
+  try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* not remembered */ }
+  syncTheme();
+}
+
+// ---------- Events ----------
+
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.name === 'pkg') state.pkg = t.value;
+  else if (t.id === 'primary') { state.primary = t.value; state.langs = state.langs.filter(id => id !== t.value); }
+  else if (t.id === 'translate') state.translate = t.checked;
+  else if (t.dataset.check) state.items[t.dataset.check] = t.checked ? 1 : 0;
+  else if (t.id === 'vat') state.vat = t.checked;
+  else if (t.dataset.qty || t.id === 'discount') { t.blur(); sync(); return; }
+  else return;
+  changed();
+});
+
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.qty) state.items[t.dataset.qty] = toQty(t.value);
+  else if (t.id === 'discount') state.discount = toPct(t.value);
+  else if (t.id === 'client') state.client = t.value;
+  else if (t.dataset.custom) {
+    const line = state.custom[Number(t.dataset.idx)];
+    if (!line) return;
+    if (t.dataset.custom === 'amount') line.amount = Number(t.value) || 0;
+    else line.name = t.value;
+  }
+  else return;
+  changed();
+});
+
+let clearTimer;
+function resetClear() {
+  clearTimeout(clearTimer);
+  const b = $('#clear');
+  b.classList.remove('armed');
+  b.textContent = T.clear;
+}
+
+document.addEventListener('click', e => {
+  const link = e.target.closest('a[data-target]');
+  if (link) {
+    const target = document.getElementById(link.dataset.target);
+    if (target) {
+      e.preventDefault();
+      target.scrollIntoView({ behavior: REDUCE ? 'auto' : 'smooth', block: 'start' });
+    }
+    return;
+  }
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.ui) {
+    setLang(b.dataset.ui);
+  } else if (b.id === 'theme') {
+    toggleTheme();
+  } else if (b.dataset.step) {
+    const id = b.dataset.id;
+    state.items[id] = toQty((state.items[id] || 0) + Number(b.dataset.step));
+    changed();
+  } else if (b.dataset.lang) {
+    const id = b.dataset.lang;
+    if (id === state.primary) return;
+    state.langs = state.langs.includes(id) ? state.langs.filter(x => x !== id) : [...state.langs, id];
+    changed();
+  } else if (b.id === 'add-line') {
+    state.custom.push({ name: '', amount: 0 });
+    renderCustom();
+    changed();
+    $(`#cl-name-${state.custom.length - 1}`).focus();
+  } else if (b.dataset.remove !== undefined) {
+    state.custom.splice(Number(b.dataset.remove), 1);
+    renderCustom();
+    changed();
+  } else if (b.id === 'copy') {
+    copyQuote();
+  } else if (b.id === 'clear') {
+    if (b.classList.contains('armed')) {
+      resetClear();
+      state = clean(EMPTY);
+      renderCustom();
+      changed();
+      $('#copy-fallback').hidden = true;
+      $('#status').textContent = T.cleared;
+    } else {
+      b.classList.add('armed');
+      b.textContent = T.clearConfirm;
+      clearTimer = setTimeout(resetClear, 3000);
+    }
+  }
+});
+
+function copyQuote() {
+  const text = quoteText();
+  const status = $('#status');
+  const fallback = () => {
+    const ta = $('#copy-fallback');
+    ta.value = text;
+    ta.hidden = false;
+    ta.focus();
+    ta.select();
+    status.textContent = T.copyBlocked;
+  };
+  try {
+    navigator.clipboard.writeText(text).then(() => {
+      $('#copy-fallback').hidden = true;
+      status.textContent = T.copied;
+    }, fallback);
+  } catch (err) {
+    fallback();
+  }
+}
+
+// ---------- Section menu and phone bar ----------
+
+let sectionObserver;
+function watchSections() {
+  if (!('IntersectionObserver' in window)) return;
+  if (sectionObserver) sectionObserver.disconnect();
+  const links = [...document.querySelectorAll('.secnav a')];
+  const sections = links.map(a => document.getElementById(a.dataset.target)).filter(Boolean);
+  const visible = new Set();
+  sectionObserver = new IntersectionObserver(entries => {
+    entries.forEach(en => (en.isIntersecting ? visible.add(en.target.id) : visible.delete(en.target.id)));
+    const current = sections.find(s => visible.has(s.id));
+    links.forEach(a => {
+      const on = !!current && a.dataset.target === current.id;
+      a.classList.toggle('current', on);
+      if (on) {
+        const list = a.closest('ul');
+        const left = a.offsetLeft - list.offsetLeft;
+        if (left < list.scrollLeft || left + a.offsetWidth > list.scrollLeft + list.clientWidth) {
+          list.scrollTo({ left: Math.max(0, left - 16), behavior: REDUCE ? 'auto' : 'smooth' });
+        }
+      }
+    });
+  }, { rootMargin: '-80px 0px -55% 0px' });
+  sections.forEach(s => sectionObserver.observe(s));
+}
+
+function updateMenuEdge() {
+  const list = $('#secnav');
+  list.classList.toggle('more-left', list.scrollLeft > 2);
+  list.classList.toggle('more-right', list.scrollLeft + list.clientWidth < list.scrollWidth - 2);
+}
+$('#secnav').addEventListener('scroll', updateMenuEdge, { passive: true });
+window.addEventListener('resize', updateMenuEdge);
+
+renderAll();
+syncTheme();
+
+if ('IntersectionObserver' in window) {
+  new IntersectionObserver(([entry]) => {
+    document.body.classList.toggle('quote-visible', entry.isIntersecting);
+  }, { threshold: 0.1 }).observe($('#quote'));
+}
+</script>
+</body>
+</html>
