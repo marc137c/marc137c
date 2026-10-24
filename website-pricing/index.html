@@ -1,0 +1,1021 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Website Price List</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a rate card. Option lists on the left, a sticky quote slip on the right; one column on phones with the total pinned to the bottom. */
+:root {
+  --paper: #f2f5f5;
+  --surface: #ffffff;
+  --ink: #142028;
+  --muted: #586872;
+  --line: #d9e1e3;
+  --hover: #f0f5f4;
+  --accent: #0b6e66;
+  --on-accent: #ffffff;
+  --tint: #e2f0ed;
+  --minus: #a8402c;
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --num: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0d1417;
+    --surface: #141d21;
+    --ink: #e3eaec;
+    --muted: #8e9fa6;
+    --line: #25333a;
+    --hover: #172428;
+    --accent: #4cbfb2;
+    --on-accent: #062320;
+    --tint: #11302c;
+    --minus: #e88c76;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0d1417;
+  --surface: #141d21;
+  --ink: #e3eaec;
+  --muted: #8e9fa6;
+  --line: #25333a;
+  --hover: #172428;
+  --accent: #4cbfb2;
+  --on-accent: #062320;
+  --tint: #11302c;
+  --minus: #e88c76;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px/1.5 var(--body);
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.wrap {
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* Header */
+.top { padding-block: 40px 28px; display: grid; gap: 10px; }
+.eyebrow {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+h1 {
+  margin: 0;
+  font: 700 clamp(32px, 5vw, 46px)/1.05 var(--display);
+  letter-spacing: -.02em;
+  text-wrap: balance;
+}
+.lede { margin: 0; max-width: 62ch; color: var(--muted); }
+code {
+  font-family: var(--num);
+  font-size: .88em;
+  background: var(--tint);
+  color: var(--ink);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* Two columns */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 48px;
+  align-items: start;
+  padding-block: 8px 72px;
+}
+.picker { display: grid; gap: 44px; min-width: 0; }
+.sec { display: grid; gap: 14px; min-width: 0; }
+.sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+h2 { margin: 0; font: 600 23px/1.2 var(--display); letter-spacing: -.01em; }
+.count {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.sec-note { margin: 0; color: var(--muted); max-width: 65ch; }
+.num { font-family: var(--num); font-weight: 500; font-size: .93em; white-space: nowrap; color: var(--ink); }
+
+/* Packages */
+.pkgs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.pkg {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color .15s, background-color .15s;
+}
+.pkg:hover { border-color: var(--muted); }
+.pkg input { position: absolute; opacity: 0; pointer-events: none; }
+.pkg:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pkg.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--tint); }
+.pkg-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.pkg-name { font: 600 17px/1.25 var(--display); }
+.pkg-pages { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.pkg-price { font: 500 20px/1.2 var(--num); font-variant-numeric: tabular-nums; }
+.pkg-desc { font-size: 13.5px; color: var(--muted); }
+.pkg-none { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); cursor: pointer; justify-self: start; }
+.pkg-none input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+
+/* Languages */
+.lang-main { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.field-label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+select, input[type="text"], input[type="number"] {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color .15s, border-color .15s;
+}
+.chip::before { content: "+ "; color: var(--muted); }
+.chip:hover { border-color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.chip[aria-pressed="true"]::before { content: "✓ "; color: inherit; }
+.chip.primary, .chip.primary:hover { background: var(--tint); border-color: var(--accent); color: var(--ink); cursor: default; }
+.chip.primary::before { content: ""; }
+.chip.primary::after { content: " · main"; color: var(--muted); }
+.lang-calc { margin: 0; font-size: 13.5px; color: var(--muted); }
+
+/* Item rows */
+.items { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.items > li { border-bottom: 1px solid var(--line); }
+.item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8.5rem 6.75rem;
+  grid-template-areas: "text price ctl";
+  gap: 4px 20px;
+  align-items: center;
+  padding: 14px 12px;
+  transition: background-color .15s;
+}
+label.item { cursor: pointer; }
+label.item:hover { background: var(--hover); }
+.item.on, label.item.on:hover { background: var(--tint); }
+.item.off { opacity: .45; }
+label.item.off, label.item.inc { cursor: default; }
+.item-text { grid-area: text; min-width: 0; display: grid; gap: 2px; }
+.item-name { font-weight: 600; }
+.item-desc { font-size: 13.5px; color: var(--muted); }
+.item-flag { font-size: 12px; font-weight: 600; color: var(--accent); }
+.item-flag:empty { display: none; }
+.item-price { grid-area: price; display: grid; justify-items: end; text-align: right; }
+.amt { font-family: var(--num); font-size: 14.5px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.inc .amt { text-decoration: line-through; color: var(--muted); }
+.per { font-size: 12px; color: var(--muted); }
+.ctl { grid-area: ctl; justify-self: end; display: inline-flex; align-items: center; }
+.ctl input[type="checkbox"] { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); cursor: inherit; }
+.stepper { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.stepper button {
+  width: 32px;
+  height: 34px;
+  border: 0;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 7px;
+}
+.stepper button:hover:not(:disabled) { background: var(--hover); }
+.stepper button:disabled { cursor: default; }
+.stepper input {
+  width: 2.75rem;
+  border: 0;
+  border-radius: 0;
+  padding: 6px 0;
+  background: transparent;
+  text-align: center;
+  font-family: var(--num);
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Adjustments */
+.adjust { display: grid; gap: 14px; }
+.money { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.money input { width: 7rem; font-family: var(--num); color: var(--ink); }
+.discount input { width: 5rem; }
+.clines { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cline { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+.x {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 18px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+.x:hover { color: var(--minus); border-color: var(--minus); }
+
+/* Quote slip */
+.quote {
+  position: sticky;
+  top: calc(env(safe-area-inset-top, 0px) + 20px);
+  max-height: calc(100vh - 40px - env(safe-area-inset-top, 0px));
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px;
+  display: grid;
+  gap: 18px;
+  scroll-margin-top: 16px;
+}
+.q-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.q-date { font: 400 12px/1 var(--num); color: var(--muted); }
+.field { display: grid; gap: 6px; }
+.field input { width: 100%; }
+.example {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--tint);
+  font-size: 13px;
+}
+.q-sub {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.qlines { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.qline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 12px; align-items: baseline; }
+.qline .lab { font-weight: 500; min-width: 0; }
+.qline .det { grid-column: 1; font-size: 12.5px; color: var(--muted); }
+.qamt { font-family: var(--num); font-size: 13.5px; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.qempty { color: var(--muted); font-size: 13.5px; }
+.sums { display: grid; gap: 6px; padding-top: 14px; border-top: 1px dashed var(--line); }
+.sum { display: flex; justify-content: space-between; gap: 12px; }
+.sum.minus .qamt { color: var(--minus); }
+.vat-toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13.5px; }
+.vat-toggle input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.grand { display: grid; gap: 2px; padding-top: 12px; border-top: 2px solid var(--ink); }
+.grand-amt {
+  font: 700 38px/1.1 var(--display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+}
+.grand-note { font-size: 12.5px; color: var(--muted); }
+.ongoing { display: grid; gap: 10px; padding-top: 14px; border-top: 1px dashed var(--line); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn {
+  padding: 11px 16px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--ink); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.armed { border-color: var(--minus); color: var(--minus); }
+.status { margin: 0; font-size: 13px; color: var(--muted); min-height: 1.5em; }
+.copy-fallback {
+  width: 100%;
+  min-height: 160px;
+  font: 12.5px/1.5 var(--num);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+}
+.foot { margin: 0; font-size: 13px; color: var(--muted); max-width: 65ch; }
+
+/* Phone total bar */
+.mbar { display: none; }
+
+@media (max-width: 1100px) {
+  .layout { grid-template-columns: minmax(0, 1fr) 320px; gap: 32px; }
+}
+@media (max-width: 900px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .quote { position: static; max-height: none; overflow: visible; }
+  body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+  .mbar {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    background: var(--ink);
+    color: var(--paper);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    transition: transform .2s ease;
+  }
+  .quote-visible .mbar { transform: translateY(110%); }
+  .mbar-in { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 10px; }
+  .mbar-total { display: grid; line-height: 1.2; }
+  .mbar-total b { font: 700 20px/1.2 var(--display); font-variant-numeric: tabular-nums; }
+  .mbar-total span { font-size: 12px; opacity: .75; }
+  .mbar a {
+    color: var(--paper);
+    font-weight: 600;
+    font-size: 14px;
+    padding: 9px 14px;
+    border: 1px solid currentColor;
+    border-radius: 9px;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+}
+@media (max-width: 560px) {
+  .pkgs { grid-template-columns: minmax(0, 1fr); }
+  .item {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "text ctl" "price ctl";
+    gap: 6px 16px;
+    padding-inline: 8px;
+  }
+  .item-price { justify-items: start; text-align: left; grid-auto-flow: column; justify-content: start; gap: 8px; align-items: baseline; }
+  .cline { grid-template-columns: minmax(0, 1fr) auto; }
+  .cline .money { grid-row: 2; }
+  .cline .x { grid-row: 1 / span 2; grid-column: 2; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="top wrap">
+  <p class="eyebrow">Internal · NOK eks. mva · <span id="updated"></span></p>
+  <h1>Website price list</h1>
+  <p class="lede">Tick what the client wants and the quote adds it up. To change a price, edit the <code>PRICES</code> list at the top of the script in this file.</p>
+</header>
+
+<main class="wrap layout">
+  <div class="picker">
+
+    <section class="sec" aria-labelledby="h-pkg">
+      <div class="sec-head"><h2 id="h-pkg">Package</h2></div>
+      <p class="sec-note">The base price for design and build. Extra pages and languages below are added on top.</p>
+      <div class="pkgs" id="packages"></div>
+      <label class="pkg-none" for="pkg-none"><input type="radio" name="pkg" id="pkg-none" value="none">No package, only add-ons or ongoing services</label>
+    </section>
+
+    <section class="sec" aria-labelledby="h-lang">
+      <div class="sec-head"><h2 id="h-lang">Languages</h2><span class="count" id="lang-count"></span></div>
+      <p class="sec-note" id="lang-note"></p>
+      <div class="lang-main">
+        <label class="field-label" for="primary">Main language</label>
+        <select id="primary"></select>
+      </div>
+      <div class="field-label" id="chips-label">Extra languages</div>
+      <div class="chips" id="chips" role="group" aria-labelledby="chips-label"></div>
+      <ul class="items">
+        <li>
+          <label class="item" id="translate-row" for="translate">
+            <span class="item-text">
+              <span class="item-name">We translate the content</span>
+              <span class="item-desc">Leave this off if the client sends finished translations.</span>
+            </span>
+            <span class="item-price"><span class="amt" id="translate-price"></span><span class="per">per page, per language</span></span>
+            <span class="ctl"><input type="checkbox" id="translate"></span>
+          </label>
+        </li>
+      </ul>
+      <p class="lang-calc" id="translate-note"></p>
+    </section>
+
+    <div id="groups" class="picker"></div>
+
+    <section class="sec" aria-labelledby="h-adjust">
+      <div class="sec-head"><h2 id="h-adjust">Adjustments</h2></div>
+      <div class="adjust">
+        <div class="lang-main discount">
+          <label class="field-label" for="discount">Discount on one-time price</label>
+          <span class="money"><input type="number" id="discount" min="0" max="100" step="1" inputmode="numeric"><span>%</span></span>
+        </div>
+        <div class="field-label">Custom lines</div>
+        <ul class="clines" id="custom"></ul>
+        <div><button type="button" class="btn" id="add-line">Add custom line</button></div>
+      </div>
+    </section>
+
+    <p class="foot">All prices are in NOK excluding 25% MVA. Ongoing services are billed monthly or yearly and are not part of the one-time price.</p>
+  </div>
+
+  <aside class="quote" id="quote" aria-labelledby="h-quote">
+    <div class="q-head"><h2 id="h-quote">Quote</h2><span class="q-date" id="q-date"></span></div>
+    <p class="example" id="example" hidden>This is an example quote. Press Clear to start a new one.</p>
+    <div class="field">
+      <label class="field-label" for="client">Client or project</label>
+      <input type="text" id="client" placeholder="e.g. Fjordkafé AS" autocomplete="off">
+    </div>
+
+    <p class="q-sub">One-time</p>
+    <ul class="qlines" id="qlines"></ul>
+
+    <div class="sums">
+      <div class="sum" id="row-sub"><span>Subtotal</span><span class="qamt" id="t-sub"></span></div>
+      <div class="sum minus" id="row-discount"><span id="t-discount-label"></span><span class="qamt" id="t-discount"></span></div>
+      <div class="sum" id="row-net"><span>Total eks. mva</span><span class="qamt" id="t-net"></span></div>
+      <div class="sum" id="row-vat"><span>MVA 25%</span><span class="qamt" id="t-vat"></span></div>
+      <label class="vat-toggle" for="vat"><input type="checkbox" id="vat">Add 25% MVA</label>
+    </div>
+
+    <div class="grand">
+      <span class="q-sub" id="grand-label"></span>
+      <span class="grand-amt" id="t-total"></span>
+    </div>
+
+    <div class="ongoing">
+      <p class="q-sub">Ongoing, eks. mva</p>
+      <ul class="qlines" id="olines"></ul>
+      <div class="sums" id="o-sums">
+        <div class="sum" id="row-month"><span>Per month</span><span class="qamt" id="t-month"></span></div>
+        <div class="sum" id="row-year"><span>Per year</span><span class="qamt" id="t-year"></span></div>
+        <div class="sum"><span id="first-year-label"></span><span class="qamt" id="t-first-year"></span></div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="btn primary" id="copy">Copy quote as text</button>
+      <button type="button" class="btn" id="clear">Clear</button>
+    </div>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+    <textarea class="copy-fallback" id="copy-fallback" readonly hidden aria-label="Quote text"></textarea>
+  </aside>
+</main>
+
+<div class="mbar" aria-hidden="true">
+  <div class="wrap mbar-in">
+    <span class="mbar-total"><b id="m-total"></b><span id="m-sub"></span></span>
+    <a href="#quote" tabindex="-1">See quote</a>
+  </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------
+// PRICES: edit the numbers here to change the price list.
+// All amounts are NOK excluding MVA.
+//   qty: true        -> has a +/- counter instead of a checkbox
+//   unit             -> what the counter counts ("page", "hour")
+//   period           -> "month" or "year" for ongoing services
+//   percent          -> adds a % of the one-time price
+//   requires         -> only available with that package
+//   includedWith     -> free (already included) with those packages
+// ---------------------------------------------------------------
+const PRICES = {
+  updated: 'Prices set October 2026',
+  vatRate: 0.25,
+  packages: [
+    { id: 'landing', name: 'Landing page', price: 6000, pages: 1, desc: 'One scrolling page with intro, services and contact info. Good for small businesses and events.' },
+    { id: 'basic', name: 'Basic website', price: 15000, pages: 5, desc: 'Up to 5 pages, for example Home, About, Services, Gallery and Contact.' },
+    { id: 'business', name: 'Business website', price: 28000, pages: 10, desc: 'Up to 10 pages with a fully custom design.' },
+    { id: 'shop', name: 'Webshop', price: 45000, pages: 6, desc: 'Online store with up to 50 products, cart and checkout with Vipps and card.' },
+  ],
+  languages: {
+    perLanguage: 2500,     // language switcher and setup, per extra language
+    translatePerPage: 400, // when we translate: per page, per extra language
+    rtlLayout: 3000,       // right-to-left layout for Arabic and similar
+    list: [
+      { id: 'nb', name: 'Norwegian (Bokmål)' },
+      { id: 'nn', name: 'Norwegian (Nynorsk)' },
+      { id: 'en', name: 'English' },
+      { id: 'se', name: 'Northern Sámi' },
+      { id: 'sv', name: 'Swedish' },
+      { id: 'da', name: 'Danish' },
+      { id: 'fi', name: 'Finnish' },
+      { id: 'de', name: 'German' },
+      { id: 'fr', name: 'French' },
+      { id: 'es', name: 'Spanish' },
+      { id: 'it', name: 'Italian' },
+      { id: 'pl', name: 'Polish' },
+      { id: 'lt', name: 'Lithuanian' },
+      { id: 'uk', name: 'Ukrainian' },
+      { id: 'ar', name: 'Arabic', rtl: true },
+    ],
+  },
+  groups: [
+    {
+      id: 'features', title: 'Features', items: [
+        { id: 'dark', name: 'Night mode', price: 2500, desc: 'Dark theme with a light/dark switch. Follows the visitor’s phone or computer setting and remembers their choice.' },
+        { id: 'contact', name: 'Contact form', price: 1500, desc: 'Sends enquiries to the client’s email, with spam protection.' },
+        { id: 'booking', name: 'Booking system', price: 5000, desc: 'Visitors book appointments or tables online, synced to a calendar.' },
+        { id: 'blog', name: 'Blog or news section', price: 4000, desc: 'Post list, article pages and categories.' },
+        { id: 'cms', name: 'Client can edit content', price: 5000, desc: 'Admin panel so the client can change text and images without us.' },
+        { id: 'gallery', name: 'Image gallery', price: 1500, desc: 'Photo grid with a full-screen viewer.' },
+        { id: 'map', name: 'Map and opening hours', price: 800, desc: 'Address, map link and opening hours.' },
+        { id: 'newsletter', name: 'Newsletter signup', price: 1500, desc: 'Signup form connected to Mailchimp or similar.' },
+        { id: 'social', name: 'Social media', price: 1000, desc: 'Links, share buttons and an Instagram feed.' },
+        { id: 'animations', name: 'Animations', price: 3000, desc: 'Scroll effects and page transitions.' },
+        { id: 'search', name: 'Site search', price: 2500, desc: 'Search across pages and posts.' },
+        { id: 'members', name: 'Member login', price: 8000, desc: 'User accounts and pages only members can see.' },
+        { id: 'payments', name: 'Online payments', price: 4000, desc: 'Vipps and card payments for services, deposits or gift cards.', includedWith: ['shop'] },
+        { id: 'pages', name: 'Extra pages', price: 1500, qty: true, unit: 'page', desc: 'Pages beyond what the package includes.' },
+        { id: 'products', name: 'Extra products', price: 1500, qty: true, unit: '25 products', requires: 'shop', desc: 'Adding products beyond the 50 in the webshop package.' },
+      ],
+    },
+    {
+      id: 'content', title: 'Content and branding', items: [
+        { id: 'logo', name: 'Logo design', price: 4000, desc: 'Three concepts, two rounds of changes, files for web and print.' },
+        { id: 'brand', name: 'Colours and fonts guide', price: 2000, desc: 'One-page guide the client can reuse for social media and print.' },
+        { id: 'copy', name: 'Copywriting', price: 1200, qty: true, unit: 'page', desc: 'We write the text.' },
+        { id: 'photos', name: 'Stock photos', price: 1000, desc: 'Up to 10 licensed photos, chosen and cropped to fit.' },
+        { id: 'migrate', name: 'Move content from old site', price: 3000, desc: 'Copy text and images over from the client’s current website.' },
+      ],
+    },
+    {
+      id: 'tech', title: 'Technical and launch', items: [
+        { id: 'seo', name: 'SEO setup', price: 2500, desc: 'Page titles and descriptions, sitemap and Google Search Console.' },
+        { id: 'gbp', name: 'Google Business Profile', price: 1000, desc: 'Set up or tidy the listing that shows in Google Search and Maps.' },
+        { id: 'analytics', name: 'Visitor statistics', price: 1000, desc: 'Google Analytics or Plausible, with a short how-to for the client.' },
+        { id: 'cookies', name: 'Cookie banner and privacy policy', price: 1500, desc: 'GDPR consent banner and a privacy page.' },
+        { id: 'a11y', name: 'Universal design (WCAG)', price: 3500, desc: 'Built and tested for screen readers, keyboard use and contrast. Norwegian rules on universell utforming cover most business websites.' },
+        { id: 'speed', name: 'Speed optimisation', price: 2000, desc: 'Image compression and caching, aiming for a Lighthouse score above 90.' },
+        { id: 'domain', name: 'Domain and email setup', price: 1000, desc: 'Connect the domain and set up the email addresses.' },
+      ],
+    },
+    {
+      id: 'other', title: 'Other work', items: [
+        { id: 'hours', name: 'Extra work', price: 750, qty: true, unit: 'hour', desc: 'Anything not on this list, at the hourly rate.' },
+        { id: 'rush', name: 'Rush delivery', percent: 25, desc: 'Launch within 2 weeks. Adds a percentage to the one-time price.' },
+      ],
+    },
+    {
+      id: 'ongoing', title: 'Ongoing services', note: 'Billed monthly or yearly. Not part of the one-time price.', items: [
+        { id: 'hosting', name: 'Hosting', price: 150, period: 'month', desc: 'Fast hosting with SSL and daily backups.' },
+        { id: 'maint', name: 'Maintenance and small edits', price: 500, period: 'month', desc: 'Updates, security checks and up to 30 minutes of edits each month.' },
+        { id: 'mailbox', name: 'Email account', price: 75, period: 'month', qty: true, unit: 'mailbox', desc: 'Google Workspace or similar.' },
+        { id: 'domainyr', name: 'Domain renewal (.no)', price: 200, period: 'year', desc: 'Yearly registration of the .no domain.' },
+      ],
+    },
+  ],
+};
+
+// ---------------------------------------------------------------
+// Calculator
+// ---------------------------------------------------------------
+const $ = (s, root = document) => root.querySelector(s);
+const NUM = new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 });
+const kr = n => NUM.format(Math.round(n)) + ' kr';
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const sum = lines => lines.reduce((t, l) => t + l.amount, 0);
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const toQty = v => Math.max(0, Math.min(999, Math.floor(Number(v) || 0)));
+const toPct = v => Math.max(0, Math.min(100, Number(v) || 0));
+const PERIOD = { month: 'monthly', year: 'yearly' };
+
+const ITEMS = Object.fromEntries(PRICES.groups.flatMap(g => g.items).map(it => [it.id, it]));
+const LANGS = Object.fromEntries(PRICES.languages.list.map(l => [l.id, l]));
+const PKGS = Object.fromEntries(PRICES.packages.map(p => [p.id, p]));
+
+const EMPTY = { pkg: 'none', primary: 'nb', langs: [], translate: true, items: {}, discount: 0, custom: [], vat: true, client: '' };
+const EXAMPLE = { ...EMPTY, pkg: 'basic', langs: ['en'], items: { dark: 1, contact: 1, seo: 1, hosting: 1, maint: 1, domainyr: 1 } };
+const KEY = 'website-price-list:v1';
+
+let isExample = false;
+let state = load();
+
+function clean(s) {
+  const out = JSON.parse(JSON.stringify(EMPTY));
+  if (!s || typeof s !== 'object') return out;
+  if (s.pkg === 'none' || PKGS[s.pkg]) out.pkg = s.pkg;
+  if (LANGS[s.primary]) out.primary = s.primary;
+  if (Array.isArray(s.langs)) out.langs = s.langs.filter(id => LANGS[id] && id !== out.primary);
+  out.translate = s.translate !== false;
+  if (s.items && typeof s.items === 'object') {
+    for (const [id, q] of Object.entries(s.items)) if (ITEMS[id]) out.items[id] = toQty(q);
+  }
+  out.discount = toPct(s.discount);
+  if (Array.isArray(s.custom)) {
+    out.custom = s.custom.filter(c => c && typeof c === 'object').map(c => ({ name: String(c.name ?? ''), amount: Number(c.amount) || 0 }));
+  }
+  out.vat = s.vat !== false;
+  out.client = typeof s.client === 'string' ? s.client : '';
+  return out;
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) return clean(JSON.parse(raw));
+  } catch (e) { /* storage unavailable: start from the example */ }
+  isExample = true;
+  return clean(EXAMPLE);
+}
+
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* not saved, still works */ }
+}
+
+const available = it => !it.requires || it.requires === state.pkg;
+const included = it => !!(it.includedWith && it.includedWith.includes(state.pkg));
+const extraLangs = () => state.langs.filter(id => id !== state.primary);
+
+function pageCount() {
+  const pkg = PKGS[state.pkg];
+  return (pkg ? pkg.pages : 0) + (state.items.pages || 0);
+}
+
+function compute() {
+  const once = [];
+  const ongoing = [];
+  const pkg = PKGS[state.pkg];
+  const L = PRICES.languages;
+  if (pkg) once.push({ label: pkg.name, detail: `${plural(pkg.pages, 'page', 'pages')} included`, amount: pkg.price });
+
+  const extra = extraLangs();
+  const pages = pageCount();
+  if (extra.length) {
+    once.push({
+      label: extra.length === 1 ? 'Extra language' : 'Extra languages',
+      detail: `${extra.map(id => LANGS[id].name).join(', ')} · ${extra.length} × ${kr(L.perLanguage)}`,
+      amount: extra.length * L.perLanguage,
+    });
+    if (state.translate && pages > 0) {
+      once.push({
+        label: 'Translation',
+        detail: `${plural(pages, 'page', 'pages')} × ${plural(extra.length, 'language', 'languages')} × ${kr(L.translatePerPage)}`,
+        amount: pages * extra.length * L.translatePerPage,
+      });
+    }
+  }
+  const rtl = [state.primary, ...extra].filter(id => LANGS[id].rtl);
+  if (rtl.length) once.push({ label: 'Right-to-left layout', detail: rtl.map(id => LANGS[id].name).join(', '), amount: L.rtlLayout });
+
+  const percents = [];
+  for (const it of Object.values(ITEMS)) {
+    const q = state.items[it.id] || 0;
+    if (!q || !available(it) || included(it)) continue;
+    if (it.percent) { percents.push(it); continue; }
+    const line = { label: it.name, detail: it.qty ? `${q} × ${kr(it.price)}` : '', amount: q * it.price, period: it.period };
+    (it.period ? ongoing : once).push(line);
+  }
+  for (const c of state.custom) {
+    if (c.name.trim() || c.amount) once.push({ label: c.name.trim() || 'Custom line', detail: '', amount: c.amount });
+  }
+
+  const work = sum(once);
+  const adds = percents.map(it => ({ label: it.name, detail: `+${it.percent}% of ${kr(work)}`, amount: Math.round(work * it.percent / 100) }));
+  const subtotal = work + sum(adds);
+  const discount = Math.round(subtotal * state.discount / 100);
+  const net = subtotal - discount;
+  const vat = state.vat ? Math.round(net * PRICES.vatRate) : 0;
+  const monthly = sum(ongoing.filter(l => l.period === 'month'));
+  const yearly = sum(ongoing.filter(l => l.period === 'year'));
+  const firstYearNet = net + monthly * 12 + yearly;
+  const firstYear = state.vat ? Math.round(firstYearNet * (1 + PRICES.vatRate)) : firstYearNet;
+  return { once: [...once, ...adds], ongoing, subtotal, discount, net, vat, total: net + vat, monthly, yearly, firstYear };
+}
+
+// ---------- Rendering ----------
+
+function priceSub(it) {
+  if (it.percent) return 'of the one-time price';
+  const parts = [];
+  if (it.unit) parts.push('per ' + it.unit);
+  if (it.period) parts.push(PERIOD[it.period]);
+  return parts.join(', ');
+}
+
+function itemRow(it) {
+  const sub = priceSub(it);
+  const price = `<span class="item-price"><span class="amt">${it.percent ? '+' + it.percent + '%' : kr(it.price)}</span>${sub ? `<span class="per">${esc(sub)}</span>` : ''}</span>`;
+  const text = `<span class="item-text"><span class="item-name">${esc(it.name)}</span><span class="item-desc">${esc(it.desc)}</span><span class="item-flag" id="flag-${it.id}"></span></span>`;
+  if (it.qty) {
+    return `<li><div class="item" data-item="${it.id}">${text}${price}
+      <span class="ctl stepper">
+        <button type="button" data-step="-1" data-id="${it.id}" aria-label="Fewer: ${esc(it.name)}">−</button>
+        <input type="number" inputmode="numeric" min="0" max="999" id="q-${it.id}" data-qty="${it.id}" aria-label="Quantity: ${esc(it.name)}">
+        <button type="button" data-step="1" data-id="${it.id}" aria-label="More: ${esc(it.name)}">+</button>
+      </span></div></li>`;
+  }
+  return `<li><label class="item" data-item="${it.id}" for="c-${it.id}">${text}${price}<span class="ctl"><input type="checkbox" id="c-${it.id}" data-check="${it.id}"></span></label></li>`;
+}
+
+function renderPicker() {
+  const L = PRICES.languages;
+  $('#updated').textContent = PRICES.updated;
+  $('#packages').innerHTML = PRICES.packages.map(p => `
+    <label class="pkg" for="pkg-${p.id}">
+      <input type="radio" name="pkg" id="pkg-${p.id}" value="${p.id}">
+      <span class="pkg-top"><span class="pkg-name">${esc(p.name)}</span><span class="pkg-pages">${plural(p.pages, 'page', 'pages')}</span></span>
+      <span class="pkg-price">${kr(p.price)}</span>
+      <span class="pkg-desc">${esc(p.desc)}</span>
+    </label>`).join('');
+
+  const rtlNames = L.list.filter(l => l.rtl).map(l => l.name).join(', ');
+  $('#lang-note').innerHTML = `The main language is included. Each extra language adds a language switcher and a full copy of the site for <span class="num">${kr(L.perLanguage)}</span> per language.`
+    + (rtlNames ? ` ${esc(rtlNames)} also needs a right-to-left layout: <span class="num">${kr(L.rtlLayout)}</span>.` : '');
+  $('#primary').innerHTML = L.list.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('');
+  $('#chips').innerHTML = L.list.map(l => `<button type="button" class="chip" id="lang-${l.id}" data-lang="${l.id}" aria-pressed="false">${esc(l.name)}</button>`).join('');
+  $('#translate-price').textContent = kr(L.translatePerPage);
+
+  $('#groups').innerHTML = PRICES.groups.map(g => `
+    <section class="sec" aria-labelledby="h-${g.id}">
+      <div class="sec-head"><h2 id="h-${g.id}">${esc(g.title)}</h2><span class="count" id="count-${g.id}"></span></div>
+      ${g.note ? `<p class="sec-note">${esc(g.note)}</p>` : ''}
+      <ul class="items">${g.items.map(itemRow).join('')}</ul>
+    </section>`).join('');
+}
+
+function renderCustom() {
+  $('#custom').innerHTML = state.custom.map((c, i) => `
+    <li class="cline">
+      <input type="text" id="cl-name-${i}" data-custom="name" data-idx="${i}" value="${esc(c.name)}" placeholder="Description, e.g. Product photos" aria-label="Custom line description">
+      <span class="money"><input type="number" id="cl-amt-${i}" data-custom="amount" data-idx="${i}" value="${c.amount || ''}" placeholder="0" inputmode="numeric" aria-label="Custom line amount in kr"><span>kr</span></span>
+      <button type="button" class="x" data-remove="${i}" aria-label="Remove custom line">×</button>
+    </li>`).join('');
+}
+
+function setValue(input, value) {
+  if (document.activeElement !== input) input.value = value;
+}
+
+function sync() {
+  for (const p of PRICES.packages) {
+    const input = $('#pkg-' + p.id);
+    input.checked = state.pkg === p.id;
+    input.closest('.pkg').classList.toggle('on', input.checked);
+  }
+  $('#pkg-none').checked = state.pkg === 'none';
+
+  $('#primary').value = state.primary;
+  for (const l of PRICES.languages.list) {
+    const chip = $('#lang-' + l.id);
+    const isMain = l.id === state.primary;
+    chip.disabled = isMain;
+    chip.classList.toggle('primary', isMain);
+    chip.setAttribute('aria-pressed', String(isMain || state.langs.includes(l.id)));
+  }
+  const extra = extraLangs();
+  const pages = pageCount();
+  $('#lang-count').textContent = extra.length ? `${extra.length} extra` : '';
+  $('#translate').checked = state.translate;
+  $('#translate-row').classList.toggle('on', state.translate && extra.length > 0);
+  $('#translate-note').textContent = !extra.length
+    ? 'Pick an extra language to see the translation cost.'
+    : !state.translate
+      ? 'Translation not included. The client provides the text.'
+      : pages
+        ? `${plural(pages, 'page', 'pages')} × ${plural(extra.length, 'language', 'languages')} × ${kr(PRICES.languages.translatePerPage)} = ${kr(pages * extra.length * PRICES.languages.translatePerPage)}`
+        : 'Pick a package or add extra pages to count the pages to translate.';
+
+  for (const g of PRICES.groups) {
+    let picked = 0;
+    for (const it of g.items) {
+      const row = document.querySelector(`.item[data-item="${it.id}"]`);
+      const ok = available(it);
+      const inc = included(it);
+      const q = state.items[it.id] || 0;
+      if (ok && !inc && q > 0) picked++;
+      row.classList.toggle('off', !ok);
+      row.classList.toggle('inc', inc);
+      row.classList.toggle('on', ok && (inc || q > 0));
+      $('#flag-' + it.id).textContent = !ok ? `Only with ${PKGS[it.requires].name}` : inc ? `Included in ${PKGS[state.pkg].name}` : '';
+      if (it.qty) {
+        const input = $('#q-' + it.id);
+        setValue(input, q);
+        input.disabled = !ok;
+        row.querySelectorAll('button').forEach(b => { b.disabled = !ok; });
+      } else {
+        const box = $('#c-' + it.id);
+        box.checked = inc || q > 0;
+        box.disabled = !ok || inc;
+      }
+    }
+    $('#count-' + g.id).textContent = picked ? `${picked} selected` : '';
+  }
+
+  setValue($('#discount'), state.discount || '');
+  setValue($('#client'), state.client);
+  $('#vat').checked = state.vat;
+  $('#example').hidden = !isExample;
+}
+
+function lineHTML(l, suffix = '') {
+  return `<li class="qline"><span class="lab">${esc(l.label)}</span><span class="qamt">${kr(l.amount)}${suffix}</span>${l.detail ? `<span class="det">${esc(l.detail)}</span>` : ''}</li>`;
+}
+
+function renderQuote() {
+  const c = compute();
+  $('#q-date').textContent = new Date().toLocaleDateString('nb-NO');
+  $('#qlines').innerHTML = c.once.length
+    ? c.once.map(l => lineHTML(l)).join('')
+    : '<li class="qempty">Nothing selected yet. Pick a package or some add-ons.</li>';
+
+  $('#row-sub').hidden = !c.discount;
+  $('#t-sub').textContent = kr(c.subtotal);
+  $('#row-discount').hidden = !c.discount;
+  $('#t-discount-label').textContent = `Discount ${state.discount}%`;
+  $('#t-discount').textContent = '−' + kr(c.discount);
+  $('#row-net').hidden = !c.discount && !state.vat;
+  $('#t-net').textContent = kr(c.net);
+  $('#row-vat').hidden = !state.vat;
+  $('#t-vat').textContent = kr(c.vat);
+  $('#grand-label').textContent = state.vat ? 'Total inkl. mva' : 'Total, no MVA';
+  $('#t-total').textContent = kr(c.total);
+
+  $('#olines').innerHTML = c.ongoing.length
+    ? c.ongoing.map(l => lineHTML(l, l.period === 'month' ? '/mo' : '/yr')).join('')
+    : '<li class="qempty">No ongoing services.</li>';
+  $('#o-sums').hidden = !c.ongoing.length;
+  $('#row-month').hidden = !c.monthly;
+  $('#t-month').textContent = kr(c.monthly);
+  $('#row-year').hidden = !c.yearly;
+  $('#t-year').textContent = kr(c.yearly);
+  $('#first-year-label').textContent = `First year in total, ${state.vat ? 'inkl.' : 'eks.'} mva`;
+  $('#t-first-year').textContent = kr(c.firstYear);
+
+  $('#m-total').textContent = kr(c.total);
+  $('#m-sub').textContent = (state.vat ? 'inkl. mva' : 'no MVA') + (c.monthly ? ` · + ${kr(c.monthly)}/mo` : '');
+}
+
+function quoteText() {
+  const c = compute();
+  const out = [];
+  const name = state.client.trim();
+  const fmtLine = (l, suffix = '') => `${l.label}${l.detail ? ` (${l.detail})` : ''}: ${kr(l.amount)}${suffix}`;
+  out.push(`Website quote${name ? ' – ' + name : ''}`);
+  out.push(new Date().toLocaleDateString('nb-NO'));
+  out.push('');
+  if (c.once.length) c.once.forEach(l => out.push(fmtLine(l)));
+  else out.push('No one-time work');
+  out.push('');
+  if (c.discount) {
+    out.push(`Subtotal: ${kr(c.subtotal)}`);
+    out.push(`Discount ${state.discount}%: −${kr(c.discount)}`);
+  }
+  if (state.vat) {
+    out.push(`Total eks. mva: ${kr(c.net)}`);
+    out.push(`MVA 25%: ${kr(c.vat)}`);
+    out.push(`Total inkl. mva: ${kr(c.total)}`);
+  } else {
+    out.push(`Total: ${kr(c.total)}`);
+  }
+  if (c.ongoing.length) {
+    out.push('');
+    out.push('Ongoing (eks. mva):');
+    c.ongoing.forEach(l => out.push(fmtLine(l, l.period === 'month' ? ' per month' : ' per year')));
+    out.push(`First year in total, ${state.vat ? 'inkl.' : 'eks.'} mva: ${kr(c.firstYear)}`);
+  }
+  return out.join('\n');
+}
+
+function changed() {
+  isExample = false;
+  $('#status').textContent = '';
+  save();
+  sync();
+  renderQuote();
+}
+
+// ---------- Events ----------
+
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.name === 'pkg') state.pkg = t.value;
+  else if (t.id === 'primary') { state.primary = t.value; state.langs = state.langs.filter(id => id !== t.value); }
+  else if (t.id === 'translate') state.translate = t.checked;
+  else if (t.dataset.check) state.items[t.dataset.check] = t.checked ? 1 : 0;
+  else if (t.id === 'vat') state.vat = t.checked;
+  else if (t.dataset.qty || t.id === 'discount') { t.blur(); sync(); return; }
+  else return;
+  changed();
+});
+
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.qty) state.items[t.dataset.qty] = toQty(t.value);
+  else if (t.id === 'discount') state.discount = toPct(t.value);
+  else if (t.id === 'client') state.client = t.value;
+  else if (t.dataset.custom) {
+    const line = state.custom[Number(t.dataset.idx)];
+    if (!line) return;
+    if (t.dataset.custom === 'amount') line.amount = Number(t.value) || 0;
+    else line.name = t.value;
+  }
+  else return;
+  changed();
+});
+
+let clearTimer;
+document.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.step) {
+    const id = b.dataset.id;
+    state.items[id] = toQty((state.items[id] || 0) + Number(b.dataset.step));
+    changed();
+  } else if (b.dataset.lang) {
+    const id = b.dataset.lang;
+    if (id === state.primary) return;
+    state.langs = state.langs.includes(id) ? state.langs.filter(x => x !== id) : [...state.langs, id];
+    changed();
+  } else if (b.id === 'add-line') {
+    state.custom.push({ name: '', amount: 0 });
+    renderCustom();
+    changed();
+    $(`#cl-name-${state.custom.length - 1}`).focus();
+  } else if (b.dataset.remove !== undefined) {
+    state.custom.splice(Number(b.dataset.remove), 1);
+    renderCustom();
+    changed();
+  } else if (b.id === 'copy') {
+    copyQuote();
+  } else if (b.id === 'clear') {
+    if (b.classList.contains('armed')) {
+      clearTimeout(clearTimer);
+      b.classList.remove('armed');
+      b.textContent = 'Clear';
+      state = clean(EMPTY);
+      renderCustom();
+      changed();
+      $('#copy-fallback').hidden = true;
+      $('#status').textContent = 'Cleared. Pick a package to start.';
+    } else {
+      b.classList.add('armed');
+      b.textContent = 'Press again to clear';
+      clearTimer = setTimeout(() => { b.classList.remove('armed'); b.textContent = 'Clear'; }, 3000);
+    }
+  }
+});
+
+function copyQuote() {
+  const text = quoteText();
+  const status = $('#status');
+  const fallback = () => {
+    const ta = $('#copy-fallback');
+    ta.value = text;
+    ta.hidden = false;
+    ta.focus();
+    ta.select();
+    status.textContent = 'Copying is blocked here. The text below is selected: press Ctrl+C or ⌘C.';
+  };
+  try {
+    navigator.clipboard.writeText(text).then(() => {
+      $('#copy-fallback').hidden = true;
+      status.textContent = 'Quote copied. Paste it into an email or message.';
+    }, fallback);
+  } catch (err) {
+    fallback();
+  }
+}
+
+if ('IntersectionObserver' in window) {
+  new IntersectionObserver(([entry]) => {
+    document.body.classList.toggle('quote-visible', entry.isIntersecting);
+  }, { threshold: 0.1 }).observe($('#quote'));
+}
+
+renderPicker();
+renderCustom();
+sync();
+renderQuote();
+</script>
+</body>
+</html>
