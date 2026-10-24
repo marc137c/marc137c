@@ -214,10 +214,14 @@ h1 {
 }
 .secnav ul { list-style: none; margin: 0; padding: 0; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
 .secnav ul::-webkit-scrollbar { display: none; }
-.secnav ul.more {
-  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
-  mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+.secnav ul {
+  --fade-left: #000;
+  --fade-right: #000;
+  -webkit-mask-image: linear-gradient(to right, var(--fade-left), #000 40px, #000 calc(100% - 40px), var(--fade-right));
+  mask-image: linear-gradient(to right, var(--fade-left), #000 40px, #000 calc(100% - 40px), var(--fade-right));
 }
+.secnav ul.more-left { --fade-left: transparent; }
+.secnav ul.more-right { --fade-right: transparent; }
 .secnav a {
   display: inline-flex;
   align-items: center;
@@ -266,6 +270,7 @@ h2 { flex: 1; margin: 0; font: 600 24px/1.2 var(--display); letter-spacing: -.01
   white-space: nowrap;
 }
 .sec-note { margin: 0; color: var(--muted); max-width: 65ch; }
+.sec-note.need { color: var(--accent); font-weight: 600; font-size: 14px; }
 .num { font-family: var(--num); font-weight: 500; font-size: .93em; white-space: nowrap; color: var(--ink); }
 
 /* ---------- Packages ---------- */
@@ -682,7 +687,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       </div>
     </section>
 
-    <p class="foot">All prices are in NOK excluding 25% MVA. Ongoing services are billed monthly or yearly and are not part of the one-time price.</p>
+    <p class="foot">All prices are in NOK excluding 25% MVA. Ongoing services and marketing are billed monthly or yearly and are not part of the one-time price. Add-on prices are based on roughly how many hours each takes at the hourly rate.</p>
   </div>
 
   <aside class="quote" id="quote" aria-labelledby="h-quote">
@@ -747,8 +752,9 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 //   unit             -> what the counter counts ("page", "hour")
 //   period           -> "month" or "year" for ongoing services
 //   percent          -> adds a % of the one-time price
-//   requires         -> only available with that package
+//   requires         -> only available with that package (on an item or a whole group)
 //   includedWith     -> free (already included) with those packages
+// New add-on prices are estimated as hours of work × the hourly rate.
 // ---------------------------------------------------------------
 const PRICES = {
   updated: 'Prices set October 2026',
@@ -783,42 +789,88 @@ const PRICES = {
   },
   groups: [
     {
+      id: 'planning', title: 'Planning and design', short: 'Planning', icon: 'frame', items: [
+        { id: 'kickoff', name: 'Kickoff workshop', price: 1500, desc: 'Two-hour meeting to agree on goals, pages, content and who does what.' },
+        { id: 'research', name: 'Competitor review', price: 2000, desc: 'Short report on what similar businesses do online and where the client can stand out.' },
+        { id: 'wireframes', name: 'Wireframes', price: 3000, desc: 'Simple sketch of every page so the structure is agreed before design starts.' },
+        { id: 'prototype', name: 'Clickable prototype', price: 4500, desc: 'The client clicks through the finished design in Figma before we build it.' },
+        { id: 'round', name: 'Extra design round', price: 2000, qty: true, unit: 'round', desc: 'Another round of design changes after the design is approved.' },
+      ],
+    },
+    {
       id: 'features', title: 'Features', icon: 'toggle', items: [
         { id: 'dark', name: 'Night mode', price: 2500, desc: 'Dark theme with a light/dark switch. Follows the visitor’s phone or computer setting and remembers their choice.' },
         { id: 'contact', name: 'Contact form', price: 1500, desc: 'Sends enquiries to the client’s email, with spam protection.' },
+        { id: 'forms', name: 'Advanced forms', price: 2500, desc: 'Multi-step forms, file uploads and quote requests.' },
         { id: 'booking', name: 'Booking system', price: 5000, desc: 'Visitors book appointments or tables online, synced to a calendar.' },
         { id: 'blog', name: 'Blog or news section', price: 4000, desc: 'Post list, article pages and categories.' },
         { id: 'cms', name: 'Client can edit content', price: 5000, desc: 'Admin panel so the client can change text and images without us.' },
         { id: 'gallery', name: 'Image gallery', price: 1500, desc: 'Photo grid with a full-screen viewer.' },
+        { id: 'portfolio', name: 'Portfolio or case studies', price: 2500, desc: 'Project pages with images, text and results.' },
+        { id: 'menu', name: 'Menu or price list page', price: 1500, desc: 'Restaurant menu or service prices the client can update.' },
+        { id: 'events', name: 'Event calendar', price: 3000, desc: 'Upcoming events with dates, details and sign-up.' },
+        { id: 'jobs', name: 'Job listings', price: 3000, desc: 'Job ads with an application form.' },
+        { id: 'reviews', name: 'Customer reviews', price: 1000, desc: 'Google reviews or testimonials shown on the site.' },
+        { id: 'faq', name: 'FAQ section', price: 800, desc: 'Questions and answers that open and close.' },
         { id: 'map', name: 'Map and opening hours', price: 800, desc: 'Address, map link and opening hours.' },
+        { id: 'video', name: 'Video', price: 1000, desc: 'Video background or embedded films, set up so the page stays fast.' },
         { id: 'newsletter', name: 'Newsletter signup', price: 1500, desc: 'Signup form connected to Mailchimp or similar.' },
         { id: 'social', name: 'Social media', price: 1000, desc: 'Links, share buttons and an Instagram feed.' },
+        { id: 'popup', name: 'Pop-up or campaign banner', price: 800, desc: 'Announce offers, opening hours changes or news.' },
+        { id: 'chat', name: 'Live chat', price: 1500, desc: 'Chat bubble (Tidio, Crisp or similar) that reaches the client by email or phone.' },
+        { id: 'ai', name: 'AI chat assistant', price: 6000, desc: 'Answers visitor questions from the site’s own content. The provider’s usage fee comes on top.' },
         { id: 'animations', name: 'Animations', price: 3000, desc: 'Scroll effects and page transitions.' },
         { id: 'search', name: 'Site search', price: 2500, desc: 'Search across pages and posts.' },
         { id: 'members', name: 'Member login', price: 8000, desc: 'User accounts and pages only members can see.' },
         { id: 'payments', name: 'Online payments', price: 4000, desc: 'Vipps and card payments for services, deposits or gift cards.', includedWith: ['shop'] },
+        { id: 'pwa', name: 'Installable app', price: 4000, desc: 'Visitors can add the site to their home screen and open it like an app.' },
         { id: 'pages', name: 'Extra pages', price: 1500, qty: true, unit: 'page', desc: 'Pages beyond what the package includes.' },
-        { id: 'products', name: 'Extra products', price: 1500, qty: true, unit: '25 products', requires: 'shop', desc: 'Adding products beyond the 50 in the webshop package.' },
+      ],
+    },
+    {
+      id: 'shop', title: 'Webshop extras', short: 'Webshop', icon: 'cart', requires: 'shop', items: [
+        { id: 'products', name: 'Extra products', price: 1500, qty: true, unit: '25 products', desc: 'Adding products beyond the 50 in the webshop package.' },
+        { id: 'variants', name: 'Variants and filters', price: 2500, desc: 'Sizes and colours on products, and filters on the product list.' },
+        { id: 'shipping', name: 'Shipping integration', price: 3000, desc: 'Live shipping prices and labels from Bring/Posten, PostNord or Helthjem.' },
+        { id: 'klarna', name: 'Klarna', price: 2000, desc: 'Pay later and instalments at checkout, alongside Vipps and card.' },
+        { id: 'accounting', name: 'Accounting integration', price: 3000, desc: 'Orders and payments sent to Fiken, Tripletex or PowerOffice.' },
+        { id: 'discounts', name: 'Discount codes and gift cards', price: 1500, desc: 'Campaign codes and gift cards the client can create.' },
+        { id: 'feeds', name: 'Google Shopping and Meta catalogue', price: 2000, desc: 'Product feeds so products can appear in Google Shopping, Facebook and Instagram.' },
+        { id: 'subscriptions', name: 'Subscriptions', price: 5000, desc: 'Recurring orders, for example coffee or flowers every month.' },
       ],
     },
     {
       id: 'content', title: 'Content and branding', short: 'Content', icon: 'pen', items: [
         { id: 'logo', name: 'Logo design', price: 4000, desc: 'Three concepts, two rounds of changes, files for web and print.' },
         { id: 'brand', name: 'Colours and fonts guide', price: 2000, desc: 'One-page guide the client can reuse for social media and print.' },
+        { id: 'illustrations', name: 'Icons and illustrations', price: 3000, desc: 'Custom icon set or illustrations in the brand style.' },
         { id: 'copy', name: 'Copywriting', price: 1200, qty: true, unit: 'page', desc: 'We write the text.' },
+        { id: 'proofread', name: 'Proofreading', price: 300, qty: true, unit: 'page', desc: 'We check spelling and flow in text the client wrote.' },
         { id: 'photos', name: 'Stock photos', price: 1000, desc: 'Up to 10 licensed photos, chosen and cropped to fit.' },
+        { id: 'shoot', name: 'Photo shoot', price: 4500, desc: 'Half a day of photos on site: people, premises and work in progress. Edited for web.' },
+        { id: 'productphotos', name: 'Product photos', price: 1500, qty: true, unit: '10 products', desc: 'Clean product photos on a white or styled background.' },
+        { id: 'promo', name: 'Promo video', price: 8000, desc: '30–60 second film for the front page and social media.' },
+        { id: 'somekit', name: 'Social media templates', price: 2000, desc: 'Post and story templates in Canva that match the website.' },
+        { id: 'print', name: 'Business cards and print', price: 1500, desc: 'Business card, letterhead or flyer in the same style.' },
         { id: 'migrate', name: 'Move content from old site', price: 3000, desc: 'Copy text and images over from the client’s current website.' },
       ],
     },
     {
       id: 'tech', title: 'Technical and launch', short: 'Technical', icon: 'code', items: [
         { id: 'seo', name: 'SEO setup', price: 2500, desc: 'Page titles and descriptions, sitemap and Google Search Console.' },
+        { id: 'schema', name: 'Rich results in Google', price: 1500, desc: 'Structured data so Google can show opening hours, reviews, events or prices.' },
         { id: 'gbp', name: 'Google Business Profile', price: 1000, desc: 'Set up or tidy the listing that shows in Google Search and Maps.' },
         { id: 'analytics', name: 'Visitor statistics', price: 1000, desc: 'Google Analytics or Plausible, with a short how-to for the client.' },
         { id: 'cookies', name: 'Cookie banner and privacy policy', price: 1500, desc: 'GDPR consent banner and a privacy page.' },
         { id: 'a11y', name: 'Universal design (WCAG)', price: 3500, desc: 'Built and tested for screen readers, keyboard use and contrast. Norwegian rules on universell utforming cover most business websites.' },
+        { id: 'a11ystatement', name: 'Accessibility statement', price: 1000, desc: 'Tilgjengelighetserklæring through Uutilsynet’s tool. Required for public-sector websites.' },
         { id: 'speed', name: 'Speed optimisation', price: 2000, desc: 'Image compression and caching, aiming for a Lighthouse score above 90.' },
+        { id: 'security', name: 'Security setup', price: 1500, desc: 'Firewall, two-step login for admins and automatic off-site backups.' },
+        { id: 'redirects', name: 'Redirects from old site', price: 1500, desc: 'Old links keep working, so the client keeps their Google rankings.' },
+        { id: 'automation', name: 'CRM and automation', price: 3000, desc: 'Send form leads to HubSpot, Pipedrive or a spreadsheet through Zapier or Make.' },
         { id: 'domain', name: 'Domain and email setup', price: 1000, desc: 'Connect the domain and set up the email addresses.' },
+        { id: 'signature', name: 'Email signatures', price: 500, desc: 'Matching email signatures for the whole team.' },
+        { id: 'training', name: 'Client training', price: 1500, desc: 'One-hour session showing the client how to update the site, plus a short written guide.' },
       ],
     },
     {
@@ -831,8 +883,21 @@ const PRICES = {
       id: 'ongoing', title: 'Ongoing services', short: 'Ongoing', icon: 'repeat', note: 'Billed monthly or yearly. Not part of the one-time price.', items: [
         { id: 'hosting', name: 'Hosting', price: 150, period: 'month', desc: 'Fast hosting with SSL and daily backups.' },
         { id: 'maint', name: 'Maintenance and small edits', price: 500, period: 'month', desc: 'Updates, security checks and up to 30 minutes of edits each month.' },
+        { id: 'shopmaint', name: 'Webshop maintenance', price: 1000, period: 'month', requires: 'shop', desc: 'Plugin updates, checkout and payment checks, and help with products.' },
+        { id: 'uptime', name: 'Uptime monitoring', price: 100, period: 'month', desc: 'We get an alert if the site goes down and fix it.' },
+        { id: 'priority', name: 'Priority support', price: 300, period: 'month', desc: 'Answer within 4 working hours instead of 2 working days.' },
         { id: 'mailbox', name: 'Email account', price: 75, period: 'month', qty: true, unit: 'mailbox', desc: 'Google Workspace or similar.' },
         { id: 'domainyr', name: 'Domain renewal (.no)', price: 200, period: 'year', desc: 'Yearly registration of the .no domain.' },
+      ],
+    },
+    {
+      id: 'marketing', title: 'Marketing', icon: 'trend', note: 'Billed monthly. Not part of the one-time price. Ad spend is paid by the client.', items: [
+        { id: 'seomonthly', name: 'SEO every month', price: 2500, period: 'month', desc: 'Keyword tracking, content tweaks and technical fixes, with a short report.' },
+        { id: 'ads', name: 'Google Ads management', price: 3000, period: 'month', desc: 'We set up and run the campaigns and adjust them every week.' },
+        { id: 'some', name: 'Social media management', price: 4000, period: 'month', desc: 'Up to 8 posts a month on two channels.' },
+        { id: 'posts', name: 'Blog posts', price: 1500, period: 'month', qty: true, unit: 'post', desc: 'We write and publish articles that help the site rank.' },
+        { id: 'newsletters', name: 'Newsletter', price: 1500, period: 'month', desc: 'We write and send one newsletter a month.' },
+        { id: 'report', name: 'Monthly report', price: 400, period: 'month', desc: 'Visitors, top pages and enquiries in a short email.' },
       ],
     },
   ],
@@ -861,10 +926,17 @@ const ICONS = {
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   repeat: '<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20v-4h-4"/>',
   sliders: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+  frame: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M9 9v11"/>',
+  cart: '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.6 12.2a2 2 0 0 0 2 1.6h8.3a2 2 0 0 0 2-1.5L22 8H6"/>',
+  trend: '<path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
 };
 const icon = name => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ICONS.layers}</svg>`;
 
-const ITEMS = Object.fromEntries(PRICES.groups.flatMap(g => g.items).map(it => [it.id, it]));
+// Items in a group that requires a package inherit that requirement.
+const ITEMS = Object.fromEntries(PRICES.groups.flatMap(g => g.items.map(it => {
+  if (g.requires && !it.requires) it.requires = g.requires;
+  return [it.id, it];
+})));
 const LANGS = Object.fromEntries(PRICES.languages.list.map(l => [l.id, l]));
 const PKGS = Object.fromEntries(PRICES.packages.map(p => [p.id, p]));
 
@@ -1034,6 +1106,7 @@ function renderPicker() {
     <section class="sec" id="sec-${g.id}" aria-labelledby="h-${g.id}">
       <div class="sec-head"><span class="sec-icon">${icon(g.icon)}</span><h2 id="h-${g.id}">${esc(g.title)}</h2><span class="count" id="count-${g.id}"></span></div>
       ${g.note ? `<p class="sec-note">${esc(g.note)}</p>` : ''}
+      ${g.requires ? `<p class="sec-note need" id="need-${g.id}">Only with the ${esc(PKGS[g.requires].name)} package. Pick it above to add these.</p>` : ''}
       <ul class="items">${g.items.map(itemRow).join('')}</ul>
     </section>`).join('');
 }
@@ -1093,7 +1166,7 @@ function sync() {
       row.classList.toggle('off', !ok);
       row.classList.toggle('inc', inc);
       row.classList.toggle('on', ok && (inc || q > 0));
-      $('#flag-' + it.id).textContent = !ok ? `Only with ${PKGS[it.requires].name}` : inc ? `Included in ${PKGS[state.pkg].name}` : '';
+      $('#flag-' + it.id).textContent = !ok && !g.requires ? `Only with ${PKGS[it.requires].name}` : inc ? `Included in ${PKGS[state.pkg].name}` : '';
       if (it.qty) {
         const input = $('#q-' + it.id);
         setValue(input, q);
@@ -1105,6 +1178,7 @@ function sync() {
         box.disabled = !ok || inc;
       }
     }
+    if (g.requires) $('#need-' + g.id).hidden = g.requires === state.pkg;
     $('#count-' + g.id).textContent = picked ? `${picked} selected` : '';
     $('#n-' + g.id).textContent = picked || '';
   }
@@ -1366,7 +1440,10 @@ function watchSections() {
 
 function watchMenuEdge() {
   const list = $('#secnav');
-  const update = () => list.classList.toggle('more', list.scrollLeft + list.clientWidth < list.scrollWidth - 2);
+  const update = () => {
+    list.classList.toggle('more-left', list.scrollLeft > 2);
+    list.classList.toggle('more-right', list.scrollLeft + list.clientWidth < list.scrollWidth - 2);
+  };
   list.addEventListener('scroll', update, { passive: true });
   window.addEventListener('resize', update);
   update();
