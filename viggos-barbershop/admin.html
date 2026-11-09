@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0b0f0d">
+<title>Timebok – Viggo's Barbershop</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <!-- Innlogging: bare ett passord. Nettleseren kan huske det, og «Hold meg innlogget» varer i 60 dager. -->
+  <main class="login" id="login" hidden>
+    <form class="login-card" id="login-form">
+      <p class="brand">Viggo's Barbershop</p>
+      <h1>Timebok</h1>
+      <input type="text" name="username" value="viggo" autocomplete="username" hidden>
+      <label for="pw">Passord</label>
+      <div class="pw-wrap">
+        <input id="pw" name="password" type="password" autocomplete="current-password" required autofocus>
+        <button type="button" class="pw-toggle" id="pw-toggle" aria-label="Vis passord">Vis</button>
+      </div>
+      <label class="check"><input type="checkbox" id="remember" checked> Hold meg innlogget</label>
+      <button class="btn" type="submit">Logg inn</button>
+      <p class="msg" id="login-msg" role="alert"></p>
+      <a class="back" href="/">← Til nettsiden</a>
+    </form>
+  </main>
+
+  <div class="app" id="app" hidden>
+    <header class="top">
+      <div class="top-row">
+        <strong class="title">Timebok</strong>
+        <span class="sync" id="sync" aria-live="polite"></span>
+        <a class="link" href="/" target="_blank" rel="noopener">Se nettsiden</a>
+        <button class="link" id="logout" type="button">Logg ut</button>
+      </div>
+      <div class="day-nav">
+        <button class="icon" id="prev" type="button" aria-label="Forrige dag">‹</button>
+        <input type="date" id="day" aria-label="Velg dato">
+        <button class="icon" id="next" type="button" aria-label="Neste dag">›</button>
+        <button class="chip" id="today" type="button">I dag</button>
+      </div>
+      <div class="week" id="week" aria-label="Neste dager"></div>
+    </header>
+
+    <main class="day">
+      <div class="day-head">
+        <h2 id="day-title"></h2>
+        <div class="day-actions">
+          <button class="btn" id="add" type="button">+ Ny avtale</button>
+          <button class="btn btn-ghost" id="block" type="button">Blokker tid</button>
+        </div>
+      </div>
+      <p class="day-info" id="day-info"></p>
+      <ol class="timeline" id="timeline"></ol>
+    </main>
+  </div>
+
+  <dialog class="sheet" id="editor">
+    <form id="edit-form" method="dialog">
+      <h3 id="edit-title">Ny avtale</h3>
+      <div class="seg" role="radiogroup" aria-label="Type">
+        <label><input type="radio" name="type" value="booking" checked> Avtale</label>
+        <label><input type="radio" name="type" value="block"> Blokkering</label>
+      </div>
+      <div class="grid2">
+        <label>Dato <input type="date" name="date" required></label>
+        <label>Starttid <input type="time" name="start" step="300" required></label>
+      </div>
+      <div class="grid2">
+        <label class="only-booking">Tjeneste
+          <select name="service"></select>
+        </label>
+        <label>Varighet (min)
+          <input type="number" name="dur" min="5" max="1440" step="5" required>
+        </label>
+      </div>
+      <fieldset class="only-booking addons" id="edit-addons"><legend>Tillegg</legend></fieldset>
+      <div class="grid2 only-booking">
+        <label>Navn <input name="name" autocomplete="off"></label>
+        <label>Telefon <input name="phone" type="tel" autocomplete="off"></label>
+      </div>
+      <label>Notat <textarea name="note" rows="2" placeholder="Valgfritt – f.eks. «lunsj» eller «ferie»"></textarea></label>
+      <label class="check only-booking only-edit"><input type="checkbox" name="cancelled"> Avlyst (tiden blir ledig igjen)</label>
+      <p class="msg" id="edit-msg" role="alert"></p>
+      <div class="sheet-actions">
+        <button class="btn btn-danger only-edit" type="button" id="delete">Slett</button>
+        <span class="spacer"></span>
+        <button class="btn btn-ghost" type="button" id="cancel-edit">Lukk</button>
+        <button class="btn" type="submit" id="save">Lagre</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="admin.js"></script>
+</body>
+</html>

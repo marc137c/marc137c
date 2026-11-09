@@ -513,6 +513,33 @@ form.booking {
 }
 .slot:hover { border-color: var(--gold); }
 .slot.is-selected { background: var(--gold-fill); border-color: var(--gold-fill); color: var(--on-gold); }
+/* Ledig (grønn kant), delvis booket dag (gull prikk), opptatt (rød) */
+.cal-day { position: relative; }
+.cal-day:not(:disabled):not(.is-selected) { border-color: rgba(111, 207, 142, .28); }
+.cal-day.has-bookings::after {
+  content: ""; position: absolute; left: 50%; bottom: 5px; width: 5px; height: 5px; margin-left: -2.5px;
+  border-radius: 50%; background: var(--gold);
+}
+.cal-day.is-selected.has-bookings::after { background: var(--on-gold); }
+.cal-day.is-full:disabled {
+  opacity: 1; color: var(--err); background: rgba(239, 124, 115, .1);
+  border-color: rgba(239, 124, 115, .35); text-decoration: line-through;
+}
+.slot { display: grid; gap: 1px; justify-items: center; border-color: rgba(111, 207, 142, .45); }
+.slot small { font: 600 .66rem var(--sans); text-transform: uppercase; letter-spacing: .06em; }
+.slot.is-taken, .slot.is-taken:hover {
+  cursor: not-allowed; color: var(--err); background: rgba(239, 124, 115, .1);
+  border-color: rgba(239, 124, 115, .4); text-decoration: line-through;
+}
+.slot.is-taken small { text-decoration: none; }
+.slot.is-short, .slot.is-short:hover { cursor: not-allowed; opacity: .4; border-style: dashed; border-color: var(--line); }
+.slot-legend { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 0 0; padding: 0; font-size: .8rem; color: var(--muted); }
+.slot-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.dot-free { border: 2px solid var(--ok); }
+.dot-some { background: var(--gold); }
+.dot-taken { background: var(--err); }
+.booking .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 .slots-empty { grid-column: 1 / -1; margin: 0; padding: 14px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); font-size: .92rem; text-align: center; }
 
 .booking label { display: grid; gap: 6px; font-size: .9rem; color: var(--muted); }

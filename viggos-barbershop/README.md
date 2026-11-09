@@ -4,7 +4,8 @@ Statisk nettside (HTML/CSS/JS, ingen avhengigheter). Åpne `index.html` i nettle
 
 ## Publisering på Netlify
 `netlify.toml` i roten av repoet peker Netlify til denne mappen (`publish = "viggos-barbershop"`).
-Bestillingskalenderen sender forespørsler via Netlify Forms (skjemaet `booking`) – de dukker opp under **Forms** i Netlify-dashbordet.
+Bestillinger lagres i Netlify Blobs (lageret `bookings`) via Netlify Functions, og sendes i tillegg som e-postvarsel via Netlify Forms (skjemaet `booking`).
+**Viktig:** Netlify-siden må bygges fra dette GitHub-repoet (Site configuration → Build & deploy → Link repository), ellers blir verken funksjonene eller timeboken publisert.
 
 ## Bedriftsinfo (bekreftet)
 - **Viggos Barbershop Kurti**, org.nr. 937 845 812, innehaver Vigan Kurti
@@ -14,15 +15,26 @@ Bestillingskalenderen sender forespørsler via Netlify Forms (skjemaet `booking`
 
 ## Innhold som må holdes oppdatert
 - **Priser og tjenester:** i `index.html` (prislisten og nedtrekkslisten i bestillingen) og engelsk tekst i `i18n.js`.
-- **Åpningstider:** i tabellen i `index.html`, i `HOURS` øverst i `script.js` (styrer «Åpent nå» og ledige tider i kalenderen), i `openingHoursSpecification` i `index.html` og engelsk tekst (`hours.wk`, `hours.sat`) i `i18n.js`.
+- **Åpningstider:** `CONFIG.hours` i `netlify/lib/booking-core.mjs` styrer kalenderen og hvilke tider som kan bestilles (nettsiden henter dem derfra). Oppdater også `HOURS` i `script.js` (reserve når serveren ikke svarer), tabellen og `openingHoursSpecification` i `index.html` og engelsk tekst (`hours.wk`, `hours.sat`) i `i18n.js`.
+- **Varighet per tjeneste:** `CONFIG.durations` i `netlify/lib/booking-core.mjs` (Full service og Herreklipp + skjeggtrim = 60 min, resten 30 min).
 - **Bookingvarsler:** i Netlify går du til **Forms → booking → Form notifications** og legger inn kurtivigan1@gmail.com, så kommer timeforespørslene på e-post.
 
 ## Bestillingskalender
 `booking.js`: kunden velger tjeneste (og eventuelle tillegg), dag og tid, og skriver navn og telefon.
-- Søndager og passerte dager er stengt. Tider deles opp i 30 minutter innenfor åpningstiden, og i dag vises bare tider minst én time frem.
-- Man kan bestille opptil 60 dager frem (`MAX_DAYS`).
-- Det sendes en **forespørsel**: kalenderen vet ikke hvilke tider som allerede er tatt, så barbershopen bekrefter timen på telefon/SMS.
-- I Netlify ser du feltene `tjeneste`, `tillegg`, `dato` (ÅÅÅÅ-MM-DD), `tid` (24 t), `navn` og `telefon` – alltid på norsk.
+- Kalenderen følger åpningstidene: søndager og passerte dager er stengt, tider deles i 30 minutter, i dag vises bare tider minst én time frem, og man kan bestille opptil 60 dager frem.
+- **Opptatte tider vises i rødt med «Opptatt»**, dager med noen bookinger får en gull prikk, og fullbookede dager blir røde. Tider der valgt tjeneste ikke rekker før neste avtale eller stengetid er grået ut.
+- Bestillingen lagres med en gang (`/api/bookings`). To kunder kan aldri få samme tid: den som kommer sist får beskjed om å velge en annen.
+- I tillegg sendes et e-postvarsel via Netlify Forms (feltene `tjeneste`, `tillegg`, `dato`, `tid`, `navn`, `telefon`, alltid på norsk).
+- **Bakoverkompatibelt:** svarer ikke bookingsystemet (f.eks. før funksjonene er publisert), virker kalenderen som før og sender en forespørsel via Netlify Forms.
+
+## Timebok for admin (`/admin`)
+Gå til **/admin** (lenke «Admin» nederst på siden), skriv passordet og trykk Enter. «Hold meg innlogget» er på som standard, så du slipper å logge inn igjen på 60 dager, og nettleseren kan huske passordet.
+- **Engangsoppsett:** i Netlify → Site configuration → Environment variables, legg inn `ADMIN_PASSWORD` med et passord du velger. Bytter du passordet, blir alle logget ut.
+- Dagsoversikt med alle tider: røde kort er avtaler (navn, tjeneste, telefon du kan trykke på for å ringe), grå stripete er blokkeringer, grønne er ledige – trykk på en ledig tid for å legge inn en avtale.
+- Trykk på en avtale for å **flytte** (ny dato/tid), endre tjeneste/varighet/navn, **avlyse** (tiden blir ledig igjen) eller **slette**.
+- **Blokker tid** for lunsj, ferie eller fridager – blokkert tid vises som opptatt for kundene.
+- Admin kan legge inn timer utenom åpningstid. Kolliderer en endring med en annen avtale, spør siden om du vil dobbeltbooke.
+- Oversikten oppdaterer seg selv hvert 30. sekund, så nye nettbestillinger dukker opp.
 
 ## Google-anmeldelser
 Seksjonen «Hva kundene sier» viser snittkarakteren og 3–4 anmeldelser hentet automatisk fra Google (`/api/reviews`, mellomlagret i 12 timer).

@@ -186,6 +186,11 @@
             <div class="step">
               <p class="step-label" id="slots-label"><span class="step-no">3</span><span data-i18n="book.s3">Velg tid</span></p>
               <div class="slots" id="slots" role="group" aria-labelledby="slots-label"></div>
+              <ul class="slot-legend" aria-hidden="true">
+                <li><span class="dot dot-free"></span><span data-i18n="book.free">Ledig</span></li>
+                <li><span class="dot dot-some"></span><span data-i18n="book.some">Delvis booket</span></li>
+                <li><span class="dot dot-taken"></span><span data-i18n="book.taken">Opptatt</span></li>
+              </ul>
             </div>
 
             <div class="step">
@@ -199,7 +204,8 @@
             </div>
 
             <p class="booking-summary" id="booking-summary" aria-live="polite"></p>
-            <button class="btn btn-block" type="submit" data-i18n="f.submit">Send forespørsel</button>
+            <label class="hp" aria-hidden="true">Nettside <input name="website" id="f-website" tabindex="-1" autocomplete="off"></label>
+            <button class="btn btn-block" type="submit" data-i18n="f.submit">Bestill time</button>
             <p class="form-msg" id="form-msg" role="status"></p>
           </div>
         </form>
@@ -330,7 +336,7 @@
         <span><span data-i18n="foot.tel">Tlf</span> <a href="tel:+4740963911">409 63 911</a></span>
       </p>
       <div class="socials socials-sm" data-socials-wrap hidden><a data-social="instagram" hidden target="_blank" rel="noopener" aria-label="Instagram"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r=".9" fill="currentColor" stroke="none"/></svg></a><a data-social="tiktok" hidden target="_blank" rel="noopener" aria-label="TikTok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v11.5a3.5 3.5 0 1 1-3.5-3.5"/><path d="M14 3c.4 2.6 2.3 4.4 5 4.6"/></svg></a><a data-social="facebook" hidden target="_blank" rel="noopener" aria-label="Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M15.5 7.5H14a2 2 0 0 0-2 2V21M9.5 13h5.5"/></svg></a></div>
-      <p class="footer-small">© <span id="year"></span> Viggos Barbershop Kurti · Org.nr. 937 845 812 · <a href="mailto:kurtivigan1@gmail.com">kurtivigan1@gmail.com</a> · <a href="#top" data-i18n="totop">Til toppen ↑</a></p>
+      <p class="footer-small">© <span id="year"></span> Viggos Barbershop Kurti · Org.nr. 937 845 812 · <a href="mailto:kurtivigan1@gmail.com">kurtivigan1@gmail.com</a> · <a href="#top" data-i18n="totop">Til toppen ↑</a> · <a class="admin-link" href="/admin" rel="nofollow">Admin</a></p>
     </div>
   </footer>
 
