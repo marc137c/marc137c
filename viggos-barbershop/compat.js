@@ -73,8 +73,9 @@
   document.addEventListener("keydown", function (e) {
     var d = stack[stack.length - 1];
     if (!d) return;
-    if (e.key === "Escape" || e.key === "Esc") { e.preventDefault(); d.close(); return; }
-    if (e.key !== "Tab") return;
+    var key = e.key || ({ 27: "Escape", 9: "Tab" })[e.keyCode];
+    if (key === "Escape" || key === "Esc") { e.preventDefault(); d.close(); return; }
+    if (key !== "Tab") return;
     var items = Array.prototype.filter.call(d.querySelectorAll(FOCUSABLE), function (el) { return el.offsetParent !== null; });
     if (!items.length) return;
     var first = items[0];

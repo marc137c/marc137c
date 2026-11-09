@@ -128,6 +128,7 @@ p { margin: 0 0 1em; }
 }
 .brand-caps { font: 600 .58rem var(--caps); letter-spacing: .42em; color: var(--gold); margin: -2px 0 0 .42em; }
 .nav-menu { display: flex; align-items: center; gap: 28px; }
+.nav-menu a { white-space: nowrap; }
 .nav-menu a:not(.btn) { color: var(--muted); font-weight: 500; }
 .nav-menu a:not(.btn):hover { color: var(--text); }
 .nav-menu { order: 1; margin-left: auto; }
@@ -180,9 +181,8 @@ body, .site-header, .section-alt, .highlight, .booking, .post, .svc-link, input,
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  min-height: 92vh; min-height: min(92vh, 860px);
   display: grid; align-items: center;
-  padding: 90px 0 80px;
+  padding: 48px 0 40px;
   text-align: center;
   background:
     radial-gradient(ellipse at 70% 20%, rgba(201, 163, 92, .22), transparent 55%),
@@ -207,6 +207,8 @@ body, .site-header, .section-alt, .highlight, .booking, .post, .svc-link, input,
 }
 .trust-badge .stars { color: var(--gold); letter-spacing: 2px; }
 .lead { font-size: 1.15rem; font-size: clamp(1.05rem, 2vw, 1.3rem); color: var(--lead); max-width: 620px; margin-left: auto; margin-right: auto; }
+.hero-socials { justify-content: center; margin: 0 0 16px; }
+#bestill { padding-top: 48px; }
 .hero-cta { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; margin: 34px 0 24px; }
 .hero .btn-ghost { background: rgba(var(--bg-rgb), .4); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 .status { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); font-size: .95rem; margin: 0; }
@@ -287,7 +289,7 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 }
 
 /* Responsive */
-@media (max-width: 900px) {
+@media (max-width: 1080px) {
   .nav-toggle { display: block; }
   .theme-toggle { margin-left: auto; width: 34px; height: 34px; }
   .lang-toggle { margin-left: 8px; margin-right: 8px; padding: 4px 11px 4px 5px; font-size: .78rem; gap: 8px; }
@@ -604,18 +606,35 @@ form.booking {
 .stats { display: flex; justify-content: center; gap: 40px; flex-wrap: wrap; margin: 30px 0 0; }
 .stats dt { font: 700 1.8rem var(--caps); color: var(--gold); }
 .stats dd { margin: 0; color: var(--muted); font-size: .9rem; }
-.gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); grid-gap: 14px; gap: 14px; margin-top: 48px; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); grid-gap: 14px; gap: 14px; margin-top: 48px; }
 .gallery figure { margin: 0; }
+@media (max-width: 600px) {
+  .gallery { grid-template-columns: repeat(2, 1fr); grid-gap: 10px; gap: 10px; margin-top: 36px; }
+  .gallery figure:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .gallery figure:last-child:nth-child(odd) .gallery-item { aspect-ratio: 16 / 10; }
+}
+/* Logo-bilder (skilt, visittkort) vises hele, ikke beskåret */
+.gallery-item img.whole { object-fit: contain; }
+/* Om oss: portrett ved siden av teksten (flex, så det virker i alle nettlesere) */
+.about--photo { max-width: 980px; display: flex; align-items: center; text-align: left; }
+.about-photo { flex: 0 0 38%; max-width: 380px; margin: 0 48px 0 0; }
+.about-photo img { display: block; width: 100%; height: auto; border-radius: 20px; border: 1px solid var(--line); box-shadow: 0 18px 40px rgba(var(--shadow), .25); }
+.about-text { flex: 1; min-width: 0; }
+.about--photo .stats { justify-content: flex-start; }
+@media (max-width: 760px) {
+  .about--photo { display: block; text-align: center; }
+  .about-photo { max-width: 320px; margin: 0 auto 28px; }
+  .about--photo .stats { justify-content: center; }
+}
 .gallery-item {
   display: block; width: 100%; padding: 0; border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
-  background: var(--surface); cursor: zoom-in; aspect-ratio: 4 / 3;
+  background: var(--surface); cursor: zoom-in; aspect-ratio: 4 / 5;
 }
 .gallery-item picture { display: block; width: 100%; height: 100%; }
 .gallery-item img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .5s cubic-bezier(.2, .7, .2, 1); }
 .gallery-item:hover img { transform: scale(1.04); }
 .gallery-item:focus-visible img { transform: scale(1.04); }
 .lightbox { padding: 0; border: 0; background: transparent; max-width: 94vw; max-width: min(1100px, 94vw); max-height: 90vh; overflow: visible; }
-.lightbox[open] { position: fixed; top: 50%; bottom: auto; margin-top: 0; margin-bottom: 0; -webkit-transform: translateY(-50%); transform: translateY(-50%); }
 .lightbox::backdrop { background: rgba(6, 9, 8, .88); }
 .lightbox img { display: block; max-width: 100%; max-height: 86vh; border-radius: 14px; }
 .lightbox-close {
@@ -681,17 +700,19 @@ form.booking {
 
 /* Uten aspect-ratio (og, i de eldste, gap i flexbox). Margin i stedet for gap gir samme avstand i alle disse. */
 @supports not (aspect-ratio: 1) {
+  .lightbox[open] { position: fixed; top: 50%; bottom: auto; margin-top: 0; margin-bottom: 0; -webkit-transform: translateY(-50%); transform: translateY(-50%); }
   .post::before { content: ""; display: block; padding-top: 125%; }
   .social-feed--single .post::before { padding-top: 75%; }
   .post--follow::before { display: none; }
   .post--follow { min-height: 240px; }
   .cal-day { height: 40px; }
-  .gallery-item { height: 220px; }
+  .gallery-item { height: 300px; }
+  @media (max-width: 600px) { .gallery-item { height: 210px; } }
 
   .nav-menu, .lang-toggle, .trust-badge, .hero-cta, .status, .stats, .socials, .follow-row, .btn-follow,
   .step-label, .addon-picks, .booking .addon-picks label, .slot-legend, .slot-legend li, .rating-summary,
   .addons li, .review, .review figcaption, .footer-line, .post--follow { gap: 0; }
-  @media (min-width: 901px) { .nav-menu > * + * { margin-left: 28px; } }
+  @media (min-width: 1081px) { .nav-menu > * + * { margin-left: 28px; } }
   @media (min-width: 761px) { .svc-link { gap: 0; } .svc-link > * + * { margin-left: 14px; } }
   .lang-toggle > * + * { margin-left: 8px; }
   .trust-badge > :first-child { margin-right: 10px; }
@@ -730,7 +751,10 @@ form.booking {
   .social-feed { display: flex; flex-wrap: wrap; justify-content: space-between; }
   .post { width: 48%; margin-bottom: 22px; }
   .social-feed--single .post { width: 100%; max-width: 420px; margin: 0 auto; }
-  .highlight, .review, .gallery figure { margin-bottom: 20px; }
+  .highlight, .review { margin-bottom: 20px; }
+  .gallery { display: flex; flex-wrap: wrap; justify-content: space-between; }
+  .gallery figure { width: 32%; margin-bottom: 14px; }
+  @media (max-width: 600px) { .gallery figure { width: 48.5%; margin-bottom: 10px; } .gallery figure:last-child:nth-child(odd) { width: 100%; } }
   .booking-col > * + * { margin-top: 22px; }
   .step > * + * { margin-top: 10px; }
   .booking label:not(.step-label) > * { margin-top: 6px; display: block; }
@@ -738,6 +762,9 @@ form.booking {
   .footer-inner > * + * { margin-top: 14px; }
   .hours-grid > * + * { margin-top: 32px; }
   form.booking > * + * { margin-top: 22px; }
+  .svc-link { display: flex; }
+  .svc-link > div { display: block; flex: 1; }
+  .footer-inner .socials { justify-content: center; }
 }
 
 /* Uten <dialog> (Firefox < 98, Safari < 15.4): compat.js setter klassene */

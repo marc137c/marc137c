@@ -3,9 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@netlify/blobs": "^11.1.4"
-  },
-  "devDependencies": {
+    "@netlify/blobs": "^11.1.4",
     "acorn": "^8.14.0"
   }
 }

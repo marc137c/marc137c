@@ -72,12 +72,21 @@ onScroll();
 function osloNow() {
   try {
     const p = {};
-    new Intl.DateTimeFormat("en-CA", {
+    const fmt = new Intl.DateTimeFormat("en-CA", {
       timeZone: "Europe/Oslo", year: "numeric", month: "2-digit", day: "2-digit",
       // hour12:false, ikke hourCycle: eldre nettlesere overser hourCycle og gir 12-timersklokke (15:00 blir 3).
       // Noen svarer «24» ved midnatt, derfor % 24 under.
       hour: "2-digit", minute: "2-digit", hour12: false,
-    }).formatToParts(new Date()).forEach((x) => { p[x.type] = x.value; });
+    });
+    const now = new Date();
+    if (typeof fmt.formatToParts === "function") fmt.formatToParts(now).forEach((x) => { p[x.type] = x.value; });
+    else {
+      // Safari 10 mangler formatToParts: hent hvert felt for seg, fortsatt i norsk tid
+      ["year", "month", "day", "hour", "minute"].forEach((k) => {
+        const o = { timeZone: "Europe/Oslo", hour12: false }; o[k] = "numeric";
+        p[k] = new Intl.DateTimeFormat("en-US", o).format(now).replace(/\D/g, "");
+      });
+    }
     const y = +p.year, m = +p.month, d = +p.day;
     return { y, m, d, day: new Date(y, m - 1, d).getDay(), minutes: (+p.hour % 24) * 60 + +p.minute };
   } catch (e) {
@@ -124,7 +133,7 @@ I18N.onChange(() => {
 });
 
 // Galleri: klikk for å se bildet stort
-const lightbox = document.getElementById("lightbox");
+const lightboxDlg = document.getElementById("lightbox");
 const lightboxImg = document.getElementById("lightbox-img");
 document.querySelectorAll(".gallery-item").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -134,11 +143,11 @@ document.querySelectorAll(".gallery-item").forEach((btn) => {
     const full = btn.dataset.full || shown;
     lightboxImg.src = /\.jpg$/i.test(shown) ? full.replace(/\.webp$/i, ".jpg") : full;
     lightboxImg.alt = img.alt;
-    lightbox.showModal();
+    lightboxDlg.showModal();
   });
 });
-document.getElementById("lightbox-close").addEventListener("click", () => lightbox.close());
-lightbox.addEventListener("click", (e) => { if (e.target === lightbox) lightbox.close(); });
+document.getElementById("lightbox-close").addEventListener("click", () => lightboxDlg.close());
+lightboxDlg.addEventListener("click", (e) => { if (e.target === lightboxDlg) lightboxDlg.close(); });
 
 // Animasjon når seksjoner kommer til syne
 if ("IntersectionObserver" in window) {

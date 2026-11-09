@@ -8,6 +8,7 @@
     "brand.label": "Viggo's Barbershop – back to top",
     "nav.label": "Main menu",
     "nav.services": "Services",
+    "nav.social": "Follow us",
     "nav.about": "About",
     "nav.hours": "Opening hours",
     "nav.contact": "Contact",
@@ -87,6 +88,14 @@
     "g.sign": "Viggo's Barbershop gold sign on the window",
     "g.card": "Viggo's Barbershop business card with clippers, shaving brush and razor",
     "g.close": "Close",
+    "g.p1": "Viggo cutting a customer's hair with clippers",
+    "g.p2": "Straight-razor shave along the beard line",
+    "g.p3": "A happy customer in the chair with Viggo behind him",
+    "g.p4": "Viggo giving a boy a fade",
+    "g.p5": "Scissors and comb in Viggo's hands",
+    "g.p6": "Viggo in a vest and tie by a barber pole",
+    "g.p7": "Viggo sitting in a leather chair in the shop",
+    "about.photo": "Portrait of Vigan “Viggo” Kurti",
 
     // 7. Opening hours
     "hours.eyebrow": "Opening hours",

@@ -71,6 +71,7 @@
       </button>
       <nav id="nav-menu" class="nav-menu" data-i18n-attr="aria-label:nav.label" aria-label="Hovedmeny">
         <a href="#tjenester" data-i18n="nav.services">Tjenester</a>
+          <a href="#sosiale" data-i18n="nav.social">Følg oss</a>
         <a href="#om" data-i18n="nav.about">Om oss</a>
         <a href="#apningstider" data-i18n="nav.hours">Åpningstider</a>
         <a href="#kontakt" data-i18n="nav.contact">Kontakt</a>
@@ -100,40 +101,12 @@
           <a class="btn" href="#bestill" data-i18n="cta.book">Bestill time</a>
           <a class="btn btn-ghost" href="#tjenester" data-i18n="cta.prices">Se priser</a>
         </div>
+        <div class="socials socials-sm hero-socials anim" style="--d:.85s" data-socials-wrap hidden><a data-social="instagram" hidden target="_blank" rel="noopener" aria-label="Instagram"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r=".9" fill="currentColor" stroke="none"/></svg></a><a data-social="tiktok" hidden target="_blank" rel="noopener" aria-label="TikTok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v11.5a3.5 3.5 0 1 1-3.5-3.5"/><path d="M14 3c.4 2.6 2.3 4.4 5 4.6"/></svg></a><a data-social="facebook" hidden target="_blank" rel="noopener" aria-label="Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M15.5 7.5H14a2 2 0 0 0-2 2V21M9.5 13h5.5"/></svg></a></div>
         <p class="status anim" style="--d:.9s" id="open-status" aria-live="polite"></p>
       </div>
     </section>
 
-    <!-- 2. TJENESTER OG PRISER -->
-    <section class="section" id="tjenester">
-      <div class="container">
-        <header class="section-head">
-          <p class="eyebrow" data-i18n="svc.eyebrow">Tjenester &amp; priser</p>
-          <h2 data-i18n="svc.title">Hva kan vi gjøre for deg?</h2>
-          <p class="section-lead" data-i18n="svc.hint">Trykk på en tjeneste for å bestille time.</p>
-        </header>
-
-        <ul class="price-list">
-          <li class="svc-featured"><a class="svc-link" href="#bestill" data-service="Full service"><div><span class="svc-badge" data-i18n="svc.popular">Mest populær</span><h3 data-i18n="s.full">Full service</h3><p data-i18n="s.full.d">Klipp, barbering, vask og styling. Hele pakken.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="750">fra 750,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
-          <li><a class="svc-link" href="#bestill" data-service="Herreklipp"><div><h3 data-i18n="s.cut">Herreklipp</h3><p data-i18n="s.cut.d">Klipp med saks og/eller maskin.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="350">fra 350,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
-          <li><a class="svc-link" href="#bestill" data-service="Herreklipp + skjeggtrim (maskin)"><div><h3 data-i18n="s.combo">Herreklipp + skjeggtrim (maskin)</h3><p data-i18n="s.combo.d">Klipp og skjeggtrim med maskin.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="500">fra 500,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
-          <li><a class="svc-link" href="#bestill" data-service="Knivbarbering"><div><h3 data-i18n="s.shave">Knivbarbering</h3><p data-i18n="s.shave.d">Tradisjonell barbering med kniv, varme håndklær og balm.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="350">fra 350,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
-          <li><a class="svc-link" href="#bestill" data-service="Skjegg &amp; line-up"><div><h3 data-i18n="s.beard">Skjegg &amp; line-up</h3><p data-i18n="s.beard.d">Forming, trim og skarpe linjer.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="350">fra 350,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
-          <li><a class="svc-link" href="#bestill" data-service="Barneklipp"><div><h3 data-i18n="s.kids">Barneklipp</h3><p data-i18n="s.kids.d">For gutter til og med 12 år. Fra 13 år gjelder vanlig pris.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="300">fra 300,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
-        </ul>
-
-        <div class="addons">
-          <h3 class="addons-title" data-i18n="addons.title">Tillegg</h3>
-          <ul>
-            <li><span data-i18n="a.washShort">Vask kort hår</span><span class="price" data-price="100">fra 100,-</span></li>
-            <li><span data-i18n="a.washLong">Vask langt hår</span><span class="price" data-price="200">fra 200,-</span></li>
-            <li><span data-i18n="a.styling">Styling</span><span class="price" data-price="100">fra 100,-</span></li>
-          </ul>
-        </div>
-      </div>
-    </section>
-
-    <!-- 3. BESTILLINGSKALENDER -->
+    <!-- 2. BESTILLINGSKALENDER -->
     <section class="section section-alt" id="bestill">
       <div class="container">
         <header class="section-head">
@@ -217,7 +190,57 @@
       </div>
     </section>
 
-    <!-- 4. GOOGLE-ANMELDELSER -->
+    <!-- 3. SOSIALE MEDIER -->
+    <section class="section" id="sosiale" aria-labelledby="sosiale-title">
+      <div class="container">
+        <header class="section-head">
+          <p class="eyebrow" data-i18n="soc.eyebrow">Sosiale medier</p>
+          <h2 id="sosiale-title" data-i18n="soc.title">Ferskt fra stolen</h2>
+          <p class="section-lead" data-i18n="soc.lead">De nyeste klippene våre fra Instagram.</p>
+        </header>
+        <div class="social-feed" id="social-feed" aria-busy="true">
+          <span class="post post--skeleton"></span><span class="post post--skeleton"></span>
+          <span class="post post--skeleton"></span><span class="post post--skeleton"></span>
+          <span class="post post--skeleton"></span><span class="post post--skeleton"></span>
+        </div>
+        <div class="follow-row">
+          <a class="btn btn-ghost btn-follow" href="https://www.instagram.com/viggos.barbershop/" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r=".9" fill="currentColor" stroke="none"/></svg>Instagram <span class="handle">@viggos.barbershop</span></a>
+          <a class="btn btn-ghost btn-follow" href="https://www.tiktok.com/@viggos.barbershop1" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v11.5a3.5 3.5 0 1 1-3.5-3.5"/><path d="M14 3c.4 2.6 2.3 4.4 5 4.6"/></svg>TikTok</a>
+          <a class="btn btn-ghost btn-follow" href="https://www.facebook.com/share/19enEU6x6Q/" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M15.5 7.5H14a2 2 0 0 0-2 2V21M9.5 13h5.5"/></svg>Facebook</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. TJENESTER OG PRISER -->
+    <section class="section section-alt" id="tjenester">
+      <div class="container">
+        <header class="section-head">
+          <p class="eyebrow" data-i18n="svc.eyebrow">Tjenester &amp; priser</p>
+          <h2 data-i18n="svc.title">Hva kan vi gjøre for deg?</h2>
+          <p class="section-lead" data-i18n="svc.hint">Trykk på en tjeneste for å bestille time.</p>
+        </header>
+
+        <ul class="price-list">
+          <li class="svc-featured"><a class="svc-link" href="#bestill" data-service="Full service"><div><span class="svc-badge" data-i18n="svc.popular">Mest populær</span><h3 data-i18n="s.full">Full service</h3><p data-i18n="s.full.d">Klipp, barbering, vask og styling. Hele pakken.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="750">fra 750,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+          <li><a class="svc-link" href="#bestill" data-service="Herreklipp"><div><h3 data-i18n="s.cut">Herreklipp</h3><p data-i18n="s.cut.d">Klipp med saks og/eller maskin.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="350">fra 350,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+          <li><a class="svc-link" href="#bestill" data-service="Herreklipp + skjeggtrim (maskin)"><div><h3 data-i18n="s.combo">Herreklipp + skjeggtrim (maskin)</h3><p data-i18n="s.combo.d">Klipp og skjeggtrim med maskin.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="500">fra 500,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+          <li><a class="svc-link" href="#bestill" data-service="Knivbarbering"><div><h3 data-i18n="s.shave">Knivbarbering</h3><p data-i18n="s.shave.d">Tradisjonell barbering med kniv, varme håndklær og balm.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="350">fra 350,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+          <li><a class="svc-link" href="#bestill" data-service="Skjegg &amp; line-up"><div><h3 data-i18n="s.beard">Skjegg &amp; line-up</h3><p data-i18n="s.beard.d">Forming, trim og skarpe linjer.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="350">fra 350,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+          <li><a class="svc-link" href="#bestill" data-service="Barneklipp"><div><h3 data-i18n="s.kids">Barneklipp</h3><p data-i18n="s.kids.d">For gutter til og med 12 år. Fra 13 år gjelder vanlig pris.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="300">fra 300,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+        </ul>
+
+        <div class="addons">
+          <h3 class="addons-title" data-i18n="addons.title">Tillegg</h3>
+          <ul>
+            <li><span data-i18n="a.washShort">Vask kort hår</span><span class="price" data-price="100">fra 100,-</span></li>
+            <li><span data-i18n="a.washLong">Vask langt hår</span><span class="price" data-price="200">fra 200,-</span></li>
+            <li><span data-i18n="a.styling">Styling</span><span class="price" data-price="100">fra 100,-</span></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. GOOGLE-ANMELDELSER -->
     <section class="section" id="anmeldelser" aria-labelledby="reviews-title">
       <div class="container">
         <header class="section-head">
@@ -232,7 +255,7 @@
       </div>
     </section>
 
-    <!-- 5. HVORFOR VIGGO'S -->
+    <!-- 6. HVORFOR VIGGO'S -->
     <section class="section section-alt" id="hvorfor" aria-labelledby="why-title">
       <div class="container">
         <header class="section-head">
@@ -255,10 +278,12 @@
       </div>
     </section>
 
-    <!-- 6. OM OSS -->
+    <!-- 7. OM OSS -->
     <section class="section" id="om">
       <div class="container">
-        <div class="about">
+        <div class="about about--photo">
+          <figure class="about-photo"><picture><source srcset="img/viggo-portrett-600.webp 600w, img/viggo-portrett-1000.webp 1000w" sizes="(max-width: 760px) 320px, 380px" type="image/webp"><img src="img/viggo-portrett-600.jpg" width="600" height="750" loading="lazy" decoding="async" alt="Portrett av Vigan «Viggo» Kurti" data-i18n-attr="alt:about.photo"></picture></figure>
+          <div class="about-text">
           <p class="eyebrow" data-i18n="about.eyebrow">Om oss</p>
           <h2 data-i18n="about.title">Et sted for gode samtaler og skarpe linjer</h2>
           <p data-i18n="about.p1">Viggo's Barbershop åpnet i 2026 i Halden. Bak stolen står Vigan Kurti, som har over 20 års erfaring fra bransjen i Norge, USA, Sverige og Kosovo. Målet er et sted der folk kan komme innom, ta en prat og føle seg vel.</p>
@@ -268,17 +293,25 @@
             <div><dt>Violgata 22</dt><dd>1776 Halden</dd></div>
             <div><dt data-i18n="stat.walkin">Drop-in</dt><dd data-i18n="stat.dropin">og timebestilling</dd></div>
           </dl>
+          </div>
         </div>
 
         <!-- Galleri: legg til flere bilder ved å kopiere en <figure>-blokk (se README) -->
         <div class="gallery" id="gallery">
-          <figure><button type="button" class="gallery-item" data-full="img/skilt-1200.webp"><picture><source srcset="img/skilt-720.webp" type="image/webp"><img src="img/skilt-720.jpg" width="720" height="480" loading="lazy" decoding="async" alt="Gullskiltet til Viggo's Barbershop på vinduet" data-i18n-attr="alt:g.sign"></picture></button></figure>
-          <figure><button type="button" class="gallery-item" data-full="img/kort-1200.webp"><picture><source srcset="img/kort-720.webp" type="image/webp"><img src="img/kort-720.jpg" width="720" height="421" loading="lazy" decoding="async" alt="Visittkortet til Viggo's Barbershop med maskin, barberkost og kniv" data-i18n-attr="alt:g.card"></picture></button></figure>
+          <figure><button type="button" class="gallery-item" data-full="img/viggo-klipper-1200.webp"><picture><source srcset="img/viggo-klipper-720.webp" type="image/webp"><img src="img/viggo-klipper-720.jpg" width="675" height="900" loading="lazy" decoding="async" style="object-position: center 30%" alt="Viggo klipper en kunde med maskin" data-i18n-attr="alt:g.p1"></picture></button></figure>
+          <figure><button type="button" class="gallery-item" data-full="img/knivbarbering-1200.webp"><picture><source srcset="img/knivbarbering-720.webp" type="image/webp"><img src="img/knivbarbering-720.jpg" width="720" height="480" loading="lazy" decoding="async" style="object-position: 62% center" alt="Knivbarbering langs skjegglinjen" data-i18n-attr="alt:g.p2"></picture></button></figure>
+          <figure><button type="button" class="gallery-item" data-full="img/fornoyd-kunde-1200.webp"><picture><source srcset="img/fornoyd-kunde-720.webp" type="image/webp"><img src="img/fornoyd-kunde-720.jpg" width="720" height="480" loading="lazy" decoding="async" style="object-position: 66% center" alt="Fornøyd kunde i stolen med Viggo bak" data-i18n-attr="alt:g.p3"></picture></button></figure>
+          <figure><button type="button" class="gallery-item" data-full="img/barneklipp-1200.webp"><picture><source srcset="img/barneklipp-720.webp" type="image/webp"><img src="img/barneklipp-720.jpg" width="720" height="540" loading="lazy" decoding="async" style="object-position: 55% center" alt="Viggo gir en gutt en fade" data-i18n-attr="alt:g.p4"></picture></button></figure>
+          <figure><button type="button" class="gallery-item" data-full="img/saks-og-kam-1200.webp"><picture><source srcset="img/saks-og-kam-720.webp" type="image/webp"><img src="img/saks-og-kam-720.jpg" width="720" height="480" loading="lazy" decoding="async" style="object-position: 40% center" alt="Saks og kam i hendene til Viggo" data-i18n-attr="alt:g.p5"></picture></button></figure>
+          <figure><button type="button" class="gallery-item" data-full="img/viggo-barberstang-1200.webp"><picture><source srcset="img/viggo-barberstang-720.webp" type="image/webp"><img src="img/viggo-barberstang-720.jpg" width="600" height="900" loading="lazy" decoding="async" style="object-position: center 20%" alt="Viggo i vest og slips ved en barberstang" data-i18n-attr="alt:g.p6"></picture></button></figure>
+          <figure><button type="button" class="gallery-item" data-full="img/viggo-skinnstol-1200.webp"><picture><source srcset="img/viggo-skinnstol-720.webp" type="image/webp"><img src="img/viggo-skinnstol-720.jpg" width="359" height="900" loading="lazy" decoding="async" style="object-position: center 45%" alt="Viggo sitter i en skinnstol i salongen" data-i18n-attr="alt:g.p7"></picture></button></figure>
+          <figure><button type="button" class="gallery-item" data-full="img/skilt-1200.webp"><picture><source srcset="img/skilt-720.webp" type="image/webp"><img class="whole" src="img/skilt-720.jpg" width="720" height="480" loading="lazy" decoding="async" alt="Gullskiltet til Viggo's Barbershop på vinduet" data-i18n-attr="alt:g.sign"></picture></button></figure>
+          <figure><button type="button" class="gallery-item" data-full="img/kort-1200.webp"><picture><source srcset="img/kort-720.webp" type="image/webp"><img class="whole" src="img/kort-720.jpg" width="720" height="421" loading="lazy" decoding="async" alt="Visittkortet til Viggo's Barbershop med maskin, barberkost og kniv" data-i18n-attr="alt:g.card"></picture></button></figure>
         </div>
       </div>
     </section>
 
-    <!-- 7. ÅPNINGSTIDER -->
+    <!-- 8. ÅPNINGSTIDER -->
     <section class="section section-alt" id="apningstider">
       <div class="container hours-grid">
         <div>
@@ -300,27 +333,6 @@
         <iframe class="map" title="Kart: Violgata 22, 1776 Halden" data-i18n-attr="title:c.maptitle"
           src="https://www.google.com/maps?q=Violgata+22,+1776+Halden&amp;z=16&amp;output=embed"
           loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-      </div>
-    </section>
-
-    <!-- 8. SOSIALE MEDIER -->
-    <section class="section" id="sosiale" aria-labelledby="sosiale-title">
-      <div class="container">
-        <header class="section-head">
-          <p class="eyebrow" data-i18n="soc.eyebrow">Sosiale medier</p>
-          <h2 id="sosiale-title" data-i18n="soc.title">Ferskt fra stolen</h2>
-          <p class="section-lead" data-i18n="soc.lead">De nyeste klippene våre fra Instagram.</p>
-        </header>
-        <div class="social-feed" id="social-feed" aria-busy="true">
-          <span class="post post--skeleton"></span><span class="post post--skeleton"></span>
-          <span class="post post--skeleton"></span><span class="post post--skeleton"></span>
-          <span class="post post--skeleton"></span><span class="post post--skeleton"></span>
-        </div>
-        <div class="follow-row">
-          <a class="btn btn-ghost btn-follow" href="https://www.instagram.com/viggos.barbershop/" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r=".9" fill="currentColor" stroke="none"/></svg>Instagram <span class="handle">@viggos.barbershop</span></a>
-          <a class="btn btn-ghost btn-follow" href="https://www.tiktok.com/@viggos.barbershop1" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v11.5a3.5 3.5 0 1 1-3.5-3.5"/><path d="M14 3c.4 2.6 2.3 4.4 5 4.6"/></svg>TikTok</a>
-          <a class="btn btn-ghost btn-follow" href="https://www.facebook.com/share/19enEU6x6Q/" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M15.5 7.5H14a2 2 0 0 0-2 2V21M9.5 13h5.5"/></svg>Facebook</a>
-        </div>
       </div>
     </section>
   </main>

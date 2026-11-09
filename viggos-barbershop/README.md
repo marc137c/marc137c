@@ -51,7 +51,9 @@ Oppsett (ca. 10 minutter):
 Galleriet under «Om oss» viser bildene i `<div class="gallery">` i `index.html`. Slik legger du til et bilde:
 1. Legg bildet i `img/` som både `.webp` og `.jpg` med samme navn, ca. 1200 px bredt, og gjerne en mindre versjon på ca. 720 px. Eldre iPhone og Safari kan ikke vise WebP, så de får JPG-kopien.
 2. Kopier en `<figure>`-blokk i galleriet og bytt `srcset` og `src` (liten versjon), `data-full` (stor versjon, `.webp`) og `alt` (beskrivelse).
-Galleriet tilpasser seg antallet bilder automatisk, og bildene åpnes stort ved klikk.
+Galleriet tilpasser seg antallet bilder automatisk, og bildene åpnes stort ved klikk. Kortene er stående (4:5); juster utsnittet med `style="object-position: …"` på bildet.
+
+Portrettet i «Om oss» er `img/viggo-portrett-600` og `-1000` (webp og jpg).
 
 ## Språk (norsk / English)
 Siden finnes på norsk og engelsk. Bryteren **English / Norsk** øverst i menyen bytter språk på hele siden, og valget huskes.

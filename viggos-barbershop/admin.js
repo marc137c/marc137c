@@ -15,11 +15,23 @@
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const fmt = (s, o) => new Intl.DateTimeFormat("nb-NO", o).format(parse(s));
   const todayIso = () => iso(new Date());
+  // Datofelt blir vanlig tekst i nettlesere uten type=date: godta også «10.11.2026»
+  const toIso = (v) => {
+    v = String(v || "").trim();
+    let m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+    if (!m) { const n = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/.exec(v); if (n) m = [v, n[3], pad(+n[2]), pad(+n[1])]; }
+    if (!m) return null;
+    const out = m[1] + "-" + m[2] + "-" + m[3];
+    return iso(parse(out)) === out ? out : null;
+  };
   const active = (i) => i.status !== "cancelled";
 
   // ---------- Innlogging ----------
-  const getToken = () => { try { return localStorage.getItem(KEY) || sessionStorage.getItem(KEY); } catch (e) { return null; } };
+  // Safari i privat modus kan ikke lagre noe; da huskes innloggingen så lenge siden er åpen
+  let memToken = null;
+  const getToken = () => { if (memToken) return memToken; try { return localStorage.getItem(KEY) || sessionStorage.getItem(KEY); } catch (e) { return null; } };
   function setToken(t, remember) {
+    memToken = t || null;
     try {
       localStorage.removeItem(KEY); sessionStorage.removeItem(KEY);
       if (t) (remember ? localStorage : sessionStorage).setItem(KEY, t);
@@ -103,6 +115,7 @@
       render();
       $("sync").textContent = `Oppdatert ${hhmm(new Date().getHours() * 60 + new Date().getMinutes())}`;
     }).catch((err) => {
+      if (seq !== loadSeq) return; // et nyere svar er på vei
       if (err.status !== 401) $("sync").textContent = "Ingen forbindelse";
     });
   }
@@ -137,7 +150,7 @@
     const tel = String(i.phone || "").replace(/[^\d+]/g, "");
     return `<div role="button" tabindex="0" class="${cls}" data-id="${esc(i.id)}">
       <span class="when">${when}${i.status === "cancelled" ? " · AVLYST" : ""}</span>
-      <span class="what">${esc(i.service || "Avtale")}${i.addons && i.addons.length ? ` +${esc(i.addons.join(", "))}` : ""}</span>
+      <span class="what">${esc(i.service || "Avtale")}${i.addons && i.addons.length ? ` + ${esc(i.addons.join(", "))}` : ""}</span>
       <span class="who">${esc(i.name || "Uten navn")}${tel ? ` · <a href="tel:${esc(tel)}">${esc(i.phone)}</a>` : ""}</span>
       ${i.note ? `<span class="note">${esc(i.note)}</span>` : ""}
       ${i.source === "nettside" ? '<span class="tag">Bestilt på nett</span>' : ""}
@@ -195,7 +208,7 @@
   $("prev").addEventListener("click", () => go(addDays(state.day, -1)));
   $("next").addEventListener("click", () => go(addDays(state.day, 1)));
   $("today").addEventListener("click", () => go(todayIso()));
-  $("day").addEventListener("change", (e) => { if (e.target.value) go(e.target.value); });
+  $("day").addEventListener("change", (e) => { const d = toIso(e.target.value); if (d) go(d); else e.target.value = state.day; });
   $("week").addEventListener("click", (e) => { const b = e.target.closest("[data-day]"); if (b) go(b.dataset.day); });
 
   $("timeline").addEventListener("click", (e) => {
@@ -206,7 +219,7 @@
     if (it) openEditor([...state.items].find((i) => i.id === it.dataset.id));
   });
   $("timeline").addEventListener("keydown", (e) => {
-    if ((e.key === "Enter" || e.key === " ") && e.target.matches("div[data-id]")) { e.preventDefault(); e.target.click(); }
+    if ((e.key === "Enter" || e.key === " " || e.keyCode === 13 || e.keyCode === 32) && e.target.matches("div[data-id]")) { e.preventDefault(); e.target.click(); }
   });
   $("add").addEventListener("click", () => openEditor(null, { type: "booking" }));
   $("block").addEventListener("click", () => {
@@ -272,7 +285,7 @@
     const isBlock = E.type.value === "block";
     return {
       type: E.type.value,
-      date: E.date.value,
+      date: toIso(E.date.value) || E.date.value,
       start: toMin(E.start.value),
       dur: Number(E.dur.value),
       service: isBlock ? "" : E.service.value,

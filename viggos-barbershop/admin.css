@@ -102,6 +102,7 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 
 /* Redigering */
 .sheet { width: calc(100% - 24px); max-width: 560px; max-height: calc(100vh - 24px); border: 1px solid var(--line); border-radius: 18px; padding: 0; background: var(--surface); color: var(--text); }
+@supports (width: min(1px, 2px)) { .sheet { max-width: min(560px, calc(100% - 6px - 2em)); } }
 .sheet::backdrop { background: rgba(0,0,0,.6); }
 .sheet form { display: grid; grid-gap: 14px; gap: 14px; padding: 22px; }
 .sheet h3 { margin: 0; }

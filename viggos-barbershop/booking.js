@@ -238,10 +238,11 @@
 
   // Skjemaet som tekst til Netlify Forms. Samme regler som FormData, men uten å kreve at FormData
   // kan itereres (det kan den ikke i Safari før 11.1) eller at URLSearchParams finnes (Safari før 10.1).
+  const enc = (v) => { try { return encodeURIComponent(v); } catch (e) { return encodeURIComponent(String(v).replace(/[\uD800-\uDFFF]/g, "\uFFFD")); } };
   const encodeForm = (f) => Array.prototype.slice.call(f.elements)
     .filter((el) => el.name && !el.disabled && !/^(submit|button|reset|file)$/.test(el.type) &&
       (!/^(checkbox|radio)$/.test(el.type) || el.checked))
-    .map((el) => (encodeURIComponent(el.name) + "=" + encodeURIComponent(el.value)).replace(/%20/g, "+"))
+    .map((el) => (enc(el.name) + "=" + enc(el.value)).replace(/%20/g, "+"))
     .join("&");
 
   // E-postvarsel til barbershopen via Netlify Forms (skjemaet «booking»)
