@@ -4,19 +4,42 @@ Statisk nettside (HTML/CSS/JS, ingen avhengigheter). Åpne `index.html` i nettle
 
 ## Publisering på Netlify
 `netlify.toml` i roten av repoet peker Netlify til denne mappen (`publish = "viggos-barbershop"`).
-Bookingskjemaet bruker Netlify Forms – forespørsler dukker opp under **Forms** i Netlify-dashbordet.
+Bestillingskalenderen sender forespørsler via Netlify Forms (skjemaet `booking`) – de dukker opp under **Forms** i Netlify-dashbordet.
 
 ## Bedriftsinfo (bekreftet)
 - **Viggos Barbershop Kurti**, org.nr. 937 845 812, innehaver Vigan Kurti
-- Svenskegata 2, 1776 Halden – telefon 409 63 911 – e-post kurtivigan1@gmail.com
+- Violgata 22, 1776 Halden – telefon 409 63 911 – e-post kurtivigan1@gmail.com
 - Instagram [@viggos.barbershop](https://www.instagram.com/viggos.barbershop/), TikTok [@viggos.barbershop1](https://www.tiktok.com/@viggos.barbershop1), [Facebook](https://www.facebook.com/share/19enEU6x6Q/) (lenkene står i `SOCIAL` i `script.js`)
 - Kilder: Brønnøysund via Proff.no, Gule Sider og Halden Arbeiderblad
 
-## Må bekreftes / fylles inn
-- **Priser og tjenester:** står i `index.html`.
-- **Åpningstider:** står i tabellen i `index.html` og i `HOURS` øverst i `script.js`.
+## Innhold som må holdes oppdatert
+- **Priser og tjenester:** i `index.html` (prislisten og nedtrekkslisten i bestillingen) og engelsk tekst i `i18n.js`.
+- **Åpningstider:** i tabellen i `index.html`, i `HOURS` øverst i `script.js` (styrer «Åpent nå» og ledige tider i kalenderen), i `openingHoursSpecification` i `index.html` og engelsk tekst (`hours.wk`, `hours.sat`) i `i18n.js`.
 - **Bookingvarsler:** i Netlify går du til **Forms → booking → Form notifications** og legger inn kurtivigan1@gmail.com, så kommer timeforespørslene på e-post.
-- **Omtaler:** seksjonen er fjernet til ekte omtaler finnes, for eksempel fra Google.
+
+## Bestillingskalender
+`booking.js`: kunden velger tjeneste (og eventuelle tillegg), dag og tid, og skriver navn og telefon.
+- Søndager og passerte dager er stengt. Tider deles opp i 30 minutter innenfor åpningstiden, og i dag vises bare tider minst én time frem.
+- Man kan bestille opptil 60 dager frem (`MAX_DAYS`).
+- Det sendes en **forespørsel**: kalenderen vet ikke hvilke tider som allerede er tatt, så barbershopen bekrefter timen på telefon/SMS.
+- I Netlify ser du feltene `tjeneste`, `tillegg`, `dato` (ÅÅÅÅ-MM-DD), `tid` (24 t), `navn` og `telefon` – alltid på norsk.
+
+## Google-anmeldelser
+Seksjonen «Hva kundene sier» viser snittkarakteren og 3–4 anmeldelser hentet automatisk fra Google (`/api/reviews`, mellomlagret i 12 timer).
+Før den er satt opp, vises en henvisning til Google med lenken «Se alle anmeldelser på Google».
+
+Oppsett (ca. 10 minutter):
+1. Gå til console.cloud.google.com, lag et prosjekt og slå på **Places API (New)**.
+2. Lag en **API-nøkkel** (APIs & Services → Credentials) og begrens den til Places API (New).
+3. Legg den inn i **Netlify → Site configuration → Environment variables** som `GOOGLE_PLACES_API_KEY`.
+4. Valgfritt: `GOOGLE_PLACE_ID` – ellers finner siden «Viggos Barbershop» i Violgata 22 automatisk.
+5. Publiser på nytt. Google gir maks 5 anmeldelser per oppslag; siden viser de 4 første med tekst.
+
+## Galleri
+Galleriet under «Om oss» viser bildene i `<div class="gallery">` i `index.html`. Slik legger du til et bilde:
+1. Legg bildet i `img/` (helst `.webp` eller `.jpg`, ca. 1200 px bredt, og gjerne en mindre versjon på ca. 720 px).
+2. Kopier en `<figure>`-blokk i galleriet og bytt `src`, `data-full` (stor versjon) og `alt` (beskrivelse).
+Galleriet tilpasser seg antallet bilder automatisk, og bildene åpnes stort ved klikk.
 
 ## Språk (norsk / English)
 Siden finnes på norsk og engelsk. Bryteren **English / Norsk** øverst i menyen bytter språk på hele siden, og valget huskes.
@@ -24,13 +47,13 @@ Besøkende med nettleser på norsk får norsk, alle andre får engelsk. Lenke di
 
 - Norsk tekst står i `index.html`. Engelsk tekst står i `EN` i `i18n.js` (samme nøkkel som `data-i18n` i HTML-en).
 - Endrer du en tekst på norsk, oppdater den engelske også.
-- Tekster som lages av JavaScript (åpent/stengt, skjemameldinger) står i `STRINGS` i `i18n.js`.
+- Tekster som lages av JavaScript (åpent/stengt, kalenderen, skjemameldinger, anmeldelser) står i `STRINGS` i `i18n.js`. På engelsk vises klokkeslett med AM/PM.
 - Bookingskjemaet sender alltid tjenestenavnet på norsk, så forespørslene i Netlify blir like uansett språk.
 
 ## Logo og profil
 Logoen er laget i kode slik at den er skarp på alle skjermer: «Viggo's» i skriveskrift (Google-fonten Great Vibes),
 «BARBERSHOP» i Cinzel, og ornamentlinjen med diamant som SVG (`--ornament` i `styles.css`). Fargene er dyp grønn og gull fra visittkortet.
-Bildet av gullskiltet ligger i `img/` (webp i to størrelser).
+Bildene av gullskiltet og visittkortet ligger i `img/` (webp i to størrelser).
 
 ## Instagram-feed (oppdateres automatisk)
 Seksjonen «Ferskt fra stolen» viser de 6 nyeste Instagram-postene (2 per rad, 3 rader).
