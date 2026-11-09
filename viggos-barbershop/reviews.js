@@ -21,6 +21,18 @@
     return `<span class="stars-row ${cls}" role="img" aria-label="${esc(I18N.s().ratingOf(String(rating).replace(".", I18N.lang === "en" ? "." : ",")))}"><span class="stars-bg">${row}</span><span class="stars-fg" style="width:${pct}%">${row}</span></span>`;
   }
 
+  // «for 2 måneder siden» / «2 months ago» på valgt språk, regnet ut fra datoen
+  function ago(r) {
+    const t = Date.parse(r.date || "");
+    if (!t || typeof Intl.RelativeTimeFormat !== "function") return r.when || "";
+    const rtf = new Intl.RelativeTimeFormat(I18N.s().locale, { numeric: "auto" });
+    const days = Math.round((t - Date.now()) / 86400000);
+    if (Math.abs(days) < 7) return rtf.format(days, "day");
+    if (Math.abs(days) < 30) return rtf.format(Math.round(days / 7), "week");
+    if (Math.abs(days) < 365) return rtf.format(Math.round(days / 30), "month");
+    return rtf.format(Math.round(days / 365), "year");
+  }
+
   function card(r) {
     const author = r.authorUrl && safeUrl(r.authorUrl)
       ? `<a href="${esc(r.authorUrl)}" target="_blank" rel="noopener">${esc(r.author)}</a>`
@@ -31,7 +43,7 @@
     return `<figure class="review">
       <div class="review-top">${stars(r.rating)}${G_LOGO}</div>
       <blockquote>${esc(r.text)}</blockquote>
-      <figcaption>${avatar}<span><strong>${author}</strong><small>${esc(r.when)}</small></span></figcaption>
+      <figcaption>${avatar}<span><strong>${author}</strong><small>${esc(ago(r))}</small></span></figcaption>
     </figure>`;
   }
 

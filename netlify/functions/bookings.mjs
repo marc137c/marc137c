@@ -11,14 +11,14 @@ export default async (req) => {
   if (raw.length > 4000) return json({ error: "For stor forespørsel." }, 413);
   let input;
   try { input = JSON.parse(raw); } catch { return json({ error: "Ugyldig JSON." }, 400); }
-  if (input.website) return json({ ok: true }); // honningkrukke mot spam-roboter
+  if (input.botField) return json({ ok: true }); // honningkrukke mot spam-roboter (samme felt som Netlify Forms)
 
   const v = validateCustomer(input);
-  if (v.error) return json({ error: v.error }, v.status);
+  if (v.error) return json({ error: v.error, code: v.code }, v.status);
   try {
     const store = getStore({ name: "bookings", consistency: "strong" });
     const r = await createItem(store, { ...v.value, type: "booking" }, { source: "nettside" });
-    if (r.error) return json({ error: r.error, code: r.status === 409 ? "taken" : undefined }, r.status);
+    if (r.error) return json({ error: r.error, code: r.code }, r.status);
     const { id, date, start, dur, service } = r.item;
     return json({ ok: true, booking: { id, date, start, dur, service } }, 201);
   } catch (err) {

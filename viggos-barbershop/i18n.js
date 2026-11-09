@@ -109,6 +109,7 @@
     // 9. Footer
     "foot.tel": "Tel",
     "totop": "Back to top ↑",
+    "foot.org": "Org. no.",
   };
 
   // 24-timers klokke på norsk, 12-timers (AM/PM) på engelsk

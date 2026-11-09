@@ -23,8 +23,21 @@ export default async (req, context) => {
     if (req.method !== "POST") return json({ error: "Bruk POST." }, 405);
     let body = {};
     try { body = await req.json(); } catch {}
+    // Sperre mot gjetting: maks 10 feil per IP og 100 totalt per 15 minutter
+    const authStore = getStore({ name: "bookings", consistency: "strong" });
+    const ip = (context?.ip || req.headers.get("x-nf-client-connection-ip") || "ukjent").replace(/[^\w.:-]/g, "");
+    const limits = [[`auth/ip/${ip}`, 10], ["auth/all", 100]];
+    const WINDOW = 15 * 60 * 1000, now = Date.now();
+    const counts = await Promise.all(limits.map(([k]) => authStore.get(k, { type: "json" }).catch(() => null)));
+    if (limits.some(([, max], i) => counts[i] && now - counts[i].start < WINDOW && counts[i].n >= max)) {
+      return json({ error: "For mange feil forsøk. Vent et kvarter og prøv igjen." }, 429);
+    }
     if (!checkPassword(String(body.password ?? ""), password)) {
-      await new Promise((r) => setTimeout(r, 700)); // gjør gjetting tregt
+      await Promise.all(limits.map(([k], i) => {
+        const c = counts[i] && now - counts[i].start < WINDOW ? counts[i] : { start: now, n: 0 };
+        return authStore.setJSON(k, { start: c.start, n: c.n + 1 }).catch(() => {});
+      }));
+      await new Promise((r) => setTimeout(r, 500));
       return json({ error: "Feil passord." }, 401);
     }
     const ttl = body.remember === false ? DAY / 2 : 60 * DAY;

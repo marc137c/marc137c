@@ -88,15 +88,19 @@
   // ---------- Data ----------
   const state = { day: todayIso(), items: [], week: [], config: null, editing: null };
 
+  let loadSeq = 0;
   async function load() {
-    const today = todayIso();
+    const seq = ++loadSeq, d = state.day, today = todayIso();
     $("sync").textContent = "Henter …";
     try {
       const [day, week] = await Promise.all([
-        api(`/api/admin/items?from=${state.day}&to=${state.day}`),
+        api(`/api/admin/items?from=${d}&to=${d}`),
         api(`/api/admin/items?from=${today}&to=${addDays(today, WEEK_DAYS - 1)}`),
       ]);
+      // Et eldre svar (f.eks. etter rask bla-ing mellom dager) skal ikke overskrive et nyere
+      if (seq !== loadSeq || d !== state.day) return;
       state.items = day.items;
+      state.itemsDay = d;
       state.week = week.items;
       state.config = day.config;
       render();
@@ -161,22 +165,22 @@
 
     const rows = [];
     const shown = new Set();
+    if (state.itemsDay !== d) {
+      // Dagens avtaler er ikke hentet ennå: ikke vis noe som «ledig» før vi vet
+      $("timeline").innerHTML = '<li class="empty">Henter avtaler …</li>';
+      return;
+    }
     if (hours) {
-      let t = hours[0];
-      while (t < hours[1]) {
-        const here = live.filter((i) => i.start >= t && i.start < t + 30 && !shown.has(i.id));
-        // tidsrom som dekkes av en avtale som startet tidligere
-        const covering = live.find((i) => i.start < t && i.start + i.dur > t);
+      // Fast halvtimesrutenett. Alt som starter innenfor en rad (også skjeve tider og overlapp) vises i raden;
+      // «Ledig» vises bare når ingenting starter der og ingen tidligere avtale fortsatt pågår.
+      for (let t = hours[0]; t < hours[1]; t += 30) {
+        const here = live.filter((i) => !shown.has(i.id) && i.start >= hours[0] && i.start < t + 30);
+        const covering = live.some((i) => i.start < t && i.start + i.dur > t);
         if (here.length) {
           here.forEach((i) => shown.add(i.id));
           rows.push(`<li class="row"><time>${hhmm(here[0].start)}</time><div>${here.map((i) => itemHtml(i, clashes.has(i.id))).join("")}</div></li>`);
-          const end = Math.max(...here.map((i) => i.start + i.dur));
-          t = Math.max(t + 30, Math.ceil(end / 30) * 30);
-        } else if (covering) {
-          t = Math.max(t + 30, Math.ceil((covering.start + covering.dur) / 30) * 30);
-        } else {
+        } else if (!covering) {
           rows.push(`<li class="row"><time>${hhmm(t)}</time><button type="button" class="free" data-start="${t}">+ Ledig – legg inn avtale</button></li>`);
-          t += 30;
         }
       }
     }
@@ -224,7 +228,11 @@
     $("edit-addons").innerHTML = "<legend>Tillegg</legend>" +
       (state.config?.addons || []).map((a) => `<label><input type="checkbox" name="addon" value="${esc(a)}"> ${esc(a)}</label>`).join("");
   }
-  function syncType() { dlg.classList.toggle("is-block", E.type.value === "block"); }
+  // Markerer valgt type med en klasse (fungerer også i nettlesere uten CSS :has)
+  function syncType() {
+    dlg.classList.toggle("is-block", E.type.value === "block");
+    f.querySelectorAll(".seg label").forEach((l) => l.classList.toggle("is-on", l.querySelector("input").checked));
+  }
 
   // Første ledige halvtime i dag (eller åpningstid)
   function firstFree() {

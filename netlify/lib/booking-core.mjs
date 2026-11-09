@@ -58,7 +58,10 @@ export async function mutateMonth(store, ym, fn) {
     const result = await fn(doc);
     if (result && result.error) return result;
     const write = await store.setJSON(monthKey(ym), doc, cur ? { onlyIfMatch: cur.etag } : { onlyIfNew: true });
-    if (write.modified) return result || { ok: true };
+    // Bare en skriving med ETag er bekreftet lagret. Uten ETag har lagringen feilet (5xx/401/403),
+    // og da skal kunden ikke få beskjed om at timen er booket.
+    if (write.modified && write.etag) return result || { ok: true };
+    if (write.modified) throw new Error("Netlify Blobs bekreftet ikke lagringen (mangler ETag)");
     await new Promise((r) => setTimeout(r, 20 * 2 ** attempt + Math.random() * 20));
   }
   return { error: "Mange endringer samtidig. Prøv igjen.", status: 503 };
@@ -90,27 +93,30 @@ export async function getAvailability(store, now = new Date()) {
 
 // ---------- Validering ----------
 const clean = (s, max) => String(s ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, max);
-const phoneOk = (p) => String(p).replace(/\D/g, "").length >= 8 && /^[+\d\s()-]{8,20}$/.test(String(p).trim());
+// Telefon: 8–15 sifre, uansett skrivemåte («409 63 911», «+47 409-63-911», «409.63.911»)
+const phoneOk = (p) => { const n = String(p ?? "").replace(/\D/g, "").length; return n >= 8 && n <= 15; };
+const fail = (code, error, status = 400) => ({ error, code, status });
 
 // Regler for kundebestillinger
 export function validateCustomer(input, now = new Date()) {
   const { date: today, minutes: nowMin } = osloNow(now);
   const service = clean(input.service, 80);
-  const dur = CONFIG.durations[service];
-  if (!dur) return { error: "Ukjent tjeneste.", status: 400 };
-  if (!isDate(input.date)) return { error: "Ugyldig dato.", status: 400 };
-  if (input.date < today || input.date > addDays(today, CONFIG.maxDays)) return { error: "Datoen kan ikke bestilles.", status: 400 };
+  // Bare egne nøkler: «constructor», «__proto__» o.l. skal ikke gi en «varighet»
+  const dur = Object.prototype.hasOwnProperty.call(CONFIG.durations, service) ? CONFIG.durations[service] : undefined;
+  if (!Number.isInteger(dur)) return fail("bad_service", "Ukjent tjeneste.");
+  if (!isDate(input.date)) return fail("bad_date", "Ugyldig dato.");
+  if (input.date < today || input.date > addDays(today, CONFIG.maxDays)) return fail("bad_date", "Datoen kan ikke bestilles.");
   const hours = CONFIG.hours[dayOfWeek(input.date)];
-  if (!hours) return { error: "Vi har stengt denne dagen.", status: 400 };
+  if (!hours) return fail("closed", "Vi har stengt denne dagen.");
   const start = Number(input.start);
   if (!Number.isInteger(start) || start % CONFIG.slotMin !== 0 || start < hours[0] || start + dur > hours[1]) {
-    return { error: "Ugyldig tidspunkt.", status: 400 };
+    return fail("bad_time", "Ugyldig tidspunkt.");
   }
-  if (input.date === today && start < nowMin + CONFIG.leadMin) return { error: "Tidspunktet er for tidlig.", status: 400 };
+  if (input.date === today && start < nowMin + CONFIG.leadMin) return fail("too_early", "Tidspunktet er for tidlig.");
   const name = clean(input.name, 80);
-  const phone = clean(input.phone, 20);
-  if (name.length < 2) return { error: "Skriv inn navnet ditt.", status: 400 };
-  if (!phoneOk(phone)) return { error: "Ugyldig telefonnummer.", status: 400 };
+  const phone = clean(input.phone, 30);
+  if (name.length < 2) return fail("bad_name", "Skriv inn navnet ditt.");
+  if (!phoneOk(input.phone)) return fail("bad_phone", "Ugyldig telefonnummer.");
   const addons = (Array.isArray(input.addons) ? input.addons : []).filter((a) => CONFIG.addons.includes(a));
   return { value: { date: input.date, start, dur, service, addons, name, phone } };
 }
@@ -137,7 +143,7 @@ export function validateAdmin(input, { partial = false } = {}) {
     if (!["booking", "block"].includes(input.type ?? "booking")) return { error: "Ugyldig type.", status: 400 };
     out.type = input.type ?? "booking";
   }
-  for (const [k, max] of [["service", 80], ["name", 80], ["phone", 20], ["note", 300]]) {
+  for (const [k, max] of [["service", 80], ["name", 80], ["phone", 30], ["note", 300]]) {
     if (input[k] !== undefined) out[k] = clean(input[k], max);
   }
   if (input.addons !== undefined) out.addons = (Array.isArray(input.addons) ? input.addons : []).filter((a) => CONFIG.addons.includes(a));
@@ -159,8 +165,10 @@ export async function createItem(store, value, { source, force = false, now = ne
     createdAt: now.toISOString(), updatedAt: now.toISOString(),
   };
   return mutateMonth(store, monthOf(item.date), (doc) => {
+    // Ble første forsøk lagret selv om svaret gikk tapt, er jobben allerede gjort
+    if (doc.items.some((o) => o.id === item.id)) return { ok: true, item };
     const clash = doc.items.find((o) => active(o) && o.date === item.date && overlaps(item.start, item.dur, o.start, o.dur));
-    if (clash && !force) return { error: "Tidspunktet er allerede booket.", status: 409, clash: { start: clash.start, dur: clash.dur } };
+    if (clash && !force) return { error: "Tidspunktet er allerede booket.", code: "taken", status: 409 };
     doc.items.push(item);
     return { ok: true, item };
   });
@@ -204,6 +212,7 @@ export async function updateItem(store, id, changes, { force = false, now = new 
   if (error) return { error, status };
   next.id = newId(next.date);
   const added = await mutateMonth(store, toMonth, (doc) => {
+    if (doc.items.some((o) => o.id === next.id)) return { ok: true, item: next };
     if (clashIn(doc, next, next.id) && !force) return CLASH;
     doc.items.push(next);
     return { ok: true, item: next };
@@ -216,10 +225,12 @@ export async function updateItem(store, id, changes, { force = false, now = new 
 export async function deleteItem(store, id) {
   const date = String(id).split("_")[0];
   if (!isDate(date)) return { error: "Fant ikke avtalen.", status: 404 };
+  let removed = false; // et nytt forsøk etter tapt svar skal ikke gi «fant ikke»
   return mutateMonth(store, monthOf(date), (doc) => {
     const before = doc.items.length;
     doc.items = doc.items.filter((i) => i.id !== id);
-    if (doc.items.length === before) return { error: "Fant ikke avtalen.", status: 404 };
+    if (doc.items.length === before) return removed ? { ok: true } : { error: "Fant ikke avtalen.", status: 404 };
+    removed = true;
     return { ok: true };
   });
 }

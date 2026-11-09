@@ -34,7 +34,8 @@
 
   const state = { date: null, time: null, view: null };
 
-  const today = () => startOfDay(new Date());
+  // «I dag» og klokka følger norsk tid (osloNow i script.js), ikke besøkerens tidssone
+  const today = () => { const o = osloNow(); return new Date(o.y, o.m - 1, o.d); };
   const lastDay = () => { const d = today(); d.setDate(d.getDate() + MAX_DAYS); return d; };
 
   const duration = () => DURATIONS[select.value] || SLOT_MIN;
@@ -48,10 +49,8 @@
     if (!hours) return [];
     const dur = duration();
     let earliest = -1;
-    if (sameDay(date, today())) {
-      const now = new Date();
-      earliest = now.getHours() * 60 + now.getMinutes() + LEAD_MIN;
-    }
+    if (date < today() || date > lastDay()) return [];
+    if (sameDay(date, today())) earliest = osloNow().minutes + LEAD_MIN;
     const out = [];
     for (let t = hours[0]; t + SLOT_MIN <= hours[1]; t += SLOT_MIN) {
       if (t < earliest) continue;
@@ -134,6 +133,11 @@
     const opt = select.options[select.selectedIndex];
     return select.value ? opt.textContent.trim() : "";
   }
+  // Tjenestenavnet på gjeldende språk (option-teksten oversettes av i18n.js)
+  function selectedServiceLabelFor(value) {
+    const opt = [...select.options].find((o) => o.value === value);
+    return opt ? opt.textContent.trim() : value;
+  }
   function whenText() {
     const s = I18N.s();
     return s.summary(selectedServiceLabel(), dateLabel(state.date), s.time(state.time));
@@ -143,7 +147,11 @@
     summaryEl.textContent = ready ? whenText() : "";
     summaryEl.hidden = !ready;
   }
-  const renderAll = () => { renderCalendar(); renderSlots(); renderSummary(); };
+  const renderAll = () => {
+    // En valgt dag som er blitt passert mens siden sto åpen, nullstilles
+    if (state.date && (state.date < today() || state.date > lastDay())) { state.date = null; state.time = null; }
+    renderCalendar(); renderSlots(); renderSummary(); renderMsg();
+  };
 
   // Første synlige måned: den første med en ledig dag
   function initView() {
@@ -188,12 +196,27 @@
     });
   });
 
-  function clearMsg() { msg.className = "form-msg"; msg.textContent = ""; }
-  function fail(text, focusEl) {
-    msg.className = "form-msg err";
-    msg.textContent = text;
+  // Meldingen lagres som en funksjon av språket, så den oversettes når man bytter språk
+  let lastMsg = null;
+  function setMsg(kind, textFn) { lastMsg = { kind, textFn }; renderMsg(); }
+  function renderMsg() {
+    msg.className = "form-msg" + (lastMsg && lastMsg.kind ? " " + lastMsg.kind : "");
+    msg.textContent = lastMsg ? lastMsg.textFn(I18N.s()) : "";
+  }
+  function clearMsg() { setMsg("", () => ""); lastMsg = null; }
+  function fail(textFn, focusEl) {
+    setMsg("err", typeof textFn === "function" ? textFn : () => textFn);
     focusEl?.focus();
   }
+  // Feilkoder fra serveren → tekst på riktig språk
+  const ERR = {
+    bad_service: (s) => s.needService, bad_date: (s) => s.needDay, closed: (s) => s.needDay,
+    bad_time: (s) => s.needTime, too_early: (s) => s.needTime, bad_name: (s) => s.needName,
+    bad_phone: (s) => s.needPhone, taken: (s) => s.takenNow,
+  };
+  const nameOk = (v) => v.trim().length >= 2;
+  // Samme regler som serveren: navn minst 2 tegn, telefon 8–15 sifre uansett skrivemåte
+  const phoneOk = (v) => { const n = v.replace(/\D/g, "").length; return n >= 8 && n <= 15; };
 
   // Hent opptatte tider fra serveren
   async function loadAvailability() {
@@ -224,14 +247,14 @@
     const s = I18N.s();
     const name = $("f-name");
     const phone = $("f-phone");
-    if (!select.value) return fail(s.needService, select);
-    if (!state.date) return fail(s.needDay, grid.querySelector(".cal-day:not([disabled])"));
+    if (!select.value) return fail((t) => t.needService, select);
+    if (!state.date) return fail((t) => t.needDay, grid.querySelector(".cal-day:not([disabled])"));
     if (state.time === null || !freeSlots(state.date).includes(state.time)) {
       state.time = null; renderSlots(); renderSummary();
-      return fail(s.needTime, slotsEl.querySelector(".slot:not([disabled])"));
+      return fail((t) => t.needTime, slotsEl.querySelector(".slot:not([disabled])"));
     }
-    if (!name.value.trim()) return fail(s.needName, name);
-    if (phone.value.replace(/\D/g, "").length < 8) return fail(s.needPhone, phone);
+    if (!nameOk(name.value)) return fail((t) => t.needName, name);
+    if (!phoneOk(phone.value)) return fail((t) => t.needPhone, phone);
 
     // Det barbershopen ser i e-posten: dato (ÅÅÅÅ-MM-DD), tid (24 t), tjeneste og tillegg på norsk
     const addons = [...form.querySelectorAll(".addon-picks input:checked")].map((c) => c.value);
@@ -239,18 +262,18 @@
     $("f-tid").value = hhmm(state.time);
     $("f-tillegg").value = addons.join(", ");
 
-    const when = whenText();
     const btn = form.querySelector("button[type=submit]");
     btn.disabled = true;
-    msg.className = "form-msg";
-    msg.textContent = s.sending;
-    const done = (text) => {
+    const d0 = state.date, svcValue = select.value, t0 = state.time;
+    const whenFor = (t) => t.summary(selectedServiceLabelFor(svcValue), dateLabel(d0), t.time(t0));
+    setMsg("", (t) => t.sending);
+    const done = (textFn) => {
       form.reset();
+      select.classList.remove("picked");
       state.date = null;
       state.time = null;
+      lastMsg = { kind: "ok", textFn };
       renderAll();
-      msg.className = "form-msg ok";
-      msg.textContent = text;
     };
     try {
       let res = null;
@@ -260,33 +283,36 @@
           headers: { "Content-Type": "application/json", Accept: "application/json" },
           body: JSON.stringify({
             service: select.value, date: iso(state.date), start: state.time, addons,
-            name: name.value.trim(), phone: phone.value.trim(), website: $("f-website")?.value || "",
+            name: name.value.trim(), phone: phone.value.trim(), botField: form.querySelector("[name=bot-field]")?.value || "",
           }),
         });
       } catch { res = null; }
 
       if (res && res.ok) {
+        const data = await res.json().catch(() => ({}));
+        // E-posten sier tydelig at timen allerede er lagret i timeboken
+        $("f-status").value = "BOOKET – lagret i timeboken" + (data.booking?.id ? ` (id ${data.booking.id})` : "");
         notify().catch(() => {});
         await loadAvailability();
-        done(s.booked(when));
+        done((t) => t.booked(whenFor(t)));
       } else if (res && res.status === 409) {
         // Noen andre rakk å ta tiden: vis oppdatert kalender
         await loadAvailability();
         state.time = null;
         renderAll();
-        fail(s.takenNow, slotsEl.querySelector(".slot:not([disabled])"));
+        fail((t) => t.takenNow, slotsEl.querySelector(".slot:not([disabled])"));
       } else if (res && res.status >= 400 && res.status < 500 && res.status !== 404) {
         const data = await res.json().catch(() => ({}));
-        fail(data.error || s.sendFailed);
+        fail(ERR[data.code] || ((t) => t.sendFailed));
       } else {
         // Bookingsystemet svarer ikke: send som forespørsel på e-post i stedet
+        $("f-status").value = "FORESPØRSEL – IKKE lagret. Legg den inn i /admin og bekreft med kunden.";
         const r = await notify();
         if (!r.ok) throw new Error(r.status);
-        done(s.sent(when));
+        done((t) => t.sent(whenFor(t)));
       }
     } catch {
-      msg.className = "form-msg err";
-      msg.textContent = s.sendFailed;
+      setMsg("err", (t) => t.sendFailed);
     } finally {
       btn.disabled = false;
     }

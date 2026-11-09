@@ -37,8 +37,8 @@
   --line: #ddd0b4;
   --text: #17261e;
   --muted: #5b6357;
-  --gold: #946f26;
-  --gold-hover: #7a5a1c;
+  --gold: #7a5a1c;              /* mørk nok til tekst (WCAG AA) på lys bakgrunn */
+  --gold-hover: #5f4614;
   --gold-grad: linear-gradient(100deg, #6f5017 0%, #a98235 30%, #8a6624 50%, #c29a4e 70%, #745419 100%);
   --ornament: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 16' fill='none' stroke='%23946f26' stroke-width='1.3'%3E%3Cpath d='M2 8 L8 6.6 L8 9.4 Z' fill='%23946f26'/%3E%3Cpath d='M8 8 H128'/%3E%3Cpath d='M128 8 l5 -2.4 l3 2.4 l-3 2.4 Z' fill='%23946f26'/%3E%3Cpath d='M150 1.5 L156.5 8 L150 14.5 L143.5 8 Z'/%3E%3Ccircle cx='150' cy='8' r='1.6' fill='%23946f26'/%3E%3Cpath d='M172 8 l-5 -2.4 l-3 2.4 l3 2.4 Z' fill='%23946f26'/%3E%3Cpath d='M172 8 H292'/%3E%3Cpath d='M298 8 L292 6.6 L292 9.4 Z' fill='%23946f26'/%3E%3C/svg%3E");
   --bg-rgb: 247, 242, 232;
@@ -166,7 +166,7 @@ p { margin: 0 0 1em; }
 :root[data-theme="light"] .theme-toggle .icon-sun { display: none; }
 :root[data-theme="light"] .theme-toggle .icon-moon { display: block; fill: currentColor; stroke: none; }
 /* Myk overgang når temaet byttes */
-body, .site-header, .section-alt, .highlights, .booking, .post, .svc-link, input, select { transition: background-color .35s, color .35s, border-color .35s; }
+body, .site-header, .section-alt, .highlight, .booking, .post, .svc-link, input, select { transition: background-color .35s, color .35s, border-color .35s; }
 
 .nav-toggle { display: none; background: none; border: 0; padding: 8px; cursor: pointer; }
 .nav-toggle span { display: block; width: 24px; height: 2px; background: var(--text); margin: 5px 0; transition: transform .3s, opacity .3s; }
@@ -237,7 +237,8 @@ body, .site-header, .section-alt, .highlights, .booking, .post, .svc-link, input
   transition: background .2s, border-color .2s;
 }
 .svc-link:hover, .svc-link:focus-visible { background: var(--surface); border-color: rgba(207, 167, 94, .35); color: var(--text); }
-.svc-arrow { color: var(--gold); font-weight: 700; opacity: 0; transform: translateX(-6px); transition: opacity .2s, transform .2s; }
+.svc-link { position: relative; }
+.svc-arrow { position: absolute; right: 2px; top: 50%; margin-top: -.7em; color: var(--gold); font-weight: 700; opacity: 0; transform: translateX(-6px); transition: opacity .2s, transform .2s; }
 .svc-link:hover .svc-arrow, .svc-link:focus-visible .svc-arrow { opacity: 1; transform: none; }
 .price-list h3 { margin: 0; font-size: 1.15rem; }
 .price-list p { margin: 2px 0 0; color: var(--muted); font-size: .93rem; }
@@ -262,7 +263,7 @@ input, select {
   font: inherit; color: var(--text);
   background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
   padding: 12px 14px; width: 100%;
-  color-scheme: dark;
+  color-scheme: inherit;
 }
 input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(201, 163, 92, .2); }
 .form-msg { margin: 0; min-height: 1.4em; font-size: .93rem; }
@@ -283,7 +284,7 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 }
 
 /* Responsive */
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .nav-toggle { display: block; }
   .theme-toggle { margin-left: auto; width: 34px; height: 34px; }
   .lang-toggle { margin-left: 8px; margin-right: 8px; padding: 4px 11px 4px 5px; font-size: .78rem; gap: 8px; }
@@ -297,11 +298,16 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
   .nav-menu.open { display: flex; }
   .nav-menu a:not(.btn) { padding: 14px 4px; border-bottom: 1px solid var(--line); }
   .nav-menu .btn { margin-top: 16px; text-align: center; }
+}
+@media (max-width: 760px) {
   .grid-3 { grid-template-columns: 1fr; }
-  .svc-link { flex-wrap: wrap; padding: 16px 10px; }
-  .dots { display: none; }
-  .svc-link > div { flex: 1; }
-  .svc-arrow { opacity: 1; transform: none; }
+  .svc-link { display: grid; grid-template-columns: 1fr auto; align-items: baseline; column-gap: 12px; padding: 16px 10px; }
+  .svc-link > div { display: contents; }
+  .svc-link h3 { grid-column: 1; grid-row: 1; }
+  .svc-link .price { grid-column: 2; grid-row: 1; }
+  .svc-link p { grid-column: 1 / -1; grid-row: 2; }
+  .svc-badge { left: 10px; }
+  .dots, .svc-arrow { display: none; }
 }
 @media (max-width: 420px) {
   .trust-badge { font-size: .78rem; gap: 8px; padding: 7px 14px; white-space: nowrap; }
@@ -452,8 +458,9 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 
 /* ---------- Tjenester: «Mest populær» og tillegg ---------- */
 .svc-featured .svc-link { background: var(--surface); border-color: rgba(207, 167, 94, .45); box-shadow: 0 10px 30px rgba(var(--shadow), .18); }
+.svc-featured .svc-link { padding-top: 30px; }
 .svc-badge {
-  display: inline-block; margin-bottom: 6px; padding: 3px 10px; border-radius: 999px;
+  position: absolute; top: 9px; left: 20px; padding: 3px 10px; border-radius: 999px;
   background: var(--gold-fill); color: var(--on-gold);
   font: 700 .66rem var(--caps); letter-spacing: .14em; text-transform: uppercase;
 }
@@ -462,7 +469,7 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
   border: 1px dashed var(--line); border-radius: var(--radius);
 }
 .addons-title { font: 600 .8rem var(--caps); letter-spacing: .2em; text-transform: uppercase; color: var(--gold); margin: 0 0 10px; }
-.addons ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 24px; }
+.addons ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px 24px; }
 .addons li { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: .95rem; }
 .addons .price { font-size: 1rem; }
 
@@ -539,10 +546,9 @@ form.booking {
 .dot-free { border: 2px solid var(--ok); }
 .dot-some { background: var(--gold); }
 .dot-taken { background: var(--err); }
-.booking .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 .slots-empty { grid-column: 1 / -1; margin: 0; padding: 14px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); font-size: .92rem; text-align: center; }
 
-.booking label { display: grid; gap: 6px; font-size: .9rem; color: var(--muted); }
+.booking label:not(.step-label) { display: grid; gap: 6px; font-size: .9rem; color: var(--muted); }
 .booking-summary {
   margin: 0; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(207, 167, 94, .45);
   background: rgba(207, 167, 94, .08); color: var(--text); font-weight: 600;
@@ -591,7 +597,7 @@ form.booking {
 
 /* ---------- Om oss + galleri ---------- */
 .about { max-width: 760px; margin: 0 auto; text-align: center; }
-.about p { color: var(--muted); }
+.about p:not(.eyebrow) { color: var(--muted); }
 .stats { display: flex; justify-content: center; gap: 40px; flex-wrap: wrap; margin: 30px 0 0; }
 .stats dt { font: 700 1.8rem var(--caps); color: var(--gold); }
 .stats dd { margin: 0; color: var(--muted); font-size: .9rem; }
@@ -636,6 +642,7 @@ form.booking {
   .hours-grid { grid-template-columns: 1fr; gap: 32px; }
   .map { min-height: 280px; }
   .addons ul { grid-template-columns: 1fr; }
+  .cal { max-width: 440px; width: 100%; margin: 0 auto; }
 }
 @media (max-width: 600px) {
   .svc-badge { font-size: .6rem; }

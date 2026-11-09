@@ -109,7 +109,7 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 .seg label { display: block; cursor: pointer; }
 .seg input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .seg label span, .seg label { padding: 6px 14px; border-radius: 999px; color: var(--muted); font-size: .9rem; }
-.seg label:has(input:checked) { background: var(--gold); color: var(--on-gold); font-weight: 700; }
+.seg label.is-on { background: var(--gold); color: var(--on-gold); font-weight: 700; }
 .addons { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px 16px; }
 .addons legend { padding: 0; margin-bottom: 6px; font-size: .88rem; color: var(--muted); }
 .addons label { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: .92rem; }

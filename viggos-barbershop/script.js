@@ -68,11 +68,25 @@ const onScroll = () => header.classList.toggle("scrolled", window.scrollY > 10);
 window.addEventListener("scroll", onScroll, { passive: true });
 onScroll();
 
+// Klokka i Norge, uansett hvilken tidssone besøkeren er i (åpningstidene gjelder norsk tid)
+function osloNow() {
+  try {
+    const p = {};
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Oslo", year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    }).formatToParts(new Date()).forEach((x) => { p[x.type] = x.value; });
+    const y = +p.year, m = +p.month, d = +p.day;
+    return { y, m, d, day: new Date(y, m - 1, d).getDay(), minutes: (+p.hour % 24) * 60 + +p.minute };
+  } catch {
+    const n = new Date(); // svært gamle nettlesere: bruk enhetens klokke
+    return { y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate(), day: n.getDay(), minutes: n.getHours() * 60 + n.getMinutes() };
+  }
+}
+
 // Åpent nå? + marker dagens rad i tabellen
 function updateStatus() {
-  const now = new Date();
-  const day = now.getDay();
-  const minutes = now.getHours() * 60 + now.getMinutes();
+  const { day, minutes } = osloNow();
   const today = HOURS[day];
   const el = document.getElementById("open-status");
   const s = I18N.s();

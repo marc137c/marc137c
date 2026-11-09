@@ -53,7 +53,8 @@ export async function fetchReviews(env, store, fetchFn = fetch) {
       authorUrl: r.authorAttribution?.uri || null,
       photo: r.authorAttribution?.photoUri || null,
       rating: r.rating || 0,
-      text: (r.text?.text || r.originalText?.text || "").trim(),
+      // Kundens egne ord (originalText), ikke Googles maskinoversettelse
+      text: (r.originalText?.text || r.text?.text || "").trim(),
       when: r.relativePublishTimeDescription || "",
       date: r.publishTime || null,
     })),
@@ -72,6 +73,9 @@ export async function getReviews(env, store, fetchFn = fetch) {
     return data;
   } catch (err) {
     console.error("Anmeldelser:", err.message);
-    return cached?.data || emptyReviews();
+    // Prøv Google igjen tidligst om 30 minutter (ikke ved hvert besøk mens Google feiler)
+    const data = cached?.data || emptyReviews();
+    await store.setJSON("reviews", { fetchedAt: Date.now() - MAX_AGE_MS + 30 * 60 * 1000, data }).catch(() => {});
+    return data;
   }
 }
