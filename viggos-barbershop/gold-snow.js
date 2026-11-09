@@ -110,6 +110,7 @@
   resize();
   start();
   window.addEventListener("resize", () => { resize(); if (reduceMotion.matches) draw(0); });
-  reduceMotion.addEventListener("change", start);
+  if (reduceMotion.addEventListener) reduceMotion.addEventListener("change", start); // Safari < 14 har bare addListener
+  else if (reduceMotion.addListener) reduceMotion.addListener(start);
   window.addEventListener("themechange", () => { if (reduceMotion.matches) draw(0); });
 })();

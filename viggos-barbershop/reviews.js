@@ -73,15 +73,11 @@
     list.setAttribute("aria-busy", "false");
   }
 
-  async function load() {
-    try {
-      const res = await fetch("/api/reviews", { headers: { Accept: "application/json" } });
-      if (!res.ok) throw new Error(res.status);
-      data = await res.json();
-    } catch {
-      data = { reviews: [] };
-    }
-    render();
+  function load() {
+    fetch("/api/reviews", { headers: { Accept: "application/json" } })
+      .then((res) => { if (!res.ok) throw new Error(res.status); return res.json(); })
+      .catch(() => ({ reviews: [] }))
+      .then((d) => { data = d; render(); });
   }
 
   I18N.onChange(render);

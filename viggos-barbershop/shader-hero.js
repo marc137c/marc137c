@@ -169,7 +169,8 @@ void main() {
     visible = entry.isIntersecting;
     if (visible) play();
   }).observe(hero);
-  reduceMotion.addEventListener("change", play);
+  if (reduceMotion.addEventListener) reduceMotion.addEventListener("change", play); // Safari < 14 har bare addListener
+  else if (reduceMotion.addListener) reduceMotion.addListener(play);
   window.addEventListener("themechange", play);
   window.addEventListener("resize", () => { if (!raf) play(); });
 

@@ -272,8 +272,8 @@
 
         <!-- Galleri: legg til flere bilder ved å kopiere en <figure>-blokk (se README) -->
         <div class="gallery" id="gallery">
-          <figure><button type="button" class="gallery-item" data-full="img/skilt-1200.webp"><img src="img/skilt-720.webp" width="720" height="480" loading="lazy" decoding="async" alt="Gullskiltet til Viggo's Barbershop på vinduet" data-i18n-attr="alt:g.sign"></button></figure>
-          <figure><button type="button" class="gallery-item" data-full="img/kort-1200.webp"><img src="img/kort-720.webp" width="720" height="421" loading="lazy" decoding="async" alt="Visittkortet til Viggo's Barbershop med maskin, barberkost og kniv" data-i18n-attr="alt:g.card"></button></figure>
+          <figure><button type="button" class="gallery-item" data-full="img/skilt-1200.webp"><picture><source srcset="img/skilt-720.webp" type="image/webp"><img src="img/skilt-720.jpg" width="720" height="480" loading="lazy" decoding="async" alt="Gullskiltet til Viggo's Barbershop på vinduet" data-i18n-attr="alt:g.sign"></picture></button></figure>
+          <figure><button type="button" class="gallery-item" data-full="img/kort-1200.webp"><picture><source srcset="img/kort-720.webp" type="image/webp"><img src="img/kort-720.jpg" width="720" height="421" loading="lazy" decoding="async" alt="Visittkortet til Viggo's Barbershop med maskin, barberkost og kniv" data-i18n-attr="alt:g.card"></picture></button></figure>
         </div>
       </div>
     </section>
@@ -345,6 +345,7 @@
     <img id="lightbox-img" alt="">
   </dialog>
 
+  <script src="compat.js"></script>
   <script src="i18n.js"></script>
   <script src="shader-hero.js"></script>
   <script src="gold-snow.js"></script>

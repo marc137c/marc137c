@@ -13,7 +13,7 @@
   const safeUrl = (u) => (/^https:\/\//.test(u || "") ? u : "#");
 
   function ago(iso) {
-    if (!iso) return "";
+    if (!iso || !window.Intl || typeof Intl.RelativeTimeFormat !== "function") return ""; // mangler i Chrome < 71, Safari < 14
     const lang = I18N.lang === "en" ? "en" : "nb";
     const rtf = new Intl.RelativeTimeFormat(lang, { numeric: "auto" });
     const s = (new Date(iso) - Date.now()) / 1000;
@@ -39,7 +39,7 @@
   }
 
   function followCard() {
-    const url = feed?.profiles?.instagram || PROFILE;
+    const url = (feed && feed.profiles && feed.profiles.instagram) || PROFILE;
     return `<a class="post post--follow post--instagram" href="${esc(safeUrl(url))}" target="_blank" rel="noopener">
       <span class="post-badge post-badge--big">${ICON}</span>
       <span class="post-follow-text">${esc(I18N.s().followOn("Instagram"))}</span>
@@ -62,15 +62,11 @@
     });
   }
 
-  async function load() {
-    try {
-      const res = await fetch("/api/social", { headers: { Accept: "application/json" } });
-      if (!res.ok) throw new Error(res.status);
-      feed = await res.json();
-    } catch {
-      feed = { profiles: { instagram: PROFILE }, instagram: [] };
-    }
-    render();
+  function load() {
+    fetch("/api/social", { headers: { Accept: "application/json" } })
+      .then((res) => { if (!res.ok) throw new Error(res.status); return res.json(); })
+      .catch(() => ({ profiles: { instagram: PROFILE }, instagram: [] }))
+      .then((d) => { feed = d; render(); });
   }
 
   I18N.onChange(render);

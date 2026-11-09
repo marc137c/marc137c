@@ -12,18 +12,18 @@
   const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); };
   const hhmm = (min) => `${pad(Math.floor(min / 60))}:${pad(min % 60)}`;
   const toMin = (t) => { const [h, m] = String(t).split(":").map(Number); return h * 60 + m; };
-  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const fmt = (s, o) => new Intl.DateTimeFormat("nb-NO", o).format(parse(s));
   const todayIso = () => iso(new Date());
   const active = (i) => i.status !== "cancelled";
 
   // ---------- Innlogging ----------
-  const getToken = () => { try { return localStorage.getItem(KEY) || sessionStorage.getItem(KEY); } catch { return null; } };
+  const getToken = () => { try { return localStorage.getItem(KEY) || sessionStorage.getItem(KEY); } catch (e) { return null; } };
   function setToken(t, remember) {
     try {
       localStorage.removeItem(KEY); sessionStorage.removeItem(KEY);
       if (t) (remember ? localStorage : sessionStorage).setItem(KEY, t);
-    } catch {}
+    } catch (e) { /* privat modus */ }
   }
 
   function showLogin(message = "") {
@@ -46,57 +46,54 @@
     pw.focus();
   });
 
-  $("login-form").addEventListener("submit", async (e) => {
+  $("login-form").addEventListener("submit", (e) => {
     e.preventDefault();
     const btn = e.submitter || $("login-form").querySelector("button[type=submit]");
     btn.disabled = true;
     $("login-msg").textContent = "";
-    try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: $("pw").value, remember: $("remember").checked }),
-      });
-      const data = await res.json().catch(() => ({}));
+    fetch("/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: $("pw").value, remember: $("remember").checked }),
+    }).then((res) => res.json().catch(() => ({})).then((data) => {
       if (!res.ok) throw new Error(data.error || (res.status === 404 ? "Timeboken er ikke publisert ennå." : "Kunne ikke logge inn."));
       setToken(data.token, $("remember").checked);
       $("pw").value = "";
       showApp();
       load();
-    } catch (err) {
+    })).catch((err) => {
       $("login-msg").textContent = err.message;
       $("pw").select();
-    } finally {
+    }).then(() => {
       btn.disabled = false;
-    }
+    });
   });
 
   $("logout").addEventListener("click", () => { setToken(null); showLogin("Du er logget ut."); });
 
-  async function api(path, opts = {}) {
-    const res = await fetch(path, {
-      ...opts,
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}`, ...(opts.headers || {}) },
+  function api(path, opts = {}) {
+    return fetch(path, Object.assign({}, opts, {
+      headers: Object.assign({ "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` }, opts.headers || {}),
       cache: "no-store",
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.status === 401) { setToken(null); showLogin("Logg inn på nytt."); throw Object.assign(new Error(data.error || "Logg inn"), { status: 401 }); }
-    if (!res.ok) throw Object.assign(new Error(data.error || "Noe gikk galt."), { status: res.status });
-    return data;
+    })).then((res) => res.json().catch(() => ({})).then((data) => {
+      if (res.status === 401) { setToken(null); showLogin("Logg inn på nytt."); throw Object.assign(new Error(data.error || "Logg inn"), { status: 401 }); }
+      if (!res.ok) throw Object.assign(new Error(data.error || "Noe gikk galt."), { status: res.status });
+      return data;
+    }));
   }
 
   // ---------- Data ----------
   const state = { day: todayIso(), items: [], week: [], config: null, editing: null };
+  const hoursOn = (d) => { const h = state.config && state.config.hours; return h ? h[parse(d).getDay()] : null; };
 
   let loadSeq = 0;
-  async function load() {
+  function load() {
     const seq = ++loadSeq, d = state.day, today = todayIso();
     $("sync").textContent = "Henter …";
-    try {
-      const [day, week] = await Promise.all([
-        api(`/api/admin/items?from=${d}&to=${d}`),
-        api(`/api/admin/items?from=${today}&to=${addDays(today, WEEK_DAYS - 1)}`),
-      ]);
+    return Promise.all([
+      api(`/api/admin/items?from=${d}&to=${d}`),
+      api(`/api/admin/items?from=${today}&to=${addDays(today, WEEK_DAYS - 1)}`),
+    ]).then(([day, week]) => {
       // Et eldre svar (f.eks. etter rask bla-ing mellom dager) skal ikke overskrive et nyere
       if (seq !== loadSeq || d !== state.day) return;
       state.items = day.items;
@@ -105,9 +102,9 @@
       state.config = day.config;
       render();
       $("sync").textContent = `Oppdatert ${hhmm(new Date().getHours() * 60 + new Date().getMinutes())}`;
-    } catch (err) {
+    }).catch((err) => {
       if (err.status !== 401) $("sync").textContent = "Ingen forbindelse";
-    }
+    });
   }
 
   // ---------- Visning ----------
@@ -122,7 +119,7 @@
     for (let i = 0; i < WEEK_DAYS; i++) {
       const d = addDays(today, i);
       const n = state.week.filter((x) => x.date === d && active(x) && x.type === "booking").length;
-      const closed = !state.config?.hours?.[parse(d).getDay()];
+      const closed = !hoursOn(d);
       html.push(`<button type="button" data-day="${d}" class="${d === state.day ? "is-active" : ""}${closed ? " is-closed" : ""}">
         <span>${esc(fmt(d, { weekday: "short" }).replace(".", ""))}</span><strong>${parse(d).getDate()}</strong>
         <span class="n">${n ? `${n} ${n === 1 ? "time" : "timer"}` : closed ? "stengt" : "&nbsp;"}</span></button>`);
@@ -140,7 +137,7 @@
     const tel = String(i.phone || "").replace(/[^\d+]/g, "");
     return `<div role="button" tabindex="0" class="${cls}" data-id="${esc(i.id)}">
       <span class="when">${when}${i.status === "cancelled" ? " · AVLYST" : ""}</span>
-      <span class="what">${esc(i.service || "Avtale")}${i.addons?.length ? ` + ${esc(i.addons.join(", "))}` : ""}</span>
+      <span class="what">${esc(i.service || "Avtale")}${i.addons && i.addons.length ? ` +${esc(i.addons.join(", "))}` : ""}</span>
       <span class="who">${esc(i.name || "Uten navn")}${tel ? ` · <a href="tel:${esc(tel)}">${esc(i.phone)}</a>` : ""}</span>
       ${i.note ? `<span class="note">${esc(i.note)}</span>` : ""}
       ${i.source === "nettside" ? '<span class="tag">Bestilt på nett</span>' : ""}
@@ -152,7 +149,7 @@
     $("day").value = d;
     const title = fmt(d, { weekday: "long", day: "numeric", month: "long" });
     $("day-title").textContent = d === todayIso() ? `I dag, ${title}` : title;
-    const hours = state.config?.hours?.[parse(d).getDay()];
+    const hours = hoursOn(d);
     const items = state.items.filter((i) => i.date === d);
     const live = items.filter(active);
     const clashes = new Set();
@@ -213,7 +210,7 @@
   });
   $("add").addEventListener("click", () => openEditor(null, { type: "booking" }));
   $("block").addEventListener("click", () => {
-    const h = state.config?.hours?.[parse(state.day).getDay()];
+    const h = hoursOn(state.day);
     openEditor(null, { type: "block", start: h ? h[0] : 600, dur: h ? h[1] - h[0] : 480 });
   });
 
@@ -221,12 +218,12 @@
   const dlg = $("editor");
   const f = $("edit-form");
   const E = f.elements; // f.name ville gitt skjemaets eget navn, så felt hentes via elements
-  const services = () => Object.keys(state.config?.durations || {});
+  const services = () => Object.keys((state.config && state.config.durations) || {});
 
   function fillChoices() {
     E.service.innerHTML = '<option value="">Velg …</option>' + services().map((s) => `<option>${esc(s)}</option>`).join("");
     $("edit-addons").innerHTML = "<legend>Tillegg</legend>" +
-      (state.config?.addons || []).map((a) => `<label><input type="checkbox" name="addon" value="${esc(a)}"> ${esc(a)}</label>`).join("");
+      ((state.config && state.config.addons) || []).map((a) => `<label><input type="checkbox" name="addon" value="${esc(a)}"> ${esc(a)}</label>`).join("");
   }
   // Markerer valgt type med en klasse (fungerer også i nettlesere uten CSS :has)
   function syncType() {
@@ -236,7 +233,7 @@
 
   // Første ledige halvtime i dag (eller åpningstid)
   function firstFree() {
-    const h = state.config?.hours?.[parse(state.day).getDay()] || [600, 1080];
+    const h = hoursOn(state.day) || [600, 1080];
     const live = state.items.filter((i) => i.date === state.day && active(i));
     for (let t = h[0]; t < h[1]; t += 30) if (!live.some((i) => i.start < t + 30 && t < i.start + i.dur)) return t;
     return h[0];
@@ -245,13 +242,13 @@
   function openEditor(item, preset = {}) {
     fillChoices();
     state.editing = item || null;
-    const v = item || { type: "booking", date: state.day, start: firstFree(), dur: 30, service: "", addons: [], name: "", phone: "", note: "", status: "confirmed", ...preset };
+    const v = item || Object.assign({ type: "booking", date: state.day, start: firstFree(), dur: 30, service: "", addons: [], name: "", phone: "", note: "", status: "confirmed" }, preset);
     $("edit-title").textContent = item ? (item.type === "block" ? "Endre blokkering" : "Endre avtale") : (v.type === "block" ? "Blokker tid" : "Ny avtale");
     dlg.classList.toggle("is-edit", !!item);
     E.type.value = v.type;
     E.date.value = v.date || state.day;
-    E.start.value = hhmm(v.start ?? 600);
-    E.dur.value = v.dur ?? 30;
+    E.start.value = hhmm(v.start != null ? v.start : 600);
+    E.dur.value = v.dur != null ? v.dur : 30;
     if (v.service && !services().includes(v.service)) E.service.insertAdjacentHTML("beforeend", `<option>${esc(v.service)}</option>`);
     E.service.value = v.service || "";
     f.querySelectorAll("[name=addon]").forEach((c) => { c.checked = (v.addons || []).includes(c.value); });
@@ -267,7 +264,7 @@
 
   f.addEventListener("change", (e) => {
     if (e.target.name === "type") syncType();
-    if (e.target.name === "service" && state.config?.durations?.[e.target.value]) E.dur.value = state.config.durations[e.target.value];
+    if (e.target.name === "service" && state.config && state.config.durations && state.config.durations[e.target.value]) E.dur.value = state.config.durations[e.target.value];
   });
   $("cancel-edit").addEventListener("click", () => dlg.close());
 
@@ -287,44 +284,44 @@
     };
   }
 
-  async function save(force = false) {
+  function save(force = false) {
     const body = payload();
     if (!body.date || Number.isNaN(body.start)) return ($("edit-msg").textContent = "Velg dato og tid.");
     if (body.type === "booking" && !body.service && !body.name) return ($("edit-msg").textContent = "Skriv inn tjeneste eller navn.");
     const q = force ? "?force=1" : "";
     $("save").disabled = true;
-    try {
-      if (state.editing) await api(`/api/admin/items/${encodeURIComponent(state.editing.id)}${q}`, { method: "PATCH", body: JSON.stringify(body) });
-      else await api(`/api/admin/items${q}`, { method: "POST", body: JSON.stringify(body) });
+    const sent = state.editing
+      ? api(`/api/admin/items/${encodeURIComponent(state.editing.id)}${q}`, { method: "PATCH", body: JSON.stringify(body) })
+      : api(`/api/admin/items${q}`, { method: "POST", body: JSON.stringify(body) });
+    return sent.then(() => {
       dlg.close();
       if (body.date !== state.day) state.day = body.date;
-      await load();
-    } catch (err) {
+      return load();
+    }).catch((err) => {
       if (err.status === 409 && !force) {
         if (confirm(`${err.message}\n\nVil du lagre likevel (dobbeltbooking)?`)) return save(true);
       }
       if (err.status !== 401) $("edit-msg").textContent = err.message;
-    } finally {
+    }).then(() => {
       $("save").disabled = false;
-    }
+    });
   }
   f.addEventListener("submit", (e) => { e.preventDefault(); save(); });
 
-  $("delete").addEventListener("click", async () => {
+  $("delete").addEventListener("click", () => {
     const it = state.editing;
     if (!it) return;
     const what = it.type === "block" ? "blokkeringen" : `avtalen med ${it.name || "kunden"}`;
     if (!confirm(`Slette ${what} ${fmt(it.date, { day: "numeric", month: "long" })} kl. ${hhmm(it.start)} for godt?\n\nTips: huk av «Avlyst» i stedet hvis du vil ha historikken.`)) return;
-    try {
-      await api(`/api/admin/items/${encodeURIComponent(it.id)}`, { method: "DELETE" });
+    api(`/api/admin/items/${encodeURIComponent(it.id)}`, { method: "DELETE" }).then(() => {
       dlg.close();
-      await load();
-    } catch (err) { if (err.status !== 401) $("edit-msg").textContent = err.message; }
+      return load();
+    }).catch((err) => { if (err.status !== 401) $("edit-msg").textContent = err.message; });
   });
 
   // ---------- Oppstart ----------
   // Hold oversikten fersk (nye nettbestillinger dukker opp av seg selv)
-  setInterval(() => { if (!document.hidden && !dlg.open && getToken() && !$("app").hidden) load(); }, 30_000);
+  setInterval(() => { if (!document.hidden && !dlg.open && getToken() && !$("app").hidden) load(); }, 30000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden && getToken() && !$("app").hidden) load(); });
 
   if (getToken()) { showApp(); load(); } else showLogin();

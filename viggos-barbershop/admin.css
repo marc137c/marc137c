@@ -28,15 +28,16 @@ input, select, textarea {
   width: 100%; min-height: 44px; padding: 10px 12px; border-radius: 10px;
   border: 1px solid var(--line); background: var(--bg);
 }
-input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
-label { display: grid; gap: 6px; font-size: .88rem; color: var(--muted); }
+input:focus, select:focus, textarea:focus, button:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+button:focus:not(:focus-visible) { outline: none; }
+label { display: grid; grid-gap: 6px; gap: 6px; font-size: .88rem; color: var(--muted); }
 label.check { display: flex; align-items: center; gap: 10px; color: var(--text); font-size: .95rem; }
 label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: var(--gold); }
 
 /* Innlogging */
-.login { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+.login { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
 .login-card {
-  width: min(380px, 100%); display: grid; gap: 14px; padding: 32px 26px; border-radius: 18px;
+  width: 100%; max-width: 380px; display: grid; grid-gap: 14px; gap: 14px; padding: 32px 26px; border-radius: 18px;
   background: var(--surface); border: 1px solid var(--line); box-shadow: 0 20px 60px rgba(0,0,0,.45);
 }
 .brand { margin: 0; text-align: center; color: var(--gold); font: 600 .8rem var(--caps); letter-spacing: .18em; text-transform: uppercase; }
@@ -47,7 +48,7 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 .back { text-align: center; font-size: .88rem; color: var(--muted); }
 
 /* Hovedvisning */
-.top { position: sticky; top: 0; z-index: 5; background: rgba(11,15,13,.94); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); padding: 10px 16px 12px; }
+.top { position: -webkit-sticky; position: sticky; top: 0; z-index: 5; background: rgba(11,15,13,.94); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); padding: 10px 16px 12px; }
 .top-row { display: flex; align-items: center; gap: 10px; max-width: 900px; margin: 0 auto; }
 .title { font-family: var(--caps); color: var(--gold); letter-spacing: .08em; margin-right: auto; }
 .sync { font-size: .8rem; color: var(--muted); }
@@ -57,7 +58,7 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 .chip { min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; cursor: pointer; }
 .week { display: flex; gap: 6px; overflow-x: auto; max-width: 900px; margin: 10px auto 0; padding-bottom: 2px; scrollbar-width: none; }
 .week button {
-  flex: 0 0 auto; min-width: 58px; display: grid; justify-items: center; gap: 2px; padding: 6px 8px; border-radius: 12px;
+  flex: 0 0 auto; min-width: 58px; display: grid; justify-items: center; grid-gap: 2px; gap: 2px; padding: 6px 8px; border-radius: 12px;
   border: 1px solid var(--line); background: transparent; cursor: pointer; font-size: .78rem; color: var(--muted);
 }
 .week button strong { font-size: 1rem; color: var(--text); }
@@ -72,8 +73,8 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 .day-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .day-info { color: var(--muted); margin: 8px 0 14px; font-size: .92rem; }
 
-.timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.row { display: grid; grid-template-columns: 62px 1fr; gap: 10px; align-items: stretch; }
+.timeline { list-style: none; margin: 0; padding: 0; display: grid; grid-gap: 6px; gap: 6px; }
+.row { display: grid; grid-template-columns: 62px 1fr; grid-gap: 10px; gap: 10px; align-items: stretch; }
 .row time { padding-top: 12px; color: var(--muted); font-variant-numeric: tabular-nums; font-size: .9rem; }
 .free {
   min-height: 46px; border: 1px dashed rgba(111,207,142,.35); border-radius: 12px; background: transparent;
@@ -83,7 +84,7 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 .item {
   text-align: left; width: 100%; border-radius: 12px; padding: 10px 14px; cursor: pointer;
   border: 1px solid rgba(239,124,115,.45); border-left: 4px solid var(--err); background: rgba(239,124,115,.1);
-  display: grid; gap: 2px;
+  display: grid; grid-gap: 2px; gap: 2px;
 }
 .item:hover { background: rgba(239,124,115,.16); }
 .item .when { font-variant-numeric: tabular-nums; font-size: .82rem; color: var(--muted); }
@@ -100,12 +101,12 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 .empty { padding: 18px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); text-align: center; }
 
 /* Redigering */
-.sheet { width: min(560px, calc(100% - 24px)); max-height: calc(100vh - 24px); border: 1px solid var(--line); border-radius: 18px; padding: 0; background: var(--surface); color: var(--text); }
+.sheet { width: calc(100% - 24px); max-width: 560px; max-height: calc(100vh - 24px); border: 1px solid var(--line); border-radius: 18px; padding: 0; background: var(--surface); color: var(--text); }
 .sheet::backdrop { background: rgba(0,0,0,.6); }
-.sheet form { display: grid; gap: 14px; padding: 22px; }
+.sheet form { display: grid; grid-gap: 14px; gap: 14px; padding: 22px; }
 .sheet h3 { margin: 0; }
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.seg { display: flex; gap: 6px; padding: 4px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); width: fit-content; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; grid-gap: 12px; gap: 12px; }
+.seg { display: flex; gap: 6px; padding: 4px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); width: -webkit-fit-content; width: -moz-fit-content; width: fit-content; }
 .seg label { display: block; cursor: pointer; }
 .seg input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .seg label span, .seg label { padding: 6px 14px; border-radius: 999px; color: var(--muted); font-size: .9rem; }
@@ -125,3 +126,39 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
   .day-actions .btn { flex: 1; }
   .row { grid-template-columns: 50px 1fr; }
 }
+
+/* ---------- Eldre nettlesere (Safari/iOS 10+, Chrome 60+, Firefox 55+, Samsung 8+) ----------
+   Blokkene under leses bare av nettlesere som mangler funksjonen, så nye nettlesere ser siden uendret. */
+
+/* Uten gap i flexbox */
+@supports not (aspect-ratio: 1) {
+  .btn, label.check, .top-row, .day-nav, .week, .day-head, .day-actions, .seg, .addons, .addons label, .sheet-actions { gap: 0; }
+  label.check input { margin-right: 10px; }
+  .top-row > * + * { margin-left: 10px; }
+  .day-nav > * + * { margin-left: 8px; }
+  .week > * + * { margin-left: 6px; }
+  .day-head > * { margin: 6px 0; }
+  .day-actions > * + * { margin-left: 8px; }
+  .seg label + label { margin-left: 6px; }
+  .addons label { margin: 0 16px 8px 0; }
+  .addons input { margin-right: 8px; }
+  .sheet-actions > * + * { margin-left: 8px; }
+}
+
+/* Uten CSS grid (Safari/iOS 10.0–10.2) */
+@supports not (display: grid) {
+  .login-card > * + *, .sheet form > * + * { margin-top: 14px; }
+  label > input, label > select, label > textarea { margin-top: 6px; }
+  .timeline > li { margin-bottom: 6px; }
+  .row { display: flex; }
+  .row time { flex: 0 0 62px; }
+  .row > :last-child { flex: 1; margin-left: 10px; }
+  .item > span { display: block; }
+  .week button > * { display: block; text-align: center; }
+  .grid2 > * { margin-bottom: 12px; }
+}
+
+/* Uten <dialog> (Firefox < 98, Safari < 15.4): compat.js setter klassene */
+dialog:not([open]) { display: none; }
+.dialog-shim[open] { display: block; position: fixed; z-index: 1000; top: 12px; left: 0; right: 0; margin: 0 auto; overflow: auto; }
+.dialog-shim-backdrop { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 999; background: rgba(0, 0, 0, .6); }

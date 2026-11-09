@@ -15,6 +15,7 @@
   let online = false;      // true når bookingsystemet på serveren svarer
 
   const $ = (id) => document.getElementById(id);
+  const focusOn = (el) => { if (el) el.focus(); };
   const form = $("booking-form");
   if (!form) return;
   const select = $("f-service");
@@ -167,7 +168,7 @@
     state.date = new Date(y, m - 1, d);
     clearMsg();
     renderAll();
-    grid.querySelector(".is-selected")?.focus();
+    focusOn(grid.querySelector(".is-selected"));
   });
   slotsEl.addEventListener("click", (e) => {
     const btn = e.target.closest(".slot");
@@ -176,7 +177,7 @@
     clearMsg();
     renderSlots();
     renderSummary();
-    slotsEl.querySelector(".is-selected")?.focus();
+    focusOn(slotsEl.querySelector(".is-selected"));
   });
   prevBtn.addEventListener("click", () => { state.view = new Date(state.view.getFullYear(), state.view.getMonth() - 1, 1); renderCalendar(); });
   nextBtn.addEventListener("click", () => { state.view = new Date(state.view.getFullYear(), state.view.getMonth() + 1, 1); renderCalendar(); });
@@ -206,7 +207,7 @@
   function clearMsg() { setMsg("", () => ""); lastMsg = null; }
   function fail(textFn, focusEl) {
     setMsg("err", typeof textFn === "function" ? textFn : () => textFn);
-    focusEl?.focus();
+    focusOn(focusEl);
   }
   // Feilkoder fra serveren → tekst på riktig språk
   const ERR = {
@@ -219,30 +220,38 @@
   const phoneOk = (v) => { const n = v.replace(/\D/g, "").length; return n >= 8 && n <= 15; };
 
   // Hent opptatte tider fra serveren
-  async function loadAvailability() {
-    try {
-      const res = await fetch("/api/availability", { headers: { Accept: "application/json" }, cache: "no-store" });
-      if (!res.ok) throw new Error(res.status);
-      const data = await res.json();
-      busy = data.busy || {};
-      if (data.durations) DURATIONS = data.durations;
-      // Åpningstidene kommer fra serveren, så kalenderen og bestillingsreglene alltid er like
-      if (data.hours) for (let d = 0; d < 7; d++) if (d in data.hours) HOURS[d] = data.hours[d];
-      online = true;
-    } catch {
-      online = false; // kalenderen virker fortsatt; bestillingen sendes da som forespørsel
-    }
+  function loadAvailability() {
+    return fetch("/api/availability", { headers: { Accept: "application/json" }, cache: "no-store" })
+      .then((res) => { if (!res.ok) throw new Error(res.status); return res.json(); })
+      .then((data) => {
+        busy = data.busy || {};
+        if (data.durations) DURATIONS = data.durations;
+        // Åpningstidene kommer fra serveren, så kalenderen og bestillingsreglene alltid er like
+        if (data.hours) for (let d = 0; d < 7; d++) if (d in data.hours) HOURS[d] = data.hours[d];
+        online = true;
+      })
+      .catch(() => {
+        online = false; // kalenderen virker fortsatt; bestillingen sendes da som forespørsel
+      });
   }
-  const refresh = async () => { await loadAvailability(); if (!state.view) initView(); renderAll(); };
+  const refresh = () => loadAvailability().then(() => { if (!state.view) initView(); renderAll(); });
+
+  // Skjemaet som tekst til Netlify Forms. Samme regler som FormData, men uten å kreve at FormData
+  // kan itereres (det kan den ikke i Safari før 11.1) eller at URLSearchParams finnes (Safari før 10.1).
+  const encodeForm = (f) => Array.prototype.slice.call(f.elements)
+    .filter((el) => el.name && !el.disabled && !/^(submit|button|reset|file)$/.test(el.type) &&
+      (!/^(checkbox|radio)$/.test(el.type) || el.checked))
+    .map((el) => (encodeURIComponent(el.name) + "=" + encodeURIComponent(el.value)).replace(/%20/g, "+"))
+    .join("&");
 
   // E-postvarsel til barbershopen via Netlify Forms (skjemaet «booking»)
   const notify = () => fetch("/", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams(new FormData(form)).toString(),
+    body: encodeForm(form),
   });
 
-  form.addEventListener("submit", async (e) => {
+  form.addEventListener("submit", (e) => {
     e.preventDefault();
     const s = I18N.s();
     const name = $("f-name");
@@ -275,47 +284,45 @@
       lastMsg = { kind: "ok", textFn };
       renderAll();
     };
-    try {
-      let res = null;
-      try {
-        res = await fetch("/api/bookings", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({
-            service: select.value, date: iso(state.date), start: state.time, addons,
-            name: name.value.trim(), phone: phone.value.trim(), botField: form.querySelector("[name=bot-field]")?.value || "",
-          }),
-        });
-      } catch { res = null; }
-
+    const bot = form.querySelector("[name=bot-field]");
+    fetch("/api/bookings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        service: select.value, date: iso(state.date), start: state.time, addons,
+        name: name.value.trim(), phone: phone.value.trim(), botField: bot ? bot.value : "",
+      }),
+    }).catch(() => null).then((res) => {
       if (res && res.ok) {
-        const data = await res.json().catch(() => ({}));
-        // E-posten sier tydelig at timen allerede er lagret i timeboken
-        $("f-status").value = "BOOKET – lagret i timeboken" + (data.booking?.id ? ` (id ${data.booking.id})` : "");
-        notify().catch(() => {});
-        await loadAvailability();
-        done((t) => t.booked(whenFor(t)));
-      } else if (res && res.status === 409) {
+        return res.json().catch(() => ({})).then((data) => {
+          // E-posten sier tydelig at timen allerede er lagret i timeboken
+          $("f-status").value = "BOOKET – lagret i timeboken" + (data.booking && data.booking.id ? ` (id ${data.booking.id})` : "");
+          notify().catch(() => {});
+          return loadAvailability();
+        }).then(() => { done((t) => t.booked(whenFor(t))); });
+      }
+      if (res && res.status === 409) {
         // Noen andre rakk å ta tiden: vis oppdatert kalender
-        await loadAvailability();
-        state.time = null;
-        renderAll();
-        fail((t) => t.takenNow, slotsEl.querySelector(".slot:not([disabled])"));
-      } else if (res && res.status >= 400 && res.status < 500 && res.status !== 404) {
-        const data = await res.json().catch(() => ({}));
-        fail(ERR[data.code] || ((t) => t.sendFailed));
-      } else {
-        // Bookingsystemet svarer ikke: send som forespørsel på e-post i stedet
-        $("f-status").value = "FORESPØRSEL – IKKE lagret. Legg den inn i /admin og bekreft med kunden.";
-        const r = await notify();
+        return loadAvailability().then(() => {
+          state.time = null;
+          renderAll();
+          fail((t) => t.takenNow, slotsEl.querySelector(".slot:not([disabled])"));
+        });
+      }
+      if (res && res.status >= 400 && res.status < 500 && res.status !== 404) {
+        return res.json().catch(() => ({})).then((data) => { fail(ERR[data.code] || ((t) => t.sendFailed)); });
+      }
+      // Bookingsystemet svarer ikke: send som forespørsel på e-post i stedet
+      $("f-status").value = "FORESPØRSEL – IKKE lagret. Legg den inn i /admin og bekreft med kunden.";
+      return notify().then((r) => {
         if (!r.ok) throw new Error(r.status);
         done((t) => t.sent(whenFor(t)));
-      }
-    } catch {
+      });
+    }).catch(() => {
       setMsg("err", (t) => t.sendFailed);
-    } finally {
+    }).then(() => {
       btn.disabled = false;
-    }
+    });
   });
 
   initView();
@@ -324,11 +331,12 @@
   I18N.onChange(renderAll);
   // Hold ledige tider oppdatert mens siden står åpen
   // (ikke mens noen bruker kalenderen med tastaturet, så fokus ikke forsvinner)
-  setInterval(async () => {
+  setInterval(() => {
     if (document.hidden) return;
-    await loadAvailability();
-    if (grid.contains(document.activeElement) || slotsEl.contains(document.activeElement)) return;
-    renderAll();
-  }, 30_000);
+    loadAvailability().then(() => {
+      if (grid.contains(document.activeElement) || slotsEl.contains(document.activeElement)) return;
+      renderAll();
+    });
+  }, 30000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
 })();

@@ -38,7 +38,7 @@ themeBtn.addEventListener("click", () => {
   if (light) document.documentElement.dataset.theme = "light";
   else delete document.documentElement.dataset.theme;
   themeMeta.content = light ? "#f7f2e8" : "#0b0f0d";
-  try { localStorage.setItem("theme", light ? "light" : "dark"); } catch { /* privat modus */ }
+  try { localStorage.setItem("theme", light ? "light" : "dark"); } catch (e) { /* privat modus */ }
   setThemeLabel();
   window.dispatchEvent(new Event("themechange"));
 });
@@ -74,11 +74,13 @@ function osloNow() {
     const p = {};
     new Intl.DateTimeFormat("en-CA", {
       timeZone: "Europe/Oslo", year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+      // hour12:false, ikke hourCycle: eldre nettlesere overser hourCycle og gir 12-timersklokke (15:00 blir 3).
+      // Noen svarer «24» ved midnatt, derfor % 24 under.
+      hour: "2-digit", minute: "2-digit", hour12: false,
     }).formatToParts(new Date()).forEach((x) => { p[x.type] = x.value; });
     const y = +p.year, m = +p.month, d = +p.day;
     return { y, m, d, day: new Date(y, m - 1, d).getDay(), minutes: (+p.hour % 24) * 60 + +p.minute };
-  } catch {
+  } catch (e) {
     const n = new Date(); // svært gamle nettlesere: bruk enhetens klokke
     return { y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate(), day: n.getDay(), minutes: n.getHours() * 60 + n.getMinutes() };
   }
@@ -114,7 +116,7 @@ function updateStatus() {
   }
 }
 updateStatus();
-setInterval(updateStatus, 60_000);
+setInterval(updateStatus, 60000);
 toggle.setAttribute("aria-label", I18N.s().menuOpen);
 I18N.onChange(() => {
   updateStatus();
@@ -127,7 +129,10 @@ const lightboxImg = document.getElementById("lightbox-img");
 document.querySelectorAll(".gallery-item").forEach((btn) => {
   btn.addEventListener("click", () => {
     const img = btn.querySelector("img");
-    lightboxImg.src = btn.dataset.full || img.src;
+    // Nettlesere uten WebP viser JPG-kopien i <picture>, så de får JPG i stort format også
+    const shown = img.currentSrc || img.src;
+    const full = btn.dataset.full || shown;
+    lightboxImg.src = /\.jpg$/i.test(shown) ? full.replace(/\.webp$/i, ".jpg") : full;
     lightboxImg.alt = img.alt;
     lightbox.showModal();
   });

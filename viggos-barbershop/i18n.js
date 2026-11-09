@@ -212,13 +212,13 @@
   const NO = {}; // originalteksten fra HTML-en, fanges opp første gang
   const listeners = [];
   const store = {
-    get() { try { return localStorage.getItem("lang"); } catch { return null; } },
-    set(v) { try { localStorage.setItem("lang", v); } catch { /* privat modus */ } },
+    get() { try { return localStorage.getItem("lang"); } catch (e) { return null; } },
+    set(v) { try { localStorage.setItem("lang", v); } catch (e) { /* privat modus */ } },
   };
 
   function detect() {
-    const param = new URLSearchParams(location.search).get("lang");
-    if (param === "en" || param === "no") return param;
+    const param = /[?&]lang=(en|no)(?:&|$)/.exec(location.search);
+    if (param) return param[1];
     const saved = store.get();
     if (saved === "en" || saved === "no") return saved;
     const langs = navigator.languages || [navigator.language || ""];
@@ -230,14 +230,14 @@
     document.querySelectorAll("[data-i18n]").forEach((el) => {
       const key = el.dataset.i18n;
       if (!(key in NO)) NO[key] = el.innerHTML;
-      el.innerHTML = lang === "en" ? EN[key] ?? NO[key] : NO[key];
+      el.innerHTML = lang === "en" && EN[key] != null ? EN[key] : NO[key];
     });
     document.querySelectorAll("[data-i18n-attr]").forEach((el) => {
       el.dataset.i18nAttr.split(";").forEach((pair) => {
         const [attr, key] = pair.split(":");
         const id = `${key}@${attr}`;
         if (!(id in NO)) NO[id] = el.getAttribute(attr);
-        el.setAttribute(attr, lang === "en" ? EN[key] ?? NO[id] : NO[id]);
+        el.setAttribute(attr, lang === "en" && EN[key] != null ? EN[key] : NO[id]);
       });
     });
     const s = STRINGS[lang];
@@ -265,7 +265,8 @@
   window.I18N = I18N;
 
   apply(detect());
-  document.getElementById("lang-toggle")?.addEventListener("click", () => {
+  const langBtn = document.getElementById("lang-toggle");
+  if (langBtn) langBtn.addEventListener("click", () => {
     I18N.set(I18N.lang === "en" ? "no" : "en");
   });
 })();

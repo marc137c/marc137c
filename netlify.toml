@@ -1,4 +1,5 @@
 [build]
+  command = "node scripts/check-es2015.mjs"
   publish = "viggos-barbershop"
 
 [functions]
