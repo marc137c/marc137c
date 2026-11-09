@@ -705,6 +705,7 @@ form.booking {
   .btn-follow svg { margin-right: 10px; }
   .btn-follow .handle { margin-left: 10px; }
   .step-no { margin-right: 10px; }
+  .addon-picks { display: block; }
   .booking .addon-picks label:not(.step-label) { display: inline-grid; vertical-align: top; margin: 0 16px 8px 0; }
   .booking .addon-picks input { margin-right: 8px; }
   .slot-legend li { margin: 0 16px 6px 0; }
