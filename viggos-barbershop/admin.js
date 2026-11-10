@@ -11,7 +11,12 @@
   const parse = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
   const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); };
   const hhmm = (min) => `${pad(Math.floor(min / 60))}:${pad(min % 60)}`;
-  const toMin = (t) => { const [h, m] = String(t).split(":").map(Number); return h * 60 + m; };
+  // «14:30», «14.30», «1430» og «14» godtas (eldre Safari har ikke tidsvelger og lar folk skrive fritt)
+  const toMin = (t) => {
+    const m = /^(\d{1,2})(?:[:.]?(\d{2}))?$/.exec(String(t).trim());
+    if (!m || Number(m[2] || 0) > 59) return NaN;
+    return Number(m[1]) * 60 + Number(m[2] || 0);
+  };
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const fmt = (s, o) => new Intl.DateTimeFormat("nb-NO", o).format(parse(s));
   const todayIso = () => iso(new Date());
@@ -216,7 +221,7 @@
     const free = e.target.closest(".free");
     if (free) return openEditor(null, { type: "booking", start: Number(free.dataset.start) });
     const it = e.target.closest("[data-id]");
-    if (it) openEditor([...state.items].find((i) => i.id === it.dataset.id));
+    if (it) openEditor(state.items.filter((i) => i.id === it.dataset.id)[0]);
   });
   $("timeline").addEventListener("keydown", (e) => {
     if ((e.key === "Enter" || e.key === " " || e.keyCode === 13 || e.keyCode === 32) && e.target.matches("div[data-id]")) { e.preventDefault(); e.target.click(); }
@@ -289,7 +294,7 @@
       start: toMin(E.start.value),
       dur: Number(E.dur.value),
       service: isBlock ? "" : E.service.value,
-      addons: isBlock ? [] : [...f.querySelectorAll("[name=addon]:checked")].map((c) => c.value),
+      addons: isBlock ? [] : Array.prototype.map.call(f.querySelectorAll("[name=addon]:checked"), (c) => c.value),
       name: isBlock ? "" : E.name.value.trim(),
       phone: isBlock ? "" : E.phone.value.trim(),
       note: E.note.value.trim(),

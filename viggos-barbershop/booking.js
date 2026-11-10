@@ -26,6 +26,7 @@
   const slotsEl = $("slots");
   const summaryEl = $("booking-summary");
   const msg = $("form-msg");
+  const smsNote = $("sms-note");
 
   const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const sameDay = (a, b) => a && b && a.getTime() === b.getTime();
@@ -36,7 +37,13 @@
   const state = { date: null, time: null, view: null };
 
   // «I dag» og klokka følger norsk tid (osloNow i script.js), ikke besøkerens tidssone
-  const today = () => { const o = osloNow(); return new Date(o.y, o.m - 1, o.d); };
+  // Regnes ut høyst én gang i sekundet (kalenderen spør hundrevis av ganger per tegning)
+  let todayYmd = null, todayAt = 0;
+  const today = () => {
+    const now = Date.now();
+    if (!todayYmd || now - todayAt > 1000) { const o = osloNow(); todayYmd = [o.y, o.m - 1, o.d]; todayAt = now; }
+    return new Date(todayYmd[0], todayYmd[1], todayYmd[2]); // ny Date hver gang: kallerne endrer den
+  };
   const lastDay = () => { const d = today(); d.setDate(d.getDate() + MAX_DAYS); return d; };
 
   const duration = () => DURATIONS[select.value] || SLOT_MIN;
@@ -66,8 +73,11 @@
   const hasAnySlot = (date) => slotsFor(date).length > 0;
   const bookable = (date) => date >= today() && date <= lastDay() && freeSlots(date).length > 0;
 
-  const dateLabel = (d, opts = { weekday: "long", day: "numeric", month: "long" }) =>
-    new Intl.DateTimeFormat(I18N.s().locale, opts).format(d);
+  const fmtCache = {};
+  const dateLabel = (d, opts = { weekday: "long", day: "numeric", month: "long" }) => {
+    const key = I18N.s().locale + JSON.stringify(opts);
+    return (fmtCache[key] || (fmtCache[key] = new Intl.DateTimeFormat(I18N.s().locale, opts))).format(d);
+  };
 
   function renderCalendar() {
     const s = I18N.s();
@@ -92,10 +102,8 @@
       if (sameDay(d, state.date)) cls.push("is-selected");
       if (!HOURS[d.getDay()]) cls.push("is-closed");
       if (full) cls.push("is-full");
-      const some = ok && (busy[iso(d)] || []).length > 0;
-      if (some) cls.push("has-bookings");
       const label = cap(dateLabel(d)) + (sameDay(d, today()) ? `, ${s.today.toLowerCase()}` : "") +
-        (!HOURS[d.getDay()] ? `, ${s.closedDay.toLowerCase()}` : "") + (full ? `, ${s.fullDay.toLowerCase()}` : "") + (some ? `, ${s.someBooked.toLowerCase()}` : "");
+        (!HOURS[d.getDay()] ? `, ${s.closedDay.toLowerCase()}` : "") + (full ? `, ${s.fullDay.toLowerCase()}` : "");
       html.push(`<button type="button" class="${cls.join(" ")}" data-date="${iso(d)}" aria-label="${label}" aria-pressed="${sameDay(d, state.date)}"${ok ? "" : " disabled"}${full ? ` title="${s.fullDay}"` : ""}>${day}</button>`);
     }
     grid.innerHTML = html.join("");
@@ -136,7 +144,7 @@
   }
   // Tjenestenavnet på gjeldende språk (option-teksten oversettes av i18n.js)
   function selectedServiceLabelFor(value) {
-    const opt = [...select.options].find((o) => o.value === value);
+    const opt = Array.prototype.filter.call(select.options, (o) => o.value === value)[0];
     return opt ? opt.textContent.trim() : value;
   }
   function whenText() {
@@ -226,6 +234,7 @@
       .then((data) => {
         busy = data.busy || {};
         if (data.durations) DURATIONS = data.durations;
+        if (smsNote) smsNote.hidden = !data.sms;
         // Åpningstidene kommer fra serveren, så kalenderen og bestillingsreglene alltid er like
         if (data.hours) for (let d = 0; d < 7; d++) if (d in data.hours) HOURS[d] = data.hours[d];
         online = true;
@@ -267,7 +276,7 @@
     if (!phoneOk(phone.value)) return fail((t) => t.needPhone, phone);
 
     // Det barbershopen ser i e-posten: dato (ÅÅÅÅ-MM-DD), tid (24 t), tjeneste og tillegg på norsk
-    const addons = [...form.querySelectorAll(".addon-picks input:checked")].map((c) => c.value);
+    const addons = Array.prototype.map.call(form.querySelectorAll(".addon-picks input:checked"), (c) => c.value);
     $("f-dato").value = iso(state.date);
     $("f-tid").value = hhmm(state.time);
     $("f-tillegg").value = addons.join(", ");
@@ -299,8 +308,8 @@
           // E-posten sier tydelig at timen allerede er lagret i timeboken
           $("f-status").value = "BOOKET – lagret i timeboken" + (data.booking && data.booking.id ? ` (id ${data.booking.id})` : "");
           notify().catch(() => {});
-          return loadAvailability();
-        }).then(() => { done((t) => t.booked(whenFor(t))); });
+          return loadAvailability().then(() => data);
+        }).then((data) => { done((t) => t.booked(whenFor(t)) + (data.sms === "sent" ? " " + t.smsSent : "")); });
       }
       if (res && res.status === 409) {
         // Noen andre rakk å ta tiden: vis oppdatert kalender

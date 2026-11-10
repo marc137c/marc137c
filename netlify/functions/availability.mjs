@@ -2,10 +2,12 @@
 // Viser bare tidsrom (start/slutt), aldri hvem som har bestilt.
 import { getStore } from "@netlify/blobs";
 import { getAvailability } from "../lib/booking-core.mjs";
+import { smsConfigured } from "../lib/sms.mjs";
 
 export default async () => {
   try {
     const data = await getAvailability(getStore({ name: "bookings", consistency: "strong" }));
+    data.sms = smsConfigured(process.env); // skjemaet viser «Du får bekreftelse på SMS» bare når det er sant
     return Response.json(data, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     console.error("Ledighet:", err);

@@ -165,10 +165,12 @@ void main() {
   const play = () => { if (!raf) raf = requestAnimationFrame(frame); };
 
   // Stopp animasjonen når hero ikke vises – sparer batteri
-  new IntersectionObserver(([entry]) => {
-    visible = entry.isIntersecting;
-    if (visible) play();
-  }).observe(hero);
+  if ("IntersectionObserver" in window) { // Safari < 12.1 mangler den: da går animasjonen bare
+    new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      if (visible) play();
+    }).observe(hero);
+  }
   if (reduceMotion.addEventListener) reduceMotion.addEventListener("change", play); // Safari < 14 har bare addListener
   else if (reduceMotion.addListener) reduceMotion.addListener(play);
   window.addEventListener("themechange", play);

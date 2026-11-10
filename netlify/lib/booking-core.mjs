@@ -188,6 +188,8 @@ export async function updateItem(store, id, changes, { force = false, now = new 
   const toMonth = monthOf(changes.date ?? current.date);
   const build = (base) => {
     const next = { ...base, ...changes, updatedAt: now.toISOString() };
+    // Flyttet til ny dag/tid: kunden skal få ny påminnelse for det nye tidspunktet
+    if (next.date !== base.date || next.start !== base.start) { delete next.remindedAt; delete next.reminderError; }
     if (next.start + next.dur > 1440) return { error: "Avtalen går over midnatt.", status: 400 };
     return { next };
   };

@@ -27,6 +27,7 @@ a { color: var(--gold); }
 input, select, textarea {
   width: 100%; min-height: 44px; padding: 10px 12px; border-radius: 10px;
   border: 1px solid var(--line); background: var(--bg);
+  font-size: 16px; /* under 16px zoomer iPhone inn på feltet */
 }
 input:focus, select:focus, textarea:focus, button:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
 button:focus:not(:focus-visible) { outline: none; }
@@ -54,7 +55,7 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 .sync { font-size: .8rem; color: var(--muted); }
 .day-nav { display: flex; align-items: center; gap: 8px; max-width: 900px; margin: 10px auto 0; }
 .day-nav input { flex: 1; max-width: 220px; }
-.icon { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--gold); font-size: 1.4rem; cursor: pointer; }
+.icon { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--gold); font-size: 1.4rem; cursor: pointer; padding: 0; }
 .chip { min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; cursor: pointer; }
 .week { display: flex; gap: 6px; overflow-x: auto; max-width: 900px; margin: 10px auto 0; padding-bottom: 2px; scrollbar-width: none; }
 .week button {
@@ -62,6 +63,8 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
   border: 1px solid var(--line); background: transparent; cursor: pointer; font-size: .78rem; color: var(--muted);
 }
 .week button strong { font-size: 1rem; color: var(--text); }
+/* Safari 10.1–14.0 overser display:grid på <button>: blokker holder linjene adskilt */
+.week button > *, .item > span { display: block; }
 .week button .n { font-size: .7rem; font-weight: 700; color: var(--gold); }
 .week button.is-closed { opacity: .45; }
 .week button.is-active { background: var(--gold); border-color: var(--gold); color: var(--on-gold); }
@@ -101,7 +104,7 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 .empty { padding: 18px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); text-align: center; }
 
 /* Redigering */
-.sheet { width: calc(100% - 24px); max-width: 560px; max-height: calc(100vh - 24px); border: 1px solid var(--line); border-radius: 18px; padding: 0; background: var(--surface); color: var(--text); }
+.sheet { width: calc(100% - 24px); max-width: 560px; max-height: calc(100% - 24px); border: 1px solid var(--line); border-radius: 18px; padding: 0; background: var(--surface); color: var(--text); }
 @supports (width: min(1px, 2px)) { .sheet { max-width: min(560px, calc(100% - 6px - 2em)); } }
 .sheet::backdrop { background: rgba(0,0,0,.6); }
 .sheet form { display: grid; grid-gap: 14px; gap: 14px; padding: 22px; }

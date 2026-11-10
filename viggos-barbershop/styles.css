@@ -8,6 +8,8 @@
   --gold: #cfa75e;
   --gold-hover: #e3c381;
   --gold-grad: linear-gradient(100deg, #a8823f 0%, #e9cf98 30%, #cfa75e 50%, #f6e7c1 70%, #b38a45 100%);
+  --logo-grad: linear-gradient(100deg, #d1a91c 0%, #fbeea8 26%, #f4cd1c 48%, #fff4bd 68%, #dcb21a 100%); /* gullet på skiltet */
+  --logo-gold: #f1cf3a;
   --script: "Great Vibes", "Snell Roundhand", cursive;
   --caps: "Cinzel", "Trajan Pro", Georgia, serif;
   --ornament: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 16' fill='none' stroke='%23cfa75e' stroke-width='1.3'%3E%3Cpath d='M2 8 L8 6.6 L8 9.4 Z' fill='%23cfa75e'/%3E%3Cpath d='M8 8 H128'/%3E%3Cpath d='M128 8 l5 -2.4 l3 2.4 l-3 2.4 Z' fill='%23cfa75e'/%3E%3Cpath d='M150 1.5 L156.5 8 L150 14.5 L143.5 8 Z'/%3E%3Ccircle cx='150' cy='8' r='1.6' fill='%23cfa75e'/%3E%3Cpath d='M172 8 l-5 -2.4 l-3 2.4 l3 2.4 Z' fill='%23cfa75e'/%3E%3Cpath d='M172 8 H292'/%3E%3Cpath d='M298 8 L292 6.6 L292 9.4 Z' fill='%23cfa75e'/%3E%3C/svg%3E");
@@ -27,32 +29,6 @@
   --radius: 14px;
   --serif: "Georgia", "Times New Roman", serif;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-}
-
-/* Lyst tema: elfenben og sand med samme dype grønn og gull */
-:root[data-theme="light"] {
-  --bg: #f7f2e8;
-  --bg-alt: #efe7d6;
-  --surface: #fffbf3;
-  --line: #ddd0b4;
-  --text: #17261e;
-  --muted: #5b6357;
-  --gold: #7a5a1c;              /* mørk nok til tekst (WCAG AA) på lys bakgrunn */
-  --gold-hover: #5f4614;
-  --gold-grad: linear-gradient(100deg, #6f5017 0%, #a98235 30%, #8a6624 50%, #c29a4e 70%, #745419 100%);
-  --ornament: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 16' fill='none' stroke='%23946f26' stroke-width='1.3'%3E%3Cpath d='M2 8 L8 6.6 L8 9.4 Z' fill='%23946f26'/%3E%3Cpath d='M8 8 H128'/%3E%3Cpath d='M128 8 l5 -2.4 l3 2.4 l-3 2.4 Z' fill='%23946f26'/%3E%3Cpath d='M150 1.5 L156.5 8 L150 14.5 L143.5 8 Z'/%3E%3Ccircle cx='150' cy='8' r='1.6' fill='%23946f26'/%3E%3Cpath d='M172 8 l-5 -2.4 l-3 2.4 l3 2.4 Z' fill='%23946f26'/%3E%3Cpath d='M172 8 H292'/%3E%3Cpath d='M298 8 L292 6.6 L292 9.4 Z' fill='%23946f26'/%3E%3C/svg%3E");
-  --bg-rgb: 247, 242, 232;
-  --gold-fill: #cfa75e;
-  --gold-fill-hover: #dcb873;
-  --on-gold: #17261e;
-  --lead: #3b473f;
-  --ok: #2c8a4d;
-  --err: #b73a30;
-  --shadow: 60, 45, 15;
-  --logo-shadow: 0 3px 14px rgba(120, 90, 30, .18);
-  --skeleton-hi: #f3ead8;
-  --map-filter: sepia(.15) saturate(.9);
-  color-scheme: light;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -123,10 +99,10 @@ p { margin: 0 0 1em; }
 .brand { flex-direction: column; align-items: center; gap: 0; line-height: 1; }
 .brand-script {
   font: 400 2rem/1 var(--script);
-  background: var(--gold-grad); -webkit-background-clip: text; background-clip: text; color: transparent;
+  background: var(--logo-grad); -webkit-background-clip: text; background-clip: text; color: transparent;
   padding: 0 .15em; /* plass til swashene */
 }
-.brand-caps { font: 600 .58rem var(--caps); letter-spacing: .42em; color: var(--gold); margin: -2px 0 0 .42em; }
+.brand-caps { font: 600 .58rem var(--caps); letter-spacing: .42em; color: var(--logo-gold); margin: -2px 0 0 .42em; }
 .nav-menu { display: flex; align-items: center; gap: 28px; }
 .nav-menu a { white-space: nowrap; }
 .nav-menu a:not(.btn) { color: var(--muted); font-weight: 500; }
@@ -156,19 +132,10 @@ p { margin: 0 0 1em; }
 @media (prefers-reduced-motion: reduce) { .lang-knob, .lang-track { transition: none; } }
 .nav-toggle { order: 4; }
 .lang-toggle { order: 3; }
-.theme-toggle {
-  order: 2; margin-left: 18px;
-  display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex: none;
-  background: transparent; color: var(--gold); border: 1px solid var(--line); border-radius: 50%;
-  cursor: pointer; transition: border-color .2s, transform .3s;
-}
-.theme-toggle:hover { border-color: var(--gold); transform: rotate(-15deg); }
-.theme-toggle svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.theme-toggle .icon-moon { display: none; }
-:root[data-theme="light"] .theme-toggle .icon-sun { display: none; }
-:root[data-theme="light"] .theme-toggle .icon-moon { display: block; fill: currentColor; stroke: none; }
-/* Myk overgang når temaet byttes */
-body, .site-header, .section-alt, .highlight, .booking, .post, .svc-link, input, select { transition: background-color .35s, color .35s, border-color .35s; }
+/* Sosiale ikoner i toppmenyen */
+.socials.header-socials { order: 2; margin: 0 0 0 18px; gap: 8px; }
+.socials.header-socials a { width: 34px; height: 34px; border-radius: 50%; }
+.socials.header-socials svg { width: 17px; height: 17px; }
 
 .nav-toggle { display: none; background: none; border: 0; padding: 8px; cursor: pointer; }
 .nav-toggle span { display: block; width: 24px; height: 2px; background: var(--text); margin: 5px 0; transition: transform .3s, opacity .3s; }
@@ -207,14 +174,11 @@ body, .site-header, .section-alt, .highlight, .booking, .post, .svc-link, input,
 }
 .trust-badge .stars { color: var(--gold); letter-spacing: 2px; }
 .lead { font-size: 1.15rem; font-size: clamp(1.05rem, 2vw, 1.3rem); color: var(--lead); max-width: 620px; margin-left: auto; margin-right: auto; }
-.hero-socials { justify-content: center; margin: 0 0 16px; }
 #bestill { padding-top: 48px; }
 .hero-cta { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; margin: 34px 0 24px; }
 .hero .btn-ghost { background: rgba(var(--bg-rgb), .4); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 .status { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); font-size: .95rem; margin: 0; }
-.status::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
-.status.open::before { background: #4caf6e; box-shadow: 0 0 0 4px rgba(76, 175, 110, .2); }
-.status.closed::before { background: var(--red); }
+.status::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--gold); }
 
 .anim { animation: anim-in .9s cubic-bezier(.2, .7, .2, 1) both; animation-delay: var(--d, 0s); }
 @keyframes anim-in { from { opacity: 0; transform: translateY(18px); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
@@ -291,7 +255,8 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 /* Responsive */
 @media (max-width: 1080px) {
   .nav-toggle { display: block; }
-  .theme-toggle { margin-left: auto; width: 34px; height: 34px; }
+  .nav-menu { max-height: calc(100vh - 68px); overflow-y: auto; }
+  .socials.header-socials { margin-left: auto; }
   .lang-toggle { margin-left: 8px; margin-right: 8px; padding: 4px 11px 4px 5px; font-size: .78rem; gap: 8px; }
   .nav-menu {
     position: absolute; top: 68px; left: 0; right: 0;
@@ -326,7 +291,7 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
   display: block;
   font: 400 4.6rem/1 var(--script); font-size: clamp(4.6rem, 15vw, 9.5rem);
   padding: 0 .2em .05em; /* swashene på V og g */
-  background: var(--gold-grad); background-size: 200% auto;
+  background: var(--logo-grad); background-size: 200% auto;
   -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(var(--logo-shadow));
 }
@@ -335,7 +300,7 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
   display: block;
   font: 600 1.05rem var(--caps); font-size: clamp(1.05rem, 3.4vw, 2rem);
   letter-spacing: .38em; margin: .1em 0 0 .38em;
-  color: var(--gold);
+  color: var(--logo-gold);
   text-shadow: var(--logo-shadow);
 }
 .ornament { display: block; width: 70%; max-width: 320px; height: 16px; margin: 18px auto 20px; background: var(--ornament) center / contain no-repeat; }
@@ -356,6 +321,22 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 .socials svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .socials-sm a { width: 36px; height: 36px; border-radius: 10px; }
 .socials-sm svg { width: 18px; height: 18px; }
+.socials[hidden], .socials a[hidden], .hero-rating[hidden] { display: none; }
+/* Merkefarger, så ikonene synes */
+.socials a[data-social] { color: #fff; border-color: transparent; box-shadow: 0 6px 16px rgba(0, 0, 0, .35); }
+.socials a[data-social="instagram"], .btn-follow[href*="instagram"] svg { background: #d6249f; background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%); }
+.socials a[data-social="tiktok"], .btn-follow[href*="tiktok"] svg { background: #010101; }
+.socials a[data-social="tiktok"] svg { -webkit-filter: drop-shadow(-1.2px -1px 0 #25f4ee) drop-shadow(1.2px 1px 0 #fe2c55); filter: drop-shadow(-1.2px -1px 0 #25f4ee) drop-shadow(1.2px 1px 0 #fe2c55); }
+.socials a[data-social="facebook"], .btn-follow[href*="facebook"] svg { background: #1877f2; }
+.socials a[data-social]:hover { color: #fff; -webkit-transform: translateY(-2px) scale(1.06); transform: translateY(-2px) scale(1.06); box-shadow: 0 10px 22px rgba(0, 0, 0, .45); }
+.btn-follow svg { box-sizing: content-box; padding: 6px; border-radius: 50%; color: #fff; }
+.hero-socials { align-items: center; justify-content: center; margin: 0 0 18px; }
+.hero-socials a { width: 46px; height: 46px; border-radius: 50%; }
+.hero-socials svg { width: 22px; height: 22px; }
+.socials-label { font: 600 .78rem var(--caps); letter-spacing: .22em; text-transform: uppercase; color: var(--logo-gold); margin-right: 4px; }
+.hero-rating { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 16px; padding: 6px 14px; border-radius: 999px; background: rgba(var(--bg-rgb), .55); border: 1px solid rgba(241, 207, 58, .4); color: var(--text); font-size: .92rem; }
+.hero-rating:hover { border-color: var(--logo-gold); color: var(--text); }
+.hero-rating .stars-fg svg, .hero-rating .stars-bg svg { width: 90px; }
 
 
 /* Sosiale medier: 2 per rad, 3 rader */
@@ -402,6 +383,7 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 .post-caption {
   font-size: .95rem; line-height: 1.4;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  max-height: 2.8em; /* Firefox < 68 har ikke line-clamp */
 }
 .post-date { font: 600 .7rem var(--caps); letter-spacing: .16em; text-transform: uppercase; color: #e2c27f; }
 
@@ -444,14 +426,18 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 
 /* Valgt tjeneste i bookingskjemaet lyser kort opp */
 .booking.flash { animation: flash 1.6s ease; }
+.booking input, .booking select { font-size: 16px; }
+.sms-note { margin: 0; font-size: .85rem; color: var(--muted); }
+.sms-note[hidden] { display: none; }
 .booking select.picked { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(207, 167, 94, .25); }
 @keyframes flash { 0%, 100% { box-shadow: none; } 25% { box-shadow: 0 0 0 3px var(--gold), 0 0 40px rgba(207, 167, 94, .35); } }
 @media (prefers-reduced-motion: reduce) { .booking.flash { animation: none; } }
 @media (max-width: 360px) {
   .brand-script { font-size: 1.6rem; }
   .brand-caps { font-size: .48rem; }
-  .theme-toggle { width: 30px; height: 30px; }
-  .theme-toggle svg { width: 15px; height: 15px; }
+  .socials.header-socials { gap: 5px; }
+  .socials.header-socials a { width: 28px; height: 28px; }
+  .socials.header-socials svg { width: 14px; height: 14px; }
   .lang-toggle { margin-left: 6px; margin-right: 4px; padding: 3px 9px 3px 4px; gap: 6px; font-size: .72rem; }
   .lang-track { width: 32px; height: 19px; }
   .lang-knob { width: 13px; height: 13px; }
@@ -505,7 +491,10 @@ form.booking {
 }
 .cal-nav:hover:not(:disabled) { border-color: var(--gold); }
 .cal-nav:disabled { opacity: .3; cursor: default; }
-.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-gap: 4px; gap: 4px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-gap: 4px; gap: 4px; }
+.cal-grid > * { min-width: 0; }
+/* iOS gir <button> 1em sidepolstring: da blir kalenderen bredere enn skjermen */
+.cal-day, .cal-nav, .lightbox-close { padding: 0; }
 .cal-wd { text-align: center; font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding: 4px 0 6px; }
 .cal-day {
   aspect-ratio: 1; border-radius: 10px; border: 1px solid transparent; background: transparent;
@@ -525,18 +514,15 @@ form.booking {
 }
 .slot:hover { border-color: var(--gold); }
 .slot.is-selected { background: var(--gold-fill); border-color: var(--gold-fill); color: var(--on-gold); }
-/* Ledig (grønn kant), delvis booket dag (gull prikk), opptatt (rød) */
+/* Ledig (grønn kant), opptatt (rød) */
 .cal-day { position: relative; }
 .cal-day:not(:disabled):not(.is-selected) { border-color: rgba(111, 207, 142, .28); }
-.cal-day.has-bookings::after {
-  content: ""; position: absolute; left: 50%; bottom: 5px; width: 5px; height: 5px; margin-left: -2.5px;
-  border-radius: 50%; background: var(--gold);
-}
-.cal-day.is-selected.has-bookings::after { background: var(--on-gold); }
 .cal-day.is-full:disabled {
   opacity: 1; color: var(--err); background: rgba(239, 124, 115, .1);
   border-color: rgba(239, 124, 115, .35); text-decoration: line-through;
 }
+.slot > * { display: block; }
+.slot { text-align: center; }
 .slot { display: grid; grid-gap: 1px; gap: 1px; justify-items: center; border-color: rgba(111, 207, 142, .45); }
 .slot small { font: 600 .66rem var(--sans); text-transform: uppercase; letter-spacing: .06em; }
 .slot.is-taken, .slot.is-taken:hover {
@@ -549,7 +535,6 @@ form.booking {
 .slot-legend li { display: inline-flex; align-items: center; gap: 6px; }
 .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .dot-free { border: 2px solid var(--ok); }
-.dot-some { background: var(--gold); }
 .dot-taken { background: var(--err); }
 .slots-empty { grid-column: 1 / -1; margin: 0; padding: 14px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); font-size: .92rem; text-align: center; }
 
@@ -587,6 +572,7 @@ form.booking {
 .review blockquote {
   margin: 0; flex: 1; color: var(--text); font-size: .95rem; line-height: 1.6;
   display: -webkit-box; -webkit-line-clamp: 7; -webkit-box-orient: vertical; overflow: hidden;
+  max-height: 11.2em;
 }
 .review figcaption { display: flex; align-items: center; gap: 10px; }
 .review figcaption strong { display: block; font-size: .9rem; }
@@ -606,23 +592,26 @@ form.booking {
 .stats { display: flex; justify-content: center; gap: 40px; flex-wrap: wrap; margin: 30px 0 0; }
 .stats dt { font: 700 1.8rem var(--caps); color: var(--gold); }
 .stats dd { margin: 0; color: var(--muted); font-size: .9rem; }
-.gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); grid-gap: 14px; gap: 14px; margin-top: 48px; }
+.gallery { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-gap: 14px; gap: 14px; }
+@media (max-width: 959px) { .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .gallery figure { margin: 0; }
 @media (max-width: 600px) {
-  .gallery { grid-template-columns: repeat(2, 1fr); grid-gap: 10px; gap: 10px; margin-top: 36px; }
+  .gallery { grid-gap: 10px; gap: 10px; }
+}
+@media (max-width: 959px) {
   .gallery figure:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .gallery figure:last-child:nth-child(odd) .gallery-item { aspect-ratio: 16 / 10; }
 }
 /* Logo-bilder (skilt, visittkort) vises hele, ikke beskåret */
 .gallery-item img.whole { object-fit: contain; }
 /* Om oss: portrett ved siden av teksten (flex, så det virker i alle nettlesere) */
-.about--photo { max-width: 980px; display: flex; align-items: center; text-align: left; }
+.about--photo { max-width: 980px; display: flex; align-items: center; text-align: left; margin-top: 56px; }
 .about-photo { flex: 0 0 38%; max-width: 380px; margin: 0 48px 0 0; }
 .about-photo img { display: block; width: 100%; height: auto; border-radius: 20px; border: 1px solid var(--line); box-shadow: 0 18px 40px rgba(var(--shadow), .25); }
 .about-text { flex: 1; min-width: 0; }
 .about--photo .stats { justify-content: flex-start; }
 @media (max-width: 760px) {
-  .about--photo { display: block; text-align: center; }
+  .about--photo { display: block; text-align: center; margin-top: 40px; }
   .about-photo { max-width: 320px; margin: 0 auto 28px; }
   .about--photo .stats { justify-content: center; }
 }
@@ -708,6 +697,7 @@ form.booking {
   .cal-day { height: 40px; }
   .gallery-item { height: 300px; }
   @media (max-width: 600px) { .gallery-item { height: 210px; } }
+  #bestill { padding-top: 76px; } /* uten scroll-padding havner overskriften under menyen */
 
   .nav-menu, .lang-toggle, .trust-badge, .hero-cta, .status, .stats, .socials, .follow-row, .btn-follow,
   .step-label, .addon-picks, .booking .addon-picks label, .slot-legend, .slot-legend li, .rating-summary,
@@ -720,6 +710,10 @@ form.booking {
   .hero-cta > * { margin: 7px; }
   .status::before { margin-right: 10px; flex: none; }
   .stats > * { margin: 0 20px 12px; }
+  @media (min-width: 761px) { .about--photo .stats > * { margin: 0 40px 12px 0; } }
+  .hero-rating { gap: 0; }
+  .hero-rating > * + * { margin-left: 10px; }
+  .socials.header-socials > * + * { margin-left: 8px; }
   .socials > * + * { margin-left: 12px; }
   .follow-row { margin-top: 28px; }
   .follow-row > * { margin: 6px; }
@@ -727,7 +721,7 @@ form.booking {
   .btn-follow .handle { margin-left: 10px; }
   .step-no { margin-right: 10px; }
   .addon-picks { display: block; }
-  .booking .addon-picks label:not(.step-label) { display: inline-grid; vertical-align: top; margin: 0 16px 8px 0; }
+  .booking .addon-picks label:not(.step-label) { display: inline-flex; align-items: center; vertical-align: top; margin: 0 16px 8px 0; }
   .booking .addon-picks input { margin-right: 8px; }
   .slot-legend li { margin: 0 16px 6px 0; }
   .dot { margin-right: 6px; }
@@ -747,23 +741,23 @@ form.booking {
   .slots { display: flex; flex-wrap: wrap; }
   .slot { display: block; width: 84px; margin: 0 8px 8px 0; text-align: center; }
   .slot small { display: block; }
-  .booking .addon-picks label:not(.step-label) { display: inline-block; }
+  .booking .addon-picks label:not(.step-label) { display: inline-flex; align-items: center; }
   .social-feed { display: flex; flex-wrap: wrap; justify-content: space-between; }
   .post { width: 48%; margin-bottom: 22px; }
   .social-feed--single .post { width: 100%; max-width: 420px; margin: 0 auto; }
   .highlight, .review { margin-bottom: 20px; }
   .gallery { display: flex; flex-wrap: wrap; justify-content: space-between; }
-  .gallery figure { width: 32%; margin-bottom: 14px; }
-  @media (max-width: 600px) { .gallery figure { width: 48.5%; margin-bottom: 10px; } .gallery figure:last-child:nth-child(odd) { width: 100%; } }
+  .gallery figure { width: 23.5%; margin-bottom: 14px; }
+  @media (max-width: 959px) { .gallery figure { width: 48.5%; margin-bottom: 10px; } .gallery figure:last-child:nth-child(odd) { width: 100%; } }
   .booking-col > * + * { margin-top: 22px; }
   .step > * + * { margin-top: 10px; }
   .booking label:not(.step-label) > * { margin-top: 6px; display: block; }
+  .booking .addon-picks label:not(.step-label) > * { margin-top: 0; display: inline-block; }
   .post-meta > * + * { margin-top: 6px; display: block; }
   .footer-inner > * + * { margin-top: 14px; }
   .hours-grid > * + * { margin-top: 32px; }
   form.booking > * + * { margin-top: 22px; }
-  .svc-link { display: flex; }
-  .svc-link > div { display: block; flex: 1; }
+  @media (max-width: 760px) { .svc-link { display: flex; } .svc-link > div { display: block; flex: 1; } }
   .footer-inner .socials { justify-content: center; }
 }
 
@@ -774,3 +768,21 @@ dialog:not([open]) { display: none; }
 .lightbox.dialog-shim { left: 3vw; right: 3vw; max-width: none; }
 .lightbox.dialog-shim img { margin: 0 auto; }
 .lightbox.dialog-shim .lightbox-close { top: -8px; right: 0; z-index: 1; }
+.lightbox.dialog-shim[open] { top: 50%; bottom: auto; -webkit-transform: translateY(-50%); transform: translateY(-50%); }
+
+/* Smale telefoner: språkknappen viser bare ordet og ikonene krymper litt, så logo, sosiale ikoner,
+   språk og meny får plass på én linje helt ned til 320 px */
+@media (max-width: 480px) {
+  .lang-track { display: none; }
+  .lang-toggle { padding: 4px 10px; margin-left: 6px; margin-right: 6px; }
+  .lang-toggle > * + * { margin-left: 0; }
+  .socials.header-socials { gap: 6px; }
+  .socials.header-socials a { width: 30px; height: 30px; }
+  .socials.header-socials svg { width: 15px; height: 15px; }
+}
+@media (max-width: 360px) {
+  .lang-toggle { padding: 3px 8px; margin-left: 4px; margin-right: 2px; }
+  .socials.header-socials { gap: 4px; }
+  .socials.header-socials a { width: 28px; height: 28px; }
+  .socials.header-socials svg { width: 14px; height: 14px; }
+}

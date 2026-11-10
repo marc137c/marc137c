@@ -5,6 +5,7 @@
   if (!list) return;
   const summary = document.getElementById("rating-summary");
   const link = document.getElementById("reviews-link");
+  const heroRating = document.getElementById("hero-rating"); // stjernene øverst på siden
   const MAX_CARDS = 4;
   let data = null;
 
@@ -58,8 +59,10 @@
       const r = data.rating.toFixed(1).replace(".", I18N.lang === "en" ? "." : ",");
       summary.innerHTML = `${G_LOGO}<strong class="rating-num">${r}</strong>${stars(data.rating, "stars-lg")}<span class="rating-count">${esc(s.basedOn(data.count))}</span>`;
       summary.hidden = false;
+      if (heroRating) { heroRating.innerHTML = `${stars(data.rating)}<span>${esc(s.heroRating(r, data.count))}</span>`; heroRating.hidden = false; }
     } else {
       summary.hidden = true;
+      if (heroRating) heroRating.hidden = true;
     }
 
     if (withText.length) {

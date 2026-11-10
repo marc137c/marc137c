@@ -1,3 +1,31 @@
+// Siden åpner alltid øverst: også når adressen har et #anker (f.eks. /#om) eller siden lastes på nytt
+// midt på. Ankeret fjernes fra adressen, så «oppdater» og delte lenker også starter øverst.
+// Har besøkeren selv begynt å rulle før siden er ferdig lastet, lar vi det være.
+(() => {
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual"; // Safari < 11 har det ikke: load-hoppet under tar det
+  if (location.hash && history.replaceState) history.replaceState(null, "", location.pathname + location.search);
+  let touched = false;
+  const mark = () => { touched = true; };
+  ["wheel", "touchstart", "keydown", "mousedown", "click"].forEach((ev) => window.addEventListener(ev, mark, { passive: true, once: true }));
+  const toTop = () => {
+    if (touched || !window.pageYOffset) return;
+    const root = document.documentElement;
+    root.style.scrollBehavior = "auto"; // hopp rett opp, ikke myk rulling
+    window.scrollTo(0, 0);
+    root.style.scrollBehavior = "";
+  };
+  toTop();
+  // Firefox hopper til ankeret på nytt etter at siden er lastet: rull tilbake i 1,5 s etter load,
+  // men bare så lenge besøkeren ikke har rørt siden selv
+  window.addEventListener("load", () => {
+    toTop();
+    const end = Date.now() + 1500;
+    const guard = () => { if (touched || Date.now() > end) window.removeEventListener("scroll", guard); else toTop(); };
+    window.addEventListener("scroll", guard);
+    setTimeout(toTop, 0);
+  });
+})();
+
 // Åpningstider: [åpner, stenger] i minutter etter midnatt. 0 = søndag.
 // Hold i sync med tabellen i index.html (og engelsk tekst i i18n.js).
 const HOURS = {
@@ -25,26 +53,6 @@ document.querySelectorAll("[data-socials-wrap]").forEach((w) => {
   w.hidden = !w.querySelector("[data-social]:not([hidden])");
 });
 
-// Lyst / mørkt tema (valget huskes)
-const themeBtn = document.getElementById("theme-toggle");
-const themeMeta = document.querySelector('meta[name="theme-color"]');
-const isLight = () => document.documentElement.dataset.theme === "light";
-function setThemeLabel() {
-  themeBtn.setAttribute("aria-label", isLight() ? I18N.s().toDark : I18N.s().toLight);
-  themeBtn.setAttribute("aria-pressed", String(isLight()));
-}
-themeBtn.addEventListener("click", () => {
-  const light = !isLight();
-  if (light) document.documentElement.dataset.theme = "light";
-  else delete document.documentElement.dataset.theme;
-  themeMeta.content = light ? "#f7f2e8" : "#0b0f0d";
-  try { localStorage.setItem("theme", light ? "light" : "dark"); } catch (e) { /* privat modus */ }
-  setThemeLabel();
-  window.dispatchEvent(new Event("themechange"));
-});
-setThemeLabel();
-I18N.onChange(setThemeLabel);
-
 // Mobilmeny
 const toggle = document.querySelector(".nav-toggle");
 const menu = document.getElementById("nav-menu");
@@ -69,22 +77,24 @@ window.addEventListener("scroll", onScroll, { passive: true });
 onScroll();
 
 // Klokka i Norge, uansett hvilken tidssone besøkeren er i (åpningstidene gjelder norsk tid)
+// Formaterne lages én gang: nye Intl-formatere er trege på gamle iPhoner
+const OSLO_FMT = {};
 function osloNow() {
   try {
     const p = {};
-    const fmt = new Intl.DateTimeFormat("en-CA", {
+    const fmt = OSLO_FMT.all || (OSLO_FMT.all = new Intl.DateTimeFormat("en-CA", {
       timeZone: "Europe/Oslo", year: "numeric", month: "2-digit", day: "2-digit",
       // hour12:false, ikke hourCycle: eldre nettlesere overser hourCycle og gir 12-timersklokke (15:00 blir 3).
       // Noen svarer «24» ved midnatt, derfor % 24 under.
       hour: "2-digit", minute: "2-digit", hour12: false,
-    });
+    }));
     const now = new Date();
     if (typeof fmt.formatToParts === "function") fmt.formatToParts(now).forEach((x) => { p[x.type] = x.value; });
     else {
       // Safari 10 mangler formatToParts: hent hvert felt for seg, fortsatt i norsk tid
       ["year", "month", "day", "hour", "minute"].forEach((k) => {
-        const o = { timeZone: "Europe/Oslo", hour12: false }; o[k] = "numeric";
-        p[k] = new Intl.DateTimeFormat("en-US", o).format(now).replace(/\D/g, "");
+        if (!OSLO_FMT[k]) { const o = { timeZone: "Europe/Oslo", hour12: false }; o[k] = "numeric"; OSLO_FMT[k] = new Intl.DateTimeFormat("en-US", o); }
+        p[k] = OSLO_FMT[k].format(now).replace(/\D/g, "");
       });
     }
     const y = +p.year, m = +p.month, d = +p.day;
@@ -95,7 +105,7 @@ function osloNow() {
   }
 }
 
-// Åpent nå? + marker dagens rad i tabellen
+// Når åpner vi? (ikke «åpent nå») + marker dagens rad i tabellen
 function updateStatus() {
   const { day, minutes } = osloNow();
   const today = HOURS[day];
@@ -107,11 +117,9 @@ function updateStatus() {
   });
 
   if (today && minutes >= today[0] && minutes < today[1]) {
-    el.className = "status open";
-    el.textContent = s.openNow(s.time(today[1]));
+    el.textContent = s.hoursToday(s.time(today[0]), s.time(today[1]));
     return;
   }
-  el.className = "status closed";
   if (today && minutes < today[0]) {
     el.textContent = s.opensToday(s.time(today[0]));
     return;

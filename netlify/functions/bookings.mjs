@@ -1,7 +1,8 @@
 // POST /api/bookings – kunden bestiller en time. Tiden låses med en gang,
 // og to kunder kan aldri få samme tid (konfliktsikker skriving i Netlify Blobs).
 import { getStore } from "@netlify/blobs";
-import { validateCustomer, createItem } from "../lib/booking-core.mjs";
+import { validateCustomer, createItem, osloNow } from "../lib/booking-core.mjs";
+import { smsConfigured, sendSms, confirmText } from "../lib/sms.mjs";
 
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
@@ -20,7 +21,14 @@ export default async (req) => {
     const r = await createItem(store, { ...v.value, type: "booking" }, { source: "nettside" });
     if (r.error) return json({ error: r.error, code: r.code }, r.status);
     const { id, date, start, dur, service } = r.item;
-    return json({ ok: true, booking: { id, date, start, dur, service } }, 201);
+    // SMS-bekreftelse (Sveve). Timen er allerede lagret, så en SMS-feil skal aldri stoppe bestillingen.
+    let sms = "off";
+    if (smsConfigured(process.env)) {
+      const s = await sendSms(process.env, r.item.phone, confirmText(r.item, osloNow().date));
+      sms = s.ok ? "sent" : s.skipped ? "skipped" : "failed";
+      if (!s.ok && !s.skipped) console.error("SMS-bekreftelse feilet:", id, s.error);
+    }
+    return json({ ok: true, booking: { id, date, start, dur, service }, sms }, 201);
   } catch (err) {
     console.error("Bestilling:", err);
     return json({ error: "Noe gikk galt. Ring oss gjerne." }, 500);
