@@ -5,5 +5,15 @@
   "dependencies": {
     "@netlify/blobs": "^11.1.4",
     "acorn": "^8.14.0"
+  },
+  "browserslist": [
+    "safari >= 10",
+    "ios_saf >= 10",
+    "chrome >= 60",
+    "firefox >= 55",
+    "samsung >= 8"
+  ],
+  "scripts": {
+    "check": "node scripts/check-es2015.mjs && node scripts/check-css-assets.mjs"
   }
 }
