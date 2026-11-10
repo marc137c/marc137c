@@ -159,6 +159,7 @@
       <span class="who">${esc(i.name || "Uten navn")}${tel ? ` · <a href="tel:${esc(tel)}">${esc(i.phone)}</a>` : ""}</span>
       ${i.note ? `<span class="note">${esc(i.note)}</span>` : ""}
       ${i.source === "nettside" ? '<span class="tag">Bestilt på nett</span>' : ""}
+      ${i.remindedAt ? (i.reminderError ? '<span class="tag tag-err">SMS-påminnelse feilet</span>' : '<span class="tag">SMS-påminnelse sendt</span>') : ""}
     </div>`;
   }
 

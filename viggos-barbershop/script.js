@@ -23,7 +23,12 @@
     const guard = () => { if (touched || Date.now() > end) window.removeEventListener("scroll", guard); else toTop(); };
     window.addEventListener("scroll", guard);
     setTimeout(toTop, 0);
+    // Etterpå: vanlig Tilbake/Frem mellom ankrene på siden (Tilbake ruller dit man var før)
+    setTimeout(() => { if ("scrollRestoration" in history) history.scrollRestoration = "auto"; }, 1600);
   });
+  // Last på nytt eller gå bort: da starter siden øverst igjen neste gang
+  window.addEventListener("pagehide", () => { if ("scrollRestoration" in history) history.scrollRestoration = "manual"; });
+  window.addEventListener("pageshow", (e) => { if (e.persisted && "scrollRestoration" in history) history.scrollRestoration = "auto"; });
 })();
 
 // Åpningstider: [åpner, stenger] i minutter etter midnatt. 0 = søndag.

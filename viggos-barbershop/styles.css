@@ -336,7 +336,9 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 .socials-label { font: 600 .78rem var(--caps); letter-spacing: .22em; text-transform: uppercase; color: var(--logo-gold); margin-right: 4px; }
 .hero-rating { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 16px; padding: 6px 14px; border-radius: 999px; background: rgba(var(--bg-rgb), .55); border: 1px solid rgba(241, 207, 58, .4); color: var(--text); font-size: .92rem; }
 .hero-rating:hover { border-color: var(--logo-gold); color: var(--text); }
-.hero-rating .stars-fg svg, .hero-rating .stars-bg svg { width: 90px; }
+/* Mindre stjerner: raden og gull-stjernene må ha samme bredde, ellers viser fyllingen for mye */
+.hero-rating .stars-row { width: 90px; height: 18px; }
+.hero-rating .stars-fg svg { width: 90px; }
 
 
 /* Sosiale medier: 2 per rad, 3 rader */

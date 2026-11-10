@@ -57,7 +57,7 @@
     "f.choose": "Choose a service",
     "f.name": "Name",
     "f.phone": "Phone",
-    "f.smsNote": "You will get a confirmation and a reminder by text message.",
+    "f.smsNote": "With a Norwegian mobile number you get a confirmation by text message.",
     "f.submit": "Book appointment",
     "book.free": "Available",
     "book.taken": "Booked",

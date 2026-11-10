@@ -4,14 +4,19 @@
 import { osloNow, addDays, readMonths, mutateMonth, monthOf } from "./booking-core.mjs";
 import { reminderDue, reminderText, sendSms, smsConfigured } from "./sms.mjs";
 
-export async function runReminders(store, env, { now = new Date(), due = reminderDue, fetchFn = fetch } = {}) {
+// budgetMs: Netlify stopper planlagte funksjoner etter 30 s. Vi begynner ikke på en ny SMS etter 20 s
+// (hver SMS venter høyst 8 s), så en avtale blir aldri merket som påminnet uten at SMS-en faktisk ble forsøkt.
+// Resten tas ved neste kjøring om 15 minutter.
+export async function runReminders(store, env, { now = new Date(), due = reminderDue, fetchFn = fetch, budgetMs = 20000, clock = Date.now } = {}) {
   if (!smsConfigured(env)) return { sent: 0, failed: 0, skipped: "not_configured" };
+  const startedAt = clock();
   const oslo = osloNow(now);
   const nowMs = now.getTime();
   const items = await readMonths(store, oslo.date, addDays(oslo.date, 2));
-  let sent = 0, failed = 0;
+  let sent = 0, failed = 0, deferred = 0;
   for (const it of items) {
     if (!due(it, oslo, nowMs)) continue;
+    if (clock() - startedAt > budgetMs) { deferred++; continue; }
     const claim = await mutateMonth(store, monthOf(it.date), (doc) => {
       const cur = doc.items.find((i) => i.id === it.id);
       if (!cur || !due(cur, oslo, nowMs)) return { error: "skip", status: 409 }; // endret/sendt i mellomtiden
@@ -29,5 +34,5 @@ export async function runReminders(store, env, { now = new Date(), due = reminde
       cur.reminderError = r.error;
     });
   }
-  return { sent, failed };
+  return deferred ? { sent, failed, deferred } : { sent, failed };
 }

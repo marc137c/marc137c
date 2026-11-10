@@ -1,8 +1,8 @@
 // POST /api/bookings – kunden bestiller en time. Tiden låses med en gang,
 // og to kunder kan aldri få samme tid (konfliktsikker skriving i Netlify Blobs).
 import { getStore } from "@netlify/blobs";
-import { validateCustomer, createItem, osloNow } from "../lib/booking-core.mjs";
-import { smsConfigured, sendSms, confirmText } from "../lib/sms.mjs";
+import { validateCustomer, createItem, osloNow, readMonths, addDays, CONFIG } from "../lib/booking-core.mjs";
+import { smsConfigured, sendSms, confirmText, confirmationAllowed } from "../lib/sms.mjs";
 
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
@@ -24,9 +24,18 @@ export default async (req) => {
     // SMS-bekreftelse (Sveve). Timen er allerede lagret, så en SMS-feil skal aldri stoppe bestillingen.
     let sms = "off";
     if (smsConfigured(process.env)) {
-      const s = await sendSms(process.env, r.item.phone, confirmText(r.item, osloNow().date));
-      sms = s.ok ? "sent" : s.skipped ? "skipped" : "failed";
-      if (!s.ok && !s.skipped) console.error("SMS-bekreftelse feilet:", id, s.error);
+      try { // egen try: timen er lagret, så kunden skal få «booket» selv om noe her feiler
+        const today = osloNow().date;
+        const upcoming = await readMonths(store, today, addDays(today, CONFIG.maxDays));
+        const s = confirmationAllowed(upcoming, r.item.phone)
+          ? await sendSms(process.env, r.item.phone, confirmText(r.item, today))
+          : { ok: false, skipped: true, error: "limit" };
+        sms = s.ok ? "sent" : s.skipped ? "skipped" : "failed";
+        if (!s.ok && !s.skipped) console.error("SMS-bekreftelse feilet:", id, s.error);
+      } catch (err) {
+        sms = "failed";
+        console.error("SMS-bekreftelse feilet:", id, err && err.message);
+      }
     }
     return json({ ok: true, booking: { id, date, start, dur, service }, sms }, 201);
   } catch (err) {

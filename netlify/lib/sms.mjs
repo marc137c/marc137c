@@ -24,6 +24,17 @@ export function norwegianMobile(phone) {
   return /^[49]\d{7}$/.test(d) ? d : null;
 }
 
+// Høyst så mange SMS-bekreftelser til samme nummer per døgn. Stopper misbruk der noen booker
+// mange timer med et fremmed nummer (det koster penger og plager eieren av nummeret).
+export const MAX_CONFIRMATIONS_PER_DAY = 3;
+export function confirmationAllowed(items, phone, nowMs = Date.now()) {
+  const n = norwegianMobile(phone);
+  if (!n) return false;
+  const since = nowMs - 24 * 60 * 60 * 1000;
+  const recent = items.filter((i) => i.type === "booking" && Date.parse(i.createdAt || 0) > since && norwegianMobile(i.phone) === n);
+  return recent.length <= MAX_CONFIRMATIONS_PER_DAY; // inkludert bestillingen som nettopp ble lagret
+}
+
 const senderName = (env) => (String(env.SVEVE_FROM || "").replace(/[^A-Za-z0-9 ]/g, "").trim().slice(0, 11)) || "Viggos";
 const hhmm = (min) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
 const dayMonth = (date) => `${Number(date.slice(8, 10))}.${Number(date.slice(5, 7))}.`;
