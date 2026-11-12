@@ -370,7 +370,7 @@ export class FakeBlobs {
       }
       const retryable = res.status === 429 || res.status >= 500;
       if (attemptsLeft > 0 && retryable) {
-        const reset = res.headers["x-ratelimit-reset"];
+        const reset = res.headers["x-ratelimit-reset"]; // the client compares it with Date.now(); here: the virtual clock
         await this.clock.sleep(reset ? Math.max(Number(reset) * 1000 - this.clock.now(), 1000) : this.retryDelayMs);
         continue;
       }

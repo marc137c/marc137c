@@ -1,6 +1,7 @@
 // Det funksjonene trenger fra omgivelsene: lagring, miljøvariabler, klokke, nettverk og venting.
-// Hver funksjon eksporterer handle(req, context, deps). Netlify kaller standardeksporten, som sender inn
-// liveDeps(); testene (test/helpers/deps.mjs) sender inn falske utgaver i stedet.
+// SMS-funksjonene (bookings, sms-reminders) og availability eksporterer handle(req, context, deps).
+// Netlify kaller standardeksporten, som sender inn liveDeps(); testene (test/helpers/deps.mjs) sender inn
+// falske utgaver i stedet, så de aldri bruker ekte lagring, ekte SMS eller nettverket.
 //   getStore  samme signatur som getStore fra @netlify/blobs
 //   env       miljøvariablene (process.env)
 //   now()     tidspunktet akkurat nå som Date

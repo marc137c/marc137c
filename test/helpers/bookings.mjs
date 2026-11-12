@@ -1,5 +1,10 @@
 // Booking fixtures in the stored shape (netlify/lib/booking-core.mjs createItem), seeded straight into the
 // fake server's "bookings" store as month documents m/YYYY-MM.
+// Customers get CUSTOMER_PHONE, never the shop's own mobile (SHOP_MOBILE), so a test can tell an SMS to the
+// customer from one to the barber in the fake Sveve's ledger.
+export const CUSTOMER_PHONE = "912 34 567";
+export const CUSTOMER_MOBILE = "91234567";
+export const SHOP_MOBILE = "40963911";
 let seq = 0;
 
 export function item(over = {}) {
@@ -15,7 +20,7 @@ export function item(over = {}) {
     service: "Herreklipp",
     addons: [],
     name: "Ola Nordmann",
-    phone: "409 63 911",
+    phone: CUSTOMER_PHONE,
     note: "",
     createdAt: "2026-11-01T10:00:00.000Z",
     updatedAt: "2026-11-01T10:00:00.000Z",

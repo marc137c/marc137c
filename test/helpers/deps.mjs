@@ -1,16 +1,19 @@
-// Test deps for the function handlers: handle(req, context, testDeps({ env })).
+// Test deps for the function handlers: handle(req, context, testDeps({ env, sveve: true })).
 // Everything is fake and hermetic: Blobs = FakeBlobs (a fresh site per call), env = only what the test gives
-// (never process.env), clock = FakeClock (deps.now/deps.sleep and the store's latency/retries share it),
-// fetch = fakeFetch with no routes (every external call throws unless the test adds a route).
-// The returned object is the deps AND gives the test its fakes: d.blobs, d.clock, d.fetch.calls.
+// (never process.env), clock = FakeClock (deps.now/deps.sleep, the store's latency/retries and the fake
+// Sveve all share it), fetch = the fake Sveve (sveve: true or its options) or fakeFetch with no routes, so
+// every external call throws unless the test asked for a fake.
+// The returned object is the deps AND gives the test its fakes: d.blobs, d.clock, d.sveve, d.fetch.calls.
 import "./no-network.mjs";
 import { FakeBlobs } from "./fake-blobs.mjs";
 import { FakeClock } from "./clock.mjs";
 import { fakeFetch } from "./fake-fetch.mjs";
+import { fakeSveve } from "./fake-sveve.mjs";
 
-export function testDeps({ env = {}, clock, blobs, fetch, now } = {}) {
-  clock = clock || blobs?.clock || new FakeClock(now);
+export function testDeps({ env = {}, clock, blobs, fetch, now, sveve } = {}) {
+  clock = clock || blobs?.clock || fetch?.clock || new FakeClock(now);
   blobs = blobs || new FakeBlobs({ clock });
+  if (sveve) fetch = fakeSveve({ clock, ...(sveve === true ? {} : sveve) });
   fetch = fetch || fakeFetch();
   return {
     getStore: blobs.getStore,
@@ -20,6 +23,7 @@ export function testDeps({ env = {}, clock, blobs, fetch, now } = {}) {
     sleep: (ms) => clock.sleep(ms),
     clock,
     blobs,
+    sveve: sveve ? fetch : undefined,
   };
 }
 

@@ -3,6 +3,7 @@
 // through the FakeStore model. Return values, thrown errors, the final stored data and every HTTP attempt
 // (method, key, status, committed or not) must be identical.
 import { realGetStoreFor } from "./real-blobs.mjs"; // first: sets NODE_ENV=test before the client loads
+import "./no-network.mjs";
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";

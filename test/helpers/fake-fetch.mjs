@@ -1,10 +1,10 @@
-// A fetch stand-in for external APIs (Sveve, Google Places, Instagram). It answers from routes,
-// records every call, and throws like a dead network for any URL without a route: no test can
-// reach the internet by accident.
+// A generic fetch stand-in for external APIs. It answers from routes, records every call, and throws like
+// a dead network for any URL without a route: no test can reach the internet by accident. testDeps() uses
+// fakeFetch() with no routes as deps.fetch; for SMS use the fake Sveve in fake-sveve.mjs instead.
 //
 //   const fetch = fakeFetch([
-//     ["https://sveve.no/SMS/SendMessage", (call) => sveveReply()],      // exact URL (query ignored)
-//     [/graph\.instagram\.com\/me\/media/, () => ({ data: [] })],        // RegExp on the full URL
+//     ["https://example.test/api", (call) => ({ ok: true })],          // exact URL (query ignored)
+//     [/example\.test\/v2\//, () => new Response("x", { status: 500 })], // RegExp on the full URL
 //   ]);
 //   fetch.calls  → [{ url, method, headers, body, json(), signal }]
 //
@@ -62,11 +62,3 @@ export const hang = (call) => new Promise((resolve, reject) => {
   const abort = () => reject(Object.assign(new Error("This operation was aborted"), { name: "AbortError" }));
   if (call.signal.aborted) abort(); else call.signal.addEventListener("abort", abort, { once: true });
 });
-
-// Sveve answers in the JSON shapes netlify/lib/sms.mjs reads: ok, fatalError, errors[], HTTP 500.
-export const sveveReply = (kind = "ok") => {
-  if (kind === "fatal") return Response.json({ response: { fatalError: "Feil brukernavn/passord" } });
-  if (kind === "rejected") return Response.json({ response: { msgOkCount: 0, stdSMSCount: 0, errors: [{ number: "40963911", message: "Ugyldig nummer" }] } });
-  if (kind === "500") return new Response("oops", { status: 500 });
-  return Response.json({ response: { msgOkCount: 1, stdSMSCount: 1, ids: [42824111] } });
-};

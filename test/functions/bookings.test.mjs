@@ -2,12 +2,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { testDeps, request, read, quiet } from "../helpers/deps.mjs";
-import { fakeFetch, sveveReply } from "../helpers/fake-fetch.mjs";
-import { storedItems } from "../helpers/bookings.mjs";
+import { storedItems, CUSTOMER_PHONE, CUSTOMER_MOBILE } from "../helpers/bookings.mjs";
 import { handle, config } from "../../netlify/functions/bookings.mjs";
 
 const NOW = "2026-11-12T09:00:00Z"; // Thursday 10:00 in Oslo
-const BODY = { service: "Herreklipp", date: "2026-11-13", start: 600, addons: [], name: "Ola Nordmann", phone: "409 63 911" };
+const BODY = { service: "Herreklipp", date: "2026-11-13", start: 600, addons: [], name: "Ola Nordmann", phone: CUSTOMER_PHONE };
 const post = (json) => request("/api/bookings", { method: "POST", json });
 const SVEVE_ENV = { SVEVE_USER: "u", SVEVE_PASSWD: "p" };
 
@@ -67,20 +66,20 @@ test("bookings: honeypot, oversize and broken JSON", async () => {
 });
 
 test("bookings: with Sveve configured the confirmation goes through deps.fetch", async () => {
-  const fetch = fakeFetch([["https://sveve.no/SMS/SendMessage", () => sveveReply("ok")]]);
-  const d = testDeps({ now: NOW, env: SVEVE_ENV, fetch });
+  const d = testDeps({ now: NOW, env: SVEVE_ENV, sveve: true });
   const res = await read(await handle(post(BODY), {}, d));
   assert.equal(res.status, 201);
   assert.equal(res.body.sms, "sent");
-  assert.equal(fetch.calls.length, 1);
-  assert.equal(fetch.calls[0].json().to, "40963911");
-  assert.match(fetch.calls[0].json().msg, /i morgen kl\. 10:00/, "the SMS uses the injected clock for «i morgen»");
+  assert.equal(d.sveve.sent.length, 1);
+  assert.equal(d.sveve.sent[0].to, CUSTOMER_MOBILE);
+  assert.match(d.sveve.sent[0].msg, /i morgen kl\. 10:00/, "the SMS uses the injected clock for «i morgen»");
+  assert.equal(d.sveve.sent[0].at, Date.parse(NOW), "sent at the injected time");
 });
 
 test("bookings: an SMS failure never stops a stored booking", async (t) => {
   const out = quiet(t);
-  const fetch = fakeFetch([["https://sveve.no/SMS/SendMessage", () => sveveReply("fatal")]]);
-  const d = testDeps({ now: NOW, env: SVEVE_ENV, fetch });
+  const d = testDeps({ now: NOW, env: SVEVE_ENV, sveve: true });
+  d.sveve.inject({ fault: "fatal" });
   const res = await read(await handle(post(BODY), {}, d));
   assert.deepEqual([res.status, res.body.sms], [201, "failed"]);
   assert.equal(storedItems(d.blobs).length, 1);
