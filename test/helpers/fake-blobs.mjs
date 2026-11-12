@@ -389,7 +389,12 @@ export class FakeBlobs {
     const entry = { at: this.clock.now(), via: req.via, method: req.op, store: req.store, key: req.key, consistency: req.consistency };
     if (fault?.fault) entry.fault = fault.fault;
     this.log.push(entry);
-    const failure = () => ({ status: fault.status, headers: { ...(fault.headers || {}) }, body: Buffer.from(fault.body || "") });
+    // Header names lower-cased, as fetch's Headers does (the client reads X-RateLimit-Reset case-insensitively)
+    const failure = () => ({
+      status: fault.status,
+      headers: Object.fromEntries(Object.entries(fault.headers || {}).map(([k, v]) => [k.toLowerCase(), String(v)])),
+      body: Buffer.from(fault.body || ""),
+    });
     switch (fault?.fault) {
       case "network-down":
         entry.error = "network-down";
