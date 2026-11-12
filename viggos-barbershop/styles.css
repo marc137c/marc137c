@@ -337,7 +337,9 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 .hero-rating { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 16px; padding: 6px 14px; border-radius: 999px; background: rgba(var(--bg-rgb), .55); border: 1px solid rgba(241, 207, 58, .4); color: var(--text); font-size: .92rem; }
 .hero-rating:hover { border-color: var(--logo-gold); color: var(--text); }
 /* Mindre stjerner: raden og gull-stjernene må ha samme bredde, ellers viser fyllingen for mye */
-.hero-rating .stars-row { width: 90px; height: 18px; }
+.hero-rating .stars-row { width: 90px; height: 18px; -webkit-box-flex: 0; flex: none; } /* stjernene krymper aldri; teksten brytes heller */
+.hero-rating { max-width: 100%; }
+.hero-rating > span { min-width: 0; }
 .hero-rating .stars-fg svg { width: 90px; }
 
 
