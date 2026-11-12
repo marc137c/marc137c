@@ -83,10 +83,6 @@
       <canvas class="hero-canvas" id="hero-canvas" aria-hidden="true"></canvas>
       <div class="hero-veil" aria-hidden="true"></div>
       <div class="container hero-inner">
-        <p class="trust-badge anim" style="--d:0s">
-          <span class="stars" aria-hidden="true">◆</span>
-          <span data-i18n="hero.badge">Nyåpnet i Halden · Violgata 22</span>
-        </p>
         <h1 class="logo">
           <span class="logo-script anim" style="--d:.15s">Viggo's</span>
           <span class="logo-caps anim" style="--d:.35s">Barbershop</span>
@@ -128,7 +124,7 @@
                 <option value="" data-i18n="f.choose">Velg tjeneste</option>
                 <option value="Full service" data-i18n="s.full">Full service</option>
                 <option value="Herreklipp" data-i18n="s.cut">Herreklipp</option>
-                <option value="Herreklipp + skjeggtrim (maskin)" data-i18n="s.combo">Herreklipp + skjeggtrim (maskin)</option>
+                <option value="Herreklipp + skjeggtrim" data-i18n="s.combo">Herreklipp + skjeggtrim</option>
                 <option value="Knivbarbering" data-i18n="s.shave">Knivbarbering</option>
                 <option value="Skjegg &amp; line-up" data-i18n="s.beard">Skjegg &amp; line-up</option>
                 <option value="Barneklipp" data-i18n="s.kids">Barneklipp</option>
@@ -236,8 +232,8 @@
         <ul class="price-list">
           <li class="svc-featured"><a class="svc-link" href="#bestill" data-service="Full service"><div><span class="svc-badge" data-i18n="svc.popular">Mest populær</span><h3 data-i18n="s.full">Full service</h3><p data-i18n="s.full.d">Klipp, barbering, vask og styling. Hele pakken.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="750">fra 750,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
           <li><a class="svc-link" href="#bestill" data-service="Herreklipp"><div><h3 data-i18n="s.cut">Herreklipp</h3><p data-i18n="s.cut.d">Klipp med saks og/eller maskin.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="350">fra 350,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
-          <li><a class="svc-link" href="#bestill" data-service="Herreklipp + skjeggtrim (maskin)"><div><h3 data-i18n="s.combo">Herreklipp + skjeggtrim (maskin)</h3><p data-i18n="s.combo.d">Klipp og skjeggtrim med maskin.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="500">fra 500,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
-          <li><a class="svc-link" href="#bestill" data-service="Knivbarbering"><div><h3 data-i18n="s.shave">Knivbarbering</h3><p data-i18n="s.shave.d">Tradisjonell barbering med kniv, varme håndklær og balm.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="350">fra 350,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+          <li><a class="svc-link" href="#bestill" data-service="Herreklipp + skjeggtrim"><div><h3 data-i18n="s.combo">Herreklipp + skjeggtrim</h3><p data-i18n="s.combo.d">Samme lengde, uten linjer/fade.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="500">fra 500,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+          <li><a class="svc-link" href="#bestill" data-service="Knivbarbering"><div><h3 data-i18n="s.shave">Knivbarbering</h3><p data-i18n="s.shave.d">Tradisjonell barbering med kniv, varme og kalde håndklær og utvalgte ansiktsprodukter.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="350">fra 350,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
           <li><a class="svc-link" href="#bestill" data-service="Skjegg &amp; line-up"><div><h3 data-i18n="s.beard">Skjegg &amp; line-up</h3><p data-i18n="s.beard.d">Forming, trim og skarpe linjer.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="350">fra 350,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
           <li><a class="svc-link" href="#bestill" data-service="Barneklipp"><div><h3 data-i18n="s.kids">Barneklipp</h3><p data-i18n="s.kids.d">For gutter til og med 12 år. Fra 13 år gjelder vanlig pris.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="300">fra 300,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
         </ul>
@@ -299,7 +295,7 @@
         <div class="about about--photo">
           <figure class="about-photo"><picture><source srcset="img/viggo-portrett-600.webp 600w, img/viggo-portrett-1000.webp 1000w" sizes="(max-width: 760px) 320px, 380px" type="image/webp"><img src="img/viggo-portrett-600.jpg" width="600" height="750" loading="lazy" decoding="async" alt="Portrett av Vigan «Viggo» Kurti" data-i18n-attr="alt:about.photo"></picture></figure>
           <div class="about-text">
-          <p data-i18n="about.p1">Viggo's Barbershop åpnet i 2026 i Halden. Bak stolen står Vigan Kurti, som har over 20 års erfaring fra bransjen i Norge, New York, Stockholm og Kosovo. Målet er et sted der folk kan komme innom, ta en prat og føle seg vel.</p>
+          <p data-i18n="about.p1">Viggo's Barbershop åpnet i 2026 i Halden. Bak stolen står Vigan Kurti, som har over 20 års erfaring fra bransjen i Norge, New York, Stockholm og Kosovo. Målet er å ha en profesjonell barbershop som leverer topp kvalitet og service.</p>
           <p data-i18n="about.p2">Enten du vil ha en ren klassisk klipp, en moderne fade eller bare vil få skjegget i form, tar vi oss tid til å finne stilen som passer deg.</p>
           <dl class="stats">
             <div><dt>2026</dt><dd data-i18n="stat.opened">åpnet i Halden</dd></div>

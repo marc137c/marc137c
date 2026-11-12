@@ -15,7 +15,7 @@ export const CONFIG = {
   durations: {
     "Full service": 60,
     "Herreklipp": 30,
-    "Herreklipp + skjeggtrim (maskin)": 60,
+    "Herreklipp + skjeggtrim": 60,
     "Knivbarbering": 30,
     "Skjegg & line-up": 30,
     "Barneklipp": 30,
@@ -97,10 +97,14 @@ const clean = (s, max) => String(s ?? "").replace(/[\u0000-\u001f\u007f]/g, " ")
 const phoneOk = (p) => { const n = String(p ?? "").replace(/\D/g, "").length; return n >= 8 && n <= 15; };
 const fail = (code, error, status = 400) => ({ error, code, status });
 
+// Gamle tjenestenavn → nye (godtas fortsatt, i tilfelle noen har den gamle siden åpen)
+const SERVICE_ALIASES = { "Herreklipp + skjeggtrim (maskin)": "Herreklipp + skjeggtrim" };
+const alias = (s) => (Object.prototype.hasOwnProperty.call(SERVICE_ALIASES, s) ? SERVICE_ALIASES[s] : s);
+
 // Regler for kundebestillinger
 export function validateCustomer(input, now = new Date()) {
   const { date: today, minutes: nowMin } = osloNow(now);
-  const service = clean(input.service, 80);
+  const service = alias(clean(input.service, 80));
   // Bare egne nøkler: «constructor», «__proto__» o.l. skal ikke gi en «varighet»
   const dur = Object.prototype.hasOwnProperty.call(CONFIG.durations, service) ? CONFIG.durations[service] : undefined;
   if (!Number.isInteger(dur)) return fail("bad_service", "Ukjent tjeneste.");

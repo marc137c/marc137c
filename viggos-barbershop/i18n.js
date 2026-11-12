@@ -16,7 +16,6 @@
     "cta.prices": "See prices",
 
     // 1. Hero
-    "hero.badge": "Newly opened in Halden · Violgata 22",
     "hero.tag": "Your style. <em>Our craft.</em>",
     "hero.lead": "Classic barbering with modern precision. Come in for a classic scissor cut, fade, a beard trim or a hot towel shave, and leave a better version of yourself.",
 
@@ -29,10 +28,10 @@
     "s.full.d": "Haircut, shave, wash and styling. The complete package.",
     "s.cut": "Men's haircut",
     "s.cut.d": "Cut with scissors and/or clippers.",
-    "s.combo": "Men's haircut + beard trim (clippers)",
-    "s.combo.d": "Haircut and clipper beard trim.",
+    "s.combo": "Men's haircut + beard trim",
+    "s.combo.d": "Same length, no lines or fade.",
     "s.shave": "Straight razor shave",
-    "s.shave.d": "Traditional razor shave with hot towels and balm.",
+    "s.shave.d": "Traditional straight razor shave with hot and cold towels and selected face products.",
     "s.beard": "Beard &amp; line-up",
     "s.beard.d": "Shaping, trim and sharp lines.",
     "s.kids": "Kids' haircut",
@@ -80,7 +79,7 @@
     // 6. About us
     "about.eyebrow": "About us",
     "about.title": "A place for good conversations and sharp lines",
-    "about.p1": "Viggo's Barbershop opened in 2026 in Halden. Behind the chair is Vigan Kurti, with over 20 years of experience in the industry in Norway, New York, Stockholm and Kosovo. The goal is a place where people can drop in, have a chat and feel at home.",
+    "about.p1": "Viggo's Barbershop opened in 2026 in Halden. Behind the chair is Vigan Kurti, with over 20 years of experience in the industry in Norway, New York, Stockholm and Kosovo. The goal is a professional barbershop that delivers top quality and service.",
     "about.p2": "Whether you want a clean classic cut, a modern fade or just your beard in shape, we take the time to find the style that suits you.",
     "stat.opened": "opened in Halden",
     "stat.walkin": "Walk-ins",

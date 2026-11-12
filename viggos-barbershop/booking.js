@@ -8,7 +8,7 @@
   const MAX_DAYS = 60;     // hvor langt frem man kan bestille
   // Varighet per tjeneste (minutter). Overskrives av serveren hvis den svarer.
   let DURATIONS = {
-    "Full service": 60, "Herreklipp": 30, "Herreklipp + skjeggtrim (maskin)": 60,
+    "Full service": 60, "Herreklipp": 30, "Herreklipp + skjeggtrim": 60,
     "Knivbarbering": 30, "Skjegg & line-up": 30, "Barneklipp": 30,
   };
   let busy = {};           // { "ÅÅÅÅ-MM-DD": [[start, slutt], …] } – opptatte tidsrom
