@@ -62,20 +62,20 @@ export async function fetchReviews(env, store, fetchFn = fetch) {
 }
 
 // Henter fra mellomlageret, og fra Google når lageret er eldre enn 12 timer.
-// Feiler Google, vises forrige vellykkede resultat.
-export async function getReviews(env, store, fetchFn = fetch) {
+// Feiler Google, vises forrige vellykkede resultat. clock() = millisekunder nå (testene bruker en falsk klokke).
+export async function getReviews(env, store, fetchFn = fetch, clock = Date.now) {
   if (!env.GOOGLE_PLACES_API_KEY) return emptyReviews();
   const cached = await store.get("reviews", { type: "json" });
-  if (cached && Date.now() - cached.fetchedAt < MAX_AGE_MS) return cached.data;
+  if (cached && clock() - cached.fetchedAt < MAX_AGE_MS) return cached.data;
   try {
     const data = await fetchReviews(env, store, fetchFn);
-    await store.setJSON("reviews", { fetchedAt: Date.now(), data });
+    await store.setJSON("reviews", { fetchedAt: clock(), data });
     return data;
   } catch (err) {
     console.error("Anmeldelser:", err.message);
     // Prøv Google igjen tidligst om 30 minutter (ikke ved hvert besøk mens Google feiler)
     const data = cached?.data || emptyReviews();
-    await store.setJSON("reviews", { fetchedAt: Date.now() - MAX_AGE_MS + 30 * 60 * 1000, data }).catch(() => {});
+    await store.setJSON("reviews", { fetchedAt: clock() - MAX_AGE_MS + 30 * 60 * 1000, data }).catch(() => {});
     return data;
   }
 }

@@ -11,7 +11,8 @@ const DAY = 24 * HOUR;
 
 // ---------- Instagram (Instagram API with Instagram Login) ----------
 
-export async function getInstagramToken(store, env, fetchFn = fetch) {
+// clock() = millisekunder nå (testene bruker en falsk klokke)
+export async function getInstagramToken(store, env, fetchFn = fetch, clock = Date.now) {
   let tok = await store.get("instagram-token", { type: "json" });
   if (!tok && env.INSTAGRAM_ACCESS_TOKEN) {
     // Startverdi fra miljøvariabel (langtidstoken generert i Meta-dashbordet)
@@ -21,18 +22,18 @@ export async function getInstagramToken(store, env, fetchFn = fetch) {
 
   // Langtidstokens varer 60 dager og kan fornyes når de er minst 24 timer gamle.
   // Vi fornyer ukentlig, så de aldri går ut.
-  if (Date.now() - (tok.refreshed_at || 0) > 7 * DAY) {
+  if (clock() - (tok.refreshed_at || 0) > 7 * DAY) {
     const url = new URL("https://graph.instagram.com/refresh_access_token");
     url.searchParams.set("grant_type", "ig_refresh_token");
     url.searchParams.set("access_token", tok.access_token);
     const res = await fetchFn(url);
     if (res.ok) {
       const data = await res.json();
-      tok = { access_token: data.access_token, refreshed_at: Date.now(), expires_at: Date.now() + data.expires_in * 1000 };
+      tok = { access_token: data.access_token, refreshed_at: clock(), expires_at: clock() + data.expires_in * 1000 };
       await store.setJSON("instagram-token", tok);
     } else if (!tok.refreshed_at) {
       // Ferskt seed-token kan være under 24 timer gammelt – bruk det som det er.
-      await store.setJSON("instagram-token", { ...tok, refreshed_at: Date.now() - 6 * DAY });
+      await store.setJSON("instagram-token", { ...tok, refreshed_at: clock() - 6 * DAY });
     } else {
       console.warn("Instagram: kunne ikke fornye token", res.status);
     }
@@ -62,11 +63,11 @@ export async function fetchInstagram(token, fetchFn = fetch) {
 // ---------- Feed ----------
 
 // Henter ferske poster og lagrer feeden. Feiler Instagram, beholdes de forrige postene.
-export async function buildFeed(store, env, fetchFn = fetch) {
+export async function buildFeed(store, env, fetchFn = fetch, clock = Date.now) {
   const previous = (await store.get("feed", { type: "json" })) || {};
-  const feed = { updated_at: new Date().toISOString(), profiles: PROFILES, instagram: [] };
+  const feed = { updated_at: new Date(clock()).toISOString(), profiles: PROFILES, instagram: [] };
   try {
-    const token = await getInstagramToken(store, env, fetchFn);
+    const token = await getInstagramToken(store, env, fetchFn, clock);
     feed.instagram = token ? await fetchInstagram(token, fetchFn) : [];
   } catch (err) {
     console.error("Feed instagram:", err.message);
@@ -76,5 +77,5 @@ export async function buildFeed(store, env, fetchFn = fetch) {
   return feed;
 }
 
-export const isStale = (feed, maxAgeMs = 2 * HOUR) =>
-  !feed || Date.now() - new Date(feed.updated_at).getTime() > maxAgeMs;
+export const isStale = (feed, maxAgeMs = 2 * HOUR, clock = Date.now) =>
+  !feed || clock() - new Date(feed.updated_at).getTime() > maxAgeMs;
