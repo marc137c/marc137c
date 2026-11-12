@@ -1,0 +1,6 @@
+[build]
+  command = "node scripts/check-es2015.mjs && node scripts/check-css-assets.mjs"
+  publish = "viggos-barbershop"
+
+[functions]
+  directory = "netlify/functions"
