@@ -109,17 +109,13 @@
           <p class="section-lead" data-i18n="book.lead">Velg tjeneste, dag og tid som passer deg.</p>
         </header>
 
-        <form class="booking" id="booking-form" name="booking" method="POST" data-netlify="true" netlify-honeypot="bot-field" novalidate>
-          <input type="hidden" name="form-name" value="booking">
+        <form class="booking" id="booking-form" action="/api/bookings" method="post" novalidate>
           <p class="hidden"><label>Ikke fyll ut: <input name="bot-field"></label></p>
-          <input type="hidden" name="dato" id="f-dato">
-          <input type="hidden" name="tid" id="f-tid">
-          <input type="hidden" name="tillegg" id="f-tillegg">
-          <input type="hidden" name="status" id="f-status">
 
           <div class="booking-col">
             <div class="step">
               <label class="step-label" for="f-service"><span class="step-no">1</span><span data-i18n="book.s1">Velg tjeneste</span></label>
+              <p class="step-msg" id="msg-service" aria-hidden="true"></p>
               <select name="tjeneste" id="f-service" required>
                 <option value="" data-i18n="f.choose">Velg tjeneste</option>
                 <option value="Full service" data-i18n="s.full">Full service</option>
@@ -139,6 +135,7 @@
 
             <div class="step">
               <p class="step-label" id="cal-label"><span class="step-no">2</span><span data-i18n="book.s2">Velg dag</span></p>
+              <p class="step-msg" id="msg-day" aria-hidden="true"></p>
               <div class="cal" id="cal">
                 <div class="cal-head">
                   <button type="button" class="cal-nav" id="cal-prev" data-i18n-attr="aria-label:cal.prev" aria-label="Forrige måned">‹</button>
@@ -153,10 +150,12 @@
           <div class="booking-col">
             <div class="step">
               <p class="step-label" id="slots-label"><span class="step-no">3</span><span data-i18n="book.s3">Velg tid</span></p>
+              <p class="step-msg" id="msg-time" aria-hidden="true"></p>
               <div class="slots" id="slots" role="group" aria-labelledby="slots-label"></div>
               <ul class="slot-legend" aria-hidden="true">
                 <li><span class="dot dot-free"></span><span data-i18n="book.free">Ledig</span></li>
                 <li><span class="dot dot-taken"></span><span data-i18n="book.taken">Opptatt</span></li>
+                <li><span class="dot dot-short"></span><span data-i18n="book.short">For kort tid til valgt tjeneste</span></li>
               </ul>
             </div>
 
@@ -172,6 +171,7 @@
             </div>
 
             <p class="booking-summary" id="booking-summary" aria-live="polite"></p>
+            <p class="booking-privacy" data-i18n="book.privacy">Vi bruker navn og telefonnummer bare til timen din. <a href="personvern.html">Personvern</a></p>
             <button class="btn btn-block" type="submit" data-i18n="f.submit">Bestill time</button>
             <p class="form-msg" id="form-msg" role="status"></p>
           </div>

@@ -238,6 +238,15 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 .form-msg { margin: 0; min-height: 1.4em; font-size: .93rem; }
 .form-msg.ok { color: var(--ok); }
 .form-msg.err { color: var(--err); }
+/* Feil ved steget den gjelder (tjeneste, dag, tid). Skjermlesere får teksten fra #form-msg. */
+.step-msg { margin: 0; font-size: .93rem; font-weight: 600; }
+.step-msg:empty { display: none; }
+.step-msg.err { color: var(--err); }
+/* Skjult for øyet, men lest opp av skjermlesere */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; min-height: 0; margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap;
+}
 
 /* Footer */
 .site-footer { border-top: 1px solid var(--line); padding: 28px 0; color: var(--muted); font-size: .9rem; }
@@ -525,6 +534,10 @@ form.booking {
   opacity: 1; color: var(--err); background: rgba(239, 124, 115, .1);
   border-color: rgba(239, 124, 115, .35); text-decoration: line-through;
 }
+/* Ledige hull finnes, men valgt tjeneste rekker ikke: stiplet som «for kort»-tidene, ikke rød */
+.cal-day.is-nofit:disabled { opacity: .6; border-style: dashed; border-color: var(--muted); }
+/* Synlig fokus også etter et trykk (siden flytter fokus hit selv, f.eks. ved en feilmelding) */
+.cal-day:focus, .slot:focus { box-shadow: 0 0 0 3px rgba(201, 163, 92, .55); }
 .slot > * { display: block; }
 .slot { text-align: center; }
 .slot { display: grid; grid-gap: 1px; gap: 1px; justify-items: center; border-color: rgba(111, 207, 142, .45); }
@@ -534,12 +547,13 @@ form.booking {
   border-color: rgba(239, 124, 115, .4); text-decoration: line-through;
 }
 .slot.is-taken small { text-decoration: none; }
-.slot.is-short, .slot.is-short:hover { cursor: not-allowed; opacity: .4; border-style: dashed; border-color: var(--line); }
+.slot.is-short, .slot.is-short:hover { cursor: not-allowed; opacity: .55; border-style: dashed; border-color: var(--muted); }
 .slot-legend { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 0 0; padding: 0; font-size: .8rem; color: var(--muted); }
 .slot-legend li { display: inline-flex; align-items: center; gap: 6px; }
 .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .dot-free { border: 2px solid var(--ok); }
 .dot-taken { background: var(--err); }
+.dot-short { border: 2px dashed var(--muted); }
 .slots-empty { grid-column: 1 / -1; margin: 0; padding: 14px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); font-size: .92rem; text-align: center; }
 
 .booking label:not(.step-label) { display: grid; grid-gap: 6px; gap: 6px; font-size: .9rem; color: var(--muted); }
@@ -548,6 +562,8 @@ form.booking {
   background: rgba(207, 167, 94, .08); color: var(--text); font-weight: 600;
 }
 .booking-summary[hidden] { display: none; }
+.booking-privacy { margin: 0; font-size: .85rem; color: var(--muted); }
+.booking-privacy a { font-weight: 600; text-decoration: underline; }
 .booking-after { text-align: center; margin-top: 26px; }
 .booking-after p { margin: 0 0 6px; color: var(--muted); }
 .booking-after a { font-weight: 700; }
