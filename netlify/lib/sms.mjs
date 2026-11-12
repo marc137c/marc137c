@@ -72,8 +72,13 @@ export function reminderDue(item, now, nowMs) {
   if (!norwegianMobile(item.phone)) return false;
   const left = minutesUntil(item, now);                                  // minutter til timen
   const bookedAgo = (nowMs - Date.parse(item.createdAt || 0)) / 60000;   // minutter siden bestillingen
-  // TODO(human): bestem når påminnelsen sendes. Returner true når det er riktig tidspunkt.
-  return false;
+  // Aldri om natten
+  if (now.minutes < 8 * 60 || now.minutes >= 21 * 60) return false;
+  // Vanlig: ett døgn før (vinduet er 60 min, så én kjøring som faller ut gjør ingenting).
+  // Ikke rett etter bestillingen: da har kunden nettopp fått bekreftelsen.
+  if (left <= 24 * 60 && left > 23 * 60 && bookedAgo > 3 * 60) return true;
+  // Bestilt mindre enn et døgn før: to timer før i stedet, hvis bestillingen ikke er helt fersk
+  return left <= 2 * 60 && left > 60 && bookedAgo > 6 * 60;
 }
 
 // Sender én SMS. Svarer { ok: true } eller { ok: false, error, skipped? }. Kaster aldri.
