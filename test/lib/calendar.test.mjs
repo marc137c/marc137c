@@ -172,6 +172,7 @@ test("calendar (property): every active booking appears exactly once with the ri
     for (const i of want) {
       const ev = map.get(uidOf(i));
       assert.equal(toUtcMs(prop(ev, "DTSTART"), cal), oslo(i.date, ...hm(i.start)).getTime());
+      assert.equal(prop(ev, "DTSTART").value.slice(0, 8), i.date.replace(/-/g, ""), "the event starts on its stored date");
       const end = i.start + i.dur;
       assert.equal(toUtcMs(prop(ev, "DTEND"), cal), end >= 1440 ? oslo(addDays(i.date, 1), ...hm(end - 1440)).getTime() : oslo(i.date, ...hm(end)).getTime());
       assert.ok(text(ev, "SUMMARY").startsWith(i.service || "Avtale"));

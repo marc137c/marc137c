@@ -14,7 +14,7 @@
 // Sending kaster aldri, har kort tidsfrist (PUSH_TIMEOUT_MS) og logger bare tjenestens navn og svaret: aldri
 // adressen (den er selv en slags nøkkel), kundens navn eller noen nøkkel.
 import { ECDH, createECDH, createPrivateKey, generateKeyPairSync, hkdfSync, createCipheriv, randomBytes, sign } from "node:crypto";
-import { mutateJSON } from "./booking-core.mjs";
+import { isDate, mutateJSON } from "./booking-core.mjs";
 
 export const VAPID_KEY = "push/vapid";
 export const SUBS_KEY = "push/subs";
@@ -286,6 +286,8 @@ export const testMessage = () => ({
 // Varsler alle Viggos enheter om en ny nettbestilling. Kaster aldri: bestillingen er allerede lagret, og et varsel
 // som feiler skal aldri felle den. Feil logges uten navn, telefonnummer, adresser eller nøkler.
 export async function notifyNewBooking(store, item, opts = {}) {
+  // En dato som ikke finnes (f.eks. 2026-11-31) ville blitt «Tirsdag 1. desember» i varselet: send heller ingenting
+  if (!item || !isDate(item.date) || !Number.isInteger(item.start)) return { skipped: true };
   try {
     return await pushToDevices(store, bookingMessage(item), opts);
   } catch (err) {

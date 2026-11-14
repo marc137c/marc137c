@@ -14,7 +14,7 @@
 //  - en påminnelse ALARM_MIN minutter før hver time;
 //  - CRLF etter hver linje, linjer brettet etter 75 oktetter (aldri midt i et UTF-8-tegn), og tekst escapet.
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
-import { CONFIG, addDays, osloNow, readMonths, mutateJSON } from "./booking-core.mjs";
+import { CONFIG, addDays, isDate, osloNow, readMonths, mutateJSON } from "./booking-core.mjs";
 
 export const FEED_KEY = "calendar/feed";
 export const FEED_PAST_DAYS = 31;
@@ -129,7 +129,7 @@ const VTIMEZONE = [
 ];
 
 const isBookingInFeed = (i) => i && i.type === "booking" && i.status !== "cancelled"
-  && typeof i.date === "string" && Number.isInteger(i.start) && Number.isInteger(i.dur) && i.dur > 0;
+  && isDate(i.date) && Number.isInteger(i.start) && Number.isInteger(i.dur) && i.dur > 0; // aldri en dato som ikke finnes
 
 const what = (i) => {
   const service = i.service || "Avtale";

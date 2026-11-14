@@ -25,7 +25,14 @@ export const CONFIG = {
 
 // ---------- Tid og dato ----------
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-export const isDate = (s) => typeof s === "string" && DATE_RE.test(s) && !Number.isNaN(Date.parse(s + "T00:00:00Z"));
+// En ekte kalenderdato: «2026-11-31» og «2027-02-29» finnes ikke (Date ruller dem over til neste måned, så de
+// må gi den samme datoen tilbake for å godtas). Ellers ble de «spøkelsestimer» som dobbeltbooket 1. desember i
+// kalenderen på telefonen og i varslene, men aldri viste seg i /admin.
+export function isDate(s) {
+  if (typeof s !== "string" || !DATE_RE.test(s)) return false;
+  const d = new Date(s + "T00:00:00Z");
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
 export const dayOfWeek = (date) => new Date(date + "T00:00:00Z").getUTCDay();
 export function addDays(date, n) {
   const d = new Date(date + "T00:00:00Z");
