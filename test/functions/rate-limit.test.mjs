@@ -8,7 +8,7 @@ import { testDeps, request, read, quiet, PRODUCTION } from "../helpers/deps.mjs"
 import { oslo } from "../helpers/clock.mjs";
 import { storedItems, SHOP_MOBILE } from "../helpers/bookings.mjs";
 import { addDays, dayOfWeek, CONFIG } from "../../netlify/lib/booking-core.mjs";
-import { BOOKING_LIMITS } from "../../netlify/lib/limits.mjs";
+import { BOOKING_LIMITS, phoneKey } from "../../netlify/lib/limits.mjs";
 import { handle } from "../../netlify/functions/bookings.mjs";
 
 const NOW = oslo("2026-11-12", 10, 0); // Thursday 10:00 in Oslo
@@ -74,6 +74,22 @@ test("rate limit: one phone number gets at most 3 bookings per 24 h, whatever th
   const rs = await flood(d, formats.length, { phone: (i) => formats[i], slots: allSlots() });
   assert.deepEqual(rs.map((r) => r.status), [201, 201, 201, 429, 429]);
   assert.equal(storedItems(d.blobs).length, 3);
+});
+
+test("rate limit: the phone counter key ignores formatting and the +47/0047 prefix, landlines too, without any SMS code", () => {
+  for (const [given, key] of [
+    ["912 34 567", "91234567"], ["+47 912 34 567", "91234567"], ["0047 91234567", "91234567"], ["47 912-34-567", "91234567"],
+    ["22 33 44 55", "22334455"], ["+47 22 33 44 55", "22334455"], ["(0047) 22.33.44.55", "22334455"],
+    ["+46 70 123 45 67", "46701234567"], ["4791234567890", "4791234567890"], ["", ""], [undefined, ""],
+  ]) assert.equal(phoneKey(given), key, String(given));
+});
+
+test("rate limit: a landline written with and without +47 shares one counter", async () => {
+  const d = testDeps({ now: NOW });
+  const formats = ["+47 69 17 00 00", "69170000", "0047 69 17 00 00", "69 17 00 00"];
+  const rs = await flood(d, formats.length, { phone: (i) => formats[i], slots: allSlots() });
+  assert.deepEqual(rs.map((r) => r.status), [201, 201, 201, 429]);
+  assert.deepEqual(d.blobs.keys("bookings").filter((k) => k.startsWith("rl/phone/")), ["rl/phone/69170000"]);
 });
 
 test("rate limit: a flood from rotating clients and numbers stores at most 20 per hour and 40 per 24 h, and refused bookings get no SMS", async (t) => {

@@ -49,12 +49,21 @@ export const BOOKING_LIMITS = {
 
 const keyPart = (s) => String(s).replace(/[^\w.:-]/g, "_").slice(0, 64) || "ukjent";
 
+// Telefonnummeret som teller-nøkkel, uansett skrivemåte: bare sifrene, og et norsk nummer skrevet med landskode
+// («+47 912 34 567», «0047 912 34 567», «47 22 33 44 55») blir de åtte sifrene uten den («91234567», «22334455»).
+export function phoneKey(phone) {
+  const d = String(phone ?? "").replace(/\D/g, "");
+  if (d.length === 12 && d.startsWith("0047")) return d.slice(4);
+  if (d.length === 10 && d.startsWith("47")) return d.slice(2);
+  return d;
+}
+
 // Teller én nettbestilling for IP-en, telefonnummeret og totalen, i den rekkefølgen. Svarer { ok: true } eller
 // { ok: false, limited: "ip" | "phone" | "all" }. Er en tidligere teller full, telles ikke de neste.
 export async function takeBookingSlot(store, { ip, phone }, nowMs) {
   const checks = [
     ["ip", `rl/ip/${keyPart(ip || "ukjent")}`],
-    ["phone", `rl/phone/${keyPart(phone)}`],
+    ["phone", `rl/phone/${keyPart(phoneKey(phone))}`],
     ["all", "rl/all"],
   ];
   for (const [name, key] of checks) {

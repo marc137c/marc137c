@@ -29,8 +29,7 @@ export async function handle(req, context, deps) {
     const store = bookingStore(deps, context); // forhåndsvisninger har sin egen timebok (F10)
     // Tak mot flom (F2): per klient (IP), per telefonnummer og totalt, telt konfliktsikkert før timen lagres
     const ip = (context && context.ip) || req.headers.get("x-nf-client-connection-ip") || "ukjent";
-    const phoneKey = norwegianMobile(v.value.phone) || v.value.phone.replace(/\D/g, "");
-    const slot = await takeBookingSlot(store, { ip, phone: phoneKey }, deps.now().getTime());
+    const slot = await takeBookingSlot(store, { ip, phone: v.value.phone }, deps.now().getTime());
     if (!slot.ok) {
       if (slot.error) return json({ error: slot.error }, slot.status || 503);
       return json({ error: "For mange bestillinger akkurat nå. Ring oss på 409 63 911.", code: "rate_limited" }, 429);
