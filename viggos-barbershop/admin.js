@@ -444,7 +444,7 @@
   const permission = () => (notif() ? notif().permission : "denied");
   const isIos = () => /iPad|iPhone|iPod/.test(navigator.userAgent || "") || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const isStandalone = () => navigator.standalone === true || !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
-  const pushState = { key: null, sub: null };
+  const pushState = { key: null, sub: null, reg: null };
   let pushSeq = 0;
 
   function pushMsg(text, kind) {
@@ -494,20 +494,12 @@
     if (!c) return Promise.reject(new Error("Denne nettleseren kan ikke vise varsler."));
     return c.register(SW_URL, { scope: SW_SCOPE }).then(() => c.ready);
   }
-  function askPermission() {
-    const N = notif();
-    if (!N) return Promise.resolve("denied");
-    if (N.permission === "granted") return Promise.resolve("granted");
-    return new Promise((resolve) => {
-      const p = N.requestPermission(resolve); // eldre Safari svarer bare med tilbakekall
-      if (p && typeof p.then === "function") p.then(resolve, () => resolve("default"));
-    });
-  }
 
   // Når «Oppsett» åpnes: vis om denne enheten får varsler, og gi serveren abonnementet på nytt (nettleseren kan ha fornyet det)
   function pushLoad() {
     const seq = ++pushSeq;
     pushState.sub = null;
+    pushState.reg = null;
     pushButtons(null);
     $("push-ios").hidden = true;
     if (!pushSupported()) {
@@ -518,7 +510,7 @@
     }
     if (permission() === "denied") { pushMsg(BLOCKED, "info"); return Promise.resolve(); }
     pushMsg("Henter …", "info");
-    return Promise.all([api("/api/admin/push"), swRegistration().then((reg) => reg.pushManager.getSubscription())]).then((r) => {
+    return Promise.all([api("/api/admin/push"), swRegistration().then((reg) => { pushState.reg = reg; return reg.pushManager.getSubscription(); })]).then((r) => {
       if (seq !== pushSeq) return;
       const info = r[0], sub = r[1];
       pushState.key = info.publicKey;
@@ -542,20 +534,29 @@
       pushMsg(pushError(err));
     });
   }
-  function pushClear() { pushSeq++; pushState.sub = null; pushButtons(null); pushMsg(""); $("push-ios").hidden = true; }
+  function pushClear() { pushSeq++; pushState.sub = null; pushState.reg = null; pushButtons(null); pushMsg(""); $("push-ios").hidden = true; }
 
   $("push-on").addEventListener("click", () => {
     const btn = $("push-on");
+    const reg = pushState.reg;
+    if (!reg || !pushState.key) return;
     const seq = ++pushSeq;
     btn.disabled = true;
     pushMsg("Slår på …", "info");
-    askPermission().then((answer) => {
-      if (answer !== "granted") {
-        if (answer === "denied") pushButtons(null);
-        throw Object.assign(new Error(answer === "denied" ? BLOCKED : "Du må tillate varsler for å få dem. Trykk «Slå på varsler» og velg Tillat."), { user: true });
-      }
-      return swRegistration();
-    }).then((reg) => reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(pushState.key) }))
+    // subscribe() kalles rett i trykket og spør selv om lov til å vise varsler. Safari (også på iPhone) godtar det
+    // bare i selve trykket, så ingenting annet får vente først.
+    let subscribing;
+    try {
+      subscribing = reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(pushState.key) });
+    } catch (e) {
+      subscribing = Promise.reject(e);
+    }
+    subscribing.catch((err) => {
+      const answer = permission();
+      if (answer === "granted") throw err;
+      if (answer === "denied") pushButtons(null);
+      throw Object.assign(new Error(answer === "denied" ? BLOCKED : "Du må tillate varsler for å få dem. Trykk «Slå på varsler» og velg Tillat."), { user: true });
+    })
       .then((sub) => saveSub(sub).then((res) => {
         if (seq !== pushSeq) return;
         pushState.sub = sub;

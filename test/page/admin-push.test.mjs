@@ -4,8 +4,9 @@
 //   2. a browser without service worker, PushManager or Notification (Safari 10, Chrome 60, Firefox 55, old
 //      browsers with the compat.js dialog shim) gets no push buttons, makes no push request and registers nothing;
 //      an iPhone outside the Home Screen gets the Norwegian «Del → Legg til på Hjem-skjerm» instruction;
-//   3. «Slå på varsler» asks for permission once, subscribes with exactly the server's public key and
-//      userVisibleOnly, and sends the subscription to the server with the admin token; a refusal sends nothing;
+//   3. «Slå på varsler» subscribes in the tap itself (Safari, also on iPhone, allows it only there; subscribe()
+//      asks for permission), with exactly the server's public key and userVisibleOnly, and sends the subscription
+//      to the server with the admin token; a refusal sends nothing;
 //   4. «Send testvarsel» asks the server to test this device only; «Slå av» unsubscribes in the browser first and
 //      only then tells the server, so a device can never turn itself back on;
 //   5. an existing subscription is given to the server again (when «Oppsett» opens and at start), and one made with
@@ -95,26 +96,25 @@ test("admin push panel: off on this device → only «Slå på varsler», and th
   assert.equal(b.log.permissionAsks, 0, "nothing is asked before the barber taps");
 });
 
-for (const legacyCallback of [false, true]) {
-  test(`admin push panel: «Slå på varsler» asks once, subscribes with the server's key and sends it with the token${legacyCallback ? " (callback-style permission, older Safari)" : ""}`, async () => {
-    const device = makeDevice("apple");
-    const b = fakePushBrowser({ device, legacyCallback });
-    const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes() });
-    page.$("push-on").click();
-    assert.equal(page.$("push-on").disabled, true, "no double tap while waiting");
-    await page.flush();
-    assert.equal(b.log.permissionAsks, 1);
-    assert.equal(b.log.subscribes.length, 1);
-    assert.equal(b.log.subscribes[0].userVisibleOnly, true);
-    assert.deepEqual([...b.log.subscribes[0].applicationServerKey], KEY_BYTES, "exactly the server's public key");
-    const post = pushCalls(page).find((c) => c.path === "/api/admin/push/subscribe");
-    assert.equal(post.headers.Authorization, "Bearer test-admin-token");
-    assert.deepEqual(post.body, { subscription: device.subscription });
-    assert.deepEqual(buttons(page), ["push-test", "push-off"]);
-    assert.match(msg(page), /^Varsler er på/);
-    assert.equal(page.$("push-on").disabled, false);
-  });
-}
+test("admin push panel: «Slå på varsler» subscribes in the tap itself with the server's key, and sends it with the token", async () => {
+  const device = makeDevice("apple");
+  const b = fakePushBrowser({ device });
+  const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes() });
+  page.$("push-on").click();
+  assert.equal(b.log.subscribes.length, 1, "subscribe() runs inside the tap, before anything is awaited (iPhone needs that)");
+  assert.equal(page.$("push-on").disabled, true, "no double tap while waiting");
+  await page.flush();
+  assert.equal(b.log.permissionAsks, 1);
+  assert.equal(b.log.subscribes.length, 1);
+  assert.equal(b.log.subscribes[0].userVisibleOnly, true);
+  assert.deepEqual([...b.log.subscribes[0].applicationServerKey], KEY_BYTES, "exactly the server's public key");
+  const post = pushCalls(page).find((c) => c.path === "/api/admin/push/subscribe");
+  assert.equal(post.headers.Authorization, "Bearer test-admin-token");
+  assert.deepEqual(post.body, { subscription: device.subscription });
+  assert.deepEqual(buttons(page), ["push-test", "push-off"]);
+  assert.match(msg(page), /^Varsler er på/);
+  assert.equal(page.$("push-on").disabled, false);
+});
 
 test("admin push panel: refusing permission sends nothing; «blocked» hides the button", async () => {
   for (const [answer, text, left] of [["denied", /blokkert/, []], ["default", /Du må tillate varsler/, ["push-on"]]]) {
@@ -123,7 +123,8 @@ test("admin push panel: refusing permission sends nothing; «blocked» hides the
     page.$("push-on").click();
     await page.flush();
     assert.match(msg(page), text, answer);
-    assert.deepEqual(b.log.subscribes, [], answer);
+    assert.equal(b.log.permissionAsks, 1, answer);
+    assert.equal(b.current(), null, answer);
     assert.equal(pushCalls(page).filter((c) => c.method === "POST").length, 0, answer);
     assert.deepEqual(buttons(page), left, answer);
   }

@@ -170,7 +170,9 @@ export async function loadAdmin({ routes = {}, token = "test-admin-token", navig
 // with ios: true and push: false, iPhone Safari outside the Home Screen (service worker, but no PushManager and no
 // Notification). device: a fake-push.mjs makeDevice() whose endpoint and keys the subscription gets.
 // subscribed: the browser already has a subscription made with this applicationServerKey (bytes) at load.
-export function fakePushBrowser({ permission = "default", answer = "granted", device, subscribed, push = true, ios = false, standalone = false, legacyCallback = false, unsubscribeOk = true, registered = Boolean(subscribed) } = {}) {
+// As in Chrome, Firefox and Safari, pushManager.subscribe() asks for permission itself when it is «default» (the
+// barber answers `answer`), and rejects with NotAllowedError unless it ends up «granted».
+export function fakePushBrowser({ permission = "default", answer = "granted", device, subscribed, push = true, ios = false, standalone = false, unsubscribeOk = true, registered = Boolean(subscribed) } = {}) {
   const log = { registered: [], subscribes: [], permissionAsks: 0, unsubscribed: [], getRegistration: [] };
   const listeners = {};
   const makeSub = (appKey) => ({
@@ -190,6 +192,8 @@ export function fakePushBrowser({ permission = "default", answer = "granted", de
       getSubscription: () => Promise.resolve(current),
       subscribe: (opts) => {
         log.subscribes.push(opts);
+        if (Notification.permission === "default") { log.permissionAsks++; Notification.permission = answer; }
+        if (Notification.permission !== "granted") return Promise.reject(Object.assign(new Error("Registration failed - permission denied"), { name: "NotAllowedError" }));
         current = makeSub(new Uint8Array(opts.applicationServerKey).buffer);
         return Promise.resolve(current);
       },
@@ -203,10 +207,9 @@ export function fakePushBrowser({ permission = "default", answer = "granted", de
   };
   const Notification = {
     permission,
-    requestPermission(cb) {
+    requestPermission() {
       log.permissionAsks++;
       Notification.permission = answer;
-      if (legacyCallback) { cb(answer); return undefined; }
       return Promise.resolve(answer);
     },
   };
