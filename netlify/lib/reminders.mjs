@@ -1,10 +1,11 @@
-// SMS-utboksen: bekreftelser til kunden (sendes med en gang fra bookings.mjs, ellers av neste kjøring) og
-// påminnelser før timen (planlagt kjøring hvert 15. minutt, sms-reminders.mjs).
+// SMS-utboksen: bekreftelser til kunden og varsel til frisøren (sendes med en gang fra bookings.mjs, ellers av
+// neste kjøring) og påminnelser før timen (planlagt kjøring hvert 15. minutt, sms-reminders.mjs).
 // Hver SMS går i konfliktsikre steg (ETag), så den aldri sendes to ganger og aldri vises som «sendt» uten at Sveve
 // har bekreftet den:
 //   1. krav: avtalen merkes f.claim + f.run (denne kjøringens id) + f.error «sending». To kjøringer samtidig kan
 //      ikke begge få kravet. Gikk svaret på skrivingen tapt, kjenner kjøringen igjen sin egen id (F38).
-//   2. tak: en plass i nummerets SMS-logg (limits.mjs, høyst 3 per nummer per døgn til sammen, F3/F16).
+//   2. tak: en plass i nummerets SMS-logg (limits.mjs: høyst 3 per kundenummer per døgn til sammen, F3/F16;
+//      høyst 40 varsler per døgn til frisøren).
 //   3. send: bare før fristen og aldri 21–08; ellers gis kravet og plassen tilbake og neste kjøring tar den (F39).
 //   4. utfall: sendt → f.sent, feilen fjernes (/admin viser «sendt» først nå).
 //      Sikkert ikke sendt (avvist, feil passord, HTTP-feil, ingen forbindelse) → kravet og plassen gis tilbake, så
@@ -14,7 +15,7 @@
 import { randomBytes } from "node:crypto";
 import { osloNow, addDays, readMonths, mutateMonth, monthOf, findItem, CONFIG } from "./booking-core.mjs";
 import {
-  reminderDue, reminderText, confirmText, sendSms, smsConfigured, smsTestMode, quietHours, minutesUntil, norwegianMobile,
+  reminderDue, reminderText, confirmText, shopText, shopNumber, sendSms, smsConfigured, smsTestMode, quietHours, minutesUntil, norwegianMobile,
 } from "./sms.mjs";
 import { reserveSms, releaseSms } from "./limits.mjs";
 
@@ -23,6 +24,7 @@ const DAY = 24 * 60 * 60 * 1000;
 
 // Feltene på avtalen for hver type SMS. pending = «skal sendes» (settes når nettbestillingen lagres).
 export const REMINDER = { claim: "remindedAt", run: "reminderRun", sent: "reminderSentAt", error: "reminderError", fails: "reminderFails", test: "reminderTestAt" };
+export const SHOP = { pending: "shopPending", claim: "shopSmsAt", run: "shopRun", sent: "shopSentAt", error: "shopError", fails: "shopFails", test: "shopTestAt" };
 export const CONFIRM = { pending: "confirmPending", claim: "confirmAt", run: "confirmRun", sent: "confirmSentAt", error: "confirmError", fails: "confirmFails", test: "confirmTestAt" };
 export const SENDING = "sending"; // f.error mens SMS-en er krevd, men ikke bekreftet sendt
 
@@ -44,6 +46,14 @@ function jobsFor(env, oslo, nowMs, due = reminderDue) {
         Boolean(norwegianMobile(it.phone)) && nowMs - Date.parse(it.createdAt || 0) < DAY && minutesUntil(it, oslo) > 0 && !quietHours(oslo),
       to: (it) => it.phone,
       text: (it) => confirmText(it, oslo.date),
+    },
+    // Varsel til frisøren om en ny nettbestilling (eier: én SMS per bestilling, til SHOP_SMS_TO)
+    shop: {
+      kind: "shop", f: SHOP,
+      due: (it) => it.type === "booking" && it.status !== "cancelled" && it[SHOP.pending] === true && open(SHOP, it) &&
+        Boolean(shopNumber(env)) && nowMs - Date.parse(it.createdAt || 0) < DAY && minutesUntil(it, oslo) > 0 && !quietHours(oslo),
+      to: () => shopNumber(env),
+      text: (it) => shopText(it),
     },
     reminder: {
       kind: "reminder", f: REMINDER,
@@ -143,13 +153,19 @@ function newRun(now, { clock = Date.now, fetchFn = fetch, sendDeadlineMs = SEND_
   return { id: randomBytes(6).toString("hex"), stamp: now.toISOString(), startedAt: clock(), clock, fetchFn, sendDeadlineMs, timeoutMs };
 }
 
-// Bekreftelsen rett etter at nettbestillingen er lagret (bookings.mjs). Klarer den det ikke innen fristen, eller
-// er det natt, blir den liggende og sendes av neste planlagte kjøring (fra kl. 08).
-export async function sendConfirmationNow(store, env, item, { now = new Date(), clock = Date.now, fetchFn = fetch } = {}) {
+// Bekreftelsen til kunden og varselet til frisøren rett etter at nettbestillingen er lagret (bookings.mjs), begge
+// samtidig så kunden ikke venter på to SMS etter hverandre. Klarer en av dem det ikke innen fristen, eller er det
+// natt, blir den liggende og sendes av neste planlagte kjøring (fra kl. 08). Svarer { confirm, shop } med utfallene.
+export async function sendBookingSms(store, env, item, { now = new Date(), clock = Date.now, fetchFn = fetch } = {}) {
   const oslo = osloNow(now);
-  const job = jobsFor(env, oslo, now.getTime()).confirm;
-  if (!job.due(item)) return quietHours(oslo) ? "deferred" : "skip";
-  return deliver(store, env, item, job, newRun(now, { clock, fetchFn, ...INLINE }));
+  const jobs = jobsFor(env, oslo, now.getTime());
+  const one = (job) => (job.due(item) ? deliver(store, env, item, job, newRun(now, { clock, fetchFn, ...INLINE }))
+    : Promise.resolve(item[job.f.pending] && quietHours(oslo) ? "deferred" : "skip"));
+  const [confirm, shop] = await Promise.all([one(jobs.confirm), one(jobs.shop)].map((p) => p.catch((err) => {
+    console.error("SMS:", item.id, err && err.message);
+    return "failed";
+  })));
+  return { confirm, shop };
 }
 
 export async function runReminders(store, env, {
@@ -163,6 +179,7 @@ export async function runReminders(store, env, {
   // Bekreftelser som venter (nattbestillinger, feil) først, så påminnelser for i dag og de neste to dagene
   const items = await readMonths(store, oslo.date, addDays(oslo.date, CONFIG.maxDays));
   const work = [
+    ...items.filter((it) => jobs.shop.due(it)).map((it) => [it, jobs.shop]),
     ...items.filter((it) => jobs.confirm.due(it)).map((it) => [it, jobs.confirm]),
     ...items.filter((it) => it.date >= oslo.date && it.date <= addDays(oslo.date, 2) && jobs.reminder.due(it)).map((it) => [it, jobs.reminder]),
   ];

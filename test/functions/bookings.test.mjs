@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { testDeps, request, read, quiet, PRODUCTION } from "../helpers/deps.mjs";
-import { storedItems, CUSTOMER_PHONE, CUSTOMER_MOBILE } from "../helpers/bookings.mjs";
+import { storedItems, CUSTOMER_PHONE, CUSTOMER_MOBILE, SHOP_MOBILE } from "../helpers/bookings.mjs";
 import { handle, config } from "../../netlify/functions/bookings.mjs";
 
 const NOW = "2026-11-12T09:00:00Z"; // Thursday 10:00 in Oslo
@@ -70,10 +70,10 @@ test("bookings: with Sveve configured the confirmation goes through deps.fetch",
   const res = await read(await handle(post(BODY), PRODUCTION, d));
   assert.equal(res.status, 201);
   assert.equal(res.body.sms, "sent");
-  assert.equal(d.sveve.sent.length, 1);
-  assert.equal(d.sveve.sent[0].to, CUSTOMER_MOBILE);
-  assert.match(d.sveve.sent[0].msg, /i morgen kl\. 10:00/, "the SMS uses the injected clock for «i morgen»");
-  assert.equal(d.sveve.sent[0].at, Date.parse(NOW), "sent at the injected time");
+  const [toCustomer] = d.sveve.to(CUSTOMER_MOBILE);
+  assert.match(toCustomer.msg, /i morgen kl\. 10:00/, "the SMS uses the injected clock for «i morgen»");
+  assert.equal(toCustomer.at, Date.parse(NOW), "sent at the injected time");
+  assert.deepEqual(d.sveve.sent.map((s) => s.to).sort(), [SHOP_MOBILE, CUSTOMER_MOBILE].sort(), "and one notice to the barber");
 });
 
 test("bookings: in SVEVE_TEST mode the page is never told an SMS was sent (F42)", async () => {
@@ -88,7 +88,7 @@ test("bookings: in SVEVE_TEST mode the page is never told an SMS was sent (F42)"
 test("bookings: an SMS failure never stops a stored booking", async (t) => {
   const out = quiet(t);
   const d = testDeps({ now: NOW, env: SVEVE_ENV, sveve: true });
-  d.sveve.inject({ fault: "fatal" });
+  d.sveve.inject({ fault: "fatal", match: (c) => c.body.to === CUSTOMER_MOBILE });
   const res = await read(await handle(post(BODY), PRODUCTION, d));
   assert.deepEqual([res.status, res.body.sms], [201, "failed"]);
   assert.equal(storedItems(d.blobs).length, 1);

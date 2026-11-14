@@ -9,7 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { testDeps, request, read, quiet, PRODUCTION } from "./helpers/deps.mjs";
 import { oslo } from "./helpers/clock.mjs";
-import { item, seedItems, storedItems, CUSTOMER_PHONE, CUSTOMER_MOBILE } from "./helpers/bookings.mjs";
+import { item, seedItems, storedItems, CUSTOMER_PHONE, CUSTOMER_MOBILE, SHOP_MOBILE } from "./helpers/bookings.mjs";
 import { osloNow } from "../netlify/lib/booking-core.mjs";
 import { quietHours } from "../netlify/lib/sms.mjs";
 import { SMS_LIMITS, smsLogKey } from "../netlify/lib/limits.mjs";
@@ -116,11 +116,12 @@ test("night rule: no SMS between 21:00 and 08:00; a night booking is confirmed f
   assert.deepEqual([a.status, a.body.sms, b.body.sms], [201, "later", "later"], "the page promises no SMS now");
   assert.equal(d.sveve.calls.length, 0);
   await runEveryQuarter(d, oslo("2026-11-19", 23, 15), oslo("2026-11-20", 12, 0));
-  assert.deepEqual(d.sveve.sent.map((s) => [s.to, s.at]), [
+  assert.deepEqual(d.sveve.sent.filter((s) => s.to !== SHOP_MOBILE).map((s) => [s.to, s.at]), [
     [CUSTOMER_MOBILE, oslo("2026-11-20", 8, 0).getTime()],
     ["91300000", oslo("2026-11-20", 8, 0).getTime()],
   ], "both confirmations at 08:00, and no extra 2 h reminder right after the confirmation");
-  assert.match(d.sveve.sent[0].msg, /^Timen din .* i dag kl\. 10:00/);
+  assert.match(d.sveve.to(CUSTOMER_MOBILE)[0].msg, /^Timen din .* i dag kl\. 10:00/);
+  assert.deepEqual(d.sveve.to(SHOP_MOBILE).map((s) => s.at), [oslo("2026-11-20", 8, 0).getTime(), oslo("2026-11-20", 8, 0).getTime()], "the barber's notices too");
   assert.ok(storedItems(d.blobs).every((i) => i.confirmSentAt));
 });
 
@@ -146,11 +147,11 @@ test("night rule: whatever the timing, no SMS reaches a phone at night (c)", asy
 test("a confirmation that Sveve certainly refused is sent by the next run (F37 for confirmations)", async (t) => {
   quiet(t);
   const d = testDeps({ now: oslo("2026-11-19", 10, 0), env: ENV, sveve: true });
-  d.sveve.inject({ fault: "fatal", message: "Ikke nok SMS-kreditt" });
+  d.sveve.inject({ fault: "fatal", message: "Ikke nok SMS-kreditt", match: (c) => c.body.to === CUSTOMER_MOBILE });
   const r = await book(d, { date: "2026-11-25", start: 600 });
   assert.deepEqual([r.status, r.body.sms], [201, "failed"]);
   await runEveryQuarter(d, oslo("2026-11-19", 10, 15), oslo("2026-11-19", 11, 0));
   assert.equal(d.sveve.to(CUSTOMER_MOBILE).length, 1);
-  assert.equal(d.sveve.sent[0].at, oslo("2026-11-19", 10, 15).getTime());
+  assert.equal(d.sveve.to(CUSTOMER_MOBILE)[0].at, oslo("2026-11-19", 10, 15).getTime());
   assert.ok(storedItems(d.blobs)[0].confirmSentAt);
 });

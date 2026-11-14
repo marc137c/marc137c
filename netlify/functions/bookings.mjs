@@ -2,8 +2,8 @@
 // og to kunder kan aldri få samme tid (konfliktsikker skriving i Netlify Blobs).
 import { liveDeps, bookingStore, isProduction } from "../lib/runtime.mjs";
 import { validateCustomer, createItem } from "../lib/booking-core.mjs";
-import { smsConfigured, norwegianMobile } from "../lib/sms.mjs";
-import { sendConfirmationNow, CONFIRM } from "../lib/reminders.mjs";
+import { smsConfigured, norwegianMobile, shopNumber } from "../lib/sms.mjs";
+import { sendBookingSms, CONFIRM, SHOP } from "../lib/reminders.mjs";
 import { takeBookingSlot } from "../lib/limits.mjs";
 
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -35,10 +35,13 @@ export async function handle(req, context, deps) {
       if (slot.error) return json({ error: slot.error }, slot.status || 503);
       return json({ error: "For mange bestillinger akkurat nå. Ring oss på 409 63 911.", code: "rate_limited" }, 429);
     }
-    // SMS bare fra den ekte nettsiden, og bare når Sveve er satt opp. Bekreftelsen merkes «skal sendes» sammen med
-    // timen, så den aldri går tapt: klarer vi den ikke nå (natt, feil, treg Sveve), sender neste planlagte kjøring den.
+    // SMS bare fra den ekte nettsiden, og bare når Sveve er satt opp: bekreftelse til kunden (norsk mobil) og ett
+    // varsel til frisøren (SHOP_SMS_TO). Begge merkes «skal sendes» sammen med timen, så de aldri går tapt: klarer vi
+    // dem ikke nå (natt, feil, treg Sveve), sender neste planlagte kjøring dem.
     const smsOn = isProduction(context) && smsConfigured(env);
-    const extra = smsOn && norwegianMobile(v.value.phone) ? { [CONFIRM.pending]: true } : {};
+    const extra = {};
+    if (smsOn && norwegianMobile(v.value.phone)) extra[CONFIRM.pending] = true;
+    if (smsOn && shopNumber(env)) extra[SHOP.pending] = true;
     const r = await createItem(store, { ...v.value, type: "booking" }, { source: "nettside", now: deps.now(), extra });
     if (r.error) return json({ error: r.error, code: r.code }, r.status);
     const { id, date, start, dur, service } = r.item;
@@ -46,7 +49,7 @@ export async function handle(req, context, deps) {
     if (smsOn) {
       try { // egen try: timen er lagret, så kunden skal få «booket» selv om noe her feiler
         const opts = { now: deps.now(), clock: () => deps.now().getTime(), fetchFn: deps.fetch };
-        const kind = await sendConfirmationNow(store, env, r.item, opts);
+        const kind = (await sendBookingSms(store, env, r.item, opts)).confirm;
         // booking.js lover «bekreftelse på SMS» bare for «sent»; «test» = testmodus, ingen SMS (F42)
         sms = { sent: "sent", test: "test", deferred: "later", failed: "failed", unknown: "unknown", skip: "skipped", limit: "skipped" }[kind] || "failed";
       } catch (err) {

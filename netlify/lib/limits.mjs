@@ -70,12 +70,15 @@ export async function takeBookingSlot(store, { ip, phone }, nowMs) {
 // En plass tas FØR SMS-en sendes og gis tilbake hvis Sveve sikkert ikke sendte den.
 //   customer  bekreftelser og påminnelser: høyst 3 SMS per nummer per døgn, uansett hvor mange timer
 //             nummeret står på, så et fremmed nummer aldri kan bli oversvømt
+//   shop      varsel til frisøren om nye nettbestillinger: høyst 40 per døgn (samme som taket på nettbestillinger),
+//             så en flom aldri kan sende frisøren flere SMS enn det
 export const SMS_LIMITS = {
   customer: { rules: [{ max: 3, windowMs: DAY }], count: () => true },
+  shop: { rules: [{ max: 40, windowMs: DAY }], count: (h) => h.kind === "shop" },
 };
 export const smsLogKey = (number) => `sms/to/${keyPart(number)}`;
 export function reserveSms(store, number, kind, nowMs, token) {
-  const l = SMS_LIMITS.customer;
+  const l = kind === "shop" ? SMS_LIMITS.shop : SMS_LIMITS.customer;
   return take(store, smsLogKey(number), l.rules, { nowMs, token, data: { kind }, count: l.count });
 }
 export const releaseSms = (store, number, token) => release(store, smsLogKey(number), token);

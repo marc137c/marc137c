@@ -115,6 +115,35 @@ function customerText(kind, item, today) {
 export const confirmText = (item, today) => customerText("confirm", item, today);
 export const reminderText = (item, today) => customerText("reminder", item, today);
 
+// ---------- Varsel til frisøren ----------
+// Én SMS per ny nettbestilling til SHOP_SMS_TO (standard butikkens mobil 409 63 911), alltid på norsk.
+// Den er den eneste SMS-en som har med navnet kunden skrev, og den går bare til butikkens eget nummer.
+export const SHOP_SMS_DEFAULT = "40963911";
+export const shopNumber = (env) => norwegianMobile(env.SHOP_SMS_TO || SHOP_SMS_DEFAULT);
+
+// Navnet slik kunden skrev det: uten kontroll- og formateringstegn (linjeskift, retningsmarkører, nullbredde),
+// mellomrom slått sammen, trimmet, høyst 40 tegn (uten å dele et tegn som trenger to UTF-16-enheter)
+export function shopName(name) {
+  const s = String(name ?? "").replace(/[\p{Cc}\p{Cf}\u2028\u2029]/gu, "").replace(/\s+/g, " ").trim();
+  let out = "";
+  for (const ch of s) { if (out.length + ch.length > 40) break; out += ch; }
+  return out.trim();
+}
+const shopPhone = (phone) => {
+  const m = norwegianMobile(phone);
+  return m ? `${m.slice(0, 3)} ${m.slice(3, 5)} ${m.slice(5)}` : String(phone ?? "").replace(/[^\d+]/g, "").slice(0, 16);
+};
+// «Ny time fra nettsiden: fredag 20.11. kl. 14:00, Herreklipp. Kunde: Ola Nordmann, tlf 912 34 567».
+// Får det ikke plass i én SMS (lang tjeneste, navn med tegn utenfor GSM-7), brukes en kortere form (høyst 2 SMS).
+export function shopText(item) {
+  const when = `${weekday(item.date)} ${dayMonth(item.date)} kl. ${hhmm(item.start)}`;
+  const service = String(item.service || "").trim();
+  const name = shopName(item.name);
+  const tel = shopPhone(item.phone);
+  const full = `Ny time fra nettsiden: ${when}${service ? `, ${service}` : ""}. Kunde: ${name}, tlf ${tel}`;
+  return oneSms(full) ? full : `Ny time ${when}${service ? `, ${service}` : ""}. ${name}, ${tel}`;
+}
+
 // Minutter fra nå til timen starter, regnet i norsk tid. Negativt tall = timen har begynt.
 // now = { date: "ÅÅÅÅ-MM-DD", minutes } fra osloNow()
 export function minutesUntil(item, now) {
