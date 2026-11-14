@@ -2,8 +2,10 @@
 // admin.html and a fake push-capable browser (test/helpers/admin-page.mjs). Invariants:
 //   1. every element admin.js uses exists in admin.html;
 //   2. a browser without service worker, PushManager or Notification (Safari 10, Chrome 60, Firefox 55, old
-//      browsers with the compat.js dialog shim) gets no push buttons, makes no push request and registers nothing;
-//      an iPhone outside the Home Screen gets the Norwegian «Del → Legg til på Hjem-skjerm» instruction;
+//      browsers with the compat.js dialog shim) gets no push buttons of its own, registers nothing and only asks the
+//      server how many devices get notifications (GET /api/admin/push); an iPhone outside the Home Screen gets the
+//      Norwegian «Del → Legg til på Hjem-skjerm» instruction. There, and where notifications are blocked,
+//      «Slå av varsler på alle andre enheter» still shows when other devices get them;
 //   3. «Slå på varsler» subscribes in the tap itself (Safari, also on iPhone, allows it only there; subscribe()
 //      asks for permission), with exactly the server's public key and userVisibleOnly, and sends the subscription
 //      to the server with the admin token; a refusal sends nothing;
@@ -26,6 +28,7 @@ const SERVER_KEY = makeDevice().subscription.keys.p256dh; // any P-256 point ser
 const KEY_BYTES = [...Buffer.from(SERVER_KEY, "base64url")];
 const INFO = { publicKey: SERVER_KEY, devices: 0 };
 const pushCalls = (page) => page.calls.filter((c) => c.path.startsWith("/api/admin/push"));
+const pushRequests = (page) => pushCalls(page).map((c) => `${c.method} ${c.path}`);
 const visible = (page, id) => !page.$(id).hidden;
 const buttons = (page) => ["push-on", "push-retry", "push-test", "push-off"].filter((id) => visible(page, id));
 const msg = (page) => page.$("push-msg").textContent;
@@ -54,14 +57,14 @@ for (const oldBrowser of [false, true]) {
     for (const id of ["push", "push-msg", "push-ios", "push-on", "push-retry", "push-test", "push-off", "push-reset"]) assert.ok(page.$(id), id);
   });
 
-  test(`admin push panel: a browser without push gets no buttons, no push request and no service worker${label}`, async () => {
+  test(`admin push panel: a browser without push gets no buttons, no service worker, and only asks for the device count${label}`, async () => {
     for (const navigator of [{}, { serviceWorker: { register: () => { throw new Error("must not register"); } } }]) {
       const page = await openSettings({ oldBrowser, navigator, routes: routes() });
       assert.deepEqual(buttons(page), []);
-      assert.equal(page.$("push-reset").hidden, true);
-      assert.match(msg(page), /^Denne nettleseren kan ikke vise varsler/);
+      assert.equal(page.$("push-reset").hidden, true, "no other device gets notifications");
+      assert.equal(msg(page), "Denne nettleseren kan ikke vise varsler. Bruk en nyere Chrome, Edge, Firefox eller Safari.");
       assert.equal(page.$("push-ios").hidden, true);
-      assert.deepEqual(pushCalls(page), []);
+      assert.deepEqual(pushRequests(page), ["GET /api/admin/push"]);
     }
   });
 }
@@ -74,7 +77,7 @@ test("admin push panel: an iPhone in Safari gets the Home Screen instruction, an
   assert.match(text, /Del → Legg til på Hjem-skjerm, åpne Timebok derfra, og trykk Slå på varsler/);
   assert.match(text, /iOS 16\.4/);
   assert.deepEqual(buttons(page), []);
-  assert.deepEqual(pushCalls(page), []);
+  assert.deepEqual(pushRequests(page), ["GET /api/admin/push"], "only the device count");
   assert.deepEqual(b.log.registered, []);
 });
 
@@ -147,7 +150,8 @@ test("admin push panel: refusing permission sends nothing; «blocked» offers on
   const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes() });
   assert.match(msg(page), /blokkert/, "already blocked when «Oppsett» opens");
   assert.deepEqual(buttons(page), ["push-retry"]);
-  assert.deepEqual(pushCalls(page), []);
+  assert.deepEqual(pushRequests(page), ["GET /api/admin/push"], "only the device count");
+  assert.deepEqual(b.log.registered, []);
 });
 
 test("admin push panel: a subscription the server refuses is undone in the browser", async () => {
@@ -462,10 +466,71 @@ test("admin push panel: «Slå av varsler på alle andre enheter» shows only wh
     assert.equal(resetShown(page), shown, JSON.stringify([opts.permission, devices]));
     if (opts.subscribed && devices === 3) assert.match(msg(page), /^Varsler er på\..* 2 andre enheter får varsler\.$/);
   }
-  for (const navigator of [{}, fakePushBrowser({ device: makeDevice(), ios: true, push: false }).navigator]) {
-    const page = await openSettings({ navigator, routes: routes({ "GET /api/admin/push": () => ({ ...INFO, devices: 4 }) }) });
-    assert.equal(resetShown(page), false, "never in a browser without push");
+  // Also where this browser cannot get notifications itself, or has them blocked
+  for (const [label, opts] of [
+    ["no push", { navigator: {} }],
+    ["iPhone Safari tab", { navigator: fakePushBrowser({ device: makeDevice(), ios: true, push: false }).navigator }],
+    ["blocked", fakePushBrowser({ device: makeDevice(), permission: "denied" })],
+  ]) {
+    for (const devices of [0, 4]) {
+      const page = await openSettings({ navigator: opts.navigator, globals: opts.globals, routes: routes({ "GET /api/admin/push": () => ({ ...INFO, devices }) }) });
+      assert.equal(resetShown(page), devices > 0, `${label}, ${devices}`);
+    }
   }
+});
+
+test("admin push panel: without push here (iPhone Safari tab, old browser) or with it blocked, the other devices can still be cut off", async () => {
+  const cases = [
+    ["iPhone Safari tab", () => fakePushBrowser({ device: makeDevice("apple"), ios: true, push: false }), "2 andre enheter får varsler.", []],
+    ["iPhone Home Screen app before iOS 16.4", () => fakePushBrowser({ device: makeDevice("apple"), ios: true, standalone: true, push: false }), "Varsler på iPhone krever iOS 16.4 eller nyere. Oppdater under Innstillinger → Generelt → Programvareoppdatering. 2 andre enheter får varsler.", []],
+    ["no service worker", () => ({ navigator: {}, globals: {} }), "Denne nettleseren kan ikke vise varsler. Bruk en nyere Chrome, Edge, Firefox eller Safari. 2 andre enheter får varsler.", []],
+    ["blocked", () => fakePushBrowser({ device: makeDevice(), permission: "denied" }), BLOCKED_TEXT + " 2 andre enheter får varsler.", ["push-retry"]],
+  ];
+  for (const oldBrowser of [false, true]) {
+    for (const [label, make, text, left] of cases) {
+      const b = make();
+      const page = await openSettings({ oldBrowser, navigator: b.navigator, globals: b.globals, routes: routes({
+        "GET /api/admin/push": () => ({ ...INFO, devices: 2 }),
+        "POST /api/admin/push/reset": () => ({ ok: true, devices: 0 }),
+      }) });
+      assert.equal(msg(page), text, label);
+      assert.deepEqual(buttons(page), left, label);
+      assert.equal(resetShown(page), true, label);
+      page.$("push-reset").click();
+      await page.flush();
+      assert.match(page.confirms[0], /^Slå av varsler på de 2 andre enhetene?/, label);
+      assert.match(page.confirms[0], /bytt også admin-passordet/, label);
+      const reset = pushCalls(page).find((c) => c.path === "/api/admin/push/reset");
+      assert.deepEqual([reset.method, reset.headers.Authorization], ["POST", "Bearer test-admin-token"], label);
+      assert.equal(msg(page), "Varsler er slått av på alle andre enheter.", label);
+      assert.deepEqual(buttons(page), left, `${label}: never «Slå på varsler» where it cannot work`);
+      assert.equal(resetShown(page), false, label);
+      assert.deepEqual(pushRequests(page).filter((r) => r.startsWith("POST")), ["POST /api/admin/push/reset"], `${label}: nothing is subscribed`);
+      assert.deepEqual(page.missing, [], label);
+    }
+  }
+});
+
+test("admin push panel: end to end, an iPhone Safari tab cuts off a lost phone, which gets no further booking", async () => {
+  const PASSWORD = "fake-admin-password";
+  const lost = makeDevice("fcm");
+  const push = fakePushService({ devices: [lost] });
+  const d = testDeps({ now: "2026-11-12T09:00:00Z", env: { ADMIN_PASSWORD: PASSWORD }, fetch: push.fetch });
+  const token = makeToken(PASSWORD, d.clock.now(), 60 * 24 * 3600e3);
+  const toServer = (call) => adminFn.handle(request(call.path, { method: call.method, headers: { Authorization: call.headers.Authorization }, json: call.body }), PRODUCTION, d).then(read);
+  await toServer({ path: "/api/admin/push", method: "GET", headers: { Authorization: "Bearer " + token } });
+  assert.equal((await toServer({ path: "/api/admin/push/subscribe", method: "POST", headers: { Authorization: "Bearer " + token }, body: { subscription: lost.subscription } })).status, 201);
+  const b = fakePushBrowser({ device: makeDevice("apple"), ios: true, push: false });
+  const page = await openSettings({ token, navigator: b.navigator, globals: b.globals, routes: { "GET /api/admin/push": toServer, "POST /api/admin/push/reset": toServer } });
+  assert.equal(msg(page), "1 annen enhet får varsler.");
+  page.$("push-reset").click();
+  await page.flush();
+  assert.equal(msg(page), "Varsler er slått av på alle andre enheter.");
+  const res = await read(await bookingsFn.handle(request("/api/bookings", { method: "POST", json: {
+    service: "Herreklipp", date: "2026-11-14", start: 690, addons: [], name: "Per Hansen", phone: "41234567",
+  } }), PRODUCTION, d));
+  assert.equal(res.status, 201);
+  assert.equal(push.deliveries.length, 0, "the lost phone gets nothing");
 });
 
 test("admin push panel: reset asks first, needs the token, and turns this device on again afterwards", async () => {
@@ -549,8 +614,9 @@ test("admin push panel: blocked → «Prøv igjen»; after allowing notification
   assert.deepEqual(buttons(page), ["push-retry"]);
   page.$("push-retry").click();
   await page.flush();
-  assert.equal(msg(page), BLOCKED_TEXT, "still blocked: same answer");
-  assert.deepEqual(pushCalls(page), [], "nothing is asked of the server while blocked");
+  assert.match(msg(page), /blokkert/i, "still blocked");
+  assert.deepEqual(pushRequests(page).filter((r) => r.startsWith("POST")), [], "nothing is subscribed while blocked");
+  assert.deepEqual(b.log.registered, [], "and no service worker is registered");
   b.setPermission("granted");
   page.$("push-retry").click();
   await page.flush();

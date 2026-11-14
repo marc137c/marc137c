@@ -494,7 +494,9 @@
   const isStandalone = () => navigator.standalone === true || !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
   // others: hvor mange andre enheter som får varsler (da vises «Slå av varsler på alle andre enheter»)
   // lost: abonnementet her er fjernet fordi push-tjenesten sa at det var borte, så «av» sier at de må slås på igjen
-  const pushState = { key: null, sub: null, reg: null, others: 0, lost: false };
+  // limited: { mode, text } når denne nettleseren ikke kan få varsler (eller de er blokkert): panelet viser bare
+  // teksten, eventuelt «Prøv igjen», og «Slå av varsler på alle andre enheter» når andre enheter får dem
+  const pushState = { key: null, sub: null, reg: null, others: 0, lost: false, limited: null };
   let pushSeq = 0;
 
   function pushMsg(text, kind) {
@@ -502,6 +504,8 @@
     $("push-msg").className = "msg" + (kind ? " " + kind : "");
   }
   // mode: «off» (Slå på), «on» (Send testvarsel, Slå av), «blocked» (Prøv igjen) eller null (ingen knapper).
+  // «Slå av varsler på alle andre enheter» vises i alle tilstander når andre enheter får varsler, også i en nettleser
+  // som ikke kan få varsler selv (en iPhone i Safari, en gammel PC): da kan en mistet telefon slås av derfra.
   // Knappene blir alltid trykkbare igjen her, så «Oppsett» lukket og åpnet på nytt aldri viser en knapp som henger
   // fra et tidligere trykk.
   const PUSH_BUTTONS = ["push-on", "push-test", "push-off", "push-retry", "push-reset"];
@@ -510,7 +514,7 @@
     $("push-on").hidden = mode !== "off";
     $("push-test").hidden = mode !== "on";
     $("push-off").hidden = mode !== "on";
-    $("push-reset").hidden = !(mode === "on" || mode === "off") || !(pushState.others > 0);
+    $("push-reset").hidden = !(pushState.others > 0);
     PUSH_BUTTONS.forEach((id) => { $(id).disabled = false; });
   }
   // En knapp er grået ut mens trykket på den arbeider
@@ -578,21 +582,35 @@
     return c.register(SW_URL, { scope: SW_SCOPE }).then(() => c.ready);
   }
 
+  // Denne nettleseren kan ikke få varsler, eller de er blokkert (mode «blocked»): vis text, og spør serveren hvor mange
+  // andre enheter som får varsler (ingen service worker og ingen abonnement trengs for det).
+  function pushLimited(seq, mode, text) {
+    pushState.limited = { mode, text };
+    pushButtons(mode);
+    pushMsg(text, "info");
+    return api("/api/admin/push").then((info) => {
+      if (seq !== pushSeq) return;
+      pushState.others = Math.max(0, Number(info.devices) || 0);
+      pushButtons(mode);
+      pushMsg((text + others(pushState.others)).trim(), "info");
+    }).catch(() => {}); // 401 viser innloggingen; ellers står teksten uten antallet
+  }
+
   // Når «Oppsett» åpnes: vis om denne enheten får varsler, og gi serveren abonnementet på nytt (nettleseren kan ha fornyet det)
   function pushLoad() {
     const seq = ++pushSeq;
     pushState.sub = null;
     pushState.reg = null;
     pushState.others = 0;
+    pushState.limited = null;
     pushButtons(null);
     $("push-ios").hidden = true;
     if (!pushSupported()) {
-      if (isIos() && isStandalone()) pushMsg("Varsler på iPhone krever iOS 16.4 eller nyere. Oppdater under Innstillinger → Generelt → Programvareoppdatering.", "info");
-      else if (isIos()) { $("push-ios").hidden = false; pushMsg(""); }
-      else pushMsg("Denne nettleseren kan ikke vise varsler. Bruk en nyere Chrome, Edge, Firefox eller Safari.", "info");
-      return Promise.resolve();
+      if (isIos() && isStandalone()) return pushLimited(seq, null, "Varsler på iPhone krever iOS 16.4 eller nyere. Oppdater under Innstillinger → Generelt → Programvareoppdatering.");
+      if (isIos()) { $("push-ios").hidden = false; return pushLimited(seq, null, ""); }
+      return pushLimited(seq, null, "Denne nettleseren kan ikke vise varsler. Bruk en nyere Chrome, Edge, Firefox eller Safari.");
     }
-    if (permission() === "denied") { pushButtons("blocked"); pushMsg(BLOCKED, "info"); return Promise.resolve(); }
+    if (permission() === "denied") return pushLimited(seq, "blocked", BLOCKED);
     pushMsg("Henter …", "info");
     return Promise.all([api("/api/admin/push"), swRegistration().then((reg) => { pushState.reg = reg; return reg.pushManager.getSubscription(); })]).then((r) => {
       if (seq !== pushSeq) return;
@@ -621,7 +639,7 @@
       pushMsg(pushError(err));
     });
   }
-  function pushClear() { pushSeq++; pushState.sub = null; pushState.reg = null; pushState.others = 0; pushButtons(null); pushMsg(""); $("push-ios").hidden = true; }
+  function pushClear() { pushSeq++; pushState.sub = null; pushState.reg = null; pushState.others = 0; pushState.limited = null; pushButtons(null); pushMsg(""); $("push-ios").hidden = true; }
 
   $("push-on").addEventListener("click", () => {
     const btn = $("push-on");
@@ -726,7 +744,10 @@
     api("/api/admin/push/reset", { method: "POST", body: "{}" }).then(() => {
       if (!sub) {
         if (seq !== pushSeq) return;
-        pushShow("off", 0);
+        // Uten varsler her (av, blokkert eller ikke mulig i denne nettleseren): de samme knappene som før, uten
+        // «Slå av varsler på alle andre enheter»
+        const limited = pushState.limited;
+        if (limited) { pushState.others = 0; pushButtons(limited.mode); } else pushShow("off", 0);
         pushMsg("Varsler er slått av på alle andre enheter.", "ok");
         return;
       }
