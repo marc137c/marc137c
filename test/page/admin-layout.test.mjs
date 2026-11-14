@@ -64,3 +64,22 @@ for (const oldBrowser of [false, true]) {
     assert.equal(page.local.getItem("viggo-admin-token"), null);
   });
 }
+
+//   2. a modal sheet («Oppsett», the editor) never spills out of its frame: it scrolls inside, and where the browser
+//      has <dialog> (also old Chromium, which places it position: absolute with overflow visible) it is fixed to the
+//      screen and at most the screen's height; the compat.js stand-in keeps its own fixed, scrolling style.
+test("layout: a modal sheet is fixed to the screen, no taller than it, and scrolls inside (Chrome 60)", () => {
+  const sheet = ruleIn(null, ".sheet");
+  assert.match(sheet, /max-height:\s*calc\(100% - 24px\)/);
+  assert.match(CSS, /\.sheet \{ overflow: auto; -webkit-overflow-scrolling: touch; \}/, "scrolls inside instead of spilling out");
+  const modal = ruleIn(null, ".sheet[open]:not(.dialog-shim)");
+  assert.match(modal, /position:\s*fixed/);
+  assert.match(modal, /top:\s*0/);
+  assert.match(modal, /bottom:\s*0/);
+  assert.match(modal, /height:\s*fit-content/, "shrinks to its content where it fits, like newer browsers");
+  const shim = ruleIn(null, ".dialog-shim[open]");
+  assert.match(shim, /position:\s*fixed/);
+  assert.match(shim, /overflow:\s*auto/);
+  // Both dialogs are .sheet
+  for (const id of ["settings", "editor"]) assert.match(HTML, new RegExp(`<dialog class="sheet" id="${id}"`));
+});
