@@ -21,20 +21,21 @@ import { RFC8291_EXAMPLE as X, makeDevice, fakePushService, decryptPushMessage, 
 import {
   encryptPayload, vapidKeys, readVapidKeys, vapidAuthorization, contactFor, pushService, normalizeEndpoint,
   parseSubscription, saveSubscription, removeSubscriptions, readSubscriptions, sendPush, pushToDevices,
-  bookingMessage, testMessage, notifyNewBooking, VAPID_KEY, SUBS_KEY, MAX_DEVICES, RECORD_SIZE, JWT_LIFETIME_S, PUSH_TIMEOUT_MS,
+  bookingMessage, testMessage, notifyNewBooking, pushGen, clearSubscriptions, VAPID_KEY, SUBS_KEY, MAX_DEVICES, RECORD_SIZE, JWT_LIFETIME_S, PUSH_TIMEOUT_MS,
 } from "../../netlify/lib/push.mjs";
 
 const NOW = new Date("2026-11-16T08:00:00Z");
 const unb64u = (s) => Buffer.from(s, "base64url");
 const storeOf = (blobs = new FakeBlobs()) => blobs.getStore({ name: "bookings", consistency: "strong" });
 const asStored = (device) => parseSubscription(device.subscription).value;
+const GEN = pushGen("fake-admin-password"); // the admin password the devices were turned on with
 
 async function setup(kinds = ["fcm"], reply) {
   const blobs = new FakeBlobs();
   const store = storeOf(blobs);
   const keys = await vapidKeys(store, { now: NOW });
   const devices = kinds.map(makeDevice);
-  for (const d of devices) await saveSubscription(store, asStored(d), { now: NOW });
+  for (const d of devices) await saveSubscription(store, asStored(d), { now: NOW, gen: GEN });
   const push = fakePushService({ devices, reply });
   return { blobs, store, keys, devices, push };
 }
@@ -181,16 +182,16 @@ test("push: saving is idempotent per endpoint; above MAX_DEVICES the least recen
   const store = storeOf(blobs);
   const clock = new FakeClock(NOW);
   const devices = Array.from({ length: MAX_DEVICES + 1 }, () => makeDevice());
-  let r = await saveSubscription(store, asStored(devices[0]), { now: clock.date() });
+  let r = await saveSubscription(store, asStored(devices[0]), { now: clock.date(), gen: GEN });
   assert.deepEqual(r, { ok: true, created: true, devices: 1 });
-  r = await saveSubscription(store, asStored(devices[0]), { now: clock.advance(1000).date() });
+  r = await saveSubscription(store, asStored(devices[0]), { now: clock.advance(1000).date(), gen: GEN });
   assert.deepEqual(r, { ok: true, created: false, devices: 1 }, "the same device twice is one device");
   const first = blobs.json("bookings", SUBS_KEY).subs[0];
   assert.equal(first.createdAt, NOW.toISOString());
   assert.equal(first.seenAt, new Date(NOW.getTime() + 1000).toISOString());
-  for (const d of devices.slice(1, MAX_DEVICES)) await saveSubscription(store, asStored(d), { now: clock.advance(1000).date() });
-  await saveSubscription(store, asStored(devices[0]), { now: clock.advance(1000).date() }); // the first one is seen again
-  r = await saveSubscription(store, asStored(devices[MAX_DEVICES]), { now: clock.advance(1000).date() });
+  for (const d of devices.slice(1, MAX_DEVICES)) await saveSubscription(store, asStored(d), { now: clock.advance(1000).date(), gen: GEN });
+  await saveSubscription(store, asStored(devices[0]), { now: clock.advance(1000).date(), gen: GEN }); // the first one is seen again
+  r = await saveSubscription(store, asStored(devices[MAX_DEVICES]), { now: clock.advance(1000).date(), gen: GEN });
   assert.equal(r.devices, MAX_DEVICES);
   const kept = (await readSubscriptions(store)).map((s) => s.endpoint);
   assert.ok(kept.includes(devices[0].endpoint), "seen recently: kept");
@@ -207,7 +208,7 @@ test("push: two devices saved at the same time are both kept", async () => {
   const blobs = new FakeBlobs();
   const store = storeOf(blobs);
   const devices = Array.from({ length: 4 }, () => makeDevice());
-  await Promise.all(devices.map((d) => saveSubscription(store, asStored(d), { now: NOW })));
+  await Promise.all(devices.map((d) => saveSubscription(store, asStored(d), { now: NOW, gen: GEN })));
   assert.deepEqual((await readSubscriptions(store)).map((s) => s.endpoint).sort(), devices.map((d) => d.endpoint).sort());
 });
 
@@ -274,8 +275,8 @@ test("push: pushToDevices sends to every device at once, removes only the gone o
   const out = quiet(t);
   const { store, blobs, devices, push } = await setup(["fcm", "mozilla", "apple", "wns"], (del) => (del.device.kind === "mozilla" ? 410 : del.device.kind === "wns" ? 500 : 201));
   const item = { id: "2026-11-20_abc", date: "2026-11-20", start: 840, service: "Herreklipp", addons: [], name: "Ola Nordmann", phone: "912 34 567" };
-  const r = await pushToDevices(store, bookingMessage(item), { fetch: push.fetch, now: NOW, origin: "https://viggos.test" });
-  assert.deepEqual(r, { devices: 3, targets: 4, sent: 2, failed: 1, gone: 1 });
+  const r = await pushToDevices(store, bookingMessage(item), { fetch: push.fetch, now: NOW, gen: GEN, origin: "https://viggos.test" });
+  assert.deepEqual(r, { devices: 3, targets: 4, sent: 2, failed: 1, gone: 1, stale: 0 });
   assert.equal(push.deliveries.length, 4);
   const left = (await readSubscriptions(store)).map((s) => s.endpoint).sort();
   assert.deepEqual(left, devices.filter((d) => d.kind !== "mozilla").map((d) => d.endpoint).sort(), "a 500 keeps the device, a 410 removes it");
@@ -290,12 +291,12 @@ test("push: pushToDevices sends to every device at once, removes only the gone o
 
 test("push: only the one device asked for; an unknown endpoint sends nothing", async () => {
   const { store, devices, push } = await setup(["fcm", "apple"]);
-  let r = await pushToDevices(store, testMessage(), { fetch: push.fetch, now: NOW, endpoint: devices[1].endpoint });
+  let r = await pushToDevices(store, testMessage(), { fetch: push.fetch, now: NOW, gen: GEN, endpoint: devices[1].endpoint });
   assert.deepEqual([r.targets, r.sent], [1, 1]);
   assert.deepEqual(push.deliveries.map((d) => d.url), [devices[1].endpoint]);
-  r = await pushToDevices(store, testMessage(), { fetch: push.fetch, now: NOW, endpoint: makeDevice().endpoint });
+  r = await pushToDevices(store, testMessage(), { fetch: push.fetch, now: NOW, gen: GEN, endpoint: makeDevice().endpoint });
   assert.deepEqual([r.targets, r.sent], [0, 0]);
-  r = await pushToDevices(store, testMessage(), { fetch: push.fetch, now: NOW, endpoint: "https://evil.test/x" });
+  r = await pushToDevices(store, testMessage(), { fetch: push.fetch, now: NOW, gen: GEN, endpoint: "https://evil.test/x" });
   assert.equal(r.targets, 0);
   assert.equal(push.deliveries.length, 1);
 });
@@ -303,8 +304,8 @@ test("push: only the one device asked for; an unknown endpoint sends nothing", a
 test("push: without devices nothing is read beyond the device list, and nothing is fetched", async () => {
   const blobs = new FakeBlobs();
   const fetch = fakeFetch();
-  const r = await pushToDevices(storeOf(blobs), testMessage(), { fetch, now: NOW });
-  assert.deepEqual(r, { devices: 0, targets: 0, sent: 0, failed: 0, gone: 0 });
+  const r = await pushToDevices(storeOf(blobs), testMessage(), { fetch, now: NOW, gen: GEN });
+  assert.deepEqual(r, { devices: 0, targets: 0, sent: 0, failed: 0, gone: 0, stale: 0 });
   assert.deepEqual(blobs.log.map((e) => e.key), [SUBS_KEY]);
   assert.equal(blobs.has("bookings", VAPID_KEY), false, "sending never makes keys");
   assert.equal(fetch.calls.length, 0);
@@ -315,10 +316,10 @@ test("push: notifyNewBooking never throws, whatever the store or the push servic
   const { blobs, store, devices } = await setup(["fcm"]);
   const item = { id: "2026-11-20_abc", date: "2026-11-20", start: 840, service: "Herreklipp", addons: [], name: "Ola Nordmann", phone: "912 34 567" };
   blobs.inject({ method: "GET", key: SUBS_KEY, fault: "fail-before", status: 500, times: Infinity });
-  assert.deepEqual(await notifyNewBooking(store, item, { fetch: fakePushService({ devices }).fetch, now: NOW }), { error: true });
+  assert.deepEqual(await notifyNewBooking(store, item, { fetch: fakePushService({ devices }).fetch, now: NOW, gen: GEN }), { error: true });
   blobs.clearFaults();
   blobs.seed("bookings", SUBS_KEY, "{ broken json with Ola Nordmann");
-  assert.deepEqual(await notifyNewBooking(store, item, { fetch: fakePushService({ devices }).fetch, now: NOW }), { error: true });
+  assert.deepEqual(await notifyNewBooking(store, item, { fetch: fakePushService({ devices }).fetch, now: NOW, gen: GEN }), { error: true });
   assert.doesNotMatch(JSON.stringify(out.error), /Ola|broken/, "a parse error's message (which quotes stored text) is not logged");
 });
 
@@ -342,4 +343,50 @@ test("push: a booking's notification says weekday, date, time, service with add-
     const w = weekday.format(d);
     assert.equal(body, `${w[0].toUpperCase()}${w.slice(1)} ${d.getUTCDate()}. ${month.format(d)} kl. 10:05 · Barneklipp · Kari`);
   }
+});
+
+// ---------- 7. Tied to the admin password ----------
+test("push: devices belong to the admin password they were turned on with; another password never reaches them", async (t) => {
+  const out = quiet(t);
+  const { store, blobs, devices, push } = await setup(["apple", "fcm"]);
+  assert.equal(pushGen("fake-admin-password"), GEN);
+  assert.match(GEN, /^[A-Za-z0-9_-]{16}$/);
+  assert.notEqual(pushGen("another-password"), GEN);
+  assert.equal(pushGen(""), null);
+  assert.equal(pushGen(undefined), null);
+  assert.ok(blobs.json("bookings", SUBS_KEY).subs.every((s) => s.gen === GEN), "each device is stored with its password's gen");
+  assert.doesNotMatch(JSON.stringify(blobs.json("bookings", SUBS_KEY)), /fake-admin-password/, "never the password itself");
+  // No password (admin not set up): nothing is sent and nothing is deleted
+  for (const gen of [undefined, null, ""]) {
+    const r = await pushToDevices(store, testMessage(), { fetch: push.fetch, now: NOW, gen });
+    assert.deepEqual([r.targets, r.sent, r.stale], [0, 0, 0], String(gen));
+  }
+  assert.equal(blobs.json("bookings", SUBS_KEY).subs.length, 2);
+  assert.deepEqual(await saveSubscription(store, asStored(makeDevice()), { now: NOW }), { error: "Varsler er ikke satt opp: mangler admin-passord.", status: 503 });
+  // A new password: the old devices get nothing and are removed
+  const r = await pushToDevices(store, testMessage(), { fetch: push.fetch, now: NOW, gen: pushGen("another-password") });
+  assert.deepEqual(r, { devices: 0, targets: 0, sent: 0, failed: 0, gone: 0, stale: 2 });
+  assert.equal(push.deliveries.length, 0);
+  assert.deepEqual(blobs.json("bookings", SUBS_KEY).subs, []);
+  assert.doesNotMatch(JSON.stringify(out.warn), new RegExp(devices[0].endpoint.slice(-20)));
+});
+
+test("push: saving under a new password drops the old password's devices; reading counts only the current ones", async () => {
+  const { store, blobs, devices } = await setup(["apple", "fcm"]);
+  const NEW = pushGen("new-password");
+  assert.deepEqual((await readSubscriptions(store, { gen: NEW })), []);
+  assert.equal((await readSubscriptions(store, { gen: GEN })).length, 2);
+  const r = await saveSubscription(store, asStored(devices[0]), { now: NOW, gen: NEW });
+  assert.deepEqual(r, { ok: true, created: true, devices: 1 }, "the same browser under a new password is a new device");
+  assert.deepEqual(blobs.json("bookings", SUBS_KEY).subs.map((s) => [s.endpoint, s.gen]), [[devices[0].endpoint, NEW]]);
+});
+
+test("push: clearSubscriptions leaves no device, and writes nothing when there is none", async () => {
+  const { store, blobs } = await setup(["apple", "fcm", "wns"]);
+  assert.deepEqual(await clearSubscriptions(store), { ok: true, devices: 0 });
+  assert.deepEqual(blobs.json("bookings", SUBS_KEY), { subs: [] });
+  const writes = blobs.log.filter((e) => e.method === "PUT").length;
+  assert.ok(writes >= 4, "the three saves and the clear were writes");
+  assert.deepEqual(await clearSubscriptions(store), { ok: true, devices: 0 });
+  assert.equal(blobs.log.filter((e) => e.method === "PUT").length, writes);
 });

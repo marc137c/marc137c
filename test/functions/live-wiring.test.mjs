@@ -15,7 +15,7 @@ import admin from "../../netlify/functions/admin.mjs";
 import calendar from "../../netlify/functions/calendar.mjs";
 import { realGetStoreFor } from "../helpers/real-blobs.mjs";
 import { createFeed } from "../../netlify/lib/calendar.mjs";
-import { vapidKeys, saveSubscription, parseSubscription } from "../../netlify/lib/push.mjs";
+import { vapidKeys, saveSubscription, parseSubscription, pushGen } from "../../netlify/lib/push.mjs";
 import { makeDevice, fakePushService, PUSH_HOST } from "../helpers/fake-push.mjs";
 
 const ENV_VARS = ["ADMIN_PASSWORD"];
@@ -98,7 +98,9 @@ test("live wiring: a web booking notifies the stored devices through the global 
   const store = realGetStoreFor(blobs)({ name: "bookings", consistency: "strong" });
   const keys = await vapidKeys(store);
   const phone = makeDevice("apple");
-  await saveSubscription(store, parseSubscription(phone.subscription).value);
+  process.env.ADMIN_PASSWORD = "fake-admin-password"; // the device belongs to this admin password (the handler reads it)
+  const saved = await saveSubscription(store, parseSubscription(phone.subscription).value, { gen: pushGen("fake-admin-password") });
+  assert.equal(saved.ok, true, JSON.stringify(saved));
   const push = fakePushService({ devices: [phone] });
   const blobsOnly = globalThis.fetch;
   globalThis.fetch = (input, init) => (PUSH_HOST.test(String(input)) ? push.fetch(input, init) : blobsOnly(input, init));

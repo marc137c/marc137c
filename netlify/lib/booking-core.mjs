@@ -257,6 +257,14 @@ export async function deleteItem(store, id) {
 const b64url = (buf) => Buffer.from(buf).toString("base64url");
 const signingKey = (password) => createHash("sha256").update("viggos-admin:" + password).digest();
 
+// Et kort merke for «dette passordet» til ting som skal slutte å virke når passordet byttes, slik billettene gjør:
+// varsler på enhetene (purpose «push») og kalenderlenken («calendar»). De første 16 tegnene av
+// SHA-256(«viggos-<purpose>:» + passordet) i base64url. Uten passord null.
+export function passwordGen(password, purpose) {
+  if (!password || !/^[a-z]+$/.test(String(purpose))) return null;
+  return createHash("sha256").update(`viggos-${purpose}:` + password).digest("base64url").slice(0, 16);
+}
+
 export function checkPassword(given, password) {
   if (!password || typeof given !== "string") return false;
   const a = createHash("sha256").update(given).digest();

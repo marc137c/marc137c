@@ -14,7 +14,7 @@ import { makeDevice, fakePushService } from "../helpers/fake-push.mjs";
 import { parseCalendar, components, prop } from "../helpers/ical.mjs";
 import { isDate, addDays, makeToken, getAvailability } from "../../netlify/lib/booking-core.mjs";
 import { buildCalendar } from "../../netlify/lib/calendar.mjs";
-import { notifyNewBooking, saveSubscription, parseSubscription, vapidKeys } from "../../netlify/lib/push.mjs";
+import { notifyNewBooking, saveSubscription, parseSubscription, vapidKeys, pushGen } from "../../netlify/lib/push.mjs";
 import * as bookings from "../../netlify/functions/bookings.mjs";
 import * as admin from "../../netlify/functions/admin.mjs";
 
@@ -96,8 +96,8 @@ test("impossible dates: no notification is built for a date that does not exist"
   const d = testDeps({ now: NOW, env: { ADMIN_PASSWORD: PASSWORD }, fetch: push.fetch });
   const store = d.blobs.getStore({ name: "bookings", consistency: "strong" });
   await vapidKeys(store, { now: d.clock.date() });
-  await saveSubscription(store, parseSubscription(phone.subscription).value, { now: d.clock.date() });
-  const opts = { fetch: push.fetch, now: d.clock.date(), origin: "https://viggos.test" };
+  await saveSubscription(store, parseSubscription(phone.subscription).value, { now: d.clock.date(), gen: pushGen(PASSWORD) });
+  const opts = { fetch: push.fetch, now: d.clock.date(), origin: "https://viggos.test", gen: pushGen(PASSWORD) };
   for (const date of ["2026-11-31", "2027-02-29", "", undefined]) {
     assert.deepEqual(await notifyNewBooking(store, item({ date, name: "Spøkelse" }), opts), { skipped: true }, String(date));
   }

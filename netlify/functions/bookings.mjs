@@ -5,7 +5,7 @@
 import { liveDeps, bookingStore, afterResponse } from "../lib/runtime.mjs";
 import { validateCustomer, createItem } from "../lib/booking-core.mjs";
 import { takeBookingSlot } from "../lib/limits.mjs";
-import { notifyNewBooking, BOOKING_PUSH_WAIT_MS } from "../lib/push.mjs";
+import { notifyNewBooking, pushGen, BOOKING_PUSH_WAIT_MS } from "../lib/push.mjs";
 
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
@@ -36,7 +36,8 @@ export async function handle(req, context, deps) {
     }
     const r = await createItem(store, { ...v.value, type: "booking" }, { source: "nettside", now: deps.now() });
     if (r.error) return json({ error: r.error, code: r.code }, r.status);
-    const pushing = notifyNewBooking(store, r.item, { fetch: deps.fetch, now: deps.now(), origin: new URL(req.url).origin });
+    // Bare enheter slått på med dagens admin-passord får varselet (bytter Viggo passordet, stopper alle gamle)
+    const pushing = notifyNewBooking(store, r.item, { fetch: deps.fetch, now: deps.now(), origin: new URL(req.url).origin, gen: pushGen(deps.env.ADMIN_PASSWORD) });
     await afterResponse(context, pushing, BOOKING_PUSH_WAIT_MS);
     const { id, date, start, dur, service } = r.item;
     return json({ ok: true, booking: { id, date, start, dur, service } }, 201);

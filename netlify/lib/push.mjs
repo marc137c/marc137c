@@ -7,14 +7,22 @@
 //   VAPID_KEY  { publicKey, privateKey (JWK), createdAt }: lages én gang, av serveren selv, så ingen trenger å
 //              skrive inn en hemmelighet. Den private nøkkelen forlater aldri serveren og skrives aldri til
 //              loggen; nettleseren får bare den offentlige.
-//   SUBS_KEY   { subs: [{ endpoint, p256dh, auth, createdAt, seenAt }] }: én per enhet, høyst MAX_DEVICES.
+//   SUBS_KEY   { subs: [{ endpoint, p256dh, auth, gen, createdAt, seenAt }] }: én per enhet, høyst MAX_DEVICES.
+//
+// Hver enhet er knyttet til admin-passordet den ble slått på med (gen = pushGen(ADMIN_PASSWORD)). Bytter Viggo
+// passordet, får ingen av de gamle enhetene flere varsler (de slettes ved neste sending), akkurat som alle blir
+// logget ut. «Slå av varsler på alle andre enheter» (clearSubscriptions) fjerner alle med en gang.
 //
 // Vi sender bare til adresser hos kjente push-tjenester (PUSH_SERVICES), aldri til en vilkårlig adresse en
 // nettleser har oppgitt. Svarer tjenesten 404/410, er abonnementet borte for godt og slettes.
 // Sending kaster aldri, har kort tidsfrist (PUSH_TIMEOUT_MS) og logger bare tjenestens navn og svaret: aldri
 // adressen (den er selv en slags nøkkel), kundens navn eller noen nøkkel.
 import { ECDH, createECDH, createPrivateKey, generateKeyPairSync, hkdfSync, createCipheriv, randomBytes, sign } from "node:crypto";
-import { isDate, mutateJSON } from "./booking-core.mjs";
+import { isDate, mutateJSON, passwordGen } from "./booking-core.mjs";
+
+// Hvilket admin-passord en enhet hører til: de første 16 tegnene av SHA-256("viggos-push:" + passordet) i
+// base64url. Uten passord (admin ikke satt opp) null: da sendes ingenting.
+export const pushGen = (password) => passwordGen(password, "push");
 
 export const VAPID_KEY = "push/vapid";
 export const SUBS_KEY = "push/subs";
@@ -78,35 +86,54 @@ export function parseSubscription(input) {
 const initSubs = (d) => (d && Array.isArray(d.subs) ? d : { subs: [] });
 const newestFirst = (a, b) => (a.seenAt < b.seenAt ? 1 : a.seenAt > b.seenAt ? -1 : 0);
 
-export async function readSubscriptions(store) {
-  return initSubs(await store.get(SUBS_KEY, { type: "json" })).subs.filter(usable);
+const isGen = (gen) => typeof gen === "string" && gen.length === 16;
+const current = (gen) => (s) => usable(s) && isGen(gen) && s.gen === gen;
+
+// Enhetene som hører til dette passordet (gen). Uten gen: alle som er hele (bare til tester og opprydding).
+export async function readSubscriptions(store, { gen } = {}) {
+  const subs = initSubs(await store.get(SUBS_KEY, { type: "json" })).subs.filter(usable);
+  return gen === undefined ? subs : subs.filter(current(gen));
 }
 
-// Legger til (eller fornyer) en enhet. Er det flere enn MAX_DEVICES, går den som er sett minst nylig ut.
+// Legger til (eller fornyer) en enhet for passordet gen. Enheter fra et gammelt passord ryddes bort samtidig.
+// Er det flere enn MAX_DEVICES, går den som er sett minst nylig ut.
 // Svarer { ok, created, devices } (eller { error, status } hvis lagringen ikke ble enig med seg selv).
-export async function saveSubscription(store, sub, { now = new Date() } = {}) {
+export async function saveSubscription(store, sub, { now = new Date(), gen } = {}) {
+  if (!isGen(gen)) return { error: "Varsler er ikke satt opp: mangler admin-passord.", status: 503 };
   let created = false;
   const r = await mutateJSON(store, SUBS_KEY, initSubs, (doc) => {
     const at = now.toISOString();
-    const same = doc.subs.find((s) => s && s.endpoint === sub.endpoint);
+    const same = doc.subs.find((s) => s && s.endpoint === sub.endpoint && s.gen === gen);
     created = !same;
-    if (same) Object.assign(same, { p256dh: sub.p256dh, auth: sub.auth, seenAt: at });
-    else doc.subs.push({ endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth, createdAt: at, seenAt: at });
+    doc.subs = doc.subs.filter((s) => s !== same && current(gen)(s) && s.endpoint !== sub.endpoint);
+    doc.subs.push(same
+      ? Object.assign(same, { p256dh: sub.p256dh, auth: sub.auth, seenAt: at })
+      : { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth, gen, createdAt: at, seenAt: at });
     doc.subs = doc.subs.filter(usable).sort(newestFirst).slice(0, MAX_DEVICES);
     return { ok: true, devices: doc.subs.length };
   });
   return r.error ? r : { ok: true, created, devices: r.devices };
 }
 
-// Fjerner enhetene med disse adressene. Svarer { ok, removed, devices }.
-export async function removeSubscriptions(store, endpoints) {
+// Fjerner enhetene med disse adressene (og, med gen, alle fra et gammelt passord). Svarer { ok, removed, devices }.
+export async function removeSubscriptions(store, endpoints, { gen } = {}) {
   const gone = new Set(endpoints.map(normalizeEndpoint).filter(Boolean));
   return mutateJSON(store, SUBS_KEY, initSubs, (doc) => {
     const before = doc.subs.length;
-    doc.subs = doc.subs.filter((s) => !(s && gone.has(s.endpoint)));
-    const devices = doc.subs.filter(usable).length;
+    doc.subs = doc.subs.filter((s) => !(s && gone.has(s.endpoint)) && (gen === undefined || current(gen)(s)));
+    const devices = doc.subs.filter(gen === undefined ? usable : current(gen)).length;
     return doc.subs.length === before ? { ok: true, noWrite: true, removed: 0, devices } : { ok: true, removed: before - doc.subs.length, devices };
   });
+}
+
+// «Slå av varsler på alle andre enheter»: ingen enhet får varsler før den slås på igjen. Svarer { ok, devices: 0 }.
+export async function clearSubscriptions(store) {
+  const r = await mutateJSON(store, SUBS_KEY, initSubs, (doc) => {
+    if (!doc.subs.length) return { ok: true, noWrite: true };
+    doc.subs = [];
+    return { ok: true };
+  });
+  return r.error ? r : { ok: true, devices: 0 };
 }
 
 // ---------- VAPID-nøkkelparet (RFC 8292) ----------
@@ -223,13 +250,25 @@ export async function sendPush(sub, message, { keys, fetch, now = new Date(), su
 
 const why = (r) => (r.status ? `svarte ${r.status}` : r.error === "timeout" ? "svarte ikke i tide" : r.error === "crypto" ? "fikk ikke kryptert melding" : "kunne ikke nås");
 
-// Sender meldingen til alle lagrede enheter (eller bare den med adressen endpoint) samtidig, og sletter enheter
-// push-tjenesten sier er borte. Svarer { devices, targets, sent, failed, gone }. Kaster bare hvis lagringen feiler.
-export async function pushToDevices(store, message, { fetch, now = new Date(), origin, endpoint, timeoutMs } = {}) {
-  const all = await readSubscriptions(store);
+// Sender meldingen til alle lagrede enheter for passordet gen (eller bare den med adressen endpoint) samtidig.
+// Sletter enheter push-tjenesten sier er borte, og enheter fra et gammelt passord (de får aldri noe). Uten gen
+// (admin-passordet mangler) sendes ingenting, og ingenting slettes.
+// Svarer { devices, targets, sent, failed, gone, stale }. Kaster bare hvis lagringen feiler.
+export async function pushToDevices(store, message, { fetch, now = new Date(), origin, endpoint, timeoutMs, gen } = {}) {
+  const stored = await readSubscriptions(store);
+  const all = stored.filter(current(gen));
+  const stale = isGen(gen) ? stored.length - all.length : 0;
   const only = endpoint === undefined ? null : normalizeEndpoint(endpoint);
   const targets = endpoint === undefined ? all : all.filter((s) => s.endpoint === only);
-  const summary = { devices: all.length, targets: targets.length, sent: 0, failed: 0, gone: 0 };
+  const summary = { devices: all.length, targets: targets.length, sent: 0, failed: 0, gone: 0, stale };
+  if (stale) {
+    try {
+      await removeSubscriptions(store, [], { gen });
+      console.warn(`Push: ${stale} ${stale === 1 ? "enhet" : "enheter"} fra et gammelt admin-passord er fjernet`);
+    } catch (err) {
+      console.error("Push: kunne ikke fjerne enheter fra et gammelt passord:", err && err.name);
+    }
+  }
   if (!targets.length) return summary;
   const keys = await readVapidKeys(store);
   if (!keys) {
@@ -252,7 +291,7 @@ export async function pushToDevices(store, message, { fetch, now = new Date(), o
   });
   if (gone.length) {
     try {
-      const removed = await removeSubscriptions(store, gone);
+      const removed = await removeSubscriptions(store, gone, { gen });
       if (!removed.error) summary.devices = removed.devices;
     } catch (err) {
       console.error("Push: kunne ikke fjerne enheter som er borte:", err && err.name);

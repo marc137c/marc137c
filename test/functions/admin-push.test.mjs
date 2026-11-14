@@ -19,7 +19,7 @@ import * as admin from "../../netlify/functions/admin.mjs";
 
 const PASSWORD = "fake-admin-password";
 const NOW = "2026-11-16T08:00:00Z";
-const PATHS = ["/api/admin/push", "/api/admin/push/subscribe", "/api/admin/push/unsubscribe", "/api/admin/push/test"];
+const PATHS = ["/api/admin/push", "/api/admin/push/subscribe", "/api/admin/push/unsubscribe", "/api/admin/push/test", "/api/admin/push/reset"];
 
 function setup({ devices = [], reply } = {}) {
   const push = fakePushService({ devices, reply });
