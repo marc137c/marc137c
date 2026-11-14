@@ -46,6 +46,16 @@ Alle timene kan ligge i kalenderen på telefonen (iPhone-kalenderen eller Google
 - **Hold lenken hemmelig:** den som har den, ser navn og telefonnummer til kundene. Har noen fått den som ikke skal ha den, eller er en telefon mistet: **Oppsett → Lag ny lenke**. Den gamle slutter å virke med en gang; slett den gamle kalenderen på telefonen og legg til den nye.
 - Teknisk: `/api/calendar/<hemmelighet>.ics` (`netlify/functions/calendar.mjs`, iCalendar etter RFC 5545, norsk tid med sommertid). Hemmeligheten ligger i Netlify Blobs (`calendar/feed` i timeboken), og forhåndsvisninger har sin egen lenke og sin egen timebok. Svaret mellomlagres aldri, og en feil eller gammel lenke gir bare «Fant ikke kalenderen».
 
+### Varsler om nye bestillinger
+Hver gang en kunde bestiller time på nettsiden, kommer det et varsel på telefonen (og/eller PC-en): «Ny time» med dag, dato, klokkeslett, tjeneste og kundens navn. Trykk på varselet, så åpnes timeboken på den dagen. Det slås på én gang per enhet:
+- **iPhone/iPad (iOS 16.4 eller nyere):** åpne /admin i Safari, trykk **Del → Legg til på Hjem-skjerm**, og åpne **Timebok** fra Hjem-skjermen. Logg inn der (appen husker ikke innloggingen fra Safari), gå til **Oppsett → Slå på varsler** og trykk **Tillat**.
+- **Android og PC (Chrome, Edge, Firefox, Safari på Mac):** gå til /admin → **Oppsett → Slå på varsler** og trykk **Tillat**.
+- **Send testvarsel** sjekker at det virker på enheten. **Slå av** stopper varslene på den enheten. Opptil 10 enheter kan få varsler samtidig.
+- Varsler kommer bare for bestillinger på nettsiden, ikke for timer du legger inn selv i timeboken.
+- Kommer det ikke noe varsel? Sjekk at varsler er tillatt for Timebok (iPhone: Innstillinger → Varslinger → Timebok) eller for nettleseren, og at telefonen ikke står i «Ikke forstyrr».
+- Ingenting å sette opp i Netlify: nøkkelparet (VAPID) lages automatisk første gang og ligger i timeboken i Netlify Blobs. Den private nøkkelen forlater aldri serveren. Forhåndsvisninger har egne nøkler og egne enheter.
+- Teknisk: standard Web Push (RFC 8030/8291/8292) i `netlify/lib/push.mjs`, `/api/admin/push` i `netlify/functions/admin.mjs`, service worker `admin-sw.js` og app-filen `admin.webmanifest` (ikonene lages av `scripts/make-admin-icons.mjs`). Varselet går kryptert via Apple, Google, Mozilla eller Microsoft sin push-tjeneste, så bare enheten kan lese det, og telefonnummeret sendes ikke med. Serveren sender bare til disse fire tjenestene, fjerner enheter tjenesten sier er borte, og en bestilling venter aldri mer enn 1,5 sekunder på varslene.
+
 ## Google-anmeldelser
 Seksjonen «Hva kundene sier» viser snittkarakteren og 3–4 anmeldelser hentet automatisk fra Google (`/api/reviews`, mellomlagret i 12 timer).
 Før den er satt opp, vises en henvisning til Google med lenken «Se alle anmeldelser på Google».
