@@ -16,3 +16,15 @@ export const liveDeps = () => ({
   fetch: (url, init) => fetch(url, init),
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 });
+
+// Hvilken utrulling funksjonen hører til. Netlify gir hver funksjon context.deploy.context (Functions API,
+// https://docs.netlify.com/build/functions/api/#deploy): «production» for hovedsiden, ellers «deploy-preview»,
+// «branch-deploy», «preview-server», «dev» (netlify dev) eller et grennavn.
+// Bare produksjon bruker den ekte timeboken og sender SMS. Forhåndsvisninger og grener har sin egen lagring
+// («bookings-preview»), så en testbestilling der aldri tar en ekte tid eller får en ekte påminnelse.
+// Mangler context (eldre kall, tester), regnes det som ikke-produksjon: heller en tom timebok enn ekte data.
+export const isProduction = (context) => Boolean(context && context.deploy && context.deploy.context === "production");
+export const PRODUCTION_STORE = "bookings";
+export const PREVIEW_STORE = "bookings-preview";
+export const bookingStore = (deps, context) =>
+  deps.getStore({ name: isProduction(context) ? PRODUCTION_STORE : PREVIEW_STORE, consistency: "strong" });

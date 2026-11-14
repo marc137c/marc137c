@@ -9,6 +9,7 @@ import {
   CONFIG, addDays, isDate, osloNow, readMonths, validateAdmin,
   createItem, updateItem, deleteItem, checkPassword, makeToken, verifyToken,
 } from "../lib/booking-core.mjs";
+import { bookingStore } from "../lib/runtime.mjs";
 
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 const DAY = 24 * 60 * 60 * 1000;
@@ -24,7 +25,7 @@ export default async (req, context) => {
     let body = {};
     try { body = await req.json(); } catch {}
     // Sperre mot gjetting: maks 10 feil per IP og 100 totalt per 15 minutter
-    const authStore = getStore({ name: "bookings", consistency: "strong" });
+    const authStore = bookingStore({ getStore }, context); // forhåndsvisninger har sin egen lagring (F10)
     const ip = (context?.ip || req.headers.get("x-nf-client-connection-ip") || "ukjent").replace(/[^\w.:-]/g, "");
     const limits = [[`auth/ip/${ip}`, 10], ["auth/all", 100]];
     const WINDOW = 15 * 60 * 1000, now = Date.now();
@@ -47,7 +48,7 @@ export default async (req, context) => {
   const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   if (!verifyToken(token, password)) return json({ error: "Logg inn på nytt." }, 401);
 
-  const store = getStore({ name: "bookings", consistency: "strong" });
+  const store = bookingStore({ getStore }, context);
   const id = context?.params?.id || path.match(/^\/api\/admin\/items\/([^/]+)$/)?.[1];
   const force = url.searchParams.get("force") === "1";
 

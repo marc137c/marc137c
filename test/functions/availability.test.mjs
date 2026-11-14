@@ -1,7 +1,7 @@
 // Smoke test: GET /api/availability through handle(req, context, deps) with fake Blobs, env and clock.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { testDeps, request, read, quiet } from "../helpers/deps.mjs";
+import { testDeps, request, read, quiet, PRODUCTION } from "../helpers/deps.mjs";
 import { item, seedItems } from "../helpers/bookings.mjs";
 import { handle, config } from "../../netlify/functions/availability.mjs";
 
@@ -16,7 +16,7 @@ test("availability: answers with the schedule from the injected clock and busy r
     item({ date: "2026-11-13", start: 660, dur: 60, status: "cancelled" }),
     item({ date: "2026-12-01", start: 720, dur: 30, type: "block" }),
   ]);
-  const res = await read(await handle(request("/api/availability"), {}, d));
+  const res = await read(await handle(request("/api/availability"), PRODUCTION, d));
   assert.equal(res.status, 200);
   assert.equal(res.headers["cache-control"], "no-store");
   for (const k of ["today", "nowMinutes", "lastDate", "hours", "slotMin", "leadMin", "maxDays", "durations", "busy", "sms"]) {
@@ -34,14 +34,14 @@ test("availability: answers with the schedule from the injected clock and busy r
 
 test("availability: sms is true only when Sveve is configured in the injected env", async () => {
   const d = testDeps({ env: { SVEVE_USER: "u", SVEVE_PASSWD: "p" } });
-  assert.equal((await read(await handle(request("/api/availability"), {}, d))).body.sms, true);
+  assert.equal((await read(await handle(request("/api/availability"), PRODUCTION, d))).body.sms, true);
 });
 
 test("availability: a Blobs outage gives 500 JSON, not a crash", async (t) => {
   const out = quiet(t);
   const d = testDeps();
   d.blobs.inject({ method: "GET", fault: "fail-before", status: 500, times: Infinity });
-  const res = await read(await handle(request("/api/availability"), {}, d));
+  const res = await read(await handle(request("/api/availability"), PRODUCTION, d));
   assert.equal(res.status, 500);
   assert.deepEqual(res.body, { error: "Kunne ikke hente ledige tider." });
   assert.equal(res.headers["cache-control"], "no-store");

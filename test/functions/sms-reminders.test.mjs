@@ -2,7 +2,7 @@
 // clock and Sveve. The time budget, the store's latency and the Sveve ledger all run on the one virtual clock.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { testDeps, request, quiet } from "../helpers/deps.mjs";
+import { testDeps, request, quiet, PRODUCTION } from "../helpers/deps.mjs";
 import { oslo } from "../helpers/clock.mjs";
 import { item, seedItems, storedItems, CUSTOMER_MOBILE } from "../helpers/bookings.mjs";
 import { handle, config } from "../../netlify/functions/sms-reminders.mjs";
@@ -22,7 +22,7 @@ test("sms-reminders: sends a due reminder through deps.fetch and marks it on the
   const out = quiet(t);
   const d = testDeps({ now: NOW, env: SVEVE_ENV, sveve: true });
   const [b] = seedItems(d.blobs, [due(840), item({ date: "2026-11-25", start: 600 })]);
-  assert.equal(await handle(tick(), {}, d), undefined);
+  assert.equal(await handle(tick(), PRODUCTION, d), undefined);
   assert.equal(d.sveve.sent.length, 1);
   assert.equal(d.sveve.sent[0].to, CUSTOMER_MOBILE);
   assert.match(d.sveve.sent[0].msg, /i morgen kl\. 14:00/);
@@ -37,7 +37,7 @@ test("sms-reminders: without Sveve configured nothing is read, written or sent",
   const out = quiet(t);
   const d = testDeps({ now: NOW, env: {}, sveve: true });
   seedItems(d.blobs, [due(840)]);
-  await handle(tick(), {}, d);
+  await handle(tick(), PRODUCTION, d);
   assert.equal(d.blobs.log.length, 0);
   assert.equal(d.sveve.calls.length, 0);
   assert.deepEqual(out.log, []);
@@ -49,7 +49,7 @@ test("sms-reminders: a Blobs outage is logged and never thrown (the client's ret
   seedItems(d.blobs, [due(840)]);
   d.blobs.inject({ method: "GET", fault: "fail-before", status: 500, times: Infinity });
   const t0 = d.clock.now();
-  await handle(tick(), {}, d);
+  await handle(tick(), PRODUCTION, d);
   assert.equal(d.clock.now() - t0, 5 * 5000, "6 attempts, 5 s apart");
   assert.equal(d.sveve.calls.length, 0);
   assert.equal(out.error.length, 1);
@@ -61,7 +61,7 @@ test("sms-reminders: the 20 s budget is measured on deps.now(), so slow store wr
   const d = testDeps({ now: NOW, env: SVEVE_ENV, sveve: true });
   const items = seedItems(d.blobs, [due(830), due(845), due(860)]);
   d.blobs.inject({ method: "PUT", latencyMs: 12000, times: Infinity }); // every claim write takes 12 s
-  await handle(tick(), {}, d);
+  await handle(tick(), PRODUCTION, d);
   // claim 1 at 0 s, claim 2 at 12 s, item 3 at 24 s > 20 s: deferred, unmarked, picked up by the next run
   assert.equal(d.sveve.sent.length, 2);
   const stored = storedItems(d.blobs);

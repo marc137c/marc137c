@@ -1,7 +1,7 @@
 // Smoke test: POST /api/bookings through handle(req, context, deps) with fake Blobs, env, clock and Sveve.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { testDeps, request, read, quiet } from "../helpers/deps.mjs";
+import { testDeps, request, read, quiet, PRODUCTION } from "../helpers/deps.mjs";
 import { storedItems, CUSTOMER_PHONE, CUSTOMER_MOBILE } from "../helpers/bookings.mjs";
 import { handle, config } from "../../netlify/functions/bookings.mjs";
 
@@ -15,13 +15,13 @@ test("bookings: path is unchanged", () => {
 });
 
 test("bookings: only POST", async () => {
-  const res = await read(await handle(request("/api/bookings"), {}, testDeps()));
+  const res = await read(await handle(request("/api/bookings"), PRODUCTION, testDeps()));
   assert.equal(res.status, 405);
 });
 
 test("bookings: a valid booking is stored once, with the injected clock, and answered 201", async () => {
   const d = testDeps({ now: NOW });
-  const res = await read(await handle(post(BODY), {}, d));
+  const res = await read(await handle(post(BODY), PRODUCTION, d));
   assert.equal(res.status, 201);
   assert.equal(res.headers["cache-control"], "no-store");
   assert.equal(res.body.ok, true);
@@ -38,36 +38,36 @@ test("bookings: a valid booking is stored once, with the injected clock, and ans
 
 test("bookings: validation errors carry a code; a taken slot is 409", async () => {
   const d = testDeps({ now: NOW });
-  let res = await read(await handle(post({ ...BODY, service: "Nope" }), {}, d));
+  let res = await read(await handle(post({ ...BODY, service: "Nope" }), PRODUCTION, d));
   assert.deepEqual([res.status, res.body.code], [400, "bad_service"]);
-  res = await read(await handle(post({ ...BODY, phone: "12" }), {}, d));
+  res = await read(await handle(post({ ...BODY, phone: "12" }), PRODUCTION, d));
   assert.deepEqual([res.status, res.body.code], [400, "bad_phone"]);
-  assert.equal((await handle(post(BODY), {}, d)).status, 201);
-  res = await read(await handle(post({ ...BODY, name: "Kari" }), {}, d));
+  assert.equal((await handle(post(BODY), PRODUCTION, d)).status, 201);
+  res = await read(await handle(post({ ...BODY, name: "Kari" }), PRODUCTION, d));
   assert.deepEqual([res.status, res.body.code], [409, "taken"]);
   assert.equal(storedItems(d.blobs).length, 1);
 });
 
 test("bookings: today's slots respect the injected clock (lead time)", async () => {
   const d = testDeps({ now: NOW });
-  const res = await read(await handle(post({ ...BODY, date: "2026-11-12", start: 630 }), {}, d));
+  const res = await read(await handle(post({ ...BODY, date: "2026-11-12", start: 630 }), PRODUCTION, d));
   assert.deepEqual([res.status, res.body.code], [400, "too_early"]);
 });
 
 test("bookings: honeypot, oversize and broken JSON", async () => {
   const d = testDeps({ now: NOW });
-  let res = await read(await handle(post({ ...BODY, botField: "x" }), {}, d));
+  let res = await read(await handle(post({ ...BODY, botField: "x" }), PRODUCTION, d));
   assert.deepEqual([res.status, res.body], [200, { ok: true }]);
   assert.equal(storedItems(d.blobs).length, 0);
-  res = await read(await handle(post({ ...BODY, note: "x".repeat(5000) }), {}, d));
+  res = await read(await handle(post({ ...BODY, note: "x".repeat(5000) }), PRODUCTION, d));
   assert.equal(res.status, 413);
-  res = await read(await handle(request("/api/bookings", { method: "POST", body: "{nope" }), {}, d));
+  res = await read(await handle(request("/api/bookings", { method: "POST", body: "{nope" }), PRODUCTION, d));
   assert.equal(res.status, 400);
 });
 
 test("bookings: with Sveve configured the confirmation goes through deps.fetch", async () => {
   const d = testDeps({ now: NOW, env: SVEVE_ENV, sveve: true });
-  const res = await read(await handle(post(BODY), {}, d));
+  const res = await read(await handle(post(BODY), PRODUCTION, d));
   assert.equal(res.status, 201);
   assert.equal(res.body.sms, "sent");
   assert.equal(d.sveve.sent.length, 1);
@@ -80,7 +80,7 @@ test("bookings: an SMS failure never stops a stored booking", async (t) => {
   const out = quiet(t);
   const d = testDeps({ now: NOW, env: SVEVE_ENV, sveve: true });
   d.sveve.inject({ fault: "fatal" });
-  const res = await read(await handle(post(BODY), {}, d));
+  const res = await read(await handle(post(BODY), PRODUCTION, d));
   assert.deepEqual([res.status, res.body.sms], [201, "failed"]);
   assert.equal(storedItems(d.blobs).length, 1);
   assert.equal(out.error.length, 1);
@@ -90,7 +90,7 @@ test("bookings: a Blobs outage gives 500 and the call-us text", async (t) => {
   quiet(t);
   const d = testDeps({ now: NOW });
   d.blobs.inject({ method: "GET", fault: "fail-before", status: 500, times: Infinity });
-  const res = await read(await handle(post(BODY), {}, d));
+  const res = await read(await handle(post(BODY), PRODUCTION, d));
   assert.equal(res.status, 500);
   assert.match(res.body.error, /Ring oss/);
 });

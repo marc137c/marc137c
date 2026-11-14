@@ -7,7 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { smsUnits } from "./helpers/fake-sveve.mjs";
-import { testDeps, request, read } from "./helpers/deps.mjs";
+import { testDeps, request, read, PRODUCTION } from "./helpers/deps.mjs";
 import { storedItems, CUSTOMER_PHONE, CUSTOMER_MOBILE } from "./helpers/bookings.mjs";
 import { addDays, CONFIG, validateCustomer } from "../netlify/lib/booking-core.mjs";
 import { confirmText, reminderText } from "../netlify/lib/sms.mjs";
@@ -84,7 +84,7 @@ test("validateCustomer stores the booking language, whitelisted to 'no' or 'en'"
 test("POST /api/bookings with lang 'en' stores lang and sends the confirmation in English", async () => {
   const d = testDeps({ now: "2026-11-12T09:00:00Z", env: { SVEVE_USER: "u", SVEVE_PASSWD: "p" }, sveve: true });
   const body = { service: "Herreklipp + skjeggtrim", date: "2026-11-13", start: 600, addons: [], name: "Tourist", phone: CUSTOMER_PHONE, lang: "en" };
-  const res = await read(await handle(request("/api/bookings", { method: "POST", json: body }), {}, d));
+  const res = await read(await handle(request("/api/bookings", { method: "POST", json: body }), PRODUCTION, d));
   assert.equal(res.status, 201);
   assert.equal(storedItems(d.blobs)[0].lang, "en");
   const toCustomer = d.sveve.to(CUSTOMER_MOBILE);

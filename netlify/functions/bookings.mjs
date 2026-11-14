@@ -1,6 +1,6 @@
 // POST /api/bookings – kunden bestiller en time. Tiden låses med en gang,
 // og to kunder kan aldri få samme tid (konfliktsikker skriving i Netlify Blobs).
-import { liveDeps } from "../lib/runtime.mjs";
+import { liveDeps, bookingStore, isProduction } from "../lib/runtime.mjs";
 import { validateCustomer, createItem, osloNow, readMonths, addDays, CONFIG } from "../lib/booking-core.mjs";
 import { smsConfigured, sendSms, confirmText, confirmationAllowed } from "../lib/sms.mjs";
 
@@ -19,13 +19,13 @@ export async function handle(req, context, deps) {
   const v = validateCustomer(input, deps.now());
   if (v.error) return json({ error: v.error, code: v.code }, v.status);
   try {
-    const store = deps.getStore({ name: "bookings", consistency: "strong" });
+    const store = bookingStore(deps, context); // forhåndsvisninger har sin egen timebok (F10)
     const r = await createItem(store, { ...v.value, type: "booking" }, { source: "nettside", now: deps.now() });
     if (r.error) return json({ error: r.error, code: r.code }, r.status);
     const { id, date, start, dur, service } = r.item;
     // SMS-bekreftelse (Sveve). Timen er allerede lagret, så en SMS-feil skal aldri stoppe bestillingen.
     let sms = "off";
-    if (smsConfigured(env)) {
+    if (isProduction(context) && smsConfigured(env)) { // SMS bare fra den ekte nettsiden
       try { // egen try: timen er lagret, så kunden skal få «booket» selv om noe her feiler
         const today = osloNow(deps.now()).date;
         const upcoming = await readMonths(store, today, addDays(today, CONFIG.maxDays));

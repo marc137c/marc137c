@@ -29,6 +29,12 @@ export function testDeps({ env = {}, clock, blobs, fetch, now, sveve } = {}) {
 
 export const SITE = "https://viggos.test";
 
+// The context Netlify gives a function (Functions API, context.deploy). The handlers use the real booking store
+// and send SMS only in PRODUCTION; deploy previews, branch deploys, netlify dev or no context get their own store.
+export const PRODUCTION = Object.freeze({ deploy: Object.freeze({ context: "production", id: "deploy-prod", published: true }) });
+export const PREVIEW = Object.freeze({ deploy: Object.freeze({ context: "deploy-preview", id: "deploy-pr1", published: false }) });
+export const BRANCH = Object.freeze({ deploy: Object.freeze({ context: "branch-deploy", id: "deploy-branch", published: false }) });
+
 // A Request like Netlify gives the function. json → JSON body with Content-Type application/json.
 export function request(path, { method = "GET", json, body, headers = {} } = {}) {
   const h = { ...headers };
