@@ -48,7 +48,7 @@ test("calendar feed: path", () => {
 });
 
 test("calendar feed: the right token gets the RFC 5545 feed of the bookings, never cached", async () => {
-  const b = item({ date: "2026-11-18", start: 600, name: "Ola Nordmann" });
+  const b = item({ date: "2026-11-18", start: 600, name: "Ola Nordmann", note: "Privat: kunden har lus, ikke si det til noen" });
   const { d, path } = await withFeed([b, item({ date: "2026-11-18", start: 660, status: "cancelled", name: "Avlyst Kunde" })]);
   const res = await feed(d, path);
   assert.equal(res.status, 200);
@@ -60,6 +60,8 @@ test("calendar feed: the right token gets the RFC 5545 feed of the bookings, nev
   assert.deepEqual(rfc5545Problems(res.body), []);
   assert.deepEqual(uids(res.body), [`${b.id}@viggos-timebok`]);
   assert.doesNotMatch(res.body, /Avlyst Kunde/);
+  assert.match(res.body, /Ola Nordmann/);
+  assert.doesNotMatch(res.body, /Privat|kunden har lus|Notat/, "the barber's private note never leaves /admin");
   assert.deepEqual(d.blobs.opened.map((o) => o.consistency), ["strong", "strong"], "always the strong store");
   assert.equal(d.fetch.calls.length, 0);
   // Without .ics works too (some apps drop it)

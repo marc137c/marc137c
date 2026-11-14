@@ -4,7 +4,8 @@
 //      DTSTAMP in UTC, a unique UID per event, every TZID backed by a VTIMEZONE, valid alarms;
 //   2. every active booking appears exactly once, with the right Oslo wall-clock times, also across the
 //      summer/winter time changes (the VTIMEZONE is resolved by its own rules and compared with Intl);
-//   3. cancelled bookings and blocks never appear; the text carries service (+ add-ons), name and phone;
+//   3. cancelled bookings and blocks never appear; the text carries service (+ add-ons), name and phone, and never
+//      the barber's private note;
 //   4. the link token is 256 random bits and only an exact match passes.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -50,7 +51,8 @@ test("calendar: one booking becomes one event with service, add-ons, name, phone
   const [ev] = events(ics);
   assert.equal(prop(ev, "UID").value, uidOf(b));
   assert.equal(text(ev, "SUMMARY"), "Full service + Vask kort hår, Styling – Ola Nordmann");
-  assert.equal(text(ev, "DESCRIPTION"), "Kunde: Ola Nordmann\nTelefon: 912 34 567\nTjeneste: Full service\nTillegg: Vask kort hår, Styling\nNotat: Kommer litt sent\nBestilt på nettsiden");
+  assert.equal(text(ev, "DESCRIPTION"), "Kunde: Ola Nordmann\nTelefon: 912 34 567\nTjeneste: Full service\nTillegg: Vask kort hår, Styling\nBestilt på nettsiden");
+  assert.doesNotMatch(ics, /Kommer litt sent|Notat/, "the barber's note stays in /admin");
   assert.deepEqual([prop(ev, "DTSTART").params.TZID, prop(ev, "DTSTART").value], ["Europe/Oslo", "20261119T100000"]);
   assert.equal(prop(ev, "DTEND").value, "20261119T110000");
   assert.equal(prop(ev, "DTSTAMP").value, "20261102T083015Z", "DTSTAMP = when the booking was last changed, in UTC");
@@ -80,13 +82,14 @@ test("calendar: cancelled bookings, blocks and broken records never appear; dupl
 test("calendar: TEXT escaping of \\ ; , and newlines, control characters dropped (RFC 5545 3.3.11)", () => {
   assert.equal(escapeText("a\\b;c,d\ne\r\nf\rg"), "a\\\\b\\;c\\,d\\ne\\nf\\ng");
   assert.equal(escapeText("x\u0000y\u0007z\u001b\u007f\tok"), "x y z  \tok");
-  const nasty = item({ date: "2026-11-21", name: "Ola; Nordmann, jr. \\ «Øks»", note: "linje1\nlinje2\r\nEND:VEVENT\r\nBEGIN:VEVENT", phone: "+47 912,34;567" });
+  const nasty = item({ date: "2026-11-21", name: "Ola; Nordmann, jr. \\ «Øks»", service: "linje1\nlinje2\r\nEND:VEVENT\r\nBEGIN:VEVENT", phone: "+47 912,34;567" });
   const ics = buildCalendar([nasty], { now: NOW });
   assert.deepEqual(rfc5545Problems(ics), []);
   const [ev] = events(ics);
-  assert.equal(text(ev, "SUMMARY"), "Herreklipp – Ola; Nordmann, jr. \\ «Øks»");
-  assert.match(text(ev, "DESCRIPTION"), /Notat: linje1\nlinje2\nEND:VEVENT\nBEGIN:VEVENT\n/);
-  assert.equal(events(ics).length, 1, "a note can never inject a second event");
+  assert.equal(text(ev, "SUMMARY"), "linje1\nlinje2\nEND:VEVENT\nBEGIN:VEVENT – Ola; Nordmann, jr. \\ «Øks»");
+  assert.match(text(ev, "DESCRIPTION"), /Tjeneste: linje1\nlinje2\nEND:VEVENT\nBEGIN:VEVENT\n/);
+  assert.match(text(ev, "DESCRIPTION"), /Telefon: \+47 912,34;567\n/);
+  assert.equal(events(ics).length, 1, "stored text can never inject a second event");
 });
 
 test("calendar: lines are folded at 75 octets with CRLF + space, never inside a character (RFC 5545 3.1)", () => {
@@ -105,7 +108,7 @@ test("calendar: lines are folded at 75 octets with CRLF + space, never inside a 
       assert.equal(folded.replace(/\r\n /g, ""), line, "unfolding gives the line back");
     }
   }
-  const long = item({ date: "2026-11-21", name: "Øyvind Ærlige Åsmund-Østergård 😀 ".repeat(6).trim(), note: "Æ".repeat(300) });
+  const long = item({ date: "2026-11-21", name: "Øyvind Ærlige Åsmund-Østergård 😀 ".repeat(6).trim(), service: "Æ".repeat(300) });
   assert.deepEqual(rfc5545Problems(buildCalendar([long], { now: NOW })), []);
 });
 
@@ -159,11 +162,12 @@ test("calendar (property): every active booking appears exactly once with the ri
         date, start, dur: 5 * (1 + Math.floor(rand() * 24)),
         type: r < 0.15 ? "block" : "booking", status: r > 0.8 ? "cancelled" : "confirmed",
         service: services[Math.floor(rand() * services.length)], name: rand() < 0.1 ? "" : `Kunde ${k}, «${round}»`,
-        addons: rand() < 0.3 ? ["Styling"] : [],
+        addons: rand() < 0.3 ? ["Styling"] : [], note: rand() < 0.5 ? `Privat notat ${k}` : "",
       }));
     }
     const ics = buildCalendar(items, { now: NOW });
     assert.deepEqual(rfc5545Problems(ics), [], `round ${round}`);
+    assert.doesNotMatch(ics, /Privat notat|Notat/, `round ${round}: no private note in the feed`);
     const cal = parseCalendar(ics);
     const evs = events(ics);
     const want = items.filter((i) => i.type === "booking" && i.status !== "cancelled");

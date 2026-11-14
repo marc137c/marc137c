@@ -11,6 +11,8 @@
 //    dager frem, nøyaktig én gang; blokkeringer og avlyste timer er ikke med, så de forsvinner fra telefonen;
 //  - norsk tid med TZID=Europe/Oslo og en VTIMEZONE med EUs sommertidsregler (siste søndag i mars/oktober),
 //    så klokkeslettene står riktig også over sommertid/vintertid;
+//  - bare tjeneste (+ tillegg), kundens navn og telefonnummer: aldri Viggos egne notater (de er private, og Google
+//    Kalender henter og lagrer strømmen på sine servere);
 //  - en påminnelse ALARM_MIN minutter før hver time;
 //  - CRLF etter hver linje, linjer brettet etter 75 oktetter (aldri midt i et UTF-8-tegn), og tekst escapet.
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
@@ -144,7 +146,6 @@ function eventLines(i, fallbackStamp) {
     i.phone && `Telefon: ${i.phone}`,
     `Tjeneste: ${i.service || "Avtale"}`,
     i.addons && i.addons.length && `Tillegg: ${i.addons.join(", ")}`,
-    i.note && `Notat: ${i.note}`,
     i.source === "nettside" ? "Bestilt på nettsiden" : "Lagt inn i timeboken",
   ].filter(Boolean).join("\n");
   const lines = [
