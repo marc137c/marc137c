@@ -122,7 +122,9 @@ export function validateCustomer(input, now = new Date()) {
   if (name.length < 2) return fail("bad_name", "Skriv inn navnet ditt.");
   if (!phoneOk(input.phone)) return fail("bad_phone", "Ugyldig telefonnummer.");
   const addons = (Array.isArray(input.addons) ? input.addons : []).filter((a) => CONFIG.addons.includes(a));
-  return { value: { date: input.date, start, dur, service, addons, name, phone } };
+  // Språket kunden bestilte på (SMS-ene sendes på det språket). Bare «en» eller «no», aldri fri tekst.
+  const lang = input.lang === "en" ? "en" : "no";
+  return { value: { date: input.date, start, dur, service, addons, name, phone, lang } };
 }
 
 // Regler for admin: kan legge inn hva som helst på 5-minutters rutenett, også utenom åpningstid
@@ -168,6 +170,7 @@ export async function createItem(store, value, { source, force = false, now = ne
     service: value.service || "", addons: value.addons || [], name: value.name || "", phone: value.phone || "", note: value.note || "",
     createdAt: now.toISOString(), updatedAt: now.toISOString(),
   };
+  if (value.lang === "en" || value.lang === "no") item.lang = value.lang;
   return mutateMonth(store, monthOf(item.date), (doc) => {
     // Ble første forsøk lagret selv om svaret gikk tapt, er jobben allerede gjort
     if (doc.items.some((o) => o.id === item.id)) return { ok: true, item };

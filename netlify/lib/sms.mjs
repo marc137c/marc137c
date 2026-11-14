@@ -13,6 +13,8 @@
 
 const ENDPOINT = "https://sveve.no/SMS/SendMessage";
 const DAYS = ["søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"];
+const DAYS_EN = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTHS_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export const smsConfigured = (env) => Boolean(env.SVEVE_USER && env.SVEVE_PASSWD);
 
@@ -36,27 +38,90 @@ export function confirmationAllowed(items, phone, nowMs = Date.now()) {
 }
 
 const senderName = (env) => (String(env.SVEVE_FROM || "").replace(/[^A-Za-z0-9 ]/g, "").trim().slice(0, 11)) || "Viggos";
-const hhmm = (min) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+const pad2 = (n) => String(n).padStart(2, "0");
+const hhmm = (min) => `${pad2(Math.floor(min / 60))}:${pad2(min % 60)}`;
+const hhmm12 = (min) => { const h = Math.floor(min / 60); return `${((h + 11) % 12) + 1}:${pad2(min % 60)} ${h < 12 ? "AM" : "PM"}`; }; // som den engelske siden
 const dayMonth = (date) => `${Number(date.slice(8, 10))}.${Number(date.slice(5, 7))}.`;
 const weekday = (date) => DAYS[new Date(date + "T00:00:00Z").getUTCDay()];
+const tomorrowOf = (today) => new Date(Date.parse(today + "T00:00:00Z") + 86400000).toISOString().slice(0, 10);
 
 // «tirsdag 12.11. kl. 14:30», eller «i dag kl. …» / «i morgen kl. …» sett fra datoen today
 export function whenText(item, today) {
   const t = `kl. ${hhmm(item.start)}`;
   if (item.date === today) return `i dag ${t}`;
-  const tomorrow = new Date(Date.parse(today + "T00:00:00Z") + 86400000).toISOString().slice(0, 10);
-  if (item.date === tomorrow) return `i morgen ${t}`;
+  if (item.date === tomorrowOf(today)) return `i morgen ${t}`;
   return `${weekday(item.date)} ${dayMonth(item.date)} ${t}`;
 }
+// Engelsk: «Thursday 12 Nov at 2:30 PM», «today at …», «tomorrow at …»
+export function whenTextEn(item, today) {
+  const t = `at ${hhmm12(item.start)}`;
+  if (item.date === today) return `today ${t}`;
+  if (item.date === tomorrowOf(today)) return `tomorrow ${t}`;
+  const d = new Date(item.date + "T00:00:00Z");
+  return `${DAYS_EN[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS_EN[d.getUTCMonth()]} ${t}`;
+}
 
-// Holdt under 160 tegn (én SMS) også med lengste tjeneste og ukedag-dato; testes i tools/test-sms.mjs
-export const confirmText = (item, today) =>
-  `Timen din hos Viggo's Barbershop er booket: ${whenText(item, today)} (${item.service}). ` +
-  `Violgata 22. Endre/avlyse? Ring 409 63 911`;
+// Tjenestenavnene slik den engelske siden viser dem (i18n.js). Andre navn (skrevet inn i /admin) vises som de er.
+const SERVICES_EN = {
+  "Full service": "Full service",
+  "Herreklipp": "Men's haircut",
+  "Herreklipp + skjeggtrim": "Men's haircut + beard trim",
+  "Herreklipp + skjeggtrim (maskin)": "Men's haircut + beard trim", // gammelt navn på eldre bestillinger
+  "Knivbarbering": "Straight razor shave",
+  "Skjegg & line-up": "Beard & line-up",
+  "Barneklipp": "Kids' haircut",
+};
+const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 
-export const reminderText = (item, today) =>
-  `Påminnelse: Du har time hos Viggo's Barbershop ${whenText(item, today)} (${item.service}). ` +
-  `Violgata 22. Kan du ikke komme? Ring 409 63 911`;
+// GSM 03.38: grunntegn koster 1 septett, utvidelsestegn 2. Alt annet gjør hele SMS-en til UCS-2 (70 tegn per SMS).
+const GSM_BASIC = "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà";
+const GSM_EXT = "^{}\\[~]|€\f";
+// Antall septetter, eller null hvis teksten ikke kan sendes som GSM-7
+export function gsmLength(text) {
+  let n = 0;
+  for (const ch of String(text)) {
+    if (GSM_BASIC.includes(ch)) n += 1;
+    else if (GSM_EXT.includes(ch)) n += 2;
+    else return null;
+  }
+  return n;
+}
+// Én SMS = høyst 160 GSM-7-septetter
+export const oneSms = (text) => { const n = gsmLength(text); return n !== null && n <= 160; };
+
+// Kundens SMS: på språket kunden bestilte på (item.lang «en» = engelsk, alt annet norsk), alltid én SMS,
+// aldri navnet kunden skrev inn. Tjenesten står i parentes bare når den finnes og får plass; ellers droppes den
+// (en tom tjeneste fra /admin skal ikke gi «()», og en lang eller rar tjeneste skal ikke gi to SMS).
+const TEMPLATES = {
+  no: {
+    when: whenText,
+    service: (s) => s,
+    confirm: (when, svc) => `Timen din hos Viggo's Barbershop er booket: ${when}${svc}. Violgata 22. Endre/avlyse? Ring 409 63 911`,
+    reminder: (when, svc) => `Påminnelse: Du har time hos Viggo's Barbershop ${when}${svc}. Violgata 22. Kan du ikke komme? Ring 409 63 911`,
+  },
+  en: {
+    when: whenTextEn,
+    service: (s) => (own(SERVICES_EN, s) ? SERVICES_EN[s] : s),
+    confirm: (when, svc) => `Your appointment at Viggo's Barbershop is booked: ${when}${svc}. Violgata 22. To change or cancel, call 409 63 911`,
+    reminder: (when, svc) => `Reminder: Your appointment at Viggo's Barbershop is ${when}${svc}. Violgata 22. Can't make it? Call 409 63 911`,
+  },
+};
+export const langOf = (item) => (item && item.lang === "en" ? "en" : "no");
+
+function customerText(kind, item, today) {
+  const t = TEMPLATES[langOf(item)];
+  const when = t.when(item, today);
+  const service = String(item.service || "").trim();
+  if (service) {
+    const text = t[kind](when, ` (${t.service(service)})`);
+    if (oneSms(text)) return text;
+  }
+  return t[kind](when, "");
+}
+
+// Holdt til én SMS for alle tjenester, datoer, klokkeslett og begge språk; testes i test/sms-texts.test.mjs
+export const confirmText = (item, today) => customerText("confirm", item, today);
+export const reminderText = (item, today) => customerText("reminder", item, today);
 
 // Minutter fra nå til timen starter, regnet i norsk tid. Negativt tall = timen har begynt.
 // now = { date: "ÅÅÅÅ-MM-DD", minutes } fra osloNow()

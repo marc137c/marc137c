@@ -301,6 +301,7 @@
       body: JSON.stringify({
         service: select.value, date: iso(state.date), start: state.time, addons,
         name: name.value.trim(), phone: phone.value.trim(), botField: bot ? bot.value : "",
+        lang: I18N.lang === "en" ? "en" : "no",
       }),
     }).catch(() => null).then((res) => {
       if (res && res.ok) {
