@@ -12,6 +12,9 @@ import { osloNow, addDays, dayOfWeek, makeToken } from "../../netlify/lib/bookin
 import bookings from "../../netlify/functions/bookings.mjs";
 import availability from "../../netlify/functions/availability.mjs";
 import admin from "../../netlify/functions/admin.mjs";
+import calendar from "../../netlify/functions/calendar.mjs";
+import { realGetStoreFor } from "../helpers/real-blobs.mjs";
+import { createFeed } from "../../netlify/lib/calendar.mjs";
 
 const ENV_VARS = ["ADMIN_PASSWORD"];
 let blobs, outside, savedEnv, savedFetch;
@@ -73,4 +76,18 @@ test("live wiring: /api/admin on a deploy preview reads and writes only the prev
   // The same admin on production works on the live store
   const prod = await read(await admin(request("/api/admin/items?from=2026-12-01&to=2026-12-01", { headers: auth }), PRODUCTION));
   assert.deepEqual(prod.body.items.map((i) => i.name), ["Ekte kunde"]);
+});
+
+test("live wiring: GET /api/calendar/<token>.ics reads the strong 'bookings' store through the real client", async () => {
+  const date = addDays(osloNow().date, 3);
+  blobs.seed("bookings", `m/${date.slice(0, 7)}`, { items: [{ id: `${date}_live01`, type: "booking", status: "confirmed", source: "nettside", date, start: 600, dur: 30, service: "Herreklipp", addons: [], name: "Ola Nordmann", phone: CUSTOMER_PHONE, note: "", createdAt: "2026-11-01T10:00:00.000Z", updatedAt: "2026-11-01T10:00:00.000Z" }] });
+  const { feed } = await createFeed(realGetStoreFor(blobs)({ name: "bookings", consistency: "strong" }));
+  blobs.log.length = 0;
+  const res = await read(await calendar(request(`/api/calendar/${feed.token}.ics`), PRODUCTION));
+  assert.equal(res.status, 200);
+  assert.match(res.body, new RegExp(`UID:${date}_live01@viggos-timebok`));
+  assert.ok(strongHttpOnly(), JSON.stringify(blobs.log));
+  assert.deepEqual(outside, []);
+  const preview = await read(await calendar(request(`/api/calendar/${feed.token}.ics`), PREVIEW));
+  assert.equal(preview.status, 404, "the live link never opens on a deploy preview");
 });
