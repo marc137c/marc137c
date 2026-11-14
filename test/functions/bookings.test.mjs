@@ -61,7 +61,7 @@ test("bookings: honeypot, oversize and broken JSON", async () => {
   assert.equal(storedItems(d.blobs).length, 0);
   res = await read(await handle(post({ ...BODY, note: "x".repeat(5000) }), PRODUCTION, d));
   assert.equal(res.status, 413);
-  res = await read(await handle(request("/api/bookings", { method: "POST", body: "{nope" }), PRODUCTION, d));
+  res = await read(await handle(request("/api/bookings", { method: "POST", body: "{nope", headers: { "Content-Type": "application/json" } }), PRODUCTION, d));
   assert.equal(res.status, 400);
 });
 

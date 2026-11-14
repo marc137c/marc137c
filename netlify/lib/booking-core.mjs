@@ -50,14 +50,19 @@ const active = (item) => item.status !== "cancelled";
 const monthKey = (ym) => `m/${ym}`;
 
 // Leser en måned, lar fn endre den, og skriver bare hvis ingen andre har skrevet i mellomtiden.
-// Ved kollisjon prøves det på nytt. fn kan returnere { error, status } for å avbryte uten å skrive.
-export async function mutateMonth(store, ym, fn) {
+// Ved kollisjon prøves det på nytt. fn kan returnere { error, status } for å avbryte uten å skrive,
+// eller et svar med noWrite: true når ingenting er endret.
+export const mutateMonth = (store, ym, fn) =>
+  mutateJSON(store, monthKey(ym), (data) => (data && Array.isArray(data.items) ? data : { items: [] }), fn);
+
+// Det samme for et vilkårlig JSON-dokument: init(data) gir dokumentet fn får (data = det lagrede, eller null).
+export async function mutateJSON(store, key, init, fn) {
   for (let attempt = 0; attempt < 8; attempt++) {
-    const cur = await store.getWithMetadata(monthKey(ym), { type: "json" });
-    const doc = cur?.data && Array.isArray(cur.data.items) ? cur.data : { items: [] };
+    const cur = await store.getWithMetadata(key, { type: "json" });
+    const doc = init(cur ? cur.data : null);
     const result = await fn(doc);
-    if (result && result.error) return result;
-    const write = await store.setJSON(monthKey(ym), doc, cur ? { onlyIfMatch: cur.etag } : { onlyIfNew: true });
+    if (result && (result.error || result.noWrite)) return result;
+    const write = await store.setJSON(key, doc, cur ? { onlyIfMatch: cur.etag } : { onlyIfNew: true });
     // Bare en skriving med ETag er bekreftet lagret. Uten ETag har lagringen feilet (5xx/401/403),
     // og da skal kunden ikke få beskjed om at timen er booket.
     if (write.modified && write.etag) return result || { ok: true };
