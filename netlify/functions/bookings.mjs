@@ -46,7 +46,7 @@ export async function handle(req, context, deps) {
         const s = confirmationAllowed(upcoming, r.item.phone, deps.now().getTime())
           ? await sendSms(env, r.item.phone, confirmText(r.item, today), deps.fetch)
           : { ok: false, skipped: true, error: "limit" };
-        sms = s.ok ? "sent" : s.skipped ? "skipped" : "failed";
+        sms = s.ok ? (s.test ? "test" : "sent") : s.skipped ? "skipped" : "failed"; // «test»: siden lover ingen SMS (F42)
         if (!s.ok && !s.skipped) console.error("SMS-bekreftelse feilet:", id, s.error);
       } catch (err) {
         sms = "failed";

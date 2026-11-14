@@ -76,6 +76,15 @@ test("bookings: with Sveve configured the confirmation goes through deps.fetch",
   assert.equal(d.sveve.sent[0].at, Date.parse(NOW), "sent at the injected time");
 });
 
+test("bookings: in SVEVE_TEST mode the page is never told an SMS was sent (F42)", async () => {
+  const d = testDeps({ now: NOW, env: { ...SVEVE_ENV, SVEVE_TEST: "true" }, sveve: true });
+  const res = await read(await handle(post(BODY), PRODUCTION, d));
+  assert.equal(res.status, 201);
+  assert.equal(res.body.sms, "test", "booking.js adds «Du får også en bekreftelse på SMS» only for sms: 'sent'");
+  assert.equal(d.sveve.sent.length, 0);
+  assert.ok(d.sveve.dryRuns.length >= 1);
+});
+
 test("bookings: an SMS failure never stops a stored booking", async (t) => {
   const out = quiet(t);
   const d = testDeps({ now: NOW, env: SVEVE_ENV, sveve: true });

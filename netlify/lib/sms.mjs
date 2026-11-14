@@ -130,6 +130,9 @@ export function minutesUntil(item, now) {
   return days * 1440 + item.start - now.minutes;
 }
 
+// Aldri SMS om natten: 21:00–08:00 norsk tid. now = { date, minutes } fra osloNow()
+export const quietHours = (now) => now.minutes < 8 * 60 || now.minutes >= 21 * 60;
+
 // Skal denne avtalen få påminnelse nå? Kjøres hvert 15. minutt av sms-reminders.
 // now = { date, minutes } (norsk tid) og nowMs = Date.now() da kjøringen startet.
 export function reminderDue(item, now, nowMs) {
@@ -138,7 +141,7 @@ export function reminderDue(item, now, nowMs) {
   const left = minutesUntil(item, now);                                  // minutter til timen
   const bookedAgo = (nowMs - Date.parse(item.createdAt || 0)) / 60000;   // minutter siden bestillingen
   // Aldri om natten
-  if (now.minutes < 8 * 60 || now.minutes >= 21 * 60) return false;
+  if (quietHours(now)) return false;
   // Vanlig: ett døgn før (vinduet er 60 min, så én kjøring som faller ut gjør ingenting).
   // Ikke rett etter bestillingen: da har kunden nettopp fått bekreftelsen.
   if (left <= 24 * 60 && left > 23 * 60 && bookedAgo > 3 * 60) return true;
@@ -146,13 +149,25 @@ export function reminderDue(item, now, nowMs) {
   return left <= 2 * 60 && left > 60 && bookedAgo > 6 * 60;
 }
 
-// Sender én SMS. Svarer { ok: true } eller { ok: false, error, skipped? }. Kaster aldri.
+// SVEVE_TEST=true: Sveve tar imot kallet (sjekker brukernavn/passord), men sender ingen SMS
+export const smsTestMode = (env) => String(env.SVEVE_TEST).toLowerCase() === "true";
+
+// Feil der kallet aldri nådde Sveve (ingen forbindelse), så ingen SMS kan ha gått
+const NOT_CONNECTED = ["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "ENETUNREACH", "EHOSTUNREACH"];
+
+// Sender én SMS. Kaster aldri. Svarer
+//   { ok: true, id }                     Sveve bekreftet at SMS-en er sendt
+//   { ok: true, test: true }             testmodus: Sveve godtok kallet, men ingen SMS ble sendt
+//   { ok: false, error, skipped: true }  ikke forsøkt (ikke satt opp / ikke norsk mobil)
+//   { ok: false, error }                 Sveve sendte den sikkert ikke (avvist, feil passord, HTTP-feil, ingen forbindelse)
+//   { ok: false, error, maybeSent: true } ukjent (tidsavbrudd eller svaret gikk tapt): kan ha blitt sendt
 export async function sendSms(env, phone, msg, fetchFn = fetch) {
   if (!smsConfigured(env)) return { ok: false, skipped: true, error: "not_configured" };
   const to = norwegianMobile(phone);
   if (!to) return { ok: false, skipped: true, error: "not_norwegian_mobile" };
+  const test = smsTestMode(env);
   const body = { user: env.SVEVE_USER, passwd: env.SVEVE_PASSWD, to, msg, from: senderName(env), f: "json" };
-  if (String(env.SVEVE_TEST).toLowerCase() === "true") body.test = true;
+  if (test) body.test = true;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 8000);
   try {
@@ -162,15 +177,20 @@ export async function sendSms(env, phone, msg, fetchFn = fetch) {
       body: JSON.stringify(body),
       signal: ctrl.signal,
     });
+    if (!res.ok) return { ok: false, error: `http_${res.status}` };
     let data = null;
-    try { data = JSON.parse(await res.text()); } catch { /* ikke JSON */ }
+    try { data = JSON.parse(await res.text()); } catch { /* ikke JSON, eller svaret ble brutt */ }
     const r = data && data.response;
-    if (!res.ok || !r) return { ok: false, error: `http_${res.status}` };
+    if (!r) return { ok: false, error: "bad_response", maybeSent: true }; // 200 uten lesbart svar: vet ikke
     if (r.fatalError) return { ok: false, error: String(r.fatalError).slice(0, 200) };
+    if (test) return { ok: true, test: true }; // F42: aldri «sendt» i testmodus, uansett hva Sveve teller
     if (!(r.msgOkCount > 0)) return { ok: false, error: String((r.errors && r.errors[0] && r.errors[0].message) || "not_sent").slice(0, 200) };
     return { ok: true, id: Array.isArray(r.ids) ? r.ids[0] : undefined };
   } catch (err) {
-    return { ok: false, error: err && err.name === "AbortError" ? "timeout" : "network" };
+    if (err && err.name === "AbortError") return { ok: false, error: "timeout", maybeSent: true };
+    const code = err && err.cause && err.cause.code;
+    if (NOT_CONNECTED.includes(code)) return { ok: false, error: "network" };
+    return { ok: false, error: "network", maybeSent: true };
   } finally {
     clearTimeout(timer);
   }
