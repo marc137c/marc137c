@@ -187,3 +187,33 @@ test("admin calendar panel: the page says plainly that a password change stops t
   const html = (await import("node:fs")).readFileSync(new URL("../../viggos-barbershop/admin.html", import.meta.url), "utf8");
   assert.match(html, /Bytter du admin-passordet, slutter lenken også å virke, og du må lage en ny\./);
 });
+
+// compat.js's <dialog> stand-in (Firefox < 98, Safari < 15.4) must say «close» like a real <dialog>, or Esc would
+// leave the secret link and the push state on the page.
+for (const Event of [undefined, function Event() { throw new TypeError("Illegal constructor"); }]) {
+  const label = Event ? " (no Event constructor: createEvent)" : "";
+  test(`admin settings (old browser): Esc closes «Oppsett» and takes the link and the push state off the page${label}`, async () => {
+    const { fakePushBrowser } = await import("../helpers/admin-page.mjs");
+    const { makeDevice } = await import("../helpers/fake-push.mjs");
+    const device = makeDevice("mozilla");
+    const key = device.subscription.keys.p256dh;
+    const b = fakePushBrowser({ device, permission: "granted", subscribed: [...Buffer.from(key, "base64url")] });
+    const page = await openSettings({ oldBrowser: true, navigator: b.navigator, globals: { ...b.globals, ...(Event ? { Event } : {}) }, routes: {
+      "GET /api/admin/calendar": () => READY,
+      "GET /api/admin/push": () => ({ publicKey: key, devices: 1 }),
+      "POST /api/admin/push/subscribe": () => ({ ok: true, devices: 1 }),
+    } });
+    assert.equal(page.$("settings").classList.contains("dialog-shim"), true, "the stand-in is in use");
+    assert.equal(page.$("cal-url").value, LINKS.https);
+    assert.match(page.$("push-msg").textContent, /^Varsler er på/);
+    const e = page.doc.key("Escape");
+    assert.equal(e.defaultPrevented, true);
+    assert.equal(page.$("settings").open, false);
+    assert.equal(page.$("cal-url").value, "", "the secret link is gone from the page");
+    assert.equal(page.$("cal-ios").href, "#");
+    assert.equal(page.$("cal-google").href, "#");
+    assert.equal(page.$("cal-msg").textContent, "");
+    assert.equal(page.$("push-msg").textContent, "");
+    assert.deepEqual(["push-on", "push-test", "push-off"].filter((id) => !page.$(id).hidden), []);
+  });
+}

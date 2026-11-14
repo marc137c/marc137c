@@ -64,6 +64,11 @@
       if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
       backdrop = null;
       if (returnTo && returnTo.focus) returnTo.focus();
+      // Som en ekte <dialog>: si fra med «close», så siden kan rydde (admin.js tar da den hemmelige
+      // kalenderlenken og varselstatusen bort fra siden, også når dialogen lukkes med Esc)
+      var ev;
+      try { ev = new Event("close"); } catch (e) { ev = document.createEvent("Event"); ev.initEvent("close", false, false); }
+      d.dispatchEvent(ev);
     };
   }
 

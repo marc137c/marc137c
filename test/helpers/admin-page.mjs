@@ -70,6 +70,7 @@ class FakeElement {
     return e;
   }
   click() { if (!this.disabled) this.dispatch("click"); }
+  dispatchEvent(ev) { for (const fn of this.listeners[ev.type] || []) fn.call(this, ev); return true; }
   focus() { this.ownerDocument.activeElement = this; }
   blur() {}
   select() { this.selectedText = this.value; }
@@ -113,6 +114,10 @@ function makeDocument() {
     querySelectorAll(sel) { return /^[a-z]+$/.test(sel) ? [...this.byId.values()].filter((e) => e.tagName === sel.toUpperCase()) : []; },
     querySelector(sel) { return this.querySelectorAll(sel)[0] || null; },
     createElement(tag) { return new FakeElement(doc, tag); },
+    // Old-style events (document.createEvent + initEvent), for browsers without the Event constructor
+    createEvent() { return { type: "", initEvent(type) { this.type = type; } }; },
+    // Sends a key press to every keydown listener on the document (compat.js's Esc and Tab handling)
+    key(key) { const e = { key, keyCode: { Escape: 27, Tab: 9 }[key], shiftKey: false, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } }; (this.listeners.keydown || []).forEach((fn) => fn(e)); return e; },
     addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); },
   };
   doc.body = new FakeElement(doc, "body");
@@ -154,6 +159,7 @@ export async function loadAdmin({ routes = {}, token = "test-admin-token", navig
     confirm: (text) => { confirms.push(text); return confirm(text); },
     setInterval: () => 0, clearInterval: () => {}, console,
     atob: (s) => Buffer.from(String(s), "base64").toString("latin1"),
+    Event: class Event { constructor(type) { this.type = type; } },
     location: { pathname: "/admin", search, href: "https://viggos.test/admin" + search },
     ...globals,
   };
