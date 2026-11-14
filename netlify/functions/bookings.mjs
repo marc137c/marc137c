@@ -1,8 +1,9 @@
 // POST /api/bookings – kunden bestiller en time. Tiden låses med en gang,
 // og to kunder kan aldri få samme tid (konfliktsikker skriving i Netlify Blobs).
 import { liveDeps, bookingStore, isProduction } from "../lib/runtime.mjs";
-import { validateCustomer, createItem, osloNow, readMonths, addDays, CONFIG } from "../lib/booking-core.mjs";
-import { smsConfigured, sendSms, confirmText, confirmationAllowed, norwegianMobile } from "../lib/sms.mjs";
+import { validateCustomer, createItem } from "../lib/booking-core.mjs";
+import { smsConfigured, norwegianMobile } from "../lib/sms.mjs";
+import { sendConfirmationNow, CONFIRM } from "../lib/reminders.mjs";
 import { takeBookingSlot } from "../lib/limits.mjs";
 
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -34,23 +35,23 @@ export async function handle(req, context, deps) {
       if (slot.error) return json({ error: slot.error }, slot.status || 503);
       return json({ error: "For mange bestillinger akkurat nå. Ring oss på 409 63 911.", code: "rate_limited" }, 429);
     }
-    const r = await createItem(store, { ...v.value, type: "booking" }, { source: "nettside", now: deps.now() });
+    // SMS bare fra den ekte nettsiden, og bare når Sveve er satt opp. Bekreftelsen merkes «skal sendes» sammen med
+    // timen, så den aldri går tapt: klarer vi den ikke nå (natt, feil, treg Sveve), sender neste planlagte kjøring den.
+    const smsOn = isProduction(context) && smsConfigured(env);
+    const extra = smsOn && norwegianMobile(v.value.phone) ? { [CONFIRM.pending]: true } : {};
+    const r = await createItem(store, { ...v.value, type: "booking" }, { source: "nettside", now: deps.now(), extra });
     if (r.error) return json({ error: r.error, code: r.code }, r.status);
     const { id, date, start, dur, service } = r.item;
-    // SMS-bekreftelse (Sveve). Timen er allerede lagret, så en SMS-feil skal aldri stoppe bestillingen.
     let sms = "off";
-    if (isProduction(context) && smsConfigured(env)) { // SMS bare fra den ekte nettsiden
+    if (smsOn) {
       try { // egen try: timen er lagret, så kunden skal få «booket» selv om noe her feiler
-        const today = osloNow(deps.now()).date;
-        const upcoming = await readMonths(store, today, addDays(today, CONFIG.maxDays));
-        const s = confirmationAllowed(upcoming, r.item.phone, deps.now().getTime())
-          ? await sendSms(env, r.item.phone, confirmText(r.item, today), deps.fetch)
-          : { ok: false, skipped: true, error: "limit" };
-        sms = s.ok ? (s.test ? "test" : "sent") : s.skipped ? "skipped" : "failed"; // «test»: siden lover ingen SMS (F42)
-        if (!s.ok && !s.skipped) console.error("SMS-bekreftelse feilet:", id, s.error);
+        const opts = { now: deps.now(), clock: () => deps.now().getTime(), fetchFn: deps.fetch };
+        const kind = await sendConfirmationNow(store, env, r.item, opts);
+        // booking.js lover «bekreftelse på SMS» bare for «sent»; «test» = testmodus, ingen SMS (F42)
+        sms = { sent: "sent", test: "test", deferred: "later", failed: "failed", unknown: "unknown", skip: "skipped", limit: "skipped" }[kind] || "failed";
       } catch (err) {
         sms = "failed";
-        console.error("SMS-bekreftelse feilet:", id, err && err.message);
+        console.error("SMS-bekreftelse:", id, err && err.message);
       }
     }
     return json({ ok: true, booking: { id, date, start, dur, service }, sms }, 201);

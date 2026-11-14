@@ -26,16 +26,8 @@ export function norwegianMobile(phone) {
   return /^[49]\d{7}$/.test(d) ? d : null;
 }
 
-// Høyst så mange SMS-bekreftelser til samme nummer per døgn. Stopper misbruk der noen booker
-// mange timer med et fremmed nummer (det koster penger og plager eieren av nummeret).
-export const MAX_CONFIRMATIONS_PER_DAY = 3;
-export function confirmationAllowed(items, phone, nowMs = Date.now()) {
-  const n = norwegianMobile(phone);
-  if (!n) return false;
-  const since = nowMs - 24 * 60 * 60 * 1000;
-  const recent = items.filter((i) => i.type === "booking" && Date.parse(i.createdAt || 0) > since && norwegianMobile(i.phone) === n);
-  return recent.length <= MAX_CONFIRMATIONS_PER_DAY; // inkludert bestillingen som nettopp ble lagret
-}
+// Taket på hvor mange SMS ett nummer kan få per døgn (bekreftelser og påminnelser til sammen) ligger i
+// limits.mjs (SMS_LIMITS) og telles konfliktsikkert i Netlify Blobs før hver SMS (reminders.mjs).
 
 const senderName = (env) => (String(env.SVEVE_FROM || "").replace(/[^A-Za-z0-9 ]/g, "").trim().slice(0, 11)) || "Viggos";
 const pad2 = (n) => String(n).padStart(2, "0");
@@ -139,7 +131,9 @@ export function reminderDue(item, now, nowMs) {
   if (item.type !== "booking" || item.status === "cancelled" || item.remindedAt) return false;
   if (!norwegianMobile(item.phone)) return false;
   const left = minutesUntil(item, now);                                  // minutter til timen
-  const bookedAgo = (nowMs - Date.parse(item.createdAt || 0)) / 60000;   // minutter siden bestillingen
+  // Minutter siden bestillingen, eller siden bekreftelsen hvis den kom senere (en nattbestilling får
+  // bekreftelsen kl. 08), så kunden ikke får påminnelse rett etter bekreftelsen
+  const bookedAgo = (nowMs - Date.parse(item.confirmSentAt || item.createdAt || 0)) / 60000;
   // Aldri om natten
   if (quietHours(now)) return false;
   // Vanlig: ett døgn før (vinduet er 60 min, så én kjøring som faller ut gjør ingenting).
@@ -161,7 +155,7 @@ const NOT_CONNECTED = ["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "ENETUNREACH", 
 //   { ok: false, error, skipped: true }  ikke forsøkt (ikke satt opp / ikke norsk mobil)
 //   { ok: false, error }                 Sveve sendte den sikkert ikke (avvist, feil passord, HTTP-feil, ingen forbindelse)
 //   { ok: false, error, maybeSent: true } ukjent (tidsavbrudd eller svaret gikk tapt): kan ha blitt sendt
-export async function sendSms(env, phone, msg, fetchFn = fetch) {
+export async function sendSms(env, phone, msg, fetchFn = fetch, { timeoutMs = 8000 } = {}) {
   if (!smsConfigured(env)) return { ok: false, skipped: true, error: "not_configured" };
   const to = norwegianMobile(phone);
   if (!to) return { ok: false, skipped: true, error: "not_norwegian_mobile" };
@@ -169,7 +163,7 @@ export async function sendSms(env, phone, msg, fetchFn = fetch) {
   const body = { user: env.SVEVE_USER, passwd: env.SVEVE_PASSWD, to, msg, from: senderName(env), f: "json" };
   if (test) body.test = true;
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 8000);
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetchFn(ENDPOINT, {
       method: "POST",

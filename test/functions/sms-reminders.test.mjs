@@ -50,7 +50,13 @@ test("sms-reminders: a Blobs outage is logged and never thrown (the client's ret
   d.blobs.inject({ method: "GET", fault: "fail-before", status: 500, times: Infinity });
   const t0 = d.clock.now();
   await handle(tick(), PRODUCTION, d);
-  assert.equal(d.clock.now() - t0, 5 * 5000, "6 attempts, 5 s apart");
+  // the month documents (today to 60 days ahead) are read in parallel; the run gives up when the first one
+  // has had its 6 attempts, 5 s apart
+  const gets = d.blobs.requests({ method: "GET" });
+  const months = new Set(gets.map((g) => g.key));
+  assert.ok(months.size >= 2);
+  assert.ok([...months].some((m) => gets.filter((g) => g.key === m).length === 6));
+  assert.ok(d.clock.now() - t0 >= 5 * 5000);
   assert.equal(d.sveve.calls.length, 0);
   assert.equal(out.error.length, 1);
   assert.equal(out.error[0][1].name, "BlobsInternalError");
@@ -60,11 +66,11 @@ test("sms-reminders: the time budget is measured on deps.now(), so slow store wr
   const out = quiet(t);
   const d = testDeps({ now: NOW, env: SVEVE_ENV, sveve: true });
   const items = seedItems(d.blobs, [due(830), due(845), due(860)]);
-  d.blobs.inject({ method: "PUT", latencyMs: 12000, times: Infinity }); // every store write takes 12 s
+  d.blobs.inject({ method: "PUT", latencyMs: 6000, times: Infinity }); // every store write takes 6 s
   const t0 = d.clock.now();
   await handle(tick(), PRODUCTION, d);
-  // item 1: claimed at 12 s, sent at 12 s (before the 20 s send deadline), result stored at 24 s;
-  // items 2 and 3 come after the 10 s budget: deferred, unmarked, picked up by the next run
+  // item 1: claimed at 6 s, its seat in the number's SMS log taken at 12 s, sent at 12 s (before the 20 s send
+  // deadline), result stored at 18 s; items 2 and 3 come after the 10 s budget: deferred, unmarked, picked up next run
   assert.equal(d.sveve.sent.length, 1);
   assert.equal(d.sveve.calls[0].at - t0, 12000);
   const stored = storedItems(d.blobs);

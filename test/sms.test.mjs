@@ -9,6 +9,7 @@ import { fakeSveve, SVEVE_URL } from "./helpers/fake-sveve.mjs";
 import * as core from "../netlify/lib/booking-core.mjs";
 import * as sms from "../netlify/lib/sms.mjs";
 import { runReminders } from "../netlify/lib/reminders.mjs";
+import * as limits from "../netlify/lib/limits.mjs";
 
 const ENV = { SVEVE_USER: "u", SVEVE_PASSWD: "p" };
 
@@ -124,13 +125,21 @@ describe("SMS (port of tools/test-sms.mjs)", () => {
     for (const x of [cancelled, landline, block]) assert.equal((await core.findItem(store, x.id)).remindedAt, undefined);
   });
 
-  test("5 per-number confirmation cap and the reminder time budget", async (t) => {
+  test("5 per-number SMS cap (rolling 24 h, all kinds together) and the reminder time budget", async (t) => {
+    // The cap moved from confirmationAllowed() (confirmations only, reset at midnight: F3, F16) to the SMS log
     const nowMs = NOW.getTime();
-    const b = (phone, hoursAgo, type = "booking") => ({ type, phone, createdAt: new Date(nowMs - hoursAgo * 3600e3).toISOString() });
-    const items = [b("409 63 911", 1), b("+47 40963911", 2), b("40963911", 3), b("40963911", 30), b("99999999", 1), b("40963911", 1, "block")];
-    assert.equal(sms.confirmationAllowed(items, "40963911", nowMs), true, "3 in 24 h (incl. the new one) is still allowed");
-    assert.equal(sms.confirmationAllowed([...items, b("0047 409 63 911", 0)], "40963911", nowMs), false, "the 4th in 24 h is not");
-    assert.equal(sms.confirmationAllowed(items, "22334455", nowMs), false, "landline never");
+    const log = bookingsStore();
+    const at = (hoursAgo) => nowMs - hoursAgo * 3600e3;
+    assert.ok((await limits.reserveSms(log, "40963911", "confirm", at(30), "old")).ok);
+    assert.ok((await limits.reserveSms(log, "40963911", "confirm", at(3), "a")).ok);
+    assert.ok((await limits.reserveSms(log, "40963911", "reminder", at(2), "b")).ok);
+    assert.ok((await limits.reserveSms(log, "99999999", "confirm", at(1), "other")).ok, "other numbers have their own cap");
+    assert.ok((await limits.reserveSms(log, "40963911", "confirm", at(1), "c")).ok, "3 in 24 h is allowed");
+    assert.equal((await limits.reserveSms(log, "40963911", "reminder", at(0), "d")).ok, false, "the 4th in 24 h is not");
+    await limits.releaseSms(log, "40963911", "c"); // not sent after all: the seat comes back
+    assert.ok((await limits.reserveSms(log, "40963911", "reminder", at(0), "e")).ok);
+    assert.equal((await limits.reserveSms(log, "40963911", "reminder", at(-20.5), "f")).ok, false, "still 3 in the 24 h before");
+    assert.ok((await limits.reserveSms(log, "40963911", "reminder", at(-21), "g")).ok, "24 h after the oldest one");
     // Budget: with a clock that jumps 15 s per call, only the first due booking is sent, the rest deferred
     const store = bookingsStore();
     const mk = maker(store);

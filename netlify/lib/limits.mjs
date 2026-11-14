@@ -64,3 +64,18 @@ export async function takeBookingSlot(store, { ip, phone }, nowMs) {
   }
   return { ok: true };
 }
+
+// ---------- SMS-tak per mottaker (F3, F16) ----------
+// Én logg per nummer (nøkkel «sms/to/<nummer>»), glidende døgn, så taket aldri nullstilles ved midnatt.
+// En plass tas FØR SMS-en sendes og gis tilbake hvis Sveve sikkert ikke sendte den.
+//   customer  bekreftelser og påminnelser: høyst 3 SMS per nummer per døgn, uansett hvor mange timer
+//             nummeret står på, så et fremmed nummer aldri kan bli oversvømt
+export const SMS_LIMITS = {
+  customer: { rules: [{ max: 3, windowMs: DAY }], count: () => true },
+};
+export const smsLogKey = (number) => `sms/to/${keyPart(number)}`;
+export function reserveSms(store, number, kind, nowMs, token) {
+  const l = SMS_LIMITS.customer;
+  return take(store, smsLogKey(number), l.rules, { nowMs, token, data: { kind }, count: l.count });
+}
+export const releaseSms = (store, number, token) => release(store, smsLogKey(number), token);

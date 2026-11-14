@@ -168,7 +168,8 @@ export function validateAdmin(input, { partial = false } = {}) {
 const newId = (date) => `${date}_${randomBytes(5).toString("hex")}`;
 
 // ---------- Opprett / endre / slett ----------
-export async function createItem(store, value, { source, force = false, now = new Date() } = {}) {
+// extra: felt som lagres på avtalen i tillegg (SMS-utboksen: confirmPending)
+export async function createItem(store, value, { source, force = false, now = new Date(), extra = {} } = {}) {
   const item = {
     id: newId(value.date), type: value.type || "booking", status: "confirmed", source,
     date: value.date, start: value.start, dur: value.dur,
@@ -176,6 +177,7 @@ export async function createItem(store, value, { source, force = false, now = ne
     createdAt: now.toISOString(), updatedAt: now.toISOString(),
   };
   if (value.lang === "en" || value.lang === "no") item.lang = value.lang;
+  Object.assign(item, extra);
   return mutateMonth(store, monthOf(item.date), (doc) => {
     // Ble første forsøk lagret selv om svaret gikk tapt, er jobben allerede gjort
     if (doc.items.some((o) => o.id === item.id)) return { ok: true, item };
