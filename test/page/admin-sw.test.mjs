@@ -5,28 +5,41 @@
 //      broken JSON or a payload that is not an object;
 //   3. a tap opens /admin on the booking's day: an open /admin window is focused and told the day, otherwise a
 //      new window opens; a payload can never make it open another site or another page;
-//   4. when the browser replaces the subscription, a new one is made with the same server key.
+//   4. when the browser replaces the subscription (pushsubscriptionchange), a new one is made with the same server
+//      key (or the browser's new one is used) and given to the server at /api/push/renew with the old endpoint and
+//      its auth secret, so the next booking reaches it; if that fails in any way, a «Timebok» notification asks the
+//      barber to open the timebook, so nothing is missed silently.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
+import { makeDevice, fakePushService } from "../helpers/fake-push.mjs";
+import { testDeps, request, read, SITE, PRODUCTION } from "../helpers/deps.mjs";
+import { makeToken } from "../../netlify/lib/booking-core.mjs";
+import * as adminFn from "../../netlify/functions/admin.mjs";
+import * as bookingsFn from "../../netlify/functions/bookings.mjs";
+import * as renewFn from "../../netlify/functions/push-renew.mjs";
 
 const SW = readFileSync(fileURLToPath(new URL("../../viggos-barbershop/admin-sw.js", import.meta.url)), "utf8");
 const ORIGIN = "https://viggos.test";
 const BOOKING = { title: "Ny time", body: "Fredag 13. november kl. 10:00 · Herreklipp · Ola Nordmann", url: "/admin?dag=2026-11-13", tag: "ny-time-2026-11-13_abc" };
 
-function loadSw({ windows = [] } = {}) {
+// fetch: the server's answer to the service worker's own requests (only POST /api/push/renew); default 200
+// subscribe: what pushManager.subscribe() resolves with (a function of its options), or throws to reject
+function loadSw({ windows = [], fetch = () => new Response(JSON.stringify({ ok: true }), { status: 200 }), subscribe = () => ({}) } = {}) {
   const listeners = {};
-  const shown = [], opened = [], subscribed = [], waits = [];
+  const shown = [], opened = [], subscribed = [], waits = [], fetches = [];
   let skipped = 0, claimed = 0;
   const self = {
     location: { origin: ORIGIN, href: ORIGIN + "/admin-sw.js" },
     addEventListener: (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); },
     skipWaiting: () => { skipped++; return Promise.resolve(); },
+    btoa: (s) => Buffer.from(String(s), "latin1").toString("base64"),
+    fetch: (url, init) => { fetches.push({ url, init, body: init && init.body ? JSON.parse(init.body) : undefined }); return Promise.resolve().then(() => fetch(url, init)); },
     registration: {
       showNotification: (title, options) => { shown.push({ title, options }); return Promise.resolve(); },
-      pushManager: { subscribe: (opts) => { subscribed.push(opts); return Promise.resolve({}); } },
+      pushManager: { subscribe: (opts) => { subscribed.push(opts); return Promise.resolve().then(() => subscribe(opts)); } },
     },
     clients: {
       claim: () => { claimed++; return Promise.resolve(); },
@@ -41,7 +54,7 @@ function loadSw({ windows = [] } = {}) {
     return Promise.all(waits.splice(0));
   };
   const pushEvent = (data) => ({ data: data === undefined ? null : { json: () => (typeof data === "string" ? JSON.parse(data) : data) } });
-  return { self, listeners, shown, opened, subscribed, fire, pushEvent, counts: () => ({ skipped, claimed }) };
+  return { self, listeners, shown, opened, subscribed, fetches, fire, pushEvent, counts: () => ({ skipped, claimed }) };
 }
 
 const windowAt = (path) => {
@@ -126,13 +139,95 @@ test("admin sw: a tap without /admin open opens it on the booking's day", async 
   assert.deepEqual(none.opened, ["/admin"], "the test notification opens the timebook");
 });
 
-test("admin sw: a replaced subscription is renewed with the same server key", async () => {
-  const key = new Uint8Array([4, 1, 2, 3]).buffer;
-  const sw = loadSw();
-  await sw.fire("pushsubscriptionchange", { oldSubscription: { options: { applicationServerKey: key, userVisibleOnly: true } } });
+// ---------- 4. pushsubscriptionchange ----------
+const arrayBuffer = (buf) => Uint8Array.from(buf).buffer;
+// A PushSubscription as the browser hands it to the service worker
+const browserSub = (device, key = arrayBuffer([4, 1, 2, 3])) => ({
+  endpoint: device.endpoint,
+  options: { applicationServerKey: key, userVisibleOnly: true },
+  getKey: (name) => (name === "auth" ? arrayBuffer(device.auth) : name === "p256dh" ? arrayBuffer(device.publicKey) : null),
+  toJSON: () => device.subscription,
+});
+const REMINDER = { title: "Timebok", body: "Åpne Timebok for å fortsette å få varsel om nye bestillinger.", url: "/admin" };
+const shownAs = (n) => ({ title: n.title, body: n.options.body, url: n.options.data.url });
+
+test("admin sw: a replaced subscription is renewed with the same server key and given to the server", async () => {
+  const oldDevice = makeDevice("mozilla"), newDevice = makeDevice("mozilla");
+  const old = browserSub(oldDevice);
+  const sw = loadSw({ subscribe: () => browserSub(newDevice) });
+  await sw.fire("pushsubscriptionchange", { oldSubscription: old });
   assert.equal(sw.subscribed.length, 1);
-  assert.equal(sw.subscribed[0].applicationServerKey, key);
+  assert.equal(sw.subscribed[0].applicationServerKey, old.options.applicationServerKey);
   assert.equal(sw.subscribed[0].userVisibleOnly, true);
-  await sw.fire("pushsubscriptionchange", {});
-  assert.equal(sw.subscribed.length, 1, "without the old key there is nothing to renew with");
+  assert.equal(sw.fetches.length, 1);
+  const [f] = sw.fetches;
+  assert.equal(f.url, "/api/push/renew", "only to this site's own renew path");
+  assert.equal(f.init.method, "POST");
+  assert.equal(f.init.headers["Content-Type"], "application/json");
+  assert.deepEqual(f.body, { oldEndpoint: oldDevice.endpoint, oldAuth: oldDevice.subscription.keys.auth, subscription: newDevice.subscription });
+  assert.deepEqual(sw.shown, [], "no reminder when the server took it");
+});
+
+test("admin sw: a new subscription the browser already made is used as it is", async () => {
+  const oldDevice = makeDevice("fcm"), newDevice = makeDevice("fcm");
+  const sw = loadSw();
+  await sw.fire("pushsubscriptionchange", { oldSubscription: browserSub(oldDevice), newSubscription: browserSub(newDevice) });
+  assert.equal(sw.subscribed.length, 0);
+  assert.deepEqual(sw.fetches[0].body.subscription, newDevice.subscription);
+  assert.deepEqual(sw.shown, []);
+});
+
+test("admin sw: if the subscription cannot be renewed or the server does not take it, a Timebok notification says so", async () => {
+  const old = () => browserSub(makeDevice("mozilla"));
+  const cases = [
+    ["the server says no", { fetch: () => new Response("{}", { status: 404 }) }, { oldSubscription: old() }],
+    ["the server is down", { fetch: () => new Response("{}", { status: 503 }) }, { oldSubscription: old() }],
+    ["no network", { fetch: () => { throw new TypeError("Failed to fetch"); } }, { oldSubscription: old() }],
+    ["subscribe() fails", { subscribe: () => { throw new Error("AbortError"); } }, { oldSubscription: old() }],
+    ["no old subscription", {}, {}],
+    ["an old subscription without its key", {}, { oldSubscription: { ...old(), options: {} } }],
+    ["no auth secret", { subscribe: () => browserSub(makeDevice("mozilla")) }, { oldSubscription: { ...old(), getKey: () => null } }],
+  ];
+  for (const [label, opts, event] of cases) {
+    const sw = loadSw({ subscribe: () => browserSub(makeDevice("mozilla")), ...opts });
+    await sw.fire("pushsubscriptionchange", event);
+    assert.deepEqual(sw.shown.map(shownAs), [REMINDER], label);
+    assert.equal(sw.shown[0].options.tag, "forny-varsler", label);
+    assert.ok(sw.fetches.every((f) => f.url === "/api/push/renew"), label);
+  }
+  // A tap on the reminder opens the timebook (which gives the server the subscription)
+  const sw = loadSw();
+  await sw.fire("notificationclick", clickEvent(REMINDER.url));
+  assert.deepEqual(sw.opened, ["/admin"]);
+});
+
+test("admin sw: end to end, after pushsubscriptionchange the next booking reaches the new subscription", async (t) => {
+  t.mock.method(console, "warn", () => {});
+  const PASSWORD = "fake-admin-password";
+  const oldDevice = makeDevice("mozilla"), newDevice = makeDevice("mozilla");
+  const push = fakePushService({ devices: [oldDevice, newDevice], reply: (del) => (del.device === oldDevice ? 410 : 201) });
+  const d = testDeps({ now: "2026-11-12T09:00:00Z", env: { ADMIN_PASSWORD: PASSWORD }, fetch: push.fetch });
+  const auth = { Authorization: "Bearer " + makeToken(PASSWORD, d.clock.now(), 60 * 24 * 3600e3) };
+  await adminFn.handle(request("/api/admin/push", { headers: auth }), PRODUCTION, d);
+  const sub = await read(await adminFn.handle(request("/api/admin/push/subscribe", { method: "POST", headers: auth, json: { subscription: oldDevice.subscription } }), PRODUCTION, d));
+  assert.equal(sub.status, 201);
+  // The service worker's fetch goes to the real /api/push/renew handler (same origin, as a browser sends it)
+  const answers = [];
+  const sw = loadSw({
+    subscribe: () => browserSub(newDevice),
+    fetch: async (url, init) => {
+      const res = await renewFn.handle(new Request(SITE + url, { ...init, headers: { ...init.headers, "Sec-Fetch-Site": "same-origin" } }), PRODUCTION, d);
+      answers.push(res.status);
+      return res;
+    },
+  });
+  await sw.fire("pushsubscriptionchange", { oldSubscription: browserSub(oldDevice) });
+  assert.deepEqual(answers, [200]);
+  assert.deepEqual(sw.shown, []);
+  const res = await read(await bookingsFn.handle(request("/api/bookings", { method: "POST", json: {
+    service: "Herreklipp", date: "2026-11-14", start: 690, addons: [], name: "Per Hansen", phone: "41234567",
+  } }), PRODUCTION, d));
+  assert.equal(res.status, 201);
+  assert.deepEqual(push.deliveries.map((x) => x.device), [newDevice], "only the new subscription, and it decrypts");
+  assert.equal(push.deliveries[0].payload.title, "Ny time");
 });

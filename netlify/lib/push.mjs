@@ -23,7 +23,7 @@
 // godtas ikke igjen (Chrome beholder et slikt dødt abonnement, og /admin ville ellers meldt det på og vist «på»).
 // Sending kaster aldri, har kort tidsfrist (PUSH_TIMEOUT_MS) og logger bare tjenestens navn og svaret: aldri
 // adressen (den er selv en slags nøkkel), kundens navn eller noen nøkkel.
-import { ECDH, createECDH, createHash, createPrivateKey, generateKeyPairSync, hkdfSync, createCipheriv, randomBytes, sign } from "node:crypto";
+import { ECDH, createECDH, createHash, createPrivateKey, generateKeyPairSync, hkdfSync, createCipheriv, randomBytes, sign, timingSafeEqual } from "node:crypto";
 import { isDate, mutateJSON, passwordGen } from "./booking-core.mjs";
 
 // Hvilket admin-passord en enhet hører til: de første 16 tegnene av SHA-256("viggos-push:" + passordet) i
@@ -165,6 +165,33 @@ export async function removeSubscriptions(store, endpoints, { gen, gone: markAsG
     const devices = doc.subs.filter(gen === undefined ? usable : current(gen, now)).length;
     const removed = before - doc.subs.length;
     return removed || (markAsGone && gone.size) ? { ok: true, removed, devices } : { ok: true, noWrite: true, removed: 0, devices };
+  });
+}
+
+// Nettleseren har byttet ut abonnementet (pushsubscriptionchange i admin-sw.js), og service workeren gir serveren det
+// nye (POST /api/push/renew) uten innlogging: den har ingen. Derfor godtas det bare som erstatning for en lagret
+// enhet for dette passordet som ikke er utløpt, og bare når både den gamle adressen og dens auth-hemmelighet stemmer.
+// Hemmeligheten kjenner bare nettleseren og serveren (push-tjenesten får den aldri), og den sammenlignes i konstant
+// tid. Den nye adressen må også være hos en kjent push-tjeneste (parseSubscription) og ikke være meldt borte. Enheten
+// beholder gen, createdAt og until, og den gamle adressen godtas ikke igjen.
+// old: { endpoint, auth } (base64url). Svarer { ok, devices } eller { error, status, code } (404 for alt som ikke
+// stemmer, så svaret aldri sier hva som var feil).
+export async function renewSubscription(store, old, sub, { now = new Date(), gen } = {}) {
+  if (!isGen(gen)) return { error: "Varsler er ikke satt opp.", status: 503, code: "not_configured" };
+  const unknown = { error: "Ukjent enhet.", status: 404, code: "unknown_device" };
+  const oldEndpoint = normalizeEndpoint(old && old.endpoint);
+  const oldAuth = decodeKey(old && old.auth, 16);
+  if (!oldEndpoint || !oldAuth || !sub) return unknown;
+  return mutateJSON(store, SUBS_KEY, initSubs, (doc) => {
+    const prev = doc.subs.find((s) => s && s.endpoint === oldEndpoint && current(gen, now)(s));
+    const storedAuth = prev && decodeKey(prev.auth, 16);
+    if (!storedAuth || !timingSafeEqual(storedAuth, oldAuth)) return unknown;
+    if (isGone(doc, sub.endpoint, now)) return { error: "Abonnementet er borte.", status: 410, code: "gone" };
+    doc.subs = doc.subs.filter((s) => s !== prev && !(s && s.endpoint === sub.endpoint));
+    doc.subs.push(Object.assign(prev, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth, seenAt: now.toISOString() }));
+    if (oldEndpoint !== sub.endpoint) markGone(doc, [oldEndpoint], now);
+    doc.subs = doc.subs.filter(usable).sort(newestFirst).slice(0, MAX_DEVICES);
+    return { ok: true, devices: doc.subs.filter(current(gen, now)).length };
   });
 }
 

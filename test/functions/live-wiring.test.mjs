@@ -13,9 +13,10 @@ import bookings from "../../netlify/functions/bookings.mjs";
 import availability from "../../netlify/functions/availability.mjs";
 import admin from "../../netlify/functions/admin.mjs";
 import calendar from "../../netlify/functions/calendar.mjs";
+import pushRenew from "../../netlify/functions/push-renew.mjs";
 import { realGetStoreFor } from "../helpers/real-blobs.mjs";
 import { createFeed, feedGen } from "../../netlify/lib/calendar.mjs";
-import { vapidKeys, saveSubscription, parseSubscription, pushGen } from "../../netlify/lib/push.mjs";
+import { vapidKeys, saveSubscription, parseSubscription, pushGen, SUBS_KEY } from "../../netlify/lib/push.mjs";
 import { makeDevice, fakePushService, PUSH_HOST } from "../helpers/fake-push.mjs";
 
 const ENV_VARS = ["ADMIN_PASSWORD"];
@@ -117,4 +118,19 @@ test("live wiring: a web booking notifies the stored devices through the global 
   assert.equal(del.vapid.ok, true, del.vapid.why);
   assert.equal(del.vapid.k, keys.publicKey);
   assert.deepEqual(outside, [], "nothing else is fetched");
+});
+
+test("live wiring: POST /api/push/renew replaces the device in the strong 'bookings' store through the real client", async () => {
+  const store = realGetStoreFor(blobs)({ name: "bookings", consistency: "strong" });
+  const old = makeDevice("mozilla"), next = makeDevice("mozilla");
+  process.env.ADMIN_PASSWORD = "fake-admin-password";
+  await saveSubscription(store, parseSubscription(old.subscription).value, { gen: pushGen("fake-admin-password") });
+  blobs.log.length = 0;
+  const res = await read(await pushRenew(request("/api/push/renew", { method: "POST", headers: { "Sec-Fetch-Site": "same-origin" }, json: {
+    oldEndpoint: old.endpoint, oldAuth: old.subscription.keys.auth, subscription: next.subscription,
+  } }), PRODUCTION));
+  assert.deepEqual([res.status, res.body], [200, { ok: true }]);
+  assert.deepEqual(blobs.json("bookings", SUBS_KEY).subs.map((s) => s.endpoint), [next.endpoint]);
+  assert.ok(strongHttpOnly(), JSON.stringify(blobs.log));
+  assert.deepEqual(outside, []);
 });
