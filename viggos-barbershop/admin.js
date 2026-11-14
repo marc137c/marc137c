@@ -446,7 +446,8 @@
   const permission = () => (notif() ? notif().permission : "denied");
   const isIos = () => /iPad|iPhone|iPod/.test(navigator.userAgent || "") || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const isStandalone = () => navigator.standalone === true || !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
-  const pushState = { key: null, sub: null, reg: null };
+  // others: hvor mange andre enheter som får varsler (da vises «Slå av varsler på alle andre enheter»)
+  const pushState = { key: null, sub: null, reg: null, others: 0 };
   let pushSeq = 0;
 
   function pushMsg(text, kind) {
@@ -459,7 +460,8 @@
     $("push-on").hidden = mode !== "off";
     $("push-test").hidden = mode !== "on";
     $("push-off").hidden = mode !== "on";
-    ["push-on", "push-test", "push-off"].forEach((id) => { $(id).disabled = false; });
+    $("push-reset").hidden = !(mode === "on" || mode === "off") || !(pushState.others > 0);
+    ["push-on", "push-test", "push-off", "push-reset"].forEach((id) => { $(id).disabled = false; });
   }
   // Svarer ikke push-tjenesten (nettet er nede, eller den er sperret), blir subscribe() aldri ferdig. Da gir siden
   // beskjed etter SUBSCRIBE_WAIT_MS, i stedet for å henge på «Slår på …».
@@ -473,10 +475,13 @@
     return Promise.race([promise, late]).then((v) => { clearTimeout(timer); return v; }, (err) => { clearTimeout(timer); throw err; });
   }
   const others = (n) => (n > 0 ? ` ${n} ${n === 1 ? "annen enhet får" : "andre enheter får"} varsler.` : "");
+  // devices: alle enhetene serveren sender til (med denne, når den er på)
   function pushShow(mode, devices) {
+    const n = Number(devices) || 0;
+    pushState.others = mode === "on" ? Math.max(0, n - 1) : n;
     pushButtons(mode);
-    if (mode === "on") pushMsg("Varsler er på. Du får et varsel her hver gang en kunde bestiller time.", "ok");
-    else pushMsg("Varsler er av på denne enheten." + others(devices), "info");
+    if (mode === "on") pushMsg("Varsler er på. Du får et varsel her hver gang en kunde bestiller time." + others(pushState.others), "ok");
+    else pushMsg("Varsler er av på denne enheten." + others(pushState.others), "info");
   }
   function pushError(err) {
     if (err && (err.status || err.user)) return err.message;
@@ -515,6 +520,7 @@
     const seq = ++pushSeq;
     pushState.sub = null;
     pushState.reg = null;
+    pushState.others = 0;
     pushButtons(null);
     $("push-ios").hidden = true;
     if (!pushSupported()) {
@@ -549,7 +555,7 @@
       pushMsg(pushError(err));
     });
   }
-  function pushClear() { pushSeq++; pushState.sub = null; pushState.reg = null; pushButtons(null); pushMsg(""); $("push-ios").hidden = true; }
+  function pushClear() { pushSeq++; pushState.sub = null; pushState.reg = null; pushState.others = 0; pushButtons(null); pushMsg(""); $("push-ios").hidden = true; }
 
   $("push-on").addEventListener("click", () => {
     const btn = $("push-on");
@@ -637,6 +643,36 @@
         pushMsg("Varsler er slått av her. Serveren fikk ikke beskjed nå, men det ordner seg av seg selv.", "info");
       });
     }).catch((err) => { if (seq === pushSeq) pushMsg(pushError(err)); }).then(() => { btn.disabled = false; });
+  });
+
+  // «Slå av varsler på alle andre enheter» (en mistet, solgt eller lånt telefon, eller noen som ikke skal ha varslene):
+  // serveren glemmer alle enhetene, og får denne enheten varsler, meldes den på igjen med en gang.
+  $("push-reset").addEventListener("click", () => {
+    const n = pushState.others;
+    const which = n === 1 ? "den andre enheten" : `de ${n} andre enhetene`;
+    if (!confirm(`Slå av varsler på ${which}?\n\nDe får ikke flere varsler om nye bestillinger før noen trykker «Slå på varsler» på dem igjen.`)) return;
+    const btn = $("push-reset");
+    const seq = ++pushSeq;
+    const sub = pushState.sub;
+    btn.disabled = true;
+    pushMsg("Slår av varsler på de andre enhetene …", "info");
+    api("/api/admin/push/reset", { method: "POST", body: "{}" }).then(() => {
+      if (!sub) {
+        if (seq !== pushSeq) return;
+        pushShow("off", 0);
+        pushMsg("Varsler er slått av på alle andre enheter.", "ok");
+        return;
+      }
+      return saveSub(sub).then((res) => {
+        if (seq !== pushSeq) return;
+        pushShow("on", res.devices);
+        pushMsg("Varsler er slått av på alle andre enheter. Denne enheten får fortsatt varsler.", "ok");
+      }, (err) => {
+        if (seq !== pushSeq || err.status === 401) return;
+        pushShow("off", 0);
+        pushMsg("Varsler er slått av på alle andre enheter, men denne enheten ble ikke slått på igjen. Lukk og åpne Oppsett for å prøve igjen.");
+      });
+    }).catch((err) => { if (seq === pushSeq && err.status !== 401) pushMsg(pushError(err)); }).then(() => { btn.disabled = false; });
   });
 
   // Ved oppstart: får denne enheten varsler, gi serveren abonnementet på nytt (nettleseren kan ha fornyet det).

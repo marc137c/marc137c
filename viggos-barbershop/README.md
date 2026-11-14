@@ -52,6 +52,8 @@ Hver gang en kunde bestiller time på nettsiden, kommer det et varsel på telefo
 - **iPhone/iPad (iOS 16.4 eller nyere):** åpne /admin i Safari, trykk **Del → Legg til på Hjem-skjerm**, og åpne **Timebok** fra Hjem-skjermen. Logg inn der (appen husker ikke innloggingen fra Safari), gå til **Oppsett → Slå på varsler** og trykk **Tillat**.
 - **Android og PC (Chrome, Edge, Firefox, Safari på Mac):** gå til /admin → **Oppsett → Slå på varsler** og trykk **Tillat**.
 - **Send testvarsel** sjekker at det virker på enheten. **Slå av** stopper varslene på den enheten. Opptil 10 enheter kan få varsler samtidig.
+- **Slå av varsler på alle andre enheter** (vises under Oppsett når andre enheter får varsler) stopper varslene på alle andre telefoner og PC-er med en gang, f.eks. hvis en telefon er mistet, solgt eller lånt bort. Enheten du står på, fortsetter å få varsler.
+- **Bytter du admin-passordet, stopper varslene på alle enheter.** Slå dem på igjen under Oppsett på de enhetene du vil ha dem på.
 - Varsler kommer bare for bestillinger på nettsiden, ikke for timer du legger inn selv i timeboken.
 - Kommer det ikke noe varsel? Sjekk at varsler er tillatt for Timebok (iPhone: Innstillinger → Varslinger → Timebok) eller for nettleseren, og at telefonen ikke står i «Ikke forstyrr».
 - Ingenting å sette opp i Netlify: nøkkelparet (VAPID) lages automatisk første gang og ligger i timeboken i Netlify Blobs. Den private nøkkelen forlater aldri serveren. Forhåndsvisninger har egne nøkler og egne enheter.

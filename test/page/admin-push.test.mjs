@@ -51,13 +51,14 @@ for (const oldBrowser of [false, true]) {
     const b = fakePushBrowser({ device: makeDevice() });
     const page = await openSettings({ oldBrowser, navigator: b.navigator, globals: b.globals, routes: routes() });
     assert.deepEqual(page.missing, []);
-    for (const id of ["push", "push-msg", "push-ios", "push-on", "push-test", "push-off"]) assert.ok(page.$(id), id);
+    for (const id of ["push", "push-msg", "push-ios", "push-on", "push-test", "push-off", "push-reset"]) assert.ok(page.$(id), id);
   });
 
   test(`admin push panel: a browser without push gets no buttons, no push request and no service worker${label}`, async () => {
     for (const navigator of [{}, { serviceWorker: { register: () => { throw new Error("must not register"); } } }]) {
       const page = await openSettings({ oldBrowser, navigator, routes: routes() });
       assert.deepEqual(buttons(page), []);
+      assert.equal(page.$("push-reset").hidden, true);
       assert.match(msg(page), /^Denne nettleseren kan ikke vise varsler/);
       assert.equal(page.$("push-ios").hidden, true);
       assert.deepEqual(pushCalls(page), []);
@@ -361,4 +362,98 @@ test("admin push panel: a fast subscribe() leaves no timer and is never reported
   assert.equal(page.timers(), 0);
   await page.advance(60000);
   assert.match(msg(page), /^Varsler er på/);
+});
+
+// ---------- 9. «Slå av varsler på alle andre enheter» ----------
+const resetShown = (page) => !page.$("push-reset").hidden;
+
+test("admin push panel: «Slå av varsler på alle andre enheter» shows only when other devices get notifications", async () => {
+  const cases = [
+    [{}, 0, false], [{}, 2, true],                                   // this device off: devices = the others
+    [{ permission: "granted", subscribed: KEY_BYTES }, 1, false],    // on: only this one
+    [{ permission: "granted", subscribed: KEY_BYTES }, 3, true],     // on: this one and two others
+  ];
+  for (const [opts, devices, shown] of cases) {
+    const b = fakePushBrowser({ device: makeDevice(), ...opts });
+    const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes({
+      "GET /api/admin/push": () => ({ ...INFO, devices }),
+      "POST /api/admin/push/subscribe": () => ({ ok: true, devices }),
+    }) });
+    assert.equal(resetShown(page), shown, JSON.stringify([opts.permission, devices]));
+    if (opts.subscribed && devices === 3) assert.match(msg(page), /^Varsler er på\..* 2 andre enheter får varsler\.$/);
+  }
+  for (const navigator of [{}, fakePushBrowser({ device: makeDevice(), ios: true, push: false }).navigator]) {
+    const page = await openSettings({ navigator, routes: routes({ "GET /api/admin/push": () => ({ ...INFO, devices: 4 }) }) });
+    assert.equal(resetShown(page), false, "never in a browser without push");
+  }
+});
+
+test("admin push panel: reset asks first, needs the token, and turns this device on again afterwards", async () => {
+  const device = makeDevice("apple");
+  let answer = false;
+  const b = fakePushBrowser({ device, permission: "granted", subscribed: KEY_BYTES });
+  const order = [];
+  const page = await openSettings({ navigator: b.navigator, globals: b.globals, confirm: () => answer, routes: routes({
+    "GET /api/admin/push": () => ({ ...INFO, devices: 3 }),
+    "POST /api/admin/push/subscribe": () => { order.push("subscribe"); return { ok: true, devices: order.includes("reset") ? 1 : 3 }; },
+    "POST /api/admin/push/reset": () => { order.push("reset"); return { ok: true, devices: 0 }; },
+  }) });
+  order.length = 0;
+  page.$("push-reset").click();
+  await page.flush();
+  assert.match(page.confirms[0], /^Slå av varsler på de 2 andre enhetene\?/);
+  assert.deepEqual(order, [], "nothing happens unless the barber confirms");
+  answer = true;
+  page.$("push-reset").click();
+  await page.flush();
+  assert.deepEqual(order, ["reset", "subscribe"], "this device is subscribed again after the reset");
+  const reset = pushCalls(page).find((c) => c.path === "/api/admin/push/reset");
+  assert.deepEqual([reset.method, reset.headers.Authorization], ["POST", "Bearer test-admin-token"]);
+  assert.deepEqual(pushCalls(page).filter((c) => c.path === "/api/admin/push/subscribe").pop().body, { subscription: device.subscription });
+  assert.equal(msg(page), "Varsler er slått av på alle andre enheter. Denne enheten får fortsatt varsler.");
+  assert.deepEqual(buttons(page), ["push-test", "push-off"]);
+  assert.equal(resetShown(page), false, "no other device left");
+  assert.equal(b.log.unsubscribed.length, 0, "this browser keeps its subscription");
+});
+
+test("admin push panel: reset from a device that is off does not turn it on", async () => {
+  const b = fakePushBrowser({ device: makeDevice() });
+  const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes({
+    "GET /api/admin/push": () => ({ ...INFO, devices: 1 }),
+    "POST /api/admin/push/reset": () => ({ ok: true, devices: 0 }),
+  }) });
+  assert.equal(resetShown(page), true);
+  page.$("push-reset").click();
+  await page.flush();
+  assert.match(page.confirms[0], /^Slå av varsler på den andre enheten\?/);
+  assert.equal(pushCalls(page).filter((c) => c.path === "/api/admin/push/subscribe").length, 0);
+  assert.equal(msg(page), "Varsler er slått av på alle andre enheter.");
+  assert.deepEqual(buttons(page), ["push-on"]);
+  assert.equal(resetShown(page), false);
+});
+
+test("admin push panel: end to end, a reset from the phone leaves only the phone, and only it gets the next booking", async () => {
+  const PASSWORD = "fake-admin-password";
+  const phone = makeDevice("apple"), lost = makeDevice("fcm");
+  const push = fakePushService({ devices: [phone, lost] });
+  const d = testDeps({ now: "2026-11-12T09:00:00Z", env: { ADMIN_PASSWORD: PASSWORD }, fetch: push.fetch });
+  const token = makeToken(PASSWORD, d.clock.now());
+  const toServer = (call) => adminFn.handle(request(call.path, { method: call.method, headers: { Authorization: call.headers.Authorization }, json: call.body }), PRODUCTION, d).then(read);
+  assert.equal((await toServer({ path: "/api/admin/push", method: "GET", headers: { Authorization: "Bearer " + token } })).status, 200);
+  assert.equal((await toServer({ path: "/api/admin/push/subscribe", method: "POST", headers: { Authorization: "Bearer " + token }, body: { subscription: lost.subscription } })).status, 201);
+  const b = fakePushBrowser({ device: phone });
+  const serverRoutes = {};
+  for (const r of ["GET /api/admin/push", "POST /api/admin/push/subscribe", "POST /api/admin/push/reset"]) serverRoutes[r] = toServer;
+  const page = await openSettings({ token, navigator: b.navigator, globals: b.globals, routes: serverRoutes });
+  page.$("push-on").click();
+  await page.flush();
+  assert.match(msg(page), /^Varsler er på.* 1 annen enhet får varsler\.$/);
+  page.$("push-reset").click();
+  await page.flush();
+  assert.equal(msg(page), "Varsler er slått av på alle andre enheter. Denne enheten får fortsatt varsler.");
+  const res = await read(await bookingsFn.handle(request("/api/bookings", { method: "POST", json: {
+    service: "Herreklipp", date: "2026-11-14", start: 690, addons: [], name: "Per Hansen", phone: "41234567",
+  } }), PRODUCTION, d));
+  assert.equal(res.status, 201);
+  assert.deepEqual(push.deliveries.map((x) => x.device), [phone], "the lost phone gets nothing");
 });
