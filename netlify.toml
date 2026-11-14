@@ -7,3 +7,14 @@
 
 [functions]
   directory = "netlify/functions"
+
+# Timebokens app-fil og service worker (varsler, se netlify/lib/push.mjs og viggos-barbershop/admin-sw.js)
+[[headers]]
+  for = "/admin.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json; charset=utf-8"
+
+[[headers]]
+  for = "/admin-sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"

@@ -1,0 +1,18 @@
+{
+  "id": "/admin",
+  "name": "Timebok – Viggo's Barbershop",
+  "short_name": "Timebok",
+  "description": "Timeboken til Viggo's Barbershop, med varsel om nye bestillinger.",
+  "lang": "nb",
+  "dir": "ltr",
+  "start_url": "/admin",
+  "scope": "/admin",
+  "display": "standalone",
+  "background_color": "#0b0f0d",
+  "theme_color": "#0b0f0d",
+  "icons": [
+    { "src": "/admin-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/admin-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/admin-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
