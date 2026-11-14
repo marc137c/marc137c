@@ -94,7 +94,7 @@
     });
   });
 
-  $("logout").addEventListener("click", () => { setToken(null); showLogin("Du er logget ut."); });
+  // «Logg ut» står sammen med varslene lenger ned: får enheten varsler, spør den først om de skal slås av også.
 
   function api(path, opts = {}) {
     return fetch(path, Object.assign({}, opts, {
@@ -690,6 +690,46 @@
       return api("/api/admin/push").then((info) => (sameKey(sub, info.publicKey) ? saveSub(sub) : null));
     }).catch(() => {});
   }
+
+  // «Logg ut»: får denne enheten varsler om nye bestillinger (med kundens navn), spør siden først om de skal slås av
+  // også, så en lånt eller delt telefon eller PC ikke fortsetter å vise dem. Ja (OK): slås av i nettleseren og på
+  // serveren mens innloggingen ennå gjelder, og først da logges det ut. Nei: det står på innloggingssiden at enheten
+  // fortsatt får varsler. Uten varsler (eller i en nettleser uten push) logges det ut med en gang.
+  const LOOKUP_WAIT_MS = 3000;
+  const LOGOUT_WAIT_MS = 8000;
+  function thisDeviceSubscription() {
+    const c = sw();
+    if (!pushSupported() || permission() !== "granted" || !c.getRegistration) return Promise.resolve(null);
+    const look = c.getRegistration(SW_SCOPE).then((reg) => (reg ? reg.pushManager.getSubscription() : null));
+    return withinTime(look, LOOKUP_WAIT_MS, "").catch(() => null);
+  }
+  // Slår av i nettleseren og på serveren samtidig, og venter høyst LOGOUT_WAIT_MS. Svarer om minst én av dem lyktes
+  // (da kommer det ikke flere varsler hit: push-tjenesten svarer 410 for et avsluttet abonnement, og serveren
+  // sletter enheten).
+  function turnOffHere(sub) {
+    let browserOk = false, serverOk = false;
+    const browser = Promise.resolve().then(() => sub.unsubscribe()).then((ok) => { browserOk = ok === true; }, () => {});
+    const server = api("/api/admin/push/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint: sub.endpoint }) })
+      .then(() => { serverOk = true; }, () => {});
+    return withinTime(Promise.all([browser, server]), LOGOUT_WAIT_MS, "").catch(() => {}).then(() => browserOk || serverOk);
+  }
+  $("logout").addEventListener("click", () => {
+    const btn = $("logout");
+    if (btn.disabled) return;
+    btn.disabled = true;
+    thisDeviceSubscription().then((sub) => {
+      if (!sub) return "Du er logget ut.";
+      const yes = confirm("Slå av varsler om nye bestillinger på denne enheten også?\n\nOK: varslene slås av her (lurt på en lånt eller delt telefon eller PC).\nAvbryt: du får fortsatt varsel om nye bestillinger her, også når du er logget ut.");
+      if (!yes) return "Du er logget ut. Denne enheten får fortsatt varsel om nye bestillinger.";
+      return turnOffHere(sub).then((stopped) => (stopped
+        ? "Du er logget ut, og varsler om nye bestillinger er slått av på denne enheten."
+        : "Du er logget ut, men varslene på denne enheten kunne ikke slås av nå. Slå av varsler for denne siden i nettleserens innstillinger."));
+    }).catch(() => "Du er logget ut.").then((text) => {
+      btn.disabled = false;
+      setToken(null);
+      showLogin(text);
+    });
+  });
 
   // Har Viggo tillatt varsler i innstillingene, viser «Prøv igjen» (og det å komme tilbake til siden, eller at
   // nettleseren melder at tillatelsen er endret) panelet på nytt, så han slipper å lukke og åpne «Oppsett».
