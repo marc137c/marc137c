@@ -431,8 +431,6 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 /* Valgt tjeneste i bookingskjemaet lyser kort opp */
 .booking.flash { animation: flash 1.6s ease; }
 .booking input, .booking select { font-size: 16px; }
-.sms-note { margin: 0; font-size: .85rem; color: var(--muted); }
-.sms-note[hidden] { display: none; }
 .booking select.picked { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(207, 167, 94, .25); }
 @keyframes flash { 0%, 100% { box-shadow: none; } 25% { box-shadow: 0 0 0 3px var(--gold), 0 0 40px rgba(207, 167, 94, .35); } }
 @media (prefers-reduced-motion: reduce) { .booking.flash { animation: none; } }

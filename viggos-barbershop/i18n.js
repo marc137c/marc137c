@@ -56,7 +56,6 @@
     "f.choose": "Choose a service",
     "f.name": "Name",
     "f.phone": "Phone",
-    "f.smsNote": "With a Norwegian mobile number you get a confirmation by text message.",
     "f.submit": "Book appointment",
     "book.free": "Available",
     "book.taken": "Booked",
@@ -161,7 +160,6 @@
       dayFull: "Alle tider er booket denne dagen. Velg en annen dag.",
       takenNow: "Beklager, noen rakk å booke den tiden akkurat nå. Velg en annen tid.",
       booked: (when) => `Timen er booket: ${when}. Velkommen! Må du endre eller avlyse, ring oss på 409 63 911.`,
-      smsSent: "Du får også en bekreftelse på SMS.",
       // Anmeldelser
       basedOn: (n) => `basert på ${n} anmeldelser på Google`,
       ratingOf: (r) => `${r} av 5 stjerner`,
@@ -203,7 +201,6 @@
       dayFull: "Every time is booked this day. Please choose another day.",
       takenNow: "Sorry, someone just booked that time. Please choose another time.",
       booked: (when) => `You're booked: ${when}. See you then! To change or cancel, call us on 409 63 911.`,
-      smsSent: "We've also sent you a confirmation by text message.",
       // Reviews
       basedOn: (n) => `based on ${n} reviews on Google`,
       ratingOf: (r) => `${r} out of 5 stars`,
