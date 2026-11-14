@@ -27,7 +27,7 @@ const KEY_BYTES = [...Buffer.from(SERVER_KEY, "base64url")];
 const INFO = { publicKey: SERVER_KEY, devices: 0 };
 const pushCalls = (page) => page.calls.filter((c) => c.path.startsWith("/api/admin/push"));
 const visible = (page, id) => !page.$(id).hidden;
-const buttons = (page) => ["push-on", "push-test", "push-off"].filter((id) => visible(page, id));
+const buttons = (page) => ["push-on", "push-retry", "push-test", "push-off"].filter((id) => visible(page, id));
 const msg = (page) => page.$("push-msg").textContent;
 
 async function openSettings(opts) {
@@ -51,7 +51,7 @@ for (const oldBrowser of [false, true]) {
     const b = fakePushBrowser({ device: makeDevice() });
     const page = await openSettings({ oldBrowser, navigator: b.navigator, globals: b.globals, routes: routes() });
     assert.deepEqual(page.missing, []);
-    for (const id of ["push", "push-msg", "push-ios", "push-on", "push-test", "push-off", "push-reset"]) assert.ok(page.$(id), id);
+    for (const id of ["push", "push-msg", "push-ios", "push-on", "push-retry", "push-test", "push-off", "push-reset"]) assert.ok(page.$(id), id);
   });
 
   test(`admin push panel: a browser without push gets no buttons, no push request and no service worker${label}`, async () => {
@@ -117,8 +117,8 @@ test("admin push panel: «Slå på varsler» subscribes in the tap itself with t
   assert.equal(page.$("push-on").disabled, false);
 });
 
-test("admin push panel: refusing permission sends nothing; «blocked» hides the button", async () => {
-  for (const [answer, text, left] of [["denied", /blokkert/, []], ["default", /Du må tillate varsler/, ["push-on"]]]) {
+test("admin push panel: refusing permission sends nothing; «blocked» offers only «Prøv igjen»", async () => {
+  for (const [answer, text, left] of [["denied", /blokkert/, ["push-retry"]], ["default", /Du må tillate varsler/, ["push-on"]]]) {
     const b = fakePushBrowser({ device: makeDevice(), answer });
     const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes() });
     page.$("push-on").click();
@@ -132,7 +132,7 @@ test("admin push panel: refusing permission sends nothing; «blocked» hides the
   const b = fakePushBrowser({ device: makeDevice(), permission: "denied" });
   const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes() });
   assert.match(msg(page), /blokkert/, "already blocked when «Oppsett» opens");
-  assert.deepEqual(buttons(page), []);
+  assert.deepEqual(buttons(page), ["push-retry"]);
   assert.deepEqual(pushCalls(page), []);
 });
 
@@ -456,4 +456,72 @@ test("admin push panel: end to end, a reset from the phone leaves only the phone
   } }), PRODUCTION, d));
   assert.equal(res.status, 201);
   assert.deepEqual(push.deliveries.map((x) => x.device), [phone], "the lost phone gets nothing");
+});
+
+// ---------- 10. Blocked, then allowed in the settings ----------
+const BLOCKED_TEXT = "Varsler er blokkert for denne siden. Tillat varsler i nettleserens innstillinger (på iPhone: Innstillinger → Varslinger → Timebok), og trykk Prøv igjen.";
+const showPage = (page) => (page.doc.listeners.visibilitychange || []).forEach((fn) => fn({ type: "visibilitychange" }));
+
+test("admin push panel: blocked → «Prøv igjen»; after allowing notifications in the settings it offers «Slå på varsler»", async () => {
+  const b = fakePushBrowser({ device: makeDevice(), permission: "denied" });
+  const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes() });
+  assert.equal(msg(page), BLOCKED_TEXT);
+  assert.deepEqual(buttons(page), ["push-retry"]);
+  page.$("push-retry").click();
+  await page.flush();
+  assert.equal(msg(page), BLOCKED_TEXT, "still blocked: same answer");
+  assert.deepEqual(pushCalls(page), [], "nothing is asked of the server while blocked");
+  b.setPermission("granted");
+  page.$("push-retry").click();
+  await page.flush();
+  assert.deepEqual(buttons(page), ["push-on"]);
+  assert.equal(msg(page), "Varsler er av på denne enheten.");
+  assert.equal(page.$("push-on").disabled, false);
+});
+
+test("admin push panel: coming back to the page with «Oppsett» open shows the new permission (and does nothing when it is closed)", async () => {
+  const b = fakePushBrowser({ device: makeDevice(), permission: "denied" });
+  const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes() });
+  b.setPermission("default"); // reset in the browser's site settings
+  showPage(page);
+  await page.flush();
+  assert.deepEqual(buttons(page), ["push-on"]);
+  page.$("settings-close").click();
+  await page.flush();
+  const before = pushCalls(page).length;
+  b.setPermission("denied");
+  showPage(page);
+  await page.flush();
+  assert.equal(pushCalls(page).length, before, "no push work while «Oppsett» is closed");
+  assert.equal(msg(page), "");
+});
+
+test("admin push panel: a permission change the browser reports (navigator.permissions) refreshes the open panel", async () => {
+  const b = fakePushBrowser({ device: makeDevice(), permission: "denied", permissionsApi: true });
+  const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes() });
+  assert.deepEqual(buttons(page), ["push-retry"]);
+  b.setPermission("granted");
+  await page.flush();
+  assert.deepEqual(buttons(page), ["push-on"]);
+  // Browsers without navigator.permissions, or that refuse «notifications», are fine
+  for (const permissions of [undefined, { query: () => { throw new TypeError("nope"); } }, { query: () => Promise.reject(new TypeError("nope")) }]) {
+    const c = fakePushBrowser({ device: makeDevice(), permission: "denied" });
+    c.navigator.permissions = permissions;
+    const p = await openSettings({ navigator: c.navigator, globals: c.globals, routes: routes() });
+    assert.deepEqual(buttons(p), ["push-retry"]);
+  }
+});
+
+test("admin push panel: coming back to the page during «Slår på …» does not interrupt it", async () => {
+  const b = fakePushBrowser({ device: makeDevice("apple"), permission: "granted", subscribeHangs: true });
+  const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes() });
+  page.$("push-on").click();
+  await page.flush();
+  const gets = pushCalls(page).filter((c) => c.method === "GET").length;
+  showPage(page);
+  await page.flush();
+  assert.equal(pushCalls(page).filter((c) => c.method === "GET").length, gets, "the panel is not reloaded while a tap is working");
+  b.settleSubscribe();
+  await page.flush();
+  assert.match(msg(page), /^Varsler er på/);
 });

@@ -439,7 +439,7 @@
   // Serveren lager nøkkelparet selv; siden får bare den offentlige nøkkelen (GET /api/admin/push).
   const SW_URL = "/admin-sw.js";
   const SW_SCOPE = "/admin";
-  const BLOCKED = "Varsler er blokkert for denne siden. Tillat varsler i nettleserens innstillinger (på iPhone: Innstillinger → Varslinger → Timebok), og prøv igjen.";
+  const BLOCKED = "Varsler er blokkert for denne siden. Tillat varsler i nettleserens innstillinger (på iPhone: Innstillinger → Varslinger → Timebok), og trykk Prøv igjen.";
   const sw = () => ("serviceWorker" in navigator && navigator.serviceWorker ? navigator.serviceWorker : null);
   const notif = () => ("Notification" in window ? Notification : null);
   const pushSupported = () => !!(sw() && sw().register && "PushManager" in window && notif());
@@ -454,15 +454,20 @@
     $("push-msg").textContent = text || "";
     $("push-msg").className = "msg" + (kind ? " " + kind : "");
   }
-  // mode: «off» (Slå på), «on» (Send testvarsel, Slå av) eller null (ingen knapper). Knappene blir alltid trykkbare
-  // igjen her, så «Oppsett» lukket og åpnet på nytt aldri viser en knapp som henger fra et tidligere trykk.
+  // mode: «off» (Slå på), «on» (Send testvarsel, Slå av), «blocked» (Prøv igjen) eller null (ingen knapper).
+  // Knappene blir alltid trykkbare igjen her, så «Oppsett» lukket og åpnet på nytt aldri viser en knapp som henger
+  // fra et tidligere trykk.
+  const PUSH_BUTTONS = ["push-on", "push-test", "push-off", "push-retry", "push-reset"];
   function pushButtons(mode) {
+    $("push-retry").hidden = mode !== "blocked";
     $("push-on").hidden = mode !== "off";
     $("push-test").hidden = mode !== "on";
     $("push-off").hidden = mode !== "on";
     $("push-reset").hidden = !(mode === "on" || mode === "off") || !(pushState.others > 0);
-    ["push-on", "push-test", "push-off", "push-reset"].forEach((id) => { $(id).disabled = false; });
+    PUSH_BUTTONS.forEach((id) => { $(id).disabled = false; });
   }
+  // En knapp er grået ut mens trykket på den arbeider
+  const pushBusy = () => PUSH_BUTTONS.some((id) => $(id).disabled);
   // Svarer ikke push-tjenesten (nettet er nede, eller den er sperret), blir subscribe() aldri ferdig. Da gir siden
   // beskjed etter SUBSCRIBE_WAIT_MS, i stedet for å henge på «Slår på …».
   const SUBSCRIBE_WAIT_MS = 20000;
@@ -529,7 +534,7 @@
       else pushMsg("Denne nettleseren kan ikke vise varsler. Bruk en nyere Chrome, Edge, Firefox eller Safari.", "info");
       return Promise.resolve();
     }
-    if (permission() === "denied") { pushMsg(BLOCKED, "info"); return Promise.resolve(); }
+    if (permission() === "denied") { pushButtons("blocked"); pushMsg(BLOCKED, "info"); return Promise.resolve(); }
     pushMsg("Henter …", "info");
     return Promise.all([api("/api/admin/push"), swRegistration().then((reg) => { pushState.reg = reg; return reg.pushManager.getSubscription(); })]).then((r) => {
       if (seq !== pushSeq) return;
@@ -586,7 +591,7 @@
       if (err && err.timeout) { timedOut = true; throw err; }
       const answer = permission();
       if (answer === "granted") throw err;
-      if (answer === "denied") pushButtons(null);
+      if (answer === "denied") pushButtons("blocked");
       throw Object.assign(new Error(answer === "denied" ? BLOCKED : "Du må tillate varsler for å få dem. Trykk «Slå på varsler» og velg Tillat."), { user: true });
     })
       .then((sub) => saveSub(sub).then((res) => {
@@ -684,6 +689,19 @@
       if (!sub) return null;
       return api("/api/admin/push").then((info) => (sameKey(sub, info.publicKey) ? saveSub(sub) : null));
     }).catch(() => {});
+  }
+
+  // Har Viggo tillatt varsler i innstillingene, viser «Prøv igjen» (og det å komme tilbake til siden, eller at
+  // nettleseren melder at tillatelsen er endret) panelet på nytt, så han slipper å lukke og åpne «Oppsett».
+  $("push-retry").addEventListener("click", () => pushLoad());
+  const pushRefresh = () => { if (settings.open && getToken() && !pushBusy()) pushLoad(); };
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) pushRefresh(); });
+  if (pushSupported() && navigator.permissions && typeof navigator.permissions.query === "function") {
+    try {
+      navigator.permissions.query({ name: "notifications" }).then((status) => {
+        if (status && "onchange" in status) status.onchange = pushRefresh;
+      }, () => {});
+    } catch (e) { /* nettleseren kjenner ikke «notifications» her */ }
   }
 
   // Trykk på et varsel mens timeboken er åpen: admin-sw.js sier hvilken dag som skal vises

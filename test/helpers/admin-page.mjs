@@ -20,6 +20,8 @@
 //   browser.emit(data) sends a message from the service worker to the page; browser.current() the subscription.
 //   fakePushBrowser({ subscribeHangs: true }): subscribe() never settles (push service unreachable) until the test
 //   calls browser.settleSubscribe() (it then resolves with the subscription, as a late answer would).
+//   fakePushBrowser({ permissionsApi: true }) adds navigator.permissions; browser.setPermission(p) changes the
+//   permission as the settings app would (and fires the status's onchange).
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
@@ -200,7 +202,7 @@ export async function loadAdmin({ routes = {}, token = "test-admin-token", navig
 // subscribed: the browser already has a subscription made with this applicationServerKey (bytes) at load.
 // As in Chrome, Firefox and Safari, pushManager.subscribe() asks for permission itself when it is «default» (the
 // barber answers `answer`), and rejects with NotAllowedError unless it ends up «granted».
-export function fakePushBrowser({ permission = "default", answer = "granted", device, subscribed, push = true, ios = false, standalone = false, unsubscribeOk = true, registered = Boolean(subscribed), subscribeHangs = false } = {}) {
+export function fakePushBrowser({ permission = "default", answer = "granted", device, subscribed, push = true, ios = false, standalone = false, unsubscribeOk = true, registered = Boolean(subscribed), subscribeHangs = false, permissionsApi = false } = {}) {
   const log = { registered: [], subscribes: [], permissionAsks: 0, unsubscribed: [], getRegistration: [] };
   const listeners = {};
   const makeSub = (appKey) => ({
@@ -251,9 +253,14 @@ export function fakePushBrowser({ permission = "default", answer = "granted", de
     maxTouchPoints: ios ? 5 : 0,
   };
   if (ios) navigator.standalone = standalone;
+  // navigator.permissions (Chrome, Firefox, Safari 16+): its «notifications» status says when the barber changes it
+  const status = { state: permission === "default" ? "prompt" : permission, onchange: null };
+  if (permissionsApi) navigator.permissions = { query: (d) => (d && d.name === "notifications" ? Promise.resolve(status) : Promise.reject(new TypeError("unknown"))) };
   const globals = push ? { Notification, PushManager: function PushManager() {} } : {};
   return {
     navigator, globals, log, current: () => current, emit: (data) => (listeners.message || []).forEach((fn) => fn({ data })),
+    // The barber changes the permission in the browser's or the phone's settings
+    setPermission: (p) => { Notification.permission = p; status.state = p === "default" ? "prompt" : p; if (typeof status.onchange === "function") status.onchange({ target: status }); },
     settleSubscribe: () => { const f = hanging.shift(); if (!f) throw new Error("no subscribe() is waiting"); f(); },
   };
 }
