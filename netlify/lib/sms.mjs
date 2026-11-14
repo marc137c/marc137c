@@ -1,15 +1,18 @@
-// SMS via Sveve (sveve.no): bekreftelse når kunden bestiller, og påminnelse før timen.
-// Sett i Netlify (Site configuration → Environment variables):
+// SMS via Sveve (sveve.no): bekreftelse når kunden bestiller, påminnelse før timen (begge på språket kunden
+// bestilte på) og ett varsel til frisøren per nettbestilling. Aldri om natten (21–08), og bare fra produksjon.
+// Sett i Netlify (Site configuration → Environment variables), helst bare for produksjon:
 //   SVEVE_USER    brukernavnet på Sveve
 //   SVEVE_PASSWD  API-passordet (sveve.no → API → API-nøkkel), ikke innloggingspassordet
 //   SVEVE_FROM    valgfritt avsendernavn, maks 11 tegn uten æøå (standard «Viggos»)
 //   SVEVE_TEST    «true» = Sveve tar imot kallet, men sender ingen SMS (til testing)
+//   SHOP_SMS_TO   valgfritt: mobilen som får varsel om nye nettbestillinger (standard 409 63 911)
 // Uten SVEVE_USER/SVEVE_PASSWD sendes ingenting, og bestillingen virker akkurat som før.
 //
-// Sikkerhet: meldingen inneholder bare vår egen tekst + dato/tid/tjeneste som serveren har sjekket,
+// Sikkerhet: SMS til kunden inneholder bare vår egen tekst + dato/tid/tjeneste som serveren har sjekket,
 // aldri navnet kunden skrev inn. Ellers kunne hvem som helst sende en egen tekst («navnet») fra
-// «Viggos» til et fremmed nummer. Vi sender også bare til norske mobilnummer (stopper SMS-svindel
-// mot dyre utenlandske nummer).
+// «Viggos» til et fremmed nummer. Bare varselet til frisøren har med navnet, og det går bare til butikkens
+// eget nummer. Vi sender også bare til norske mobilnummer (stopper SMS-svindel mot dyre utenlandske nummer).
+// Tak: høyst 3 SMS per kundenummer per døgn og 40 varsler til frisøren per døgn (limits.mjs).
 
 const ENDPOINT = "https://sveve.no/SMS/SendMessage";
 const DAYS = ["søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"];

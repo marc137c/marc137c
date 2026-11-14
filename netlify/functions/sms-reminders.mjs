@@ -1,4 +1,5 @@
-// Planlagt funksjon: sender SMS-påminnelser hvert 15. minutt.
+// Planlagt funksjon hvert 15. minutt: sender SMS-påminnelser, og bekreftelser og frisørvarsler som ikke kunne
+// sendes da kunden bestilte (natt, feil hos Sveve), se netlify/lib/reminders.mjs.
 // Netlify kjører planlagte funksjoner bare på den publiserte nettsiden (ikke på forhåndsvisninger), så den
 // leser alltid den ekte timeboken. Sier context likevel at dette ikke er produksjon (f.eks. netlify dev),
 // gjør den ingenting: bare produksjon sender SMS.
