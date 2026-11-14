@@ -5,6 +5,9 @@
 // 3) sprer (...) eller går gjennom (for-of) en DOM-samling, f.eks. [...select.options]: iOS 10.0–10.2 kan ikke
 //    iterere HTMLCollection, så koden kaster midt i en bestilling. Bruk Array.prototype.map.call(...) o.l.,
 // 4) bruker et nyere nettleser-API uten å sjekke at det finnes først (if ("X" in window), typeof …, try).
+//    Også navigator.clipboard, navigator.serviceWorker, Notification og PushManager: de mangler i mange av
+//    målnettleserne, og iPhone har varsler bare i iOS 16.4+ fra Hjem-skjermen. Selve sjekken
+//    («if (navigator.clipboard && …)», «typeof Notification», «"serviceWorker" in navigator») er lov.
 // Med vilje unntatt? Skriv «compat-ok» i en kommentar på samme linje eller linjen over.
 // Mål: Safari/iOS 10+, Chrome 60+, Firefox 55+, Samsung 8+ (se «browserslist» i package.json).
 // Bruk: node scripts/check-es2015.mjs [mappe]   (standard: viggos-barbershop)
@@ -44,6 +47,13 @@ const RISKY_METHOD = {
   replaceAll: "Safari < 13.1, Chrome < 85", matchAll: "Safari < 13, Chrome < 73", at: "Safari < 15.4, Chrome < 92",
   allSettled: "Safari < 13, Chrome < 76", formatToParts: "Safari < 11", toggleAttribute: "Safari < 12, Chrome < 69",
   trimStart: "Safari < 12", trimEnd: "Safari < 12", scrollIntoViewIfNeeded: "Firefox",
+};
+// Objekter/globale navn som må sjekkes før bruk (også som window.X): navn → hvem som mangler det
+const RISKY_GLOBAL = {
+  "navigator.clipboard": "Safari < 13.1, Chrome < 66, Firefox < 63",
+  "navigator.serviceWorker": "Safari < 11.1, Chrome < 40, Firefox < 44, og i privat modus i Firefox",
+  Notification: "iOS Safari < 16.4, og iPhone utenfor Hjem-skjermen",
+  PushManager: "Safari < 16, iOS < 16.4, Chrome < 42, Firefox < 44",
 };
 // Kall som alltid gir en ekte Array (trygt å spre)
 const ARRAY_CALLS = new Set(["map", "filter", "slice", "concat", "split", "from", "keys", "sort", "reverse", "fill", "of"]);
@@ -108,7 +118,31 @@ function check(where, code, lineOffset = 0) {
     return false;
   };
 
+  // Er bruken selve sjekken? typeof X, if (X …), X && …, X ? … : …
+  const isCheck = (node, anc) => {
+    for (let i = anc.length - 1; i >= 0; i--) {
+      const a = anc[i], child = anc[i + 1] || node;
+      if (a.type === "UnaryExpression" && a.operator === "typeof") return true;
+      if ((a.type === "IfStatement" || a.type === "ConditionalExpression" || a.type === "WhileStatement") && child === a.test) return true;
+      if (a.type === "LogicalExpression" && child === a.left) return true;
+      if (/Statement|Declaration|Function/.test(a.type)) return false;
+    }
+    return false;
+  };
+  const globalName = (node, parent) => {
+    if (node.type === "MemberExpression") return dotted(node).replace(/^window./, "");
+    if (node.type !== "Identifier") return null;
+    if (parent && parent.type === "MemberExpression" && parent.property === node && !parent.computed) return null; // x.Notification
+    if (parent && parent.type === "Property" && parent.key === node && !parent.computed) return null;           // { Notification: … }
+    return node.name;
+  };
+
   walk(ast, [], (node, anc) => {
+    // 4b) Objekter som må sjekkes før bruk
+    const gname = (node.type === "MemberExpression" || node.type === "Identifier") ? globalName(node, anc[anc.length - 1]) : null;
+    if (gname && RISKY_GLOBAL[gname] && !isCheck(node, anc) && !guarded(node, anc, gname.split(".").pop())) {
+      report(where, L(node), `${gname} uten sjekk (mangler i ${RISKY_GLOBAL[gname]}). Sjekk først, f.eks. if (${gname.includes(".") ? gname + " && …" : `"${gname}" in window`}).`);
+    }
     // 3) Spredning / for-of over noe som kan være en DOM-samling
     const iterated = node.type === "SpreadElement" ? node.argument : node.type === "ForOfStatement" ? node.right : null;
     if (iterated && (iterated.type === "MemberExpression" || iterated.type === "CallExpression") && !allowed(node.loc.start.line)) {
@@ -146,4 +180,4 @@ if (failed) {
   console.error("Rett linjene over, så virker siden også på eldre telefoner.");
   process.exit(1);
 }
-console.log("ES2015-sjekk OK (syntaks, globale navn, DOM-samlinger, nyere API-er)");
+console.log("ES2015-sjekk OK (syntaks, globale navn, DOM-samlinger, nyere API-er, utklippstavle/varsler/service worker)");
