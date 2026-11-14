@@ -55,11 +55,57 @@
     $("login").hidden = false;
     $("login-msg").textContent = message;
     $("pw").focus();
+    loginPushCheck();
   }
   function showApp() {
+    loginPushHide();
     $("login").hidden = true;
     $("app").hidden = false;
   }
+
+  // Innloggingssiden på en enhet som fortsatt har varsler om nye bestillinger slått på (innloggingen har gått ut,
+  // fanen ble lukket, eller Viggo logget ut uten å slå dem av): det står der, med «Slå av varsler her». Knappen
+  // trenger ingen innlogging: nettleseren avslutter abonnementet, push-tjenesten svarer 410 neste gang, og serveren
+  // sletter enheten.
+  let loginPushSeq = 0;
+  let loginPushSub = null;
+  function loginPushMsg(text, kind) {
+    $("login-push-msg").textContent = text;
+    $("login-push-msg").className = "msg" + (kind ? " " + kind : "");
+  }
+  function loginPushHide() {
+    loginPushSeq++;
+    loginPushSub = null;
+    $("login-push").hidden = true;
+  }
+  function loginPushCheck() {
+    loginPushHide();
+    const seq = loginPushSeq;
+    return thisDeviceSubscription().then((sub) => {
+      if (seq !== loginPushSeq || !sub || $("login").hidden) return;
+      loginPushSub = sub;
+      loginPushMsg("Denne enheten har fortsatt varsler om nye bestillinger slått på.", "info");
+      $("login-push-off").hidden = false;
+      $("login-push-off").disabled = false;
+      $("login-push").hidden = false;
+    });
+  }
+  $("login-push-off").addEventListener("click", () => {
+    const sub = loginPushSub;
+    const btn = $("login-push-off");
+    if (!sub || btn.disabled) return;
+    const seq = loginPushSeq;
+    btn.disabled = true;
+    const stop = Promise.resolve().then(() => sub.unsubscribe()).then((ok) => ok === true, () => false);
+    withinTime(stop, LOGOUT_WAIT_MS, "").catch(() => false).then((ok) => {
+      btn.disabled = false;
+      if (seq !== loginPushSeq) return;
+      if (!ok) return loginPushMsg("Kunne ikke slå av varslene her. Slå av varsler for denne siden i nettleserens innstillinger.");
+      loginPushSub = null;
+      btn.hidden = true;
+      loginPushMsg("Varsler om nye bestillinger er slått av på denne enheten.", "ok");
+    });
+  });
 
   $("pw-toggle").addEventListener("click", () => {
     const pw = $("pw");
@@ -742,7 +788,7 @@
     thisDeviceSubscription().then((sub) => {
       if (!sub) return "Du er logget ut.";
       const yes = confirm("Slå av varsler om nye bestillinger på denne enheten også?\n\nOK: varslene slås av her (lurt på en lånt eller delt telefon eller PC).\nAvbryt: du får fortsatt varsel om nye bestillinger her, også når du er logget ut.");
-      if (!yes) return "Du er logget ut. Denne enheten får fortsatt varsel om nye bestillinger.";
+      if (!yes) return "Du er logget ut."; // innloggingssiden sier at varslene fortsatt er på, med «Slå av varsler her»
       return turnOffHere(sub).then((stopped) => (stopped
         ? "Du er logget ut, og varsler om nye bestillinger er slått av på denne enheten."
         : "Du er logget ut, men varslene på denne enheten kunne ikke slås av nå. Slå av varsler for denne siden i nettleserens innstillinger."));

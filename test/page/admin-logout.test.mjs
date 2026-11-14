@@ -3,7 +3,8 @@
 //   1. on a subscribed device, «Logg ut» asks whether to turn notifications off here too;
 //   2. yes: the browser unsubscribes and the server is told (with the admin token) before the token is dropped;
 //      only then is the login shown, saying notifications are off;
-//   3. no: nothing is unsubscribed, and the login page says this device still gets notifications;
+//   3. no: nothing is unsubscribed, and the login page says notifications are still on here, with «Slå av varsler
+//      her» (test/page/admin-login-push.test.mjs);
 //   4. a device without notifications, or a browser without push (Safari 10, Chrome 60, Firefox 55, the compat.js
 //      dialog shim), logs out at once without asking;
 //   5. a push service or server that does not answer never keeps the barber logged in.
@@ -56,7 +57,7 @@ test("logout: «Logg ut» on a subscribed device unsubscribes in the browser and
   assert.equal(page.$("login-msg").textContent, "Du er logget ut, og varsler om nye bestillinger er slått av på denne enheten.");
 });
 
-test("logout: answering no keeps notifications on here, and the login page says so", async () => {
+test("logout: answering no keeps notifications on here, and the login page says so, with «Slå av varsler her»", async () => {
   const b = fakePushBrowser({ device: makeDevice("fcm"), permission: "granted", subscribed: KEY_BYTES });
   const page = await loadAdmin({ navigator: b.navigator, globals: b.globals, confirm: () => false, routes: routes() });
   page.$("logout").click();
@@ -66,7 +67,10 @@ test("logout: answering no keeps notifications on here, and the login page says 
   assert.deepEqual(unsubscribeCalls(page), []);
   assert.ok(b.current(), "still subscribed");
   assert.ok(loggedOut(page));
-  assert.equal(page.$("login-msg").textContent, "Du er logget ut. Denne enheten får fortsatt varsel om nye bestillinger.");
+  assert.equal(page.$("login-msg").textContent, "Du er logget ut.");
+  assert.equal(page.$("login-push").hidden, false);
+  assert.equal(page.$("login-push-msg").textContent, "Denne enheten har fortsatt varsler om nye bestillinger slått på.");
+  assert.equal(page.$("login-push-off").hidden, false);
 });
 
 test("logout: without notifications here, or without push in the browser, it logs out at once without asking", async () => {

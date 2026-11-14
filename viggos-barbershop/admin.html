@@ -29,6 +29,12 @@
       <label class="check"><input type="checkbox" id="remember" checked> Hold meg innlogget</label>
       <button class="btn" type="submit">Logg inn</button>
       <p class="msg" id="login-msg" role="alert"></p>
+      <!-- Vises når denne enheten fortsatt har varsler om nye bestillinger slått på (f.eks. når innloggingen har gått
+           ut på en lånt PC). Knappen virker uten innlogging: nettleseren avslutter abonnementet selv. -->
+      <div class="login-push" id="login-push" hidden>
+        <p class="msg info" id="login-push-msg" role="status" aria-live="polite"></p>
+        <button class="btn btn-ghost" type="button" id="login-push-off">Slå av varsler her</button>
+      </div>
       <a class="back" href="/">← Til nettsiden</a>
     </form>
   </main>
