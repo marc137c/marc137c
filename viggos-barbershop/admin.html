@@ -33,6 +33,7 @@
         <strong class="title">Timebok</strong>
         <span class="sync" id="sync" aria-live="polite"></span>
         <a class="link" href="/" target="_blank" rel="noopener">Se nettsiden</a>
+        <button class="link" id="settings-open" type="button" aria-haspopup="dialog">Oppsett</button>
         <button class="link" id="logout" type="button">Logg ut</button>
       </div>
       <div class="day-nav">
@@ -91,6 +92,50 @@
         <button class="btn" type="submit" id="save">Lagre</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- Oppsett: kalenderen på telefonen. Lenken hentes først når dialogen åpnes (admin.js). -->
+  <dialog class="sheet" id="settings" aria-labelledby="settings-title">
+    <div class="sheet-body">
+      <h3 id="settings-title">Oppsett</h3>
+
+      <section class="panel" id="cal" aria-labelledby="cal-title">
+        <h4 id="cal-title">Kalender på telefonen</h4>
+        <p class="hint">Få alle timene inn i kalenderen på telefonen, med tjeneste, navn og telefonnummer. Nye bestillinger, flyttinger og avlysninger kommer med av seg selv.</p>
+        <p class="msg" id="cal-msg" role="status" aria-live="polite"></p>
+
+        <div class="panel-body" id="cal-none" hidden>
+          <button class="btn" type="button" id="cal-create">Lag kalenderlenke</button>
+        </div>
+
+        <div class="panel-body" id="cal-ready" hidden>
+          <div class="cal-links">
+            <a class="btn" id="cal-ios" href="#">Legg til på iPhone</a>
+            <a class="btn btn-ghost" id="cal-google" href="#" target="_blank" rel="noopener noreferrer">Legg til i Google Kalender</a>
+          </div>
+          <ul class="hint steps">
+            <li><strong>iPhone/iPad/Mac:</strong> trykk «Legg til på iPhone» og så «Abonner». Vil du ha påminnelse 15 minutter før hver time, la «Fjern varsler» være av.</li>
+            <li><strong>Google Kalender (Android):</strong> åpner Google Kalender i nettleseren. Logg inn og trykk «Legg til». Virker ikke knappen, kopier lenken og legg den til som kalender «fra URL» på calendar.google.com på en PC.</li>
+            <li>Telefonen henter endringer av seg selv, men ikke alltid med en gang. Google kan bruke flere timer.</li>
+          </ul>
+          <label for="cal-url">Lenke til kalenderen</label>
+          <div class="copy-row">
+            <input id="cal-url" type="text" readonly spellcheck="false" autocomplete="off">
+            <button class="btn btn-ghost" type="button" id="cal-copy">Kopier lenke</button>
+          </div>
+          <p class="hint warn">Hold lenken hemmelig: den som har den, ser navn og telefonnummer til kundene dine.</p>
+          <div class="renew">
+            <button class="btn btn-danger" type="button" id="cal-renew">Lag ny lenke</button>
+            <p class="hint">Har noen fått lenken som ikke skal ha den, eller har du mistet en telefon? Lag en ny. Den gamle slutter å virke med en gang.</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="sheet-actions">
+        <span class="spacer"></span>
+        <button class="btn btn-ghost" type="button" id="settings-close">Lukk</button>
+      </div>
+    </div>
   </dialog>
 
   <script src="compat.js"></script>

@@ -50,7 +50,7 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 
 /* Hovedvisning */
 .top { position: -webkit-sticky; position: sticky; top: 0; z-index: 5; background: rgba(11,15,13,.94); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); padding: 10px 16px 12px; }
-.top-row { display: flex; align-items: center; gap: 10px; max-width: 900px; margin: 0 auto; }
+.top-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; max-width: 900px; margin: 0 auto; }
 .title { font-family: var(--caps); color: var(--gold); letter-spacing: .08em; margin-right: auto; }
 .sync { font-size: .8rem; color: var(--muted); }
 .day-nav { display: flex; align-items: center; gap: 8px; max-width: 900px; margin: 10px auto 0; }
@@ -120,6 +120,22 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 .addons label { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: .92rem; }
 .addons input { width: 18px; min-height: 18px; height: 18px; accent-color: var(--gold); }
 .sheet-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* Oppsett: kalender på telefonen */
+.sheet-body { display: grid; grid-gap: 14px; gap: 14px; padding: 22px; }
+.panel { display: grid; grid-gap: 10px; gap: 10px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); }
+.panel h4 { margin: 0; font-size: 1.05rem; }
+.panel-body, .copy-row, .cal-links { display: grid; grid-gap: 10px; gap: 10px; }
+.cal-links .btn { text-align: center; }
+.copy-row .btn, .renew .btn { justify-self: start; }
+.hint { margin: 0; color: var(--muted); font-size: .88rem; }
+.hint.warn { color: var(--gold); }
+.msg.info { color: var(--muted); }
+.panel .msg:empty { display: none; }
+.steps { padding-left: 18px; }
+.steps li + li { margin-top: 6px; }
+.steps strong { color: var(--text); }
+.renew { display: grid; grid-gap: 6px; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
 .spacer { flex: 1; }
 .sheet.is-block .only-booking { display: none; }
 .sheet:not(.is-edit) .only-edit { display: none; }
@@ -129,6 +145,8 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
   .day-actions { width: 100%; }
   .day-actions .btn { flex: 1; }
   .row { grid-template-columns: 50px 1fr; }
+  .sheet-body { padding: 16px; }
+  .panel { padding: 12px; }
 }
 
 /* ---------- Eldre nettlesere (Safari/iOS 10+, Chrome 60+, Firefox 55+, Samsung 8+) ----------
@@ -160,6 +178,10 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
   .item > span { display: block; }
   .week button > * { display: block; text-align: center; }
   .grid2 > * { margin-bottom: 12px; }
+  .sheet-body > * + *, .panel > * + *, .panel-body > * + *, .renew > * + * { margin-top: 12px; }
+  .cal-links > * { display: flex; }
+  .cal-links > * + *, .copy-row > * + * { margin-top: 10px; }
+  .copy-row .btn, .renew .btn { display: inline-flex; }
 }
 
 /* Uten <dialog> (Firefox < 98, Safari < 15.4): compat.js setter klassene */

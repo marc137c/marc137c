@@ -1,5 +1,6 @@
 // Timebok for Viggo's Barbershop: se, legg inn, flytt, avlys og blokker timer.
 // Snakker med /api/admin/* (netlify/functions/admin.mjs). Innloggingen lagres i nettleseren.
+// «Oppsett» viser lenken til kalenderen på telefonen (/api/admin/calendar, se netlify/lib/calendar.mjs).
 (() => {
   const $ = (id) => document.getElementById(id);
   const KEY = "viggo-admin-token";
@@ -43,7 +44,11 @@
     } catch (e) { /* privat modus */ }
   }
 
+  // Lukker åpne dialoger (f.eks. når innloggingen har gått ut mens «Oppsett» er åpen)
+  const closeDialogs = () => Array.prototype.forEach.call(document.querySelectorAll("dialog"), (d) => { if (d.open) d.close(); });
+
   function showLogin(message = "") {
+    closeDialogs();
     $("app").hidden = true;
     $("login").hidden = false;
     $("login-msg").textContent = message;
@@ -336,6 +341,87 @@
       return load();
     }).catch((err) => { if (err.status !== 401) $("edit-msg").textContent = err.message; });
   });
+
+  // ---------- Oppsett: kalender på telefonen ----------
+  // Lenken bærer en hemmelighet (kalenderapper kan ikke logge inn), så den hentes først når dialogen åpnes,
+  // og tas bort fra siden igjen når den lukkes.
+  const settings = $("settings");
+  const offline = (err) => (err.status ? err.message : "Ingen forbindelse. Prøv igjen.");
+  function calMsg(text, kind) {
+    $("cal-msg").textContent = text || "";
+    $("cal-msg").className = "msg" + (kind ? " " + kind : "");
+  }
+  function calShow(cal) {
+    const on = !!(cal && cal.enabled && cal.links);
+    $("cal-none").hidden = on || !cal;
+    $("cal-ready").hidden = !on;
+    $("cal-ios").href = on ? cal.links.webcal : "#";
+    $("cal-google").href = on ? cal.links.google : "#";
+    $("cal-url").value = on ? cal.links.https : "";
+  }
+  let calSeq = 0;
+  function calLoad() {
+    const seq = ++calSeq;
+    calShow(null);
+    calMsg("Henter …", "info");
+    return api("/api/admin/calendar").then((cal) => {
+      if (seq !== calSeq) return;
+      calShow(cal);
+      calMsg(cal.enabled ? "" : "Du har ingen kalenderlenke ennå.", "info");
+    }).catch((err) => { if (seq === calSeq && err.status !== 401) calMsg(offline(err)); });
+  }
+  function calMake(replace) {
+    const btn = replace ? $("cal-renew") : $("cal-create");
+    const seq = ++calSeq;
+    btn.disabled = true;
+    calMsg(replace ? "Lager ny lenke …" : "Lager lenke …", "info");
+    return api("/api/admin/calendar", { method: "POST", body: JSON.stringify({ replace: !!replace }) }).then((cal) => {
+      if (seq !== calSeq) return;
+      calShow(cal);
+      calMsg(replace
+        ? "Ny lenke laget. Den gamle virker ikke lenger: slett den gamle kalenderen på telefonen og legg til den nye."
+        : "Lenken er klar. Legg den til på telefonen.", "ok");
+    }).catch((err) => { if (seq === calSeq && err.status !== 401) calMsg(offline(err)); }).then(() => {
+      btn.disabled = false;
+    });
+  }
+  function calClear() { calSeq++; calShow(null); calMsg(""); }
+
+  $("settings-open").addEventListener("click", () => { settings.showModal(); calLoad(); });
+  $("settings-close").addEventListener("click", () => { settings.close(); calClear(); });
+  settings.addEventListener("close", calClear); // Esc i nettlesere med ekte <dialog>
+  $("cal-create").addEventListener("click", () => calMake(false));
+  $("cal-renew").addEventListener("click", () => {
+    if (!confirm("Lage en ny kalenderlenke?\n\nDen gamle lenken slutter å virke med en gang. Kalenderen må legges til på nytt på alle telefoner og PC-er som bruker den.")) return;
+    calMake(true);
+  });
+
+  // Kopier: utklippstavle-API-et der det finnes, ellers execCommand («copy») som også virker i Safari 10,
+  // Chrome 60 og Firefox 55. Kan nettleseren ingen av delene, skjules knappen (lenken kan kopieres for hånd).
+  const hasClipboard = () => !!(navigator.clipboard && navigator.clipboard.writeText);
+  const canExecCopy = () => { try { return !!(document.queryCommandSupported && document.queryCommandSupported("copy")); } catch (e) { return false; } };
+  function execCopy(input) {
+    try {
+      input.focus();
+      input.select();
+      if (input.setSelectionRange) input.setSelectionRange(0, input.value.length); // iPhone
+      return document.execCommand("copy") === true;
+    } catch (e) { return false; }
+  }
+  $("cal-copy").hidden = !(hasClipboard() || canExecCopy());
+  $("cal-copy").addEventListener("click", () => {
+    const input = $("cal-url");
+    if (!input.value) return;
+    const copied = () => calMsg("Lenken er kopiert.", "ok");
+    const fallback = () => {
+      if (execCopy(input)) return copied();
+      input.select();
+      calMsg("Kunne ikke kopiere. Hold fingeren på lenken og velg Kopier.");
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(input.value).then(copied, fallback);
+    else fallback();
+  });
+  $("cal-url").addEventListener("click", (e) => e.target.select());
 
   // ---------- Oppstart ----------
   // Hold oversikten fersk (nye nettbestillinger dukker opp av seg selv)
