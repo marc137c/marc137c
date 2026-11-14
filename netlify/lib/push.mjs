@@ -20,6 +20,7 @@ export const VAPID_KEY = "push/vapid";
 export const SUBS_KEY = "push/subs";
 export const MAX_DEVICES = 10;
 export const PUSH_TIMEOUT_MS = 4000;          // én melding til én push-tjeneste
+export const BOOKING_PUSH_WAIT_MS = 1500;     // så lenge venter en nettbestilling høyst på varslene (uten waitUntil)
 export const PUSH_TTL_S = 24 * 60 * 60;       // push-tjenesten tar vare på meldingen et døgn hvis enheten er av
 export const RECORD_SIZE = 4096;              // rs i aes128gcm-hodet; hele meldingen må også være ≤ 4096 byte
 export const JWT_LIFETIME_S = 12 * 60 * 60;   // VAPID-JWT-et gjelder i 12 timer (tjenestene godtar høyst 24)

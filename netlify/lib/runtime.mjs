@@ -28,3 +28,20 @@ export const PRODUCTION_STORE = "bookings";
 export const PREVIEW_STORE = "bookings-preview";
 export const bookingStore = (deps, context) =>
   deps.getStore({ name: isProduction(context) ? PRODUCTION_STORE : PREVIEW_STORE, consistency: "strong" });
+
+// Arbeid som ikke skal holde igjen svaret, f.eks. varsel om en ny bestilling. Har plattformen context.waitUntil
+// (Netlify Functions), svarer funksjonen med en gang og arbeidet gjøres ferdig etterpå. Ellers venter svaret
+// på arbeidet i høyst maxWaitMs (ekte tid), så kunden aldri merker en treg eller hengende tjeneste.
+// Feil i arbeidet slipper aldri ut herfra.
+export function afterResponse(context, work, maxWaitMs) {
+  const safe = Promise.resolve(work).catch(() => {});
+  if (context && typeof context.waitUntil === "function") {
+    try {
+      context.waitUntil(safe);
+      return Promise.resolve();
+    } catch { /* venter heller litt nedenfor */ }
+  }
+  let timer;
+  const deadline = new Promise((resolve) => { timer = setTimeout(resolve, maxWaitMs); });
+  return Promise.race([safe, deadline]).then(() => clearTimeout(timer));
+}

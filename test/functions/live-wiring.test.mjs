@@ -15,6 +15,8 @@ import admin from "../../netlify/functions/admin.mjs";
 import calendar from "../../netlify/functions/calendar.mjs";
 import { realGetStoreFor } from "../helpers/real-blobs.mjs";
 import { createFeed } from "../../netlify/lib/calendar.mjs";
+import { vapidKeys, saveSubscription, parseSubscription } from "../../netlify/lib/push.mjs";
+import { makeDevice, fakePushService, PUSH_HOST } from "../helpers/fake-push.mjs";
 
 const ENV_VARS = ["ADMIN_PASSWORD"];
 let blobs, outside, savedEnv, savedFetch;
@@ -90,4 +92,26 @@ test("live wiring: GET /api/calendar/<token>.ics reads the strong 'bookings' sto
   assert.deepEqual(outside, []);
   const preview = await read(await calendar(request(`/api/calendar/${feed.token}.ics`), PREVIEW));
   assert.equal(preview.status, 404, "the live link never opens on a deploy preview");
+});
+
+test("live wiring: a web booking notifies the stored devices through the global fetch (liveDeps), signed with the stored key", async () => {
+  const store = realGetStoreFor(blobs)({ name: "bookings", consistency: "strong" });
+  const keys = await vapidKeys(store);
+  const phone = makeDevice("apple");
+  await saveSubscription(store, parseSubscription(phone.subscription).value);
+  const push = fakePushService({ devices: [phone] });
+  const blobsOnly = globalThis.fetch;
+  globalThis.fetch = (input, init) => (PUSH_HOST.test(String(input)) ? push.fetch(input, init) : blobsOnly(input, init));
+  let date = addDays(osloNow().date, 7);
+  if (dayOfWeek(date) === 0) date = addDays(date, 1);
+  const res = await read(await bookings(request("/api/bookings", { method: "POST", json: { service: "Herreklipp", date, start: 600, addons: [], name: "Ola Nordmann", phone: CUSTOMER_PHONE } }), PRODUCTION));
+  assert.equal(res.status, 201);
+  assert.equal(push.deliveries.length, 1);
+  const [del] = push.deliveries;
+  assert.equal(del.error, undefined, del.error);
+  assert.equal(del.payload.title, "Ny time");
+  assert.equal(del.payload.url, `/admin?dag=${date}`);
+  assert.equal(del.vapid.ok, true, del.vapid.why);
+  assert.equal(del.vapid.k, keys.publicKey);
+  assert.deepEqual(outside, [], "nothing else is fetched");
 });
