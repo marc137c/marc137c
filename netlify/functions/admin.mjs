@@ -7,12 +7,20 @@
 //   GET    /api/admin/calendar         lenken til kalenderen på telefonen: { enabled, createdAt, links }
 //   POST   /api/admin/calendar         lag lenken { replace: false } (beholder en som finnes) eller lag en ny
 //                                      { replace: true } (den gamle slutter å virke med en gang)
+//   GET    /api/admin/push             varsler på enhetene: { publicKey, devices } (nøkkelparet lages første gang)
+//   POST   /api/admin/push/subscribe   { subscription } denne enheten får varsel om nye bestillinger
+//   POST   /api/admin/push/unsubscribe { endpoint }     denne enheten får ikke flere varsler
+//   POST   /api/admin/push/test        { endpoint }     send et testvarsel til denne enheten (bare en lagret enhet)
 import { liveDeps, bookingStore } from "../lib/runtime.mjs";
 import {
   CONFIG, addDays, isDate, osloNow, readMonths, validateAdmin,
   createItem, updateItem, deleteItem, checkPassword, makeToken, verifyToken,
 } from "../lib/booking-core.mjs";
 import { readFeed, createFeed, feedLinks } from "../lib/calendar.mjs";
+import {
+  vapidKeys, readSubscriptions, parseSubscription, saveSubscription, removeSubscriptions, normalizeEndpoint,
+  pushToDevices, testMessage,
+} from "../lib/push.mjs";
 
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 const DAY = 24 * 60 * 60 * 1000;
@@ -20,6 +28,7 @@ const DAY = 24 * 60 * 60 * 1000;
 const calendarInfo = (origin, feed) => (feed
   ? { enabled: true, createdAt: feed.createdAt, links: feedLinks(origin, feed.token) }
   : { enabled: false });
+const PUSH_POSTS = new Set(["/api/admin/push/subscribe", "/api/admin/push/unsubscribe", "/api/admin/push/test"]);
 
 // deps: se netlify/lib/runtime.mjs (testene sender inn falsk lagring, miljø og klokke)
 export async function handle(req, context, deps) {
@@ -93,6 +102,38 @@ export async function handle(req, context, deps) {
       if (r.error) return json({ error: r.error }, r.status);
       return json(calendarInfo(url.origin, r.feed), r.created ? 201 : 200);
     }
+    if (path === "/api/admin/push" && req.method === "GET") {
+      // Bare den offentlige nøkkelen går til nettleseren; den private blir på serveren
+      const keys = await vapidKeys(store, { now: deps.now() });
+      if (keys.error) return json({ error: keys.error }, keys.status);
+      return json({ publicKey: keys.publicKey, devices: (await readSubscriptions(store)).length });
+    }
+    if (PUSH_POSTS.has(path) && req.method === "POST") {
+      const raw = await req.text();
+      if (raw.length > 4000) return json({ error: "For stor forespørsel." }, 413);
+      let body = {};
+      try { body = JSON.parse(raw) || {}; } catch {}
+      if (path === "/api/admin/push/subscribe") {
+        const v = parseSubscription(body.subscription);
+        if (v.error) return json({ error: v.error, code: v.code }, 400);
+        const r = await saveSubscription(store, v.value, { now: deps.now() });
+        if (r.error) return json({ error: r.error }, r.status);
+        return json({ ok: true, devices: r.devices }, r.created ? 201 : 200);
+      }
+      const endpoint = normalizeEndpoint(body.endpoint);
+      if (path === "/api/admin/push/unsubscribe") {
+        if (!endpoint) return json({ error: "Ukjent enhet.", code: "unknown_push_service" }, 400);
+        const r = await removeSubscriptions(store, [endpoint]);
+        if (r.error) return json({ error: r.error }, r.status);
+        return json({ ok: true, devices: r.devices });
+      }
+      // Testvarsel: bare til en enhet som allerede er lagret, aldri til en adresse nettleseren bare oppgir
+      const r = endpoint ? await pushToDevices(store, testMessage(), { fetch: deps.fetch, now: deps.now(), origin: url.origin, endpoint }) : { targets: 0 };
+      if (!r.targets) return json({ error: "Denne enheten får ikke varsler. Trykk «Slå på varsler».", code: "not_subscribed" }, 404);
+      if (r.sent) return json({ ok: true, devices: r.devices });
+      if (r.gone) return json({ error: "Denne enheten kan ikke lenger få varsler. Trykk «Slå på varsler» igjen.", code: "gone", devices: r.devices }, 410);
+      return json({ error: "Testvarselet kom ikke fram. Prøv igjen om litt.", code: "push_failed" }, 502);
+    }
     if (id && req.method === "DELETE") {
       const r = await deleteItem(store, decodeURIComponent(id));
       return r.error ? json(r, r.status) : json(r);
@@ -106,4 +147,7 @@ export async function handle(req, context, deps) {
 
 export default (req, context) => handle(req, context, liveDeps());
 
-export const config = { path: ["/api/admin/login", "/api/admin/items", "/api/admin/items/:id", "/api/admin/calendar"] };
+export const config = { path: [
+  "/api/admin/login", "/api/admin/items", "/api/admin/items/:id", "/api/admin/calendar",
+  "/api/admin/push", "/api/admin/push/subscribe", "/api/admin/push/unsubscribe", "/api/admin/push/test",
+] };
