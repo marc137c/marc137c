@@ -53,7 +53,7 @@ Hver gang en kunde bestiller time på nettsiden, kommer det et varsel på telefo
 - **Android og PC (Chrome, Edge, Firefox, Safari på Mac):** gå til /admin → **Oppsett → Slå på varsler** og trykk **Tillat**.
 - **Send testvarsel** sjekker at det virker på enheten. **Slå av** stopper varslene på den enheten. Opptil 10 enheter kan få varsler samtidig.
 - **Slå av varsler på alle andre enheter** (vises under Oppsett når andre enheter får varsler) stopper varslene på alle andre telefoner og PC-er med en gang, f.eks. hvis en telefon er mistet, solgt eller lånt bort. Enheten du står på, fortsetter å få varsler.
-- **Logg ut** på en enhet som får varsler, spør først om varslene skal slås av der også. Svar OK på en lånt eller delt telefon eller PC; ellers fortsetter den å vise nye bestillinger med kundens navn.
+- **Oppsett → Logg ut** på en enhet som får varsler, spør først om varslene skal slås av der også. Svar OK på en lånt eller delt telefon eller PC; ellers fortsetter den å vise nye bestillinger med kundens navn.
 - **Bytter du admin-passordet, stopper varslene på alle enheter.** Slå dem på igjen under Oppsett på de enhetene du vil ha dem på.
 - Varsler kommer bare for bestillinger på nettsiden, ikke for timer du legger inn selv i timeboken.
 - Kommer det ikke noe varsel? Sjekk at varsler er tillatt for Timebok (iPhone: Innstillinger → Varslinger → Timebok) eller for nettleseren, og at telefonen ikke står i «Ikke forstyrr».

@@ -141,6 +141,11 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 .sheet.is-block .only-booking { display: none; }
 .sheet:not(.is-edit) .only-edit { display: none; }
 
+/* Vanlige telefoner (iPhone 12–15, Pixel: 390–412 px): tittel, status, «Se nettsiden» og «Oppsett» på én linje */
+@media (max-width: 430px) {
+  .top-row { gap: 6px; }
+}
+
 @media (max-width: 520px) {
   .grid2 { grid-template-columns: 1fr; }
   .day-actions { width: 100%; }
@@ -159,6 +164,7 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
   .push-actions > * { margin: 0 10px 10px 0; }
   label.check input { margin-right: 10px; }
   .top-row > * + * { margin-left: 10px; }
+  @media (max-width: 430px) { .top-row > * + * { margin-left: 6px; } }
   .day-nav > * + * { margin-left: 8px; }
   .week > * + * { margin-left: 6px; }
   .day-head > * { margin: 6px 0; }

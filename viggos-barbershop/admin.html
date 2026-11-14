@@ -40,7 +40,6 @@
         <span class="sync" id="sync" aria-live="polite"></span>
         <a class="link" href="/" target="_blank" rel="noopener">Se nettsiden</a>
         <button class="link" id="settings-open" type="button" aria-haspopup="dialog">Oppsett</button>
-        <button class="link" id="logout" type="button">Logg ut</button>
       </div>
       <div class="day-nav">
         <button class="icon" id="prev" type="button" aria-label="Forrige dag">‹</button>
@@ -100,7 +99,8 @@
     </form>
   </dialog>
 
-  <!-- Oppsett: kalenderen på telefonen og varsler på denne enheten. Begge hentes først når dialogen åpnes (admin.js). -->
+  <!-- Oppsett: kalenderen på telefonen, varsler på denne enheten og «Logg ut». Kalender og varsler hentes først når
+       dialogen åpnes (admin.js). -->
   <dialog class="sheet" id="settings" aria-labelledby="settings-title">
     <div class="sheet-body">
       <h3 id="settings-title">Oppsett</h3>
@@ -154,7 +154,9 @@
         </div>
       </section>
 
+      <!-- «Logg ut» står her, ikke i toppen: da får toppen plass på én linje på vanlige telefoner (390–412 px) -->
       <div class="sheet-actions">
+        <button class="btn btn-ghost" type="button" id="logout">Logg ut</button>
         <span class="spacer"></span>
         <button class="btn btn-ghost" type="button" id="settings-close">Lukk</button>
       </div>
