@@ -15,7 +15,7 @@ export const CONFIG = {
   durations: {
     "Full service": 60,
     "Herreklipp": 30,
-    "Herreklipp + skjeggtrim": 60,
+    "Herreklipp + skjeggtrim": 30,
     "Knivbarbering": 30,
     "Skjegg & line-up": 30,
     "Barneklipp": 30,
