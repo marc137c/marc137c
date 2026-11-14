@@ -525,3 +525,29 @@ test("admin push panel: coming back to the page during «Slår på …» does no
   await page.flush();
   assert.match(msg(page), /^Varsler er på/);
 });
+
+test("admin push panel: end to end, after a password change a device gets notifications again only once it logs in with the new password", async () => {
+  const OLD = "old-password", NEW = "new-password";
+  const phone = makeDevice("apple");
+  const push = fakePushService({ devices: [phone] });
+  const d = testDeps({ now: "2026-11-12T09:00:00Z", env: { ADMIN_PASSWORD: OLD }, fetch: push.fetch });
+  const toServer = (call) => adminFn.handle(request(call.path, { method: call.method, headers: { Authorization: call.headers.Authorization }, json: call.body }), PRODUCTION, d).then(read);
+  const serverRoutes = {};
+  for (const r of ["GET /api/admin/push", "POST /api/admin/push/subscribe"]) serverRoutes[r] = toServer;
+  const b = fakePushBrowser({ device: phone });
+  const page = await openSettings({ token: makeToken(OLD, d.clock.now()), navigator: b.navigator, globals: b.globals, routes: serverRoutes });
+  page.$("push-on").click();
+  await page.flush();
+  assert.match(msg(page), /^Varsler er på/);
+  let slot = 600;
+  const book = () => bookingsFn.handle(request("/api/bookings", { method: "POST", json: {
+    service: "Herreklipp", date: "2026-11-14", start: (slot += 30), addons: [], name: "Per Hansen", phone: "41234567",
+  } }), PRODUCTION, d).then(read);
+  d.env.ADMIN_PASSWORD = NEW;
+  assert.equal((await book()).status, 201);
+  assert.equal(push.deliveries.length, 0, "the old password's device is cut off");
+  // The same browser opens /admin again, logged in with the new password: it turns itself back on
+  await loadAdmin({ token: makeToken(NEW, d.clock.now()), navigator: b.navigator, globals: b.globals, routes: serverRoutes });
+  assert.equal((await book()).status, 201);
+  assert.deepEqual(push.deliveries.map((x) => x.device), [phone]);
+});

@@ -655,7 +655,7 @@
   $("push-reset").addEventListener("click", () => {
     const n = pushState.others;
     const which = n === 1 ? "den andre enheten" : `de ${n} andre enhetene`;
-    if (!confirm(`Slå av varsler på ${which}?\n\nDe får ikke flere varsler om nye bestillinger før noen trykker «Slå på varsler» på dem igjen.`)) return;
+    if (!confirm(`Slå av varsler på ${which}?\n\nDe får ikke flere varsler om nye bestillinger. En enhet som fortsatt er logget inn, slår dem på igjen neste gang timeboken åpnes der. Er en telefon mistet eller stjålet, bytt også admin-passordet: da blir den logget ut for godt.`)) return;
     const btn = $("push-reset");
     const seq = ++pushSeq;
     const sub = pushState.sub;
