@@ -151,6 +151,13 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 @media (max-width: 430px) {
   .top-row { gap: 6px; }
 }
+/* Smale telefoner (320–389 px: iPhone SE, 12/13 mini, 6/7/8, de fleste Samsung Galaxy S): også én linje. Statusen og
+   «Se nettsiden» får krympe (teksten brytes inni dem), så «Oppsett» aldri havner alene på en ny linje og gjør den
+   faste toppen høyere */
+@media (max-width: 389px) {
+  .top-row { flex-wrap: nowrap; }
+  .top-row .sync, .top-row a.link { min-width: 0; }
+}
 
 @media (max-width: 520px) {
   .grid2 { grid-template-columns: 1fr; }

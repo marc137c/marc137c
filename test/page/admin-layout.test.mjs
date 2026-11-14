@@ -2,6 +2,8 @@
 // admin.css (no browser is started), plus one run of admin.js in the fake DOM. Invariants:
 //   1. the sticky header's top row holds only the title, the sync status, «Se nettsiden» and «Oppsett», with a
 //      smaller gap at 430 px and below (also where flex gap is missing), so it stays one line on 390–412 px phones;
+//      below 390 px (iPhone SE, 12/13 mini, 6/7/8, most Galaxy S: 320–375 px) the row never wraps, and the status and
+//      «Se nettsiden» may shrink instead, so «Oppsett» is never alone on a second line of the sticky header;
 //      «Logg ut» lives in the Oppsett sheet, and still logs out from there.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -112,3 +114,18 @@ for (const oldBrowser of [false, true]) {
     assert.equal(page.local.getItem("viggo-admin-token"), "test-admin-token");
   });
 }
+
+test("layout: below 390 px the top row never wraps; the status and «Se nettsiden» shrink instead of pushing «Oppsett» down", () => {
+  assert.match(ruleIn(null, ".top-row"), /flex-wrap:\s*wrap/, "wider screens may wrap as before");
+  const narrow = ruleIn("@media (max-width: 389px)", ".top-row");
+  assert.match(narrow, /flex-wrap:\s*nowrap/);
+  const shrink = ruleIn("@media (max-width: 389px)", ".top-row .sync, .top-row a.link");
+  assert.match(shrink, /min-width:\s*0/);
+  assert.doesNotMatch(CSS.slice(CSS.indexOf("@media (max-width: 389px)")), /#settings-open|\.top-row button[^{]*\{[^}]*min-width:\s*0/, "«Oppsett» keeps its full width");
+  // The narrow rule comes after the base rule, so it wins (same specificity)
+  assert.ok(CSS.indexOf("@media (max-width: 389px)") > CSS.indexOf(".top-row {"));
+  // «Se nettsiden» is the a.link and the status is .sync in the top row
+  const top = between(HTML, '<div class="top-row">', "</div>");
+  assert.match(top, /<span class="sync" id="sync"/);
+  assert.match(top, /<a class="link" href="\/"/);
+});
