@@ -83,3 +83,32 @@ test("layout: a modal sheet is fixed to the screen, no taller than it, and scrol
   // Both dialogs are .sheet
   for (const id of ["settings", "editor"]) assert.match(HTML, new RegExp(`<dialog class="sheet" id="${id}"`));
 });
+
+//   3. opening «Oppsett» puts keyboard focus on «Lukk», never on «Logg ut»: one Enter or Space must not log the
+//      barber out. «Lukk» carries autofocus (native <dialog> and the compat.js stand-in both follow it), and admin.js
+//      focuses it as well, before the panels have loaded.
+test("layout: «Lukk» is the one autofocus control in Oppsett, and «Logg ut» has none", () => {
+  const sheet = between(HTML, '<dialog class="sheet" id="settings"', "</dialog>");
+  const autofocus = [...sheet.matchAll(/<[a-z]+\b[^>]*\sautofocus\b[^>]*>/g)].map((m) => m[0]);
+  assert.equal(autofocus.length, 1, autofocus.join("\n"));
+  assert.match(autofocus[0], /id="settings-close"/);
+  assert.match(autofocus[0], /^<button\b/);
+  assert.doesNotMatch(/<button[^>]*id="logout"[^>]*>/.exec(sheet)[0], /autofocus/);
+});
+
+for (const oldBrowser of [false, true]) {
+  test(`layout: opening Oppsett focuses «Lukk», also before the panels have loaded${oldBrowser ? " (compat.js dialog shim)" : ""}`, async () => {
+    const page = await loadAdmin({ oldBrowser, routes: { "GET /api/admin/calendar": () => new Promise(() => {}), "GET /api/admin/push": () => new Promise(() => {}) } });
+    page.$("settings-open").click();
+    assert.equal(page.doc.activeElement, page.$("settings-close"), "right after opening");
+    await page.flush();
+    assert.equal(page.doc.activeElement, page.$("settings-close"), "while the panels are loading");
+    assert.notEqual(page.doc.activeElement, page.$("logout"));
+    // «Lukk» closes the sheet and leaves the barber logged in
+    page.doc.activeElement.click();
+    await page.flush();
+    assert.equal(page.$("settings").open, false);
+    assert.equal(page.$("app").hidden, false);
+    assert.equal(page.local.getItem("viggo-admin-token"), "test-admin-token");
+  });
+}

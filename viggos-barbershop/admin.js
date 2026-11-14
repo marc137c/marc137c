@@ -448,7 +448,9 @@
   }
   function calClear() { calSeq++; calShow(null); calMsg(""); }
 
-  $("settings-open").addEventListener("click", () => { settings.showModal(); calLoad(); pushLoad(); });
+  // Fokus på «Lukk» (har autofocus i admin.html; satt her også for nettlesere som ikke følger det i en <dialog>):
+  // ellers kunne fokus havne på «Logg ut», og ett Enter eller mellomrom logget Viggo ut
+  $("settings-open").addEventListener("click", () => { settings.showModal(); $("settings-close").focus(); calLoad(); pushLoad(); });
   $("settings-close").addEventListener("click", () => { settings.close(); calClear(); pushClear(); });
   settings.addEventListener("close", () => { calClear(); pushClear(); }); // Esc i nettlesere med ekte <dialog>
   $("cal-create").addEventListener("click", () => calMake(false));
