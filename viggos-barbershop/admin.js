@@ -49,11 +49,16 @@
   // Lukker åpne dialoger (f.eks. når innloggingen har gått ut mens «Oppsett» er åpen)
   const closeDialogs = () => Array.prototype.forEach.call(document.querySelectorAll("dialog"), (d) => { if (d.open) d.close(); });
 
-  function showLogin(message = "") {
+  // kind: «ok» (grønn, f.eks. «Du er logget ut.»), «info» (nøytral) eller ingenting (rød: noe gikk galt)
+  function loginMsg(text, kind) {
+    $("login-msg").textContent = text || "";
+    $("login-msg").className = "msg" + (kind ? " " + kind : "");
+  }
+  function showLogin(message = "", kind = "") {
     closeDialogs();
     $("app").hidden = true;
     $("login").hidden = false;
-    $("login-msg").textContent = message;
+    loginMsg(message, kind);
     $("pw").focus();
     loginPushCheck();
   }
@@ -120,7 +125,7 @@
     e.preventDefault();
     const btn = e.submitter || $("login-form").querySelector("button[type=submit]");
     btn.disabled = true;
-    $("login-msg").textContent = "";
+    loginMsg("");
     fetch("/api/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -133,7 +138,7 @@
       load();
       pushSync();
     })).catch((err) => {
-      $("login-msg").textContent = err.message;
+      loginMsg(err.message);
       $("pw").select();
     }).then(() => {
       btn.disabled = false;
@@ -147,7 +152,7 @@
       headers: Object.assign({ "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` }, opts.headers || {}),
       cache: "no-store",
     })).then((res) => res.json().catch(() => ({})).then((data) => {
-      if (res.status === 401) { setToken(null); showLogin("Logg inn på nytt."); throw Object.assign(new Error(data.error || "Logg inn"), { status: 401 }); }
+      if (res.status === 401) { setToken(null); showLogin("Logg inn på nytt.", "info"); throw Object.assign(new Error(data.error || "Logg inn"), { status: 401 }); }
       if (!res.ok) throw Object.assign(new Error(data.error || "Noe gikk galt."), { status: res.status });
       return data;
     }));
@@ -809,17 +814,19 @@
     const btn = $("logout");
     if (btn.disabled) return;
     btn.disabled = true;
+    // Svarer [tekst, stil] for innloggingssiden: å være logget ut er ingen feil, så bare det som må rettes er rødt
+    const done = ["Du er logget ut.", "ok"];
     thisDeviceSubscription().then((sub) => {
-      if (!sub) return "Du er logget ut.";
+      if (!sub) return done;
       const yes = confirm("Slå av varsler om nye bestillinger på denne enheten også?\n\nOK: varslene slås av her (lurt på en lånt eller delt telefon eller PC).\nAvbryt: du får fortsatt varsel om nye bestillinger her, også når du er logget ut.");
-      if (!yes) return "Du er logget ut."; // innloggingssiden sier at varslene fortsatt er på, med «Slå av varsler her»
+      if (!yes) return done; // innloggingssiden sier at varslene fortsatt er på, med «Slå av varsler her»
       return turnOffHere(sub).then((stopped) => (stopped
-        ? "Du er logget ut, og varsler om nye bestillinger er slått av på denne enheten."
-        : "Du er logget ut, men varslene på denne enheten kunne ikke slås av nå. Slå av varsler for denne siden i nettleserens innstillinger."));
-    }).catch(() => "Du er logget ut.").then((text) => {
+        ? ["Du er logget ut, og varsler om nye bestillinger er slått av på denne enheten.", "ok"]
+        : ["Du er logget ut, men varslene på denne enheten kunne ikke slås av nå. Slå av varsler for denne siden i nettleserens innstillinger.", ""]));
+    }).catch(() => done).then((msg) => {
       btn.disabled = false;
       setToken(null);
-      showLogin(text);
+      showLogin(msg[0], msg[1]);
     });
   });
 

@@ -7,7 +7,9 @@
 //      her» (test/page/admin-login-push.test.mjs);
 //   4. a device without notifications, or a browser without push (Safari 10, Chrome 60, Firefox 55, the compat.js
 //      dialog shim), logs out at once without asking;
-//   5. a push service or server that does not answer never keeps the barber logged in.
+//   5. a push service or server that does not answer never keeps the barber logged in;
+//   6. a logout is shown as done (green «ok»), never in the red error style of «Feil passord.»; only a logout that
+//      could not turn notifications off is red, and a real login error after a logout is red again.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadAdmin, fakePushBrowser } from "../helpers/admin-page.mjs";
@@ -119,4 +121,55 @@ test("logout: if neither the browser nor the server could turn it off, the barbe
   await page.flush();
   assert.ok(loggedOut(page));
   assert.match(page.$("login-msg").textContent, /^Du er logget ut, men varslene på denne enheten kunne ikke slås av nå\. Slå av varsler for denne siden i nettleserens innstillinger\.$/);
+});
+
+// ---------- 6. How the login page shows it ----------
+const style = (page) => page.$("login-msg").className.split(/\s+/).filter(Boolean).sort().join(" ");
+
+test("logout: «Du er logget ut.» is shown as done, not in the red error style", async () => {
+  const cases = [
+    ["no notifications here", () => fakePushBrowser({ device: makeDevice() }), () => true, "Du er logget ut."],
+    ["notifications turned off too", () => fakePushBrowser({ device: makeDevice("apple"), permission: "granted", subscribed: KEY_BYTES }), () => true, "Du er logget ut, og varsler om nye bestillinger er slått av på denne enheten."],
+    ["notifications kept", () => fakePushBrowser({ device: makeDevice("fcm"), permission: "granted", subscribed: KEY_BYTES }), () => false, "Du er logget ut."],
+    ["Safari 10 (no push)", () => ({ navigator: {}, globals: {} }), () => true, "Du er logget ut."],
+  ];
+  for (const oldBrowser of [false, true]) {
+    for (const [label, make, answer, text] of cases) {
+      const b = make();
+      const page = await loadAdmin({ oldBrowser, navigator: b.navigator, globals: b.globals, confirm: answer, routes: routes() });
+      page.$("logout").click();
+      await page.flush();
+      assert.equal(page.$("login-msg").textContent, text, label);
+      assert.equal(style(page), "msg ok", label);
+    }
+  }
+});
+
+test("logout: only a logout that could not turn notifications off is red, and a wrong password after it is red again", async () => {
+  const b = fakePushBrowser({ device: makeDevice("mozilla"), permission: "granted", subscribed: KEY_BYTES, unsubscribeOk: false });
+  const page = await loadAdmin({ navigator: b.navigator, globals: b.globals, confirm: () => true, routes: routes({
+    "POST /api/admin/push/unsubscribe": () => { throw new TypeError("Failed to fetch"); },
+    "POST /api/admin/login": () => ({ status: 401, body: { error: "Feil passord." } }),
+  }) });
+  page.$("logout").click();
+  await page.flush();
+  assert.match(page.$("login-msg").textContent, /kunne ikke slås av nå/);
+  assert.equal(style(page), "msg", "this one needs the barber to act");
+
+  const ok = await loadAdmin({ routes: routes({ "POST /api/admin/login": () => ({ status: 401, body: { error: "Feil passord." } }) }) });
+  ok.$("logout").click();
+  await ok.flush();
+  assert.equal(style(ok), "msg ok");
+  ok.$("login-form").dispatch("submit", { submitter: ok.doc.createElement("button") });
+  assert.equal(ok.$("login-msg").textContent, "", "cleared while logging in");
+  assert.equal(style(ok), "msg");
+  await ok.flush();
+  assert.equal(ok.$("login-msg").textContent, "Feil passord.");
+  assert.equal(style(ok), "msg", "a real error is red");
+});
+
+test("logout: a login that ran out says «Logg inn på nytt.» neutrally, not as an error", async () => {
+  const page = await loadAdmin({ routes: routes({ "GET /api/admin/items": () => ({ status: 401, body: { error: "Logg inn på nytt." } }) }) });
+  assert.equal(page.$("login-msg").textContent, "Logg inn på nytt.");
+  assert.equal(style(page), "info msg");
 });
