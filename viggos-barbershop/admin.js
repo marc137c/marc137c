@@ -486,6 +486,8 @@
   const SW_URL = "/admin-sw.js";
   const SW_SCOPE = "/admin";
   const BLOCKED = "Varsler er blokkert for denne siden. Tillat varsler i nettleserens innstillinger (på iPhone: Innstillinger → Varslinger → Timebok), og trykk Prøv igjen.";
+  // Svaret på «Prøv igjen» når varslene fortsatt er blokkert, så trykket aldri ser ut som om ingenting skjedde
+  const STILL_BLOCKED = "Fortsatt blokkert. Åpne nettleserens innstillinger for denne siden (på iPhone: Innstillinger → Varslinger → Timebok), velg Tillat for varsler, og kom tilbake hit.";
   const sw = () => ("serviceWorker" in navigator && navigator.serviceWorker ? navigator.serviceWorker : null);
   const notif = () => ("Notification" in window ? Notification : null);
   const pushSupported = () => !!(sw() && sw().register && "PushManager" in window && notif());
@@ -597,7 +599,8 @@
   }
 
   // Når «Oppsett» åpnes: vis om denne enheten får varsler, og gi serveren abonnementet på nytt (nettleseren kan ha fornyet det)
-  function pushLoad() {
+  // retry: Viggo trykket «Prøv igjen» (er varslene fortsatt blokkert, sier panelet det med andre ord)
+  function pushLoad(retry) {
     const seq = ++pushSeq;
     pushState.sub = null;
     pushState.reg = null;
@@ -610,7 +613,7 @@
       if (isIos()) { $("push-ios").hidden = false; return pushLimited(seq, null, ""); }
       return pushLimited(seq, null, "Denne nettleseren kan ikke vise varsler. Bruk en nyere Chrome, Edge, Firefox eller Safari.");
     }
-    if (permission() === "denied") return pushLimited(seq, "blocked", BLOCKED);
+    if (permission() === "denied") return pushLimited(seq, "blocked", retry === true ? STILL_BLOCKED : BLOCKED);
     pushMsg("Henter …", "info");
     return Promise.all([api("/api/admin/push"), swRegistration().then((reg) => { pushState.reg = reg; return reg.pushManager.getSubscription(); })]).then((r) => {
       if (seq !== pushSeq) return;
@@ -822,7 +825,7 @@
 
   // Har Viggo tillatt varsler i innstillingene, viser «Prøv igjen» (og det å komme tilbake til siden, eller at
   // nettleseren melder at tillatelsen er endret) panelet på nytt, så han slipper å lukke og åpne «Oppsett».
-  $("push-retry").addEventListener("click", () => pushLoad());
+  $("push-retry").addEventListener("click", () => pushLoad(true));
   const pushRefresh = () => { if (settings.open && getToken() && !pushBusy()) pushLoad(); };
   document.addEventListener("visibilitychange", () => { if (!document.hidden) pushRefresh(); });
   if (pushSupported() && navigator.permissions && typeof navigator.permissions.query === "function") {
