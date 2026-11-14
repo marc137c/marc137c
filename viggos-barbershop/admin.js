@@ -453,11 +453,24 @@
     $("push-msg").textContent = text || "";
     $("push-msg").className = "msg" + (kind ? " " + kind : "");
   }
-  // mode: «off» (Slå på), «on» (Send testvarsel, Slå av) eller null (ingen knapper)
+  // mode: «off» (Slå på), «on» (Send testvarsel, Slå av) eller null (ingen knapper). Knappene blir alltid trykkbare
+  // igjen her, så «Oppsett» lukket og åpnet på nytt aldri viser en knapp som henger fra et tidligere trykk.
   function pushButtons(mode) {
     $("push-on").hidden = mode !== "off";
     $("push-test").hidden = mode !== "on";
     $("push-off").hidden = mode !== "on";
+    ["push-on", "push-test", "push-off"].forEach((id) => { $(id).disabled = false; });
+  }
+  // Svarer ikke push-tjenesten (nettet er nede, eller den er sperret), blir subscribe() aldri ferdig. Da gir siden
+  // beskjed etter SUBSCRIBE_WAIT_MS, i stedet for å henge på «Slår på …».
+  const SUBSCRIBE_WAIT_MS = 20000;
+  const NO_CONTACT = "Fikk ikke kontakt med varseltjenesten. Sjekk nettet og prøv igjen.";
+  function withinTime(promise, ms, message) {
+    let timer;
+    const late = new Promise((resolve, reject) => {
+      timer = setTimeout(() => reject(Object.assign(new Error(message), { user: true, timeout: true })), ms);
+    });
+    return Promise.race([promise, late]).then((v) => { clearTimeout(timer); return v; }, (err) => { clearTimeout(timer); throw err; });
   }
   const others = (n) => (n > 0 ? ` ${n} ${n === 1 ? "annen enhet får" : "andre enheter får"} varsler.` : "");
   function pushShow(mode, devices) {
@@ -553,7 +566,18 @@
     } catch (e) {
       subscribing = Promise.reject(e);
     }
-    subscribing.catch((err) => {
+    // Blir abonnementet likevel ferdig etter tidsfristen, får serveren det, så enheten får varsler
+    let timedOut = false;
+    subscribing.then((sub) => {
+      if (!timedOut) return;
+      saveSub(sub).then((res) => {
+        if (seq !== pushSeq) return;
+        pushState.sub = sub;
+        pushShow("on", res.devices);
+      }, () => {});
+    }, () => {});
+    withinTime(subscribing, SUBSCRIBE_WAIT_MS, NO_CONTACT).catch((err) => {
+      if (err && err.timeout) { timedOut = true; throw err; }
       const answer = permission();
       if (answer === "granted") throw err;
       if (answer === "denied") pushButtons(null);

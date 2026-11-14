@@ -305,3 +305,60 @@ test("admin push panel: end to end through the real handlers, «Slå på varsler
   assert.equal(del.vapid.ok, true, del.vapid.why);
   assert.deepEqual([...Buffer.from(del.vapid.k, "base64url")], [...b.log.subscribes[0].applicationServerKey], "signed with the key the page subscribed with");
 });
+
+// ---------- 8. A push service that never answers ----------
+test("admin push panel: if subscribe() never finishes, after 20 s the barber is told and the button works again", async () => {
+  const device = makeDevice("fcm");
+  const b = fakePushBrowser({ device, permission: "granted", subscribeHangs: true });
+  const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes() });
+  page.$("push-on").click();
+  await page.flush();
+  assert.deepEqual([msg(page), page.$("push-on").disabled], ["Slår på …", true]);
+  await page.advance(19999);
+  assert.deepEqual([msg(page), page.$("push-on").disabled], ["Slår på …", true], "not before the time limit");
+  await page.advance(1);
+  assert.equal(msg(page), "Fikk ikke kontakt med varseltjenesten. Sjekk nettet og prøv igjen.");
+  assert.equal(page.$("push-on").disabled, false);
+  assert.deepEqual(buttons(page), ["push-on"]);
+  assert.equal(pushCalls(page).filter((c) => c.path === "/api/admin/push/subscribe").length, 0);
+  // The subscription arrives late after all: the server still gets it, and the panel shows «on»
+  b.settleSubscribe();
+  await page.flush();
+  const posts = pushCalls(page).filter((c) => c.path === "/api/admin/push/subscribe");
+  assert.deepEqual(posts.map((c) => c.body), [{ subscription: device.subscription }]);
+  assert.match(msg(page), /^Varsler er på/);
+  assert.deepEqual(buttons(page), ["push-test", "push-off"]);
+  assert.equal(page.timers(), 0, "no timer is left behind");
+});
+
+test("admin push panel: closing and reopening «Oppsett» during a hanging «Slå på varsler» gives a working button", async () => {
+  const b = fakePushBrowser({ device: makeDevice("mozilla"), permission: "granted", subscribeHangs: true });
+  const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes() });
+  page.$("push-on").click();
+  await page.flush();
+  assert.equal(page.$("push-on").disabled, true);
+  page.$("settings-close").click();
+  await page.flush();
+  page.$("settings-open").click();
+  await page.flush();
+  assert.equal(msg(page), "Varsler er av på denne enheten.");
+  assert.deepEqual(buttons(page), ["push-on"]);
+  assert.equal(page.$("push-on").disabled, false, "the button is never left disabled after reopening");
+  page.$("push-on").click();
+  assert.equal(b.log.subscribes.length, 2, "a second tap tries again");
+  // The time limit of the first, abandoned tap does not overwrite the panel of the second
+  await page.advance(20000);
+  assert.equal(msg(page), "Fikk ikke kontakt med varseltjenesten. Sjekk nettet og prøv igjen.");
+  assert.equal(page.$("push-on").disabled, false);
+});
+
+test("admin push panel: a fast subscribe() leaves no timer and is never reported as a time-out", async () => {
+  const b = fakePushBrowser({ device: makeDevice("apple"), permission: "granted" });
+  const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes() });
+  page.$("push-on").click();
+  await page.flush();
+  assert.match(msg(page), /^Varsler er på/);
+  assert.equal(page.timers(), 0);
+  await page.advance(60000);
+  assert.match(msg(page), /^Varsler er på/);
+});

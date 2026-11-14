@@ -8,6 +8,8 @@
 //   page.calls        → [{ method, path, headers, body }] every fetch the page made
 //   page.confirms     → texts passed to confirm()
 //   page.missing      → ids admin.js asked for that admin.html does not have
+//   await page.advance(ms) moves the page's fake clock: setTimeout callbacks that are due run (nothing waits in real
+//   time); page.timers() → how many timeouts are pending
 // routes: { "GET /api/admin/calendar": (call) => ({ status, body }) | body | Promise, … } (query ignored).
 // An unknown route answers 404. A route may throw to simulate a network failure.
 // globals: extra window properties (e.g. Notification and PushManager from fakePushBrowser below).
@@ -16,6 +18,8 @@
 //   loadAdmin({ navigator: browser.navigator, globals: browser.globals })
 //   browser.log  → { registered, subscribes, permissionAsks, unsubscribed, getRegistration }
 //   browser.emit(data) sends a message from the service worker to the page; browser.current() the subscription.
+//   fakePushBrowser({ subscribeHangs: true }): subscribe() never settles (push service unreachable) until the test
+//   calls browser.settleSubscribe() (it then resolves with the subscription, as a late answer would).
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
@@ -154,8 +158,13 @@ export async function loadAdmin({ routes = {}, token = "test-admin-token", navig
     });
   };
   const local = storage(token ? { "viggo-admin-token": token } : {});
+  // A fake clock for setTimeout/clearTimeout: callbacks run only when the test calls advance(ms)
+  const clock = { now: 0, seq: 0, pending: [] };
+  const setTimeoutFake = (fn, ms) => { const id = ++clock.seq; clock.pending.push({ id, at: clock.now + Math.max(0, Number(ms) || 0), fn }); return id; };
+  const clearTimeoutFake = (id) => { clock.pending = clock.pending.filter((t) => t.id !== id); };
   const context = {
     document: doc, navigator, fetch, localStorage: local, sessionStorage: storage(),
+    setTimeout: setTimeoutFake, clearTimeout: clearTimeoutFake,
     confirm: (text) => { confirms.push(text); return confirm(text); },
     setInterval: () => 0, clearInterval: () => {}, console,
     atob: (s) => Buffer.from(String(s), "base64").toString("latin1"),
@@ -168,8 +177,21 @@ export async function loadAdmin({ routes = {}, token = "test-admin-token", navig
   if (oldBrowser) vm.runInContext(COMPAT_JS, context, { filename: "compat.js" });
   vm.runInContext(ADMIN_JS, context, { filename: "admin.js" });
   const flush = async () => { for (let i = 0; i < 10; i++) await new Promise((r) => setImmediate(r)); };
+  const advance = async (ms) => {
+    const until = clock.now + ms;
+    for (;;) {
+      const due = clock.pending.filter((t) => t.at <= until).sort((a, b) => a.at - b.at || a.id - b.id)[0];
+      if (!due) break;
+      clock.pending = clock.pending.filter((t) => t !== due);
+      clock.now = due.at;
+      due.fn();
+      await flush();
+    }
+    clock.now = until;
+    await flush();
+  };
   await flush();
-  return { doc, $: (id) => doc.byId.get(id), calls, confirms, missing: doc.missing, local, flush, context };
+  return { doc, $: (id) => doc.byId.get(id), calls, confirms, missing: doc.missing, local, flush, advance, timers: () => clock.pending.length, context };
 }
 
 // A browser with service worker and Web Push (Chrome, Firefox, Safari 16+, iPhone Home Screen app on iOS 16.4+), or,
@@ -178,7 +200,7 @@ export async function loadAdmin({ routes = {}, token = "test-admin-token", navig
 // subscribed: the browser already has a subscription made with this applicationServerKey (bytes) at load.
 // As in Chrome, Firefox and Safari, pushManager.subscribe() asks for permission itself when it is «default» (the
 // barber answers `answer`), and rejects with NotAllowedError unless it ends up «granted».
-export function fakePushBrowser({ permission = "default", answer = "granted", device, subscribed, push = true, ios = false, standalone = false, unsubscribeOk = true, registered = Boolean(subscribed) } = {}) {
+export function fakePushBrowser({ permission = "default", answer = "granted", device, subscribed, push = true, ios = false, standalone = false, unsubscribeOk = true, registered = Boolean(subscribed), subscribeHangs = false } = {}) {
   const log = { registered: [], subscribes: [], permissionAsks: 0, unsubscribed: [], getRegistration: [] };
   const listeners = {};
   const makeSub = (appKey) => ({
@@ -192,6 +214,7 @@ export function fakePushBrowser({ permission = "default", answer = "granted", de
     },
   });
   let current = subscribed ? makeSub(new Uint8Array(subscribed).buffer) : null;
+  const hanging = [];
   const reg = {
     scope: "https://viggos.test/admin",
     pushManager: {
@@ -200,8 +223,9 @@ export function fakePushBrowser({ permission = "default", answer = "granted", de
         log.subscribes.push(opts);
         if (Notification.permission === "default") { log.permissionAsks++; Notification.permission = answer; }
         if (Notification.permission !== "granted") return Promise.reject(Object.assign(new Error("Registration failed - permission denied"), { name: "NotAllowedError" }));
-        current = makeSub(new Uint8Array(opts.applicationServerKey).buffer);
-        return Promise.resolve(current);
+        const make = () => { current = makeSub(new Uint8Array(opts.applicationServerKey).buffer); return current; };
+        if (subscribeHangs) return new Promise((resolve) => { hanging.push(() => resolve(make())); });
+        return Promise.resolve(make());
       },
     },
   };
@@ -228,5 +252,8 @@ export function fakePushBrowser({ permission = "default", answer = "granted", de
   };
   if (ios) navigator.standalone = standalone;
   const globals = push ? { Notification, PushManager: function PushManager() {} } : {};
-  return { navigator, globals, log, current: () => current, emit: (data) => (listeners.message || []).forEach((fn) => fn({ data })) };
+  return {
+    navigator, globals, log, current: () => current, emit: (data) => (listeners.message || []).forEach((fn) => fn({ data })),
+    settleSubscribe: () => { const f = hanging.shift(); if (!f) throw new Error("no subscribe() is waiting"); f(); },
+  };
 }
