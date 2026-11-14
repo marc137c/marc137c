@@ -1,16 +1,13 @@
 // POST /api/bookings – kunden bestiller en time. Tiden låses med en gang,
 // og to kunder kan aldri få samme tid (konfliktsikker skriving i Netlify Blobs).
-import { liveDeps, bookingStore, isProduction } from "../lib/runtime.mjs";
+import { liveDeps, bookingStore } from "../lib/runtime.mjs";
 import { validateCustomer, createItem } from "../lib/booking-core.mjs";
-import { smsConfigured, norwegianMobile, shopNumber } from "../lib/sms.mjs";
-import { sendBookingSms, CONFIRM, SHOP } from "../lib/reminders.mjs";
 import { takeBookingSlot } from "../lib/limits.mjs";
 
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
 // deps: se netlify/lib/runtime.mjs (testene sender inn falsk lagring, miljø, klokke og fetch)
 export async function handle(req, context, deps) {
-  const { env } = deps;
   if (req.method !== "POST") return json({ error: "Bruk POST." }, 405);
   // Bare JSON fra vår egen side. En annen nettside kan ikke sende JSON hit uten CORS-forhåndssjekk (som vi ikke
   // svarer på), så skjemaer og no-cors-kall fra fremmede sider kan ikke bestille i besøkendes navn (F2).
@@ -34,29 +31,10 @@ export async function handle(req, context, deps) {
       if (slot.error) return json({ error: slot.error }, slot.status || 503);
       return json({ error: "For mange bestillinger akkurat nå. Ring oss på 409 63 911.", code: "rate_limited" }, 429);
     }
-    // SMS bare fra den ekte nettsiden, og bare når Sveve er satt opp: bekreftelse til kunden (norsk mobil) og ett
-    // varsel til frisøren (SHOP_SMS_TO). Begge merkes «skal sendes» sammen med timen, så de aldri går tapt: klarer vi
-    // dem ikke nå (natt, feil, treg Sveve), sender neste planlagte kjøring dem.
-    const smsOn = isProduction(context) && smsConfigured(env);
-    const extra = {};
-    if (smsOn && norwegianMobile(v.value.phone)) extra[CONFIRM.pending] = true;
-    if (smsOn && shopNumber(env)) extra[SHOP.pending] = true;
-    const r = await createItem(store, { ...v.value, type: "booking" }, { source: "nettside", now: deps.now(), extra });
+    const r = await createItem(store, { ...v.value, type: "booking" }, { source: "nettside", now: deps.now() });
     if (r.error) return json({ error: r.error, code: r.code }, r.status);
     const { id, date, start, dur, service } = r.item;
-    let sms = "off";
-    if (smsOn) {
-      try { // egen try: timen er lagret, så kunden skal få «booket» selv om noe her feiler
-        const opts = { now: deps.now(), clock: () => deps.now().getTime(), fetchFn: deps.fetch };
-        const kind = (await sendBookingSms(store, env, r.item, opts)).confirm;
-        // booking.js lover «bekreftelse på SMS» bare for «sent»; «test» = testmodus, ingen SMS (F42)
-        sms = { sent: "sent", test: "test", deferred: "later", failed: "failed", unknown: "unknown", skip: "skipped", limit: "skipped" }[kind] || "failed";
-      } catch (err) {
-        sms = "failed";
-        console.error("SMS-bekreftelse:", id, err && err.message);
-      }
-    }
-    return json({ ok: true, booking: { id, date, start, dur, service }, sms }, 201);
+    return json({ ok: true, booking: { id, date, start, dur, service } }, 201);
   } catch (err) {
     console.error("Bestilling:", err);
     return json({ error: "Noe gikk galt. Ring oss gjerne." }, 500);

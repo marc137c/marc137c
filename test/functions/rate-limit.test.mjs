@@ -1,19 +1,18 @@
-// Audit finding F2 and owner decision (e): a booking flood must neither fill the calendar nor text strangers at
-// the shop's cost. POST /api/bookings counts every validated request per client IP (5/h, 10/24 h), per phone
+// Audit finding F2: a booking flood must not fill the calendar with fake bookings.
+// POST /api/bookings counts every validated request per client IP (5/h, 10/24 h), per phone
 // number (3/24 h, whatever the formatting) and in total (20/h, 40/24 h), atomically in Netlify Blobs, and answers
 // 429 { error, code: "rate_limited" } when a limit is reached. Cross-site and non-JSON posts are refused first.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { testDeps, request, read, quiet, PRODUCTION } from "../helpers/deps.mjs";
 import { oslo } from "../helpers/clock.mjs";
-import { storedItems, SHOP_MOBILE } from "../helpers/bookings.mjs";
+import { storedItems } from "../helpers/bookings.mjs";
 import { addDays, dayOfWeek, CONFIG } from "../../netlify/lib/booking-core.mjs";
 import { BOOKING_LIMITS, phoneKey } from "../../netlify/lib/limits.mjs";
 import { handle } from "../../netlify/functions/bookings.mjs";
 
 const NOW = oslo("2026-11-12", 10, 0); // Thursday 10:00 in Oslo
 const HOUR = 3600e3;
-const SVEVE_ENV = { SVEVE_USER: "u", SVEVE_PASSWD: "p" };
 const from = (ip) => ({ ...PRODUCTION, ip });
 
 // Every free 30-minute slot from tomorrow on, in order, so each request in a flood is a valid, different booking
@@ -76,7 +75,7 @@ test("rate limit: one phone number gets at most 3 bookings per 24 h, whatever th
   assert.equal(storedItems(d.blobs).length, 3);
 });
 
-test("rate limit: the phone counter key ignores formatting and the +47/0047 prefix, landlines too, without any SMS code", () => {
+test("rate limit: the phone counter key ignores formatting and the +47/0047 prefix, landlines too", () => {
   for (const [given, key] of [
     ["912 34 567", "91234567"], ["+47 912 34 567", "91234567"], ["0047 91234567", "91234567"], ["47 912-34-567", "91234567"],
     ["22 33 44 55", "22334455"], ["+47 22 33 44 55", "22334455"], ["(0047) 22.33.44.55", "22334455"],
@@ -92,9 +91,9 @@ test("rate limit: a landline written with and without +47 shares one counter", a
   assert.deepEqual(d.blobs.keys("bookings").filter((k) => k.startsWith("rl/phone/")), ["rl/phone/69170000"]);
 });
 
-test("rate limit: a flood from rotating clients and numbers stores at most 20 per hour and 40 per 24 h, and refused bookings get no SMS", async (t) => {
+test("rate limit: a flood from rotating clients and numbers stores at most 20 per hour and 40 per 24 h", async (t) => {
   quiet(t);
-  const d = testDeps({ now: NOW, env: SVEVE_ENV, sveve: true });
+  const d = testDeps({ now: NOW });
   const slots = allSlots();
   let i = 0;
   const wave = async (n) => {
@@ -117,12 +116,11 @@ test("rate limit: a flood from rotating clients and numbers stores at most 20 pe
     all.push(...await wave(20));
   }
   assert.equal(storedItems(d.blobs).length, 40, "nothing more until the first ones are 24 h old");
-  const refused = new Set(all.filter((r) => r.status === 429).map((r) => r.phone));
-  assert.equal(refused.size, all.length - 40);
-  assert.ok(all.filter((r) => r.status === 429).every((r) => r.body.code === "rate_limited"));
-  const customers = d.sveve.sent.filter((s) => s.to !== SHOP_MOBILE);
-  assert.ok(customers.every((s) => !refused.has(s.to)), "a refused booking never texts anyone");
-  assert.ok(customers.length <= 40);
+  const refused = all.filter((r) => r.status === 429);
+  assert.equal(refused.length, all.length - 40);
+  assert.ok(refused.every((r) => r.body.code === "rate_limited"));
+  const stored = new Set(storedItems(d.blobs).map((i) => i.phone));
+  assert.ok(refused.every((r) => !stored.has(r.phone)), "a refused booking stores nothing");
   d.clock.set(NOW.getTime() + 24 * HOUR + 1);
   assert.equal((await wave(1))[0].status, 201, "the next day web bookings work again");
 });

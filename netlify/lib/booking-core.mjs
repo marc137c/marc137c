@@ -127,9 +127,7 @@ export function validateCustomer(input, now = new Date()) {
   if (name.length < 2) return fail("bad_name", "Skriv inn navnet ditt.");
   if (!phoneOk(input.phone)) return fail("bad_phone", "Ugyldig telefonnummer.");
   const addons = (Array.isArray(input.addons) ? input.addons : []).filter((a) => CONFIG.addons.includes(a));
-  // Språket kunden bestilte på (SMS-ene sendes på det språket). Bare «en» eller «no», aldri fri tekst.
-  const lang = input.lang === "en" ? "en" : "no";
-  return { value: { date: input.date, start, dur, service, addons, name, phone, lang } };
+  return { value: { date: input.date, start, dur, service, addons, name, phone } };
 }
 
 // Regler for admin: kan legge inn hva som helst på 5-minutters rutenett, også utenom åpningstid
@@ -168,16 +166,13 @@ export function validateAdmin(input, { partial = false } = {}) {
 const newId = (date) => `${date}_${randomBytes(5).toString("hex")}`;
 
 // ---------- Opprett / endre / slett ----------
-// extra: felt som lagres på avtalen i tillegg (SMS-utboksen: confirmPending)
-export async function createItem(store, value, { source, force = false, now = new Date(), extra = {} } = {}) {
+export async function createItem(store, value, { source, force = false, now = new Date() } = {}) {
   const item = {
     id: newId(value.date), type: value.type || "booking", status: "confirmed", source,
     date: value.date, start: value.start, dur: value.dur,
     service: value.service || "", addons: value.addons || [], name: value.name || "", phone: value.phone || "", note: value.note || "",
     createdAt: now.toISOString(), updatedAt: now.toISOString(),
   };
-  if (value.lang === "en" || value.lang === "no") item.lang = value.lang;
-  Object.assign(item, extra);
   return mutateMonth(store, monthOf(item.date), (doc) => {
     // Ble første forsøk lagret selv om svaret gikk tapt, er jobben allerede gjort
     if (doc.items.some((o) => o.id === item.id)) return { ok: true, item };
@@ -202,11 +197,6 @@ export async function updateItem(store, id, changes, { force = false, now = new 
   const toMonth = monthOf(changes.date ?? current.date);
   const build = (base) => {
     const next = { ...base, ...changes, updatedAt: now.toISOString() };
-    // Flyttet til ny dag/tid: kunden skal få ny påminnelse for det nye tidspunktet
-    // (alle påminnelsesfeltene, se REMINDER i reminders.mjs; et krav fra en kjøring som pågår blir da ugyldig)
-    if (next.date !== base.date || next.start !== base.start) {
-      for (const k of ["remindedAt", "reminderRun", "reminderSentAt", "reminderError", "reminderFails", "reminderTestAt"]) delete next[k];
-    }
     if (next.start + next.dur > 1440) return { error: "Avtalen går over midnatt.", status: 400 };
     return { next };
   };

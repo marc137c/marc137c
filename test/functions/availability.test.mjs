@@ -19,22 +19,14 @@ test("availability: answers with the schedule from the injected clock and busy r
   const res = await read(await handle(request("/api/availability"), PRODUCTION, d));
   assert.equal(res.status, 200);
   assert.equal(res.headers["cache-control"], "no-store");
-  for (const k of ["today", "nowMinutes", "lastDate", "hours", "slotMin", "leadMin", "maxDays", "durations", "busy", "sms"]) {
-    assert.ok(k in res.body, `field ${k}`);
-  }
+  assert.deepEqual(Object.keys(res.body).sort(), ["busy", "durations", "hours", "lastDate", "leadMin", "maxDays", "nowMinutes", "slotMin", "today"]);
   assert.equal(res.body.today, "2026-11-12");
   assert.equal(res.body.nowMinutes, 600);
   assert.equal(res.body.lastDate, "2027-01-11");
   assert.deepEqual(res.body.busy, { "2026-11-13": [[600, 630]], "2026-12-01": [[720, 750]] });
-  assert.equal(res.body.sms, false);
   const raw = JSON.stringify(res.body);
   assert.ok(!raw.includes("Kari") && !raw.includes("912"), "never names or phone numbers");
   assert.deepEqual(d.blobs.opened, [{ name: "bookings", consistency: "strong" }]);
-});
-
-test("availability: sms is true only when Sveve is configured in the injected env", async () => {
-  const d = testDeps({ env: { SVEVE_USER: "u", SVEVE_PASSWD: "p" } });
-  assert.equal((await read(await handle(request("/api/availability"), PRODUCTION, d))).body.sms, true);
 });
 
 test("availability: a Blobs outage gives 500 JSON, not a crash", async (t) => {

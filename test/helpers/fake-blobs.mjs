@@ -29,7 +29,7 @@
 //   blobs.inject({ method: "GET", fault: "fail-before", status: 500, times: Infinity }) // outage, nothing read
 //   blobs.inject({ fault: "network-down", times: 6 })                              // connection refused
 //   blobs.inject({ method: "PUT", latencyMs: 4000 })                               // slow write
-//   blobs.inject({ method: "PUT", skip: 1, match: (req) => req.json().items.some((i) => i.remindedAt), ... })
+//   blobs.inject({ method: "PUT", skip: 1, match: (req) => req.json().items.some((i) => i.status === "cancelled"), ... })
 // Rule fields: method ("GET" | "HEAD" | "PUT" | "DELETE" | "LIST"), store, key (string | RegExp | fn),
 // match(req), skip (let n matching attempts through first), times (default 1; Infinity = until cleared),
 // fault, status (default 500), latencyMs. inject() returns the rule; rule.hits counts the attempts it hit.

@@ -1,6 +1,6 @@
 // A generic fetch stand-in for external APIs. It answers from routes, records every call, and throws like
 // a dead network for any URL without a route: no test can reach the internet by accident. testDeps() uses
-// fakeFetch() with no routes as deps.fetch; for SMS use the fake Sveve in fake-sveve.mjs instead.
+// fakeFetch() with no routes as deps.fetch unless the test passes its own.
 //
 //   const fetch = fakeFetch([
 //     ["https://example.test/api", (call) => ({ ok: true })],          // exact URL (query ignored)
