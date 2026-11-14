@@ -100,7 +100,7 @@
     </form>
   </dialog>
 
-  <!-- Oppsett: kalenderen på telefonen. Lenken hentes først når dialogen åpnes (admin.js). -->
+  <!-- Oppsett: kalenderen på telefonen og varsler på denne enheten. Begge hentes først når dialogen åpnes (admin.js). -->
   <dialog class="sheet" id="settings" aria-labelledby="settings-title">
     <div class="sheet-body">
       <h3 id="settings-title">Oppsett</h3>
@@ -134,6 +134,18 @@
             <button class="btn btn-danger" type="button" id="cal-renew">Lag ny lenke</button>
             <p class="hint">Har noen fått lenken som ikke skal ha den, eller har du mistet en telefon? Lag en ny. Den gamle slutter å virke med en gang.</p>
           </div>
+        </div>
+      </section>
+
+      <section class="panel" id="push" aria-labelledby="push-title">
+        <h4 id="push-title">Varsler på denne enheten</h4>
+        <p class="hint">Få et varsel på denne telefonen eller PC-en hver gang en kunde bestiller time på nettsiden. Trykk på varselet, så åpnes timeboken på riktig dag.</p>
+        <p class="msg" id="push-msg" role="status" aria-live="polite"></p>
+        <p class="hint" id="push-ios" hidden>På iPhone og iPad: trykk <strong>Del</strong> → <strong>Legg til på Hjem-skjerm</strong>, åpne Timebok derfra, og trykk <strong>Slå på varsler</strong>. Krever iOS 16.4 eller nyere.</p>
+        <div class="push-actions">
+          <button class="btn" type="button" id="push-on" hidden>Slå på varsler</button>
+          <button class="btn btn-ghost" type="button" id="push-test" hidden>Send testvarsel</button>
+          <button class="btn btn-danger" type="button" id="push-off" hidden>Slå av</button>
         </div>
       </section>
 

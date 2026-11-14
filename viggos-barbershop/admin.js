@@ -1,6 +1,8 @@
 // Timebok for Viggo's Barbershop: se, legg inn, flytt, avlys og blokker timer.
 // Snakker med /api/admin/* (netlify/functions/admin.mjs). Innloggingen lagres i nettleseren.
-// «Oppsett» viser lenken til kalenderen på telefonen (/api/admin/calendar, se netlify/lib/calendar.mjs).
+// «Oppsett» viser lenken til kalenderen på telefonen (/api/admin/calendar, se netlify/lib/calendar.mjs) og slår
+// varsler om nye bestillinger av og på for denne enheten (/api/admin/push, admin-sw.js, netlify/lib/push.mjs).
+// /admin?dag=ÅÅÅÅ-MM-DD åpner den dagen (lenken i varslene).
 (() => {
   const $ = (id) => document.getElementById(id);
   const KEY = "viggo-admin-token";
@@ -83,6 +85,7 @@
       $("pw").value = "";
       showApp();
       load();
+      pushSync();
     })).catch((err) => {
       $("login-msg").textContent = err.message;
       $("pw").select();
@@ -105,7 +108,12 @@
   }
 
   // ---------- Data ----------
-  const state = { day: todayIso(), items: [], week: [], config: null, editing: null };
+  // /admin?dag=ÅÅÅÅ-MM-DD (fra et varsel) åpner den dagen
+  const linkedDay = () => {
+    const m = /[?&]dag=(\d{4}-\d{2}-\d{2})(?:&|$)/.exec((window.location && window.location.search) || "");
+    return m && toIso(m[1]) === m[1] ? m[1] : null;
+  };
+  const state = { day: linkedDay() || todayIso(), items: [], week: [], config: null, editing: null };
   const hoursOn = (d) => { const h = state.config && state.config.hours; return h ? h[parse(d).getDay()] : null; };
 
   let loadSeq = 0;
@@ -387,9 +395,9 @@
   }
   function calClear() { calSeq++; calShow(null); calMsg(""); }
 
-  $("settings-open").addEventListener("click", () => { settings.showModal(); calLoad(); });
-  $("settings-close").addEventListener("click", () => { settings.close(); calClear(); });
-  settings.addEventListener("close", calClear); // Esc i nettlesere med ekte <dialog>
+  $("settings-open").addEventListener("click", () => { settings.showModal(); calLoad(); pushLoad(); });
+  $("settings-close").addEventListener("click", () => { settings.close(); calClear(); pushClear(); });
+  settings.addEventListener("close", () => { calClear(); pushClear(); }); // Esc i nettlesere med ekte <dialog>
   $("cal-create").addEventListener("click", () => calMake(false));
   $("cal-renew").addEventListener("click", () => {
     if (!confirm("Lage en ny kalenderlenke?\n\nDen gamle lenken slutter å virke med en gang. Kalenderen må legges til på nytt på alle telefoner og PC-er som bruker den.")) return;
@@ -423,10 +431,210 @@
   });
   $("cal-url").addEventListener("click", (e) => e.target.select());
 
+  // ---------- Oppsett: varsler på denne enheten (Web Push) ----------
+  // Krever service worker, PushManager og Notification: Chrome, Edge og Firefox på PC og Android, Safari 16+ på Mac,
+  // og iPhone/iPad med iOS 16.4+ når Timebok er lagt til på Hjem-skjermen. Mangler noe, skjules knappene.
+  // Serveren lager nøkkelparet selv; siden får bare den offentlige nøkkelen (GET /api/admin/push).
+  const SW_URL = "/admin-sw.js";
+  const SW_SCOPE = "/admin";
+  const BLOCKED = "Varsler er blokkert for denne siden. Tillat varsler i nettleserens innstillinger (på iPhone: Innstillinger → Varslinger → Timebok), og prøv igjen.";
+  const sw = () => ("serviceWorker" in navigator && navigator.serviceWorker ? navigator.serviceWorker : null);
+  const notif = () => ("Notification" in window ? Notification : null);
+  const pushSupported = () => !!(sw() && sw().register && "PushManager" in window && notif());
+  const permission = () => (notif() ? notif().permission : "denied");
+  const isIos = () => /iPad|iPhone|iPod/.test(navigator.userAgent || "") || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isStandalone = () => navigator.standalone === true || !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+  const pushState = { key: null, sub: null };
+  let pushSeq = 0;
+
+  function pushMsg(text, kind) {
+    $("push-msg").textContent = text || "";
+    $("push-msg").className = "msg" + (kind ? " " + kind : "");
+  }
+  // mode: «off» (Slå på), «on» (Send testvarsel, Slå av) eller null (ingen knapper)
+  function pushButtons(mode) {
+    $("push-on").hidden = mode !== "off";
+    $("push-test").hidden = mode !== "on";
+    $("push-off").hidden = mode !== "on";
+  }
+  const others = (n) => (n > 0 ? ` ${n} ${n === 1 ? "annen enhet får" : "andre enheter får"} varsler.` : "");
+  function pushShow(mode, devices) {
+    pushButtons(mode);
+    if (mode === "on") pushMsg("Varsler er på. Du får et varsel her hver gang en kunde bestiller time.", "ok");
+    else pushMsg("Varsler er av på denne enheten." + others(devices), "info");
+  }
+  function pushError(err) {
+    if (err && (err.status || err.user)) return err.message;
+    if (err && err.name === "NotAllowedError") return BLOCKED;
+    if (err && err.name === "TypeError") return "Ingen forbindelse. Prøv igjen.";
+    return "Kunne ikke slå på varsler på denne enheten. Prøv igjen.";
+  }
+
+  // Den offentlige nøkkelen (base64url) som bytes, slik pushManager.subscribe vil ha den
+  function keyBytes(b64) {
+    const s = String(b64 || "").replace(/-/g, "+").replace(/_/g, "/");
+    const bin = window.atob(s + "===".slice((s.length + 3) % 4));
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  // Er abonnementet laget med serverens nøkkel? (Eldre nettlesere viser ikke nøkkelen: da antar vi ja.)
+  function sameKey(sub, b64) {
+    const k = sub.options && sub.options.applicationServerKey;
+    if (!k) return true;
+    const a = new Uint8Array(k), b = keyBytes(b64);
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+  }
+  // JSON.stringify bruker PushSubscription.toJSON(): { endpoint, expirationTime, keys: { p256dh, auth } }
+  const saveSub = (sub) => api("/api/admin/push/subscribe", { method: "POST", body: JSON.stringify({ subscription: sub }) });
+  function swRegistration() {
+    const c = sw();
+    if (!c) return Promise.reject(new Error("Denne nettleseren kan ikke vise varsler."));
+    return c.register(SW_URL, { scope: SW_SCOPE }).then(() => c.ready);
+  }
+  function askPermission() {
+    const N = notif();
+    if (!N) return Promise.resolve("denied");
+    if (N.permission === "granted") return Promise.resolve("granted");
+    return new Promise((resolve) => {
+      const p = N.requestPermission(resolve); // eldre Safari svarer bare med tilbakekall
+      if (p && typeof p.then === "function") p.then(resolve, () => resolve("default"));
+    });
+  }
+
+  // Når «Oppsett» åpnes: vis om denne enheten får varsler, og gi serveren abonnementet på nytt (nettleseren kan ha fornyet det)
+  function pushLoad() {
+    const seq = ++pushSeq;
+    pushState.sub = null;
+    pushButtons(null);
+    $("push-ios").hidden = true;
+    if (!pushSupported()) {
+      if (isIos() && isStandalone()) pushMsg("Varsler på iPhone krever iOS 16.4 eller nyere. Oppdater under Innstillinger → Generelt → Programvareoppdatering.", "info");
+      else if (isIos()) { $("push-ios").hidden = false; pushMsg(""); }
+      else pushMsg("Denne nettleseren kan ikke vise varsler. Bruk en nyere Chrome, Edge, Firefox eller Safari.", "info");
+      return Promise.resolve();
+    }
+    if (permission() === "denied") { pushMsg(BLOCKED, "info"); return Promise.resolve(); }
+    pushMsg("Henter …", "info");
+    return Promise.all([api("/api/admin/push"), swRegistration().then((reg) => reg.pushManager.getSubscription())]).then((r) => {
+      if (seq !== pushSeq) return;
+      const info = r[0], sub = r[1];
+      pushState.key = info.publicKey;
+      if (!sub || permission() !== "granted") return pushShow("off", info.devices);
+      if (!sameKey(sub, info.publicKey)) {
+        // Laget med en nøkkel serveren ikke har lenger: det virker ikke, så det fjernes
+        return sub.unsubscribe().catch(() => false).then(() => {
+          if (seq !== pushSeq) return;
+          pushShow("off", info.devices);
+          pushMsg("Varslene må slås på igjen på denne enheten.", "info");
+        });
+      }
+      return saveSub(sub).then((res) => {
+        if (seq !== pushSeq) return;
+        pushState.sub = sub;
+        pushShow("on", res.devices);
+      });
+    }).catch((err) => {
+      if (seq !== pushSeq || err.status === 401) return;
+      pushButtons(null);
+      pushMsg(pushError(err));
+    });
+  }
+  function pushClear() { pushSeq++; pushState.sub = null; pushButtons(null); pushMsg(""); $("push-ios").hidden = true; }
+
+  $("push-on").addEventListener("click", () => {
+    const btn = $("push-on");
+    const seq = ++pushSeq;
+    btn.disabled = true;
+    pushMsg("Slår på …", "info");
+    askPermission().then((answer) => {
+      if (answer !== "granted") {
+        if (answer === "denied") pushButtons(null);
+        throw Object.assign(new Error(answer === "denied" ? BLOCKED : "Du må tillate varsler for å få dem. Trykk «Slå på varsler» og velg Tillat."), { user: true });
+      }
+      return swRegistration();
+    }).then((reg) => reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(pushState.key) }))
+      .then((sub) => saveSub(sub).then((res) => {
+        if (seq !== pushSeq) return;
+        pushState.sub = sub;
+        pushShow("on", res.devices);
+      }, (err) => {
+        if (err.status === 400) sub.unsubscribe().catch(() => false); // serveren godtar det ikke: ikke la det henge igjen
+        throw err;
+      }))
+      .catch((err) => { if (seq === pushSeq && err.status !== 401) pushMsg(pushError(err)); })
+      .then(() => { btn.disabled = false; });
+  });
+
+  $("push-test").addEventListener("click", () => {
+    const sub = pushState.sub;
+    if (!sub) return;
+    const btn = $("push-test");
+    btn.disabled = true;
+    pushMsg("Sender …", "info");
+    api("/api/admin/push/test", { method: "POST", body: JSON.stringify({ endpoint: sub.endpoint }) }).then(() => {
+      pushMsg("Testvarsel sendt. Det kommer om noen sekunder. Kommer det ikke, sjekk at varsler er tillatt for nettleseren (eller Timebok) i innstillingene.", "ok");
+    }).catch((err) => {
+      if (err.status === 401) return;
+      if (err.status === 404 || err.status === 410) {
+        // Serveren eller push-tjenesten kjenner ikke enheten lenger: start på nytt med «Slå på varsler»
+        pushState.sub = null;
+        sub.unsubscribe().catch(() => false);
+        pushButtons("off");
+      }
+      pushMsg(pushError(err));
+    }).then(() => { btn.disabled = false; });
+  });
+
+  $("push-off").addEventListener("click", () => {
+    const sub = pushState.sub;
+    if (!sub) return;
+    const btn = $("push-off");
+    const seq = ++pushSeq;
+    const endpoint = sub.endpoint;
+    btn.disabled = true;
+    pushMsg("Slår av …", "info");
+    // Først i nettleseren (ellers kunne siden melde den på igjen neste gang), så på serveren
+    sub.unsubscribe().catch(() => false).then((ok) => {
+      if (!ok) throw Object.assign(new Error("Kunne ikke slå av varsler her. Prøv igjen."), { user: true });
+      pushState.sub = null;
+      return api("/api/admin/push/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint }) }).then((res) => {
+        if (seq !== pushSeq) return;
+        pushShow("off", res.devices);
+        pushMsg("Varsler er slått av på denne enheten." + others(res.devices), "ok");
+      }, (err) => {
+        if (seq !== pushSeq || err.status === 401) return;
+        pushButtons("off");
+        pushMsg("Varsler er slått av her. Serveren fikk ikke beskjed nå, men det ordner seg av seg selv.", "info");
+      });
+    }).catch((err) => { if (seq === pushSeq) pushMsg(pushError(err)); }).then(() => { btn.disabled = false; });
+  });
+
+  // Ved oppstart: får denne enheten varsler, gi serveren abonnementet på nytt (nettleseren kan ha fornyet det).
+  // Gjør ingenting (og registrerer ingen service worker) på en enhet som aldri har slått på varsler.
+  function pushSync() {
+    const c = sw();
+    if (!pushSupported() || permission() !== "granted" || !c.getRegistration) return Promise.resolve();
+    return c.getRegistration(SW_SCOPE).then((reg) => (reg ? reg.pushManager.getSubscription() : null)).then((sub) => {
+      if (!sub) return null;
+      return api("/api/admin/push").then((info) => (sameKey(sub, info.publicKey) ? saveSub(sub) : null));
+    }).catch(() => {});
+  }
+
+  // Trykk på et varsel mens timeboken er åpen: admin-sw.js sier hvilken dag som skal vises
+  if (sw() && sw().addEventListener) {
+    sw().addEventListener("message", (e) => {
+      const d = e.data;
+      if (d && d.type === "open-day" && typeof d.date === "string" && toIso(d.date) === d.date && getToken()) go(d.date);
+    });
+  }
+
   // ---------- Oppstart ----------
   // Hold oversikten fersk (nye nettbestillinger dukker opp av seg selv)
   setInterval(() => { if (!document.hidden && !dlg.open && getToken() && !$("app").hidden) load(); }, 30000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden && getToken() && !$("app").hidden) load(); });
 
-  if (getToken()) { showApp(); load(); } else showLogin();
+  if (getToken()) { showApp(); load(); pushSync(); } else showLogin();
 })();

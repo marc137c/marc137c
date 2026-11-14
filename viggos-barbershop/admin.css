@@ -121,7 +121,7 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 .addons input { width: 18px; min-height: 18px; height: 18px; accent-color: var(--gold); }
 .sheet-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
-/* Oppsett: kalender på telefonen */
+/* Oppsett: kalender på telefonen og varsler på denne enheten */
 .sheet-body { display: grid; grid-gap: 14px; gap: 14px; padding: 22px; }
 .panel { display: grid; grid-gap: 10px; gap: 10px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); }
 .panel h4 { margin: 0; font-size: 1.05rem; }
@@ -135,6 +135,7 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 .steps { padding-left: 18px; }
 .steps li + li { margin-top: 6px; }
 .steps strong { color: var(--text); }
+.push-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .renew { display: grid; grid-gap: 6px; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
 .spacer { flex: 1; }
 .sheet.is-block .only-booking { display: none; }
@@ -154,7 +155,8 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 
 /* Uten gap i flexbox */
 @supports not (aspect-ratio: 1) {
-  .btn, label.check, .top-row, .day-nav, .week, .day-head, .day-actions, .seg, .addons, .addons label, .sheet-actions { gap: 0; }
+  .btn, label.check, .top-row, .day-nav, .week, .day-head, .day-actions, .seg, .addons, .addons label, .sheet-actions, .push-actions { gap: 0; }
+  .push-actions > * { margin: 0 10px 10px 0; }
   label.check input { margin-right: 10px; }
   .top-row > * + * { margin-left: 10px; }
   .day-nav > * + * { margin-left: 8px; }

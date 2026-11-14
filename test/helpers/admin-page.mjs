@@ -2,13 +2,20 @@
 // fake DOM built from the real admin.html: every element with an id exists with its tag, hidden flag and href,
 // and $("x") for an id that is not in admin.html gives null, as in a browser. No browser is started.
 //
-//   const page = await loadAdmin({ routes, token: "t", navigator: {}, confirm: () => true, oldBrowser: false });
+//   const page = await loadAdmin({ routes, token: "t", navigator: {}, confirm: () => true, oldBrowser: false,
+//                                  globals: { Notification, PushManager }, search: "?dag=2026-11-20" });
 //   page.$("settings-open").click(); await page.flush();
 //   page.calls        → [{ method, path, headers, body }] every fetch the page made
 //   page.confirms     → texts passed to confirm()
 //   page.missing      → ids admin.js asked for that admin.html does not have
 // routes: { "GET /api/admin/calendar": (call) => ({ status, body }) | body | Promise, … } (query ignored).
 // An unknown route answers 404. A route may throw to simulate a network failure.
+// globals: extra window properties (e.g. Notification and PushManager from fakePushBrowser below).
+//
+//   const browser = fakePushBrowser({ permission: "default", answer: "granted", device: makeDevice("apple") });
+//   loadAdmin({ navigator: browser.navigator, globals: browser.globals })
+//   browser.log  → { registered, subscribes, permissionAsks, unsubscribed, getRegistration }
+//   browser.emit(data) sends a message from the service worker to the page; browser.current() the subscription.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
@@ -120,7 +127,7 @@ const storage = (init = {}) => {
   return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), _map: m };
 };
 
-export async function loadAdmin({ routes = {}, token = "test-admin-token", navigator = {}, confirm = () => true, oldBrowser = false, execCommand, queryCommandSupported } = {}) {
+export async function loadAdmin({ routes = {}, token = "test-admin-token", navigator = {}, confirm = () => true, oldBrowser = false, execCommand, queryCommandSupported, globals = {}, search = "" } = {}) {
   const doc = makeDocument();
   const calls = [];
   const confirms = [];
@@ -146,6 +153,9 @@ export async function loadAdmin({ routes = {}, token = "test-admin-token", navig
     document: doc, navigator, fetch, localStorage: local, sessionStorage: storage(),
     confirm: (text) => { confirms.push(text); return confirm(text); },
     setInterval: () => 0, clearInterval: () => {}, console,
+    atob: (s) => Buffer.from(String(s), "base64").toString("latin1"),
+    location: { pathname: "/admin", search, href: "https://viggos.test/admin" + search },
+    ...globals,
   };
   context.window = context;
   vm.createContext(context);
@@ -154,4 +164,60 @@ export async function loadAdmin({ routes = {}, token = "test-admin-token", navig
   const flush = async () => { for (let i = 0; i < 10; i++) await new Promise((r) => setImmediate(r)); };
   await flush();
   return { doc, $: (id) => doc.byId.get(id), calls, confirms, missing: doc.missing, local, flush, context };
+}
+
+// A browser with service worker and Web Push (Chrome, Firefox, Safari 16+, iPhone Home Screen app on iOS 16.4+), or,
+// with ios: true and push: false, iPhone Safari outside the Home Screen (service worker, but no PushManager and no
+// Notification). device: a fake-push.mjs makeDevice() whose endpoint and keys the subscription gets.
+// subscribed: the browser already has a subscription made with this applicationServerKey (bytes) at load.
+export function fakePushBrowser({ permission = "default", answer = "granted", device, subscribed, push = true, ios = false, standalone = false, legacyCallback = false, unsubscribeOk = true, registered = Boolean(subscribed) } = {}) {
+  const log = { registered: [], subscribes: [], permissionAsks: 0, unsubscribed: [], getRegistration: [] };
+  const listeners = {};
+  const makeSub = (appKey) => ({
+    endpoint: device.endpoint,
+    options: { userVisibleOnly: true, applicationServerKey: appKey },
+    toJSON: () => ({ endpoint: device.endpoint, expirationTime: null, keys: device.subscription.keys }),
+    unsubscribe() {
+      log.unsubscribed.push(device.endpoint);
+      if (unsubscribeOk && current === this) current = null;
+      return Promise.resolve(unsubscribeOk);
+    },
+  });
+  let current = subscribed ? makeSub(new Uint8Array(subscribed).buffer) : null;
+  const reg = {
+    scope: "https://viggos.test/admin",
+    pushManager: {
+      getSubscription: () => Promise.resolve(current),
+      subscribe: (opts) => {
+        log.subscribes.push(opts);
+        current = makeSub(new Uint8Array(opts.applicationServerKey).buffer);
+        return Promise.resolve(current);
+      },
+    },
+  };
+  const serviceWorker = {
+    register: (url, opts) => { log.registered.push({ url, scope: opts && opts.scope }); registered = true; return Promise.resolve(reg); },
+    get ready() { return registered ? Promise.resolve(reg) : new Promise(() => {}); },
+    getRegistration: (scope) => { log.getRegistration.push(scope); return Promise.resolve(registered ? reg : undefined); },
+    addEventListener: (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); },
+  };
+  const Notification = {
+    permission,
+    requestPermission(cb) {
+      log.permissionAsks++;
+      Notification.permission = answer;
+      if (legacyCallback) { cb(answer); return undefined; }
+      return Promise.resolve(answer);
+    },
+  };
+  const navigator = {
+    serviceWorker,
+    userAgent: ios ? "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"
+      : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
+    platform: ios ? "iPhone" : "Win32",
+    maxTouchPoints: ios ? 5 : 0,
+  };
+  if (ios) navigator.standalone = standalone;
+  const globals = push ? { Notification, PushManager: function PushManager() {} } : {};
+  return { navigator, globals, log, current: () => current, emit: (data) => (listeners.message || []).forEach((fn) => fn({ data })) };
 }
