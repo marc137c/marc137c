@@ -1,11 +1,11 @@
 // GET /api/calendar/<hemmelighet>.ics – timeboken som kalenderabonnement for Viggos telefon (se netlify/lib/calendar.mjs).
 // Kalenderapper kan ikke logge inn, så hemmeligheten i adressen er innloggingen:
-//  - feil, gammel eller manglende hemmelighet (eller ingen kalenderlenke laget ennå) gir alltid det samme
-//    404-svaret, uten noe innhold fra timeboken, og leser ingen avtaler;
+//  - feil, gammel eller manglende hemmelighet (eller ingen kalenderlenke laget ennå, eller en lenke laget før
+//    admin-passordet ble byttet) gir alltid det samme 404-svaret, uten noe innhold fra timeboken, og leser ingen avtaler;
 //  - svaret mellomlagres aldri (Cache-Control: private, no-store, også for Netlifys CDN);
 //  - hemmeligheten skrives aldri til loggen.
 import { liveDeps, bookingStore } from "../lib/runtime.mjs";
-import { readFeed, tokenMatches, isTokenShaped, calendarFor } from "../lib/calendar.mjs";
+import { readFeed, feedGen, tokenMatches, isTokenShaped, calendarFor } from "../lib/calendar.mjs";
 
 const PRIVATE = {
   "Cache-Control": "private, no-store, max-age=0",
@@ -28,7 +28,7 @@ export async function handle(req, context, deps) {
   if (!isTokenShaped(given)) return notFound();
   try {
     const store = bookingStore(deps, context); // forhåndsvisninger har sin egen timebok og sin egen lenke (F10)
-    const feed = await readFeed(store);
+    const feed = await readFeed(store, feedGen(deps.env.ADMIN_PASSWORD));
     if (!feed || !tokenMatches(given, feed.token)) return notFound();
     const body = await calendarFor(store, deps.now());
     return new Response(req.method === "HEAD" ? null : body, {

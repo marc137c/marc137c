@@ -4,7 +4,8 @@
 //   POST   /api/admin/items            ny avtale/blokkering   (?force=1 = lagre selv om det kolliderer)
 //   PATCH  /api/admin/items/:id        endre (flytte, ny tjeneste, avlyse …)
 //   DELETE /api/admin/items/:id        slette for godt
-//   GET    /api/admin/calendar         lenken til kalenderen på telefonen: { enabled, createdAt, links }
+//   GET    /api/admin/calendar         lenken til kalenderen på telefonen: { enabled, createdAt, links }, eller
+//                                      { enabled: false, expired: true } når passordet er byttet siden den ble laget
 //   POST   /api/admin/calendar         lag lenken { replace: false } (beholder en som finnes) eller lag en ny
 //                                      { replace: true } (den gamle slutter å virke med en gang)
 //   GET    /api/admin/push             varsler på enhetene: { publicKey, devices } (nøkkelparet lages første gang)
@@ -18,7 +19,7 @@ import {
   CONFIG, addDays, isDate, osloNow, readMonths, validateAdmin,
   createItem, updateItem, deleteItem, checkPassword, makeToken, verifyToken,
 } from "../lib/booking-core.mjs";
-import { readFeed, createFeed, feedLinks } from "../lib/calendar.mjs";
+import { readFeedState, createFeed, feedLinks, feedGen } from "../lib/calendar.mjs";
 import {
   vapidKeys, readSubscriptions, parseSubscription, saveSubscription, removeSubscriptions, normalizeEndpoint,
   pushToDevices, testMessage, clearSubscriptions, pushGen,
@@ -27,9 +28,9 @@ import {
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 const DAY = 24 * 60 * 60 * 1000;
 // Det /admin får vite om kalenderlenken. Hemmeligheten står bare inne i lenkene.
-const calendarInfo = (origin, feed) => (feed
+const calendarInfo = (origin, feed, stale) => (feed
   ? { enabled: true, createdAt: feed.createdAt, links: feedLinks(origin, feed.token) }
-  : { enabled: false });
+  : stale ? { enabled: false, expired: true } : { enabled: false });
 const PUSH_POSTS = new Set(["/api/admin/push/subscribe", "/api/admin/push/unsubscribe", "/api/admin/push/test", "/api/admin/push/reset"]);
 
 // deps: se netlify/lib/runtime.mjs (testene sender inn falsk lagring, miljø og klokke)
@@ -95,12 +96,13 @@ export async function handle(req, context, deps) {
       return r.error ? json(r, r.status) : json(r);
     }
     if (path === "/api/admin/calendar" && req.method === "GET") {
-      return json(calendarInfo(url.origin, await readFeed(store)));
+      const { feed, stale } = await readFeedState(store, feedGen(password));
+      return json(calendarInfo(url.origin, feed, stale));
     }
     if (path === "/api/admin/calendar" && req.method === "POST") {
       let body = {};
       try { body = await req.json(); } catch {}
-      const r = await createFeed(store, { replace: body && body.replace === true, now: deps.now() });
+      const r = await createFeed(store, { replace: body && body.replace === true, now: deps.now(), gen: feedGen(password) });
       if (r.error) return json({ error: r.error }, r.status);
       return json(calendarInfo(url.origin, r.feed), r.created ? 201 : 200);
     }

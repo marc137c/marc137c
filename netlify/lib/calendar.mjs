@@ -4,7 +4,8 @@
 //
 // Kalenderapper kan ikke sende innlogging, så adressen bærer en lang, tilfeldig hemmelighet (256 bit).
 // Den ligger i timebokens egen lagring (nøkkel FEED_KEY, så forhåndsvisninger har sin egen, F10) og kan
-// lages på nytt fra /admin: da slutter den gamle adressen å virke med en gang.
+// lages på nytt fra /admin: da slutter den gamle adressen å virke med en gang. Den slutter også å virke når
+// admin-passordet byttes (feedGen), så et passordbytte stenger alt: innlogging, varsler og kalenderlenken.
 //
 // Strømmen:
 //  - hver aktive avtale (type «booking», ikke avlyst) fra FEED_PAST_DAYS dager tilbake til FEED_FUTURE_DAYS
@@ -16,7 +17,7 @@
 //  - en påminnelse ALARM_MIN minutter før hver time;
 //  - CRLF etter hver linje, linjer brettet etter 75 oktetter (aldri midt i et UTF-8-tegn), og tekst escapet.
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
-import { CONFIG, addDays, isDate, osloNow, readMonths, mutateJSON } from "./booking-core.mjs";
+import { CONFIG, addDays, isDate, osloNow, readMonths, mutateJSON, passwordGen } from "./booking-core.mjs";
 
 export const FEED_KEY = "calendar/feed";
 export const FEED_PAST_DAYS = 31;
@@ -30,19 +31,32 @@ const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/; // 32 tilfeldige byte i base64url
 export const isTokenShaped = (s) => typeof s === "string" && TOKEN_RE.test(s);
 export const newFeedToken = () => randomBytes(32).toString("base64url");
 
-export async function readFeed(store) {
-  const doc = await store.get(FEED_KEY, { type: "json" });
-  return doc && isTokenShaped(doc.token) ? doc : null;
-}
+// Lenken hører til admin-passordet den ble laget med (gen = feedGen(ADMIN_PASSWORD)), akkurat som innloggingen:
+// bytter Viggo passordet, slutter den gamle lenken å virke, og /admin ber ham lage en ny.
+export const feedGen = (password) => passwordGen(password, "calendar");
+const isGen = (gen) => typeof gen === "string" && gen.length === 16;
 
-// Lager hemmeligheten hvis den mangler. replace: true lager alltid en ny (den gamle slutter å virke med en gang).
-// Svarer { ok, created, feed: { token, createdAt } }.
-export async function createFeed(store, { replace = false, now = new Date() } = {}) {
+// { feed, stale }: feed er lenken for dette passordet (eller null); stale sier at det finnes en lenke fra et
+// gammelt passord, som ikke virker lenger.
+export async function readFeedState(store, gen) {
+  const doc = await store.get(FEED_KEY, { type: "json" });
+  const shaped = !!(doc && typeof doc === "object" && isTokenShaped(doc.token));
+  const ok = shaped && isGen(gen) && doc.gen === gen;
+  return { feed: ok ? doc : null, stale: shaped && !ok };
+}
+// Lenken for dette passordet, eller null (ingen lenke, eller en fra et gammelt passord)
+export const readFeed = async (store, gen) => (await readFeedState(store, gen)).feed;
+
+// Lager hemmeligheten for passordet gen hvis den mangler (eller er fra et gammelt passord). replace: true lager
+// alltid en ny (den gamle slutter å virke med en gang). Svarer { ok, created, feed: { token, createdAt } }.
+export async function createFeed(store, { replace = false, now = new Date(), gen } = {}) {
+  if (!isGen(gen)) return { error: "Kalenderen er ikke satt opp: mangler admin-passord.", status: 503 };
   let made = false;
   const r = await mutateJSON(store, FEED_KEY, (data) => (data && typeof data === "object" ? data : {}), (doc) => {
-    if (!replace && isTokenShaped(doc.token)) { made = false; return { ok: true, noWrite: true, feed: { token: doc.token, createdAt: doc.createdAt } }; }
+    if (!replace && isTokenShaped(doc.token) && doc.gen === gen) { made = false; return { ok: true, noWrite: true, feed: { token: doc.token, createdAt: doc.createdAt } }; }
     doc.token = newFeedToken();
     doc.createdAt = now.toISOString();
+    doc.gen = gen;
     made = true;
     return { ok: true, feed: { token: doc.token, createdAt: doc.createdAt } };
   });

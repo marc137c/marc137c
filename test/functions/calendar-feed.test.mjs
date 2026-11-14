@@ -14,13 +14,14 @@ import { oslo } from "../helpers/clock.mjs";
 import { item, seedItems, CUSTOMER_PHONE } from "../helpers/bookings.mjs";
 import { rfc5545Problems, parseCalendar, components, prop, text, toUtcMs } from "../helpers/ical.mjs";
 import { makeToken } from "../../netlify/lib/booking-core.mjs";
-import { createFeed, newFeedToken } from "../../netlify/lib/calendar.mjs";
+import { createFeed, newFeedToken, feedGen } from "../../netlify/lib/calendar.mjs";
 import { handle, config } from "../../netlify/functions/calendar.mjs";
 import * as bookings from "../../netlify/functions/bookings.mjs";
 import * as admin from "../../netlify/functions/admin.mjs";
 
 const NOW = oslo("2026-11-16", 9, 0); // Monday 09:00 in Oslo
 const PASSWORD = "fake-admin-password";
+const GEN = feedGen(PASSWORD); // the link belongs to the admin password it was made with
 const NOT_FOUND = "Fant ikke kalenderen.\n";
 
 const storeOf = (d, name = "bookings") => d.blobs.getStore({ name, consistency: "strong" });
@@ -39,7 +40,7 @@ const strip = (h) => { const { date, ...rest } = h; return rest; };
 async function withFeed(items = []) {
   const d = testDeps({ now: NOW, env: { ADMIN_PASSWORD: PASSWORD } });
   seedItems(d.blobs, items);
-  const { feed: f } = await createFeed(storeOf(d), { now: NOW });
+  const { feed: f } = await createFeed(storeOf(d), { now: NOW, gen: GEN });
   return { d, token: f.token, path: `/api/calendar/${f.token}.ics` };
 }
 
@@ -71,7 +72,7 @@ test("calendar feed: the right token gets the RFC 5545 feed of the bookings, nev
 test("calendar feed: a wrong, old, malformed or missing token gets the same 404 and no data", async () => {
   const { d, token, path } = await withFeed([item({ date: "2026-11-18", name: "Hemmelig Kunde", phone: CUSTOMER_PHONE })]);
   const flip = (t, i) => t.slice(0, i) + (t[i] === "A" ? "B" : "A") + t.slice(i + 1);
-  const { feed: renewed } = await createFeed(storeOf(d), { replace: true, now: NOW });
+  const { feed: renewed } = await createFeed(storeOf(d), { replace: true, now: NOW, gen: GEN });
   const reference = await feed(testDeps({ now: NOW }), `/api/calendar/${newFeedToken()}.ics`); // no link exists at all
   assert.equal(reference.status, 404);
   const wrong = [
@@ -103,7 +104,7 @@ test("calendar feed: a wrong, old, malformed or missing token gets the same 404 
 test("calendar feed: re-creating the link stops the old one at once", async () => {
   const { d, path } = await withFeed([item({ date: "2026-11-18" })]);
   assert.equal((await feed(d, path)).status, 200);
-  const { feed: f } = await createFeed(storeOf(d), { replace: true, now: NOW });
+  const { feed: f } = await createFeed(storeOf(d), { replace: true, now: NOW, gen: GEN });
   assert.equal((await feed(d, path)).status, 404);
   assert.equal((await feed(d, `/api/calendar/${f.token}.ics`)).status, 200);
 });
@@ -167,7 +168,7 @@ test("calendar feed: follows the timebook – a web booking appears, a move move
 test("calendar feed: a deploy preview has its own link and its own bookings (F10)", async () => {
   const { d, token, path } = await withFeed([item({ date: "2026-11-18", name: "Ekte kunde" })]);
   assert.equal((await feed(d, path, PREVIEW)).status, 404, "the live link does not open the preview");
-  const { feed: pf } = await createFeed(storeOf(d, "bookings-preview"), { now: NOW });
+  const { feed: pf } = await createFeed(storeOf(d, "bookings-preview"), { now: NOW, gen: GEN });
   seedItems(d.blobs, []);
   d.blobs.seed("bookings-preview", "m/2026-11", { items: [item({ date: "2026-11-18", name: "Test i forhåndsvisning" })] });
   const preview = await feed(d, `/api/calendar/${pf.token}.ics`, PREVIEW);
@@ -189,4 +190,32 @@ test("calendar feed: when the store fails it answers 503 with no data and never 
   assert.ok(out.error.length >= 1);
   const logged = JSON.stringify([out.log, out.error, out.warn].map((l) => l.map((args) => args.map(String))));
   assert.equal(logged.includes(token), false, "the token is not in the log");
+});
+
+test("calendar feed: after ADMIN_PASSWORD changes, the old link gets 404 and no data; /admin says so, and a new link works", async () => {
+  const d = testDeps({ now: NOW, env: { ADMIN_PASSWORD: PASSWORD } });
+  seedItems(d.blobs, [item({ date: "2026-11-18", name: "Hemmelig Kunde", phone: CUSTOMER_PHONE })]);
+  const adminCall = (method, json) => admin.handle(request("/api/admin/calendar", { method, json, headers: { Authorization: "Bearer " + makeToken(d.env.ADMIN_PASSWORD, NOW.getTime()) } }), PRODUCTION, d).then(read);
+  const made = await adminCall("POST", { replace: false });
+  assert.equal(made.status, 201);
+  const oldPath = new URL(made.body.links.https).pathname;
+  assert.equal((await feed(d, oldPath)).status, 200);
+
+  d.env.ADMIN_PASSWORD = "new-password"; // Viggo changes the password in Netlify
+  d.blobs.log.length = 0;
+  const res = await feed(d, oldPath);
+  assert.deepEqual([res.status, res.body], [404, NOT_FOUND], "the old link stops with the old password");
+  noStore(res);
+  assert.deepEqual(monthReads(d), [], "no booking is even read");
+  assert.deepEqual((await adminCall("GET")).body, { enabled: false, expired: true }, "/admin tells the barber to make a new link");
+  const fresh = await adminCall("POST", { replace: false });
+  assert.equal(fresh.status, 201, "making a link after a password change gives a new one");
+  const newPath = new URL(fresh.body.links.https).pathname;
+  assert.notEqual(newPath, oldPath);
+  assert.equal((await feed(d, newPath)).status, 200);
+  assert.equal((await feed(d, oldPath)).status, 404);
+  assert.equal((await adminCall("GET")).body.enabled, true);
+  // No admin password at all: no link works
+  delete d.env.ADMIN_PASSWORD;
+  assert.deepEqual([(await feed(d, newPath)).status, (await feed(d, newPath)).body], [404, NOT_FOUND]);
 });

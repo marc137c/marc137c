@@ -29,7 +29,7 @@ Bestillinger lagres i Netlify Blobs (lageret `bookings`) via Netlify Functions, 
 
 ## Timebok for admin (`/admin`)
 Gå til **/admin** (lenke «Admin» nederst på siden), skriv passordet og trykk Enter. «Hold meg innlogget» er på som standard, så du slipper å logge inn igjen på 60 dager, og nettleseren kan huske passordet.
-- **Engangsoppsett:** i Netlify → Site configuration → Environment variables, legg inn `ADMIN_PASSWORD` med et passord du velger. Bytter du passordet, blir alle logget ut.
+- **Engangsoppsett:** i Netlify → Site configuration → Environment variables, legg inn `ADMIN_PASSWORD` med et passord du velger. Bytter du passordet, blir alle logget ut, ingen enhet får flere varsler om nye bestillinger før du slår dem på igjen, og kalenderlenken slutter å virke (lag en ny under **Oppsett**). Det er det du gjør hvis passordet eller en innlogget telefon kan ha kommet på avveie.
 - Dagsoversikt med alle tider: røde kort er avtaler (navn, tjeneste, telefon du kan trykke på for å ringe), grå stripete er blokkeringer, grønne er ledige – trykk på en ledig tid for å legge inn en avtale.
 - Trykk på en avtale for å **flytte** (ny dato/tid), endre tjeneste/varighet/navn, **avlyse** (tiden blir ledig igjen) eller **slette**.
 - **Blokker tid** for lunsj, ferie eller fridager – blokkert tid vises som opptatt for kundene.
@@ -44,6 +44,7 @@ Alle timene kan ligge i kalenderen på telefonen (iPhone-kalenderen eller Google
 - Hver time vises med tjeneste (og tillegg), kundens navn og telefonnummer. Notatene dine kommer ikke med; de blir bare i timeboken. Flytter du en time, flyttes den i kalenderen; avlyste og slettede timer forsvinner. Blokkeringer vises ikke. Kalenderen viser fra én måned tilbake til ett år frem.
 - Telefonen henter endringer selv, men ikke alltid med en gang (Google kan bruke flere timer).
 - **Hold lenken hemmelig:** den som har den, ser navn og telefonnummer til kundene. Har noen fått den som ikke skal ha den, eller er en telefon mistet: **Oppsett → Lag ny lenke**. Den gamle slutter å virke med en gang; slett den gamle kalenderen på telefonen og legg til den nye.
+- **Bytter du admin-passordet, slutter kalenderlenken å virke.** Gå til **Oppsett → Lag kalenderlenke** og legg den nye til på telefonen (slett den gamle kalenderen der).
 - Teknisk: `/api/calendar/<hemmelighet>.ics` (`netlify/functions/calendar.mjs`, iCalendar etter RFC 5545, norsk tid med sommertid). Hemmeligheten ligger i Netlify Blobs (`calendar/feed` i timeboken), og forhåndsvisninger har sin egen lenke og sin egen timebok. Svaret mellomlagres aldri, og en feil eller gammel lenke gir bare «Fant ikke kalenderen».
 
 ### Varsler om nye bestillinger

@@ -14,7 +14,7 @@ import { item } from "../helpers/bookings.mjs";
 import { rfc5545Problems, parseCalendar, components, prop, text, toUtcMs, unfold, eventEndMs } from "../helpers/ical.mjs";
 import {
   buildCalendar, escapeText, foldLine, localDateTime, utcDateTime, feedRange, feedLinks, feedPath,
-  newFeedToken, isTokenShaped, tokenMatches, createFeed, readFeed, calendarFor, FEED_KEY, ALARM_MIN,
+  newFeedToken, isTokenShaped, tokenMatches, createFeed, readFeed, readFeedState, feedGen, calendarFor, FEED_KEY, ALARM_MIN,
 } from "../../netlify/lib/calendar.mjs";
 import { FakeBlobs } from "../helpers/fake-blobs.mjs";
 import { FakeClock } from "../helpers/clock.mjs";
@@ -223,19 +223,20 @@ test("calendar link: 256-bit base64url tokens, exact match only, links for iPhon
 test("calendar link: created once, kept unless replaced, replaced atomically", async () => {
   const blobs = new FakeBlobs();
   const store = blobs.getStore({ name: "bookings", consistency: "strong" });
-  assert.equal(await readFeed(store), null);
-  const first = await createFeed(store, { now: NOW });
+  const gen = feedGen("fake-admin-password");
+  assert.equal(await readFeed(store, gen), null);
+  const first = await createFeed(store, { now: NOW, gen });
   assert.equal(first.created, true);
-  assert.deepEqual(blobs.json("bookings", FEED_KEY), { token: first.feed.token, createdAt: NOW.toISOString() });
-  const again = await createFeed(store, { now: NOW });
+  assert.deepEqual(blobs.json("bookings", FEED_KEY), { token: first.feed.token, createdAt: NOW.toISOString(), gen });
+  const again = await createFeed(store, { now: NOW, gen });
   assert.deepEqual([again.created, again.feed.token], [false, first.feed.token], "creating again keeps the link");
-  const renewed = await createFeed(store, { replace: true, now: NOW });
+  const renewed = await createFeed(store, { replace: true, now: NOW, gen });
   assert.equal(renewed.created, true);
   assert.notEqual(renewed.feed.token, first.feed.token);
-  assert.equal((await readFeed(store)).token, renewed.feed.token);
+  assert.equal((await readFeed(store, gen)).token, renewed.feed.token);
   // Two re-creations at the same moment: both succeed, and the stored token is the one the later write returned
-  const [x, y] = await Promise.all([createFeed(store, { replace: true }), createFeed(store, { replace: true })]);
-  const stored = (await readFeed(store)).token;
+  const [x, y] = await Promise.all([createFeed(store, { replace: true, gen }), createFeed(store, { replace: true, gen })]);
+  const stored = (await readFeed(store, gen)).token;
   assert.ok([x.feed.token, y.feed.token].includes(stored));
   assert.ok(![first.feed.token, renewed.feed.token].includes(stored));
 });
@@ -283,4 +284,27 @@ test("calendar (DST nights): every event lasts exactly its booked minutes and en
     if (real !== null) assert.equal(start, real, `${i.date} ${i.start}`);
     else assert.equal(start, Date.parse(`${i.date}T00:00:00Z`) + (i.start - 60) * 60e3, "a skipped time uses +01:00 (3.3.5)");
   }
+});
+
+test("calendar link: belongs to the admin password it was made with", async () => {
+  const blobs = new FakeBlobs();
+  const store = blobs.getStore({ name: "bookings", consistency: "strong" });
+  const gen = feedGen("old-password"), other = feedGen("new-password");
+  assert.match(gen, /^[A-Za-z0-9_-]{16}$/);
+  assert.notEqual(gen, other);
+  assert.notEqual(gen, (await import("../../netlify/lib/push.mjs")).pushGen("old-password"), "not the same mark as the push devices");
+  assert.equal(feedGen(""), null);
+  assert.deepEqual(await createFeed(store, { now: NOW }), { error: "Kalenderen er ikke satt opp: mangler admin-passord.", status: 503 });
+  assert.deepEqual(await readFeedState(store, gen), { feed: null, stale: false }, "no link yet");
+  const { feed } = await createFeed(store, { now: NOW, gen });
+  assert.equal((await readFeed(store, gen)).token, feed.token);
+  assert.doesNotMatch(JSON.stringify(blobs.json("bookings", FEED_KEY)), /old-password/, "never the password itself");
+  for (const g of [other, null, undefined, ""]) {
+    assert.deepEqual(await readFeedState(store, g), { feed: null, stale: true }, String(g));
+    assert.equal(await readFeed(store, g), null);
+  }
+  const renewed = await createFeed(store, { now: NOW, gen: other }); // not replace: still a new link for the new password
+  assert.equal(renewed.created, true);
+  assert.notEqual(renewed.feed.token, feed.token);
+  assert.equal(await readFeed(store, gen), null, "the old password's link is gone");
 });

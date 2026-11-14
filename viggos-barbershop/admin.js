@@ -375,7 +375,9 @@
     return api("/api/admin/calendar").then((cal) => {
       if (seq !== calSeq) return;
       calShow(cal);
-      calMsg(cal.enabled ? "" : "Du har ingen kalenderlenke ennå.", "info");
+      calMsg(cal.enabled ? "" : cal.expired
+        ? "Passordet er byttet, så den gamle kalenderlenken virker ikke lenger. Lag en ny lenke, slett den gamle kalenderen på telefonen og legg til den nye."
+        : "Du har ingen kalenderlenke ennå.", "info");
     }).catch((err) => { if (seq === calSeq && err.status !== 401) calMsg(offline(err)); });
   }
   function calMake(replace) {

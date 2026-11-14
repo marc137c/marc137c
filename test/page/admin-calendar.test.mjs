@@ -166,3 +166,24 @@ for (const oldBrowser of [false, true]) {
     assert.ok(!visible(page, "cal-none"));
   });
 }
+
+test("admin calendar panel: after a password change the barber is told the old link stopped, and can make a new one", async () => {
+  let made = 0;
+  const page = await openSettings({ routes: {
+    "GET /api/admin/calendar": () => ({ enabled: false, expired: true }),
+    "POST /api/admin/calendar": (call) => { made++; assert.deepEqual(call.body, { replace: false }); return { status: 201, body: READY }; },
+  } });
+  assert.match(page.$("cal-msg").textContent, /^Passordet er byttet, så den gamle kalenderlenken virker ikke lenger\. Lag en ny lenke/);
+  assert.equal(visible(page, "cal-none"), true);
+  assert.equal(visible(page, "cal-ready"), false);
+  assert.equal(page.$("cal-url").value, "");
+  page.$("cal-create").click();
+  await page.flush();
+  assert.equal(made, 1);
+  assert.equal(page.$("cal-url").value, LINKS.https);
+});
+
+test("admin calendar panel: the page says plainly that a password change stops the link", async () => {
+  const html = (await import("node:fs")).readFileSync(new URL("../../viggos-barbershop/admin.html", import.meta.url), "utf8");
+  assert.match(html, /Bytter du admin-passordet, slutter lenken også å virke, og du må lage en ny\./);
+});

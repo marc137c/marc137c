@@ -14,7 +14,7 @@ import availability from "../../netlify/functions/availability.mjs";
 import admin from "../../netlify/functions/admin.mjs";
 import calendar from "../../netlify/functions/calendar.mjs";
 import { realGetStoreFor } from "../helpers/real-blobs.mjs";
-import { createFeed } from "../../netlify/lib/calendar.mjs";
+import { createFeed, feedGen } from "../../netlify/lib/calendar.mjs";
 import { vapidKeys, saveSubscription, parseSubscription, pushGen } from "../../netlify/lib/push.mjs";
 import { makeDevice, fakePushService, PUSH_HOST } from "../helpers/fake-push.mjs";
 
@@ -83,7 +83,8 @@ test("live wiring: /api/admin on a deploy preview reads and writes only the prev
 test("live wiring: GET /api/calendar/<token>.ics reads the strong 'bookings' store through the real client", async () => {
   const date = addDays(osloNow().date, 3);
   blobs.seed("bookings", `m/${date.slice(0, 7)}`, { items: [{ id: `${date}_live01`, type: "booking", status: "confirmed", source: "nettside", date, start: 600, dur: 30, service: "Herreklipp", addons: [], name: "Ola Nordmann", phone: CUSTOMER_PHONE, note: "", createdAt: "2026-11-01T10:00:00.000Z", updatedAt: "2026-11-01T10:00:00.000Z" }] });
-  const { feed } = await createFeed(realGetStoreFor(blobs)({ name: "bookings", consistency: "strong" }));
+  process.env.ADMIN_PASSWORD = "fake-admin-password"; // the link belongs to this admin password (the handler reads it)
+  const { feed } = await createFeed(realGetStoreFor(blobs)({ name: "bookings", consistency: "strong" }), { gen: feedGen("fake-admin-password") });
   blobs.log.length = 0;
   const res = await read(await calendar(request(`/api/calendar/${feed.token}.ics`), PRODUCTION));
   assert.equal(res.status, 200);
