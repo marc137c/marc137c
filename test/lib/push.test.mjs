@@ -1,7 +1,8 @@
 // netlify/lib/push.mjs: Web Push to the barber's devices (owner decision 2b). Invariants:
 //   1. encryption is RFC 8291: with the RFC's own keys and salt it gives exactly the RFC's example message, and a
 //      subscription's private key (the fake browser) decrypts every message we send; every message has a new salt
-//      and a new sender key; one record, rs 4096, at most 4096 bytes;
+//      and a new sender key; one record, rs 4096, at most 4096 bytes; every message is padded to PAD_SIZE, so two
+//      bookings whose names differ in length give bodies of exactly the same length (the push service cannot see it);
 //   2. the VAPID key pair is made once per store by the server itself (two first callers agree on one pair); the
 //      JWT is ES256 and verifies with the public key the browser subscribes with; aud is the push service's
 //      origin, exp is at most 24 h ahead (by the injected clock), sub is the site's https address;
@@ -22,6 +23,7 @@ import {
   encryptPayload, vapidKeys, readVapidKeys, vapidAuthorization, contactFor, pushService, normalizeEndpoint,
   parseSubscription, saveSubscription, removeSubscriptions, readSubscriptions, sendPush, pushToDevices,
   bookingMessage, testMessage, notifyNewBooking, pushGen, clearSubscriptions, VAPID_KEY, SUBS_KEY, MAX_DEVICES, RECORD_SIZE, JWT_LIFETIME_S, PUSH_TIMEOUT_MS,
+  PAD_SIZE,
 } from "../../netlify/lib/push.mjs";
 
 const NOW = new Date("2026-11-16T08:00:00Z");
@@ -43,8 +45,41 @@ async function setup(kinds = ["fcm"], reply) {
 // ---------- 1. Encryption ----------
 test("push: with the RFC 8291 example's keys and salt the message is exactly the RFC's", () => {
   const body = encryptPayload(Buffer.from(X.plaintext), { p256dh: X.uaPublicKey, auth: X.authSecret },
-    { salt: unb64u(X.salt), senderPrivateKey: unb64u(X.asPrivateKey) });
+    { salt: unb64u(X.salt), senderPrivateKey: unb64u(X.asPrivateKey), padTo: 0 }); // the RFC's example has no padding
   assert.equal(body.toString("base64url"), X.message);
+});
+
+test("push: messages are padded to one fixed length, so a booking's body length never shows the name's length", async () => {
+  const { store, devices, push } = await setup(["fcm", "apple"]);
+  const booking = (id, name) => ({ id, date: "2026-11-20", start: 840, service: "Herreklipp", addons: [], name, phone: "41234567" });
+  const names = ["Al", "Kari-Mette Johansen Ødegård Bakkene"]; // 2 and 35 characters
+  assert.deepEqual(names.map((n) => n.length), [2, 35]);
+  for (const [i, name] of names.entries()) await notifyNewBooking(store, booking(`2026-11-20_${i}`, name), { fetch: push.fetch, now: NOW, gen: GEN });
+  assert.equal(push.deliveries.length, 4);
+  for (const del of push.deliveries) assert.equal(del.error, undefined, del.error); // the RFC 8291 receiver strips the zeros
+  assert.deepEqual(push.deliveries.map((d) => d.payload.body.split(" · ").pop()), [names[0], names[0], names[1], names[1]]);
+  const lengths = new Set(push.deliveries.map((d) => d.bytes.length));
+  assert.deepEqual([...lengths], [86 + PAD_SIZE + 16], "every body: header, PAD_SIZE padded bytes, tag");
+  // The longest message a web booking can make (an 80-character name of the costliest characters: a lone surrogate
+  // is 6 bytes in JSON, «"» and «\» 2; the longest service, every add-on, the longest weekday and month) fits in the
+  // same size, and so does the test notification
+  const device = devices[0];
+  const longest = {
+    id: "2026-09-24_abcdef1234", date: "2026-09-24", start: 1050, service: "Herreklipp + skjeggtrim",
+    addons: ["Vask kort hår", "Vask langt hår", "Styling"], name: "\ud800".repeat(80), phone: "41234567",
+  };
+  for (const msg of [bookingMessage(longest), bookingMessage({ ...longest, name: "\"\\".repeat(40) }), testMessage()]) {
+    const body = encryptPayload(Buffer.from(JSON.stringify(msg)), asStored(device));
+    assert.equal(body.length, 86 + PAD_SIZE + 16, msg.body);
+    assert.deepEqual(JSON.parse(device.decrypt(body).toString("utf8")), JSON.parse(JSON.stringify(msg)));
+  }
+  // Anything longer still fits in one record and decrypts; only what cannot fit in 4096 bytes is refused
+  const big = Buffer.alloc(PAD_SIZE * 2, 65);
+  const body = encryptPayload(big, asStored(device));
+  assert.ok(body.length <= 4096);
+  assert.deepEqual(device.decrypt(body), big);
+  assert.equal(encryptPayload(Buffer.alloc(3993, 65), asStored(device)).length, 4096);
+  assert.throws(() => encryptPayload(Buffer.alloc(3994, 65), asStored(device)), /for stort/);
 });
 
 test("push: the subscription's private key decrypts every message; each has a new salt and sender key", () => {

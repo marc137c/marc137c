@@ -31,6 +31,10 @@ export const PUSH_TIMEOUT_MS = 4000;          // én melding til én push-tjenes
 export const BOOKING_PUSH_WAIT_MS = 1500;     // så lenge venter en nettbestilling høyst på varslene (uten waitUntil)
 export const PUSH_TTL_S = 24 * 60 * 60;       // push-tjenesten tar vare på meldingen et døgn hvis enheten er av
 export const RECORD_SIZE = 4096;              // rs i aes128gcm-hodet; hele meldingen må også være ≤ 4096 byte
+// Hver melding fylles ut til samme lengde (RFC 8188 2: nuller etter 0x02-skillet), så push-tjenesten ikke kan se
+// hvor langt kundens navn er. 1024 rommer den lengste meldingen en nettbestilling kan gi (navn på 80 tegn).
+export const PAD_SIZE = 1024;
+const MAX_PADDED = 4096 - 86 - 16;            // hele meldingen ≤ 4096 byte: hodet (86) og taggen (16) trekkes fra
 export const JWT_LIFETIME_S = 12 * 60 * 60;   // VAPID-JWT-et gjelder i 12 timer (tjenestene godtar høyst 24)
 const MAX_ENDPOINT = 2048;
 
@@ -185,9 +189,11 @@ export function vapidAuthorization(audience, keys, { now = new Date(), subject }
 }
 
 // ---------- Kryptering (RFC 8291 over RFC 8188 aes128gcm) ----------
-// Én post: salt (16) | rs (4) | idlen (1) | avsenderens offentlige nøkkel (65) | kryptert tekst + 0x02 + tag (16).
-// salt og senderPrivateKey er bare til testene (RFC 8291s eksempel); ellers er begge nye og tilfeldige hver gang.
-export function encryptPayload(plaintext, { p256dh, auth }, { salt = randomBytes(16), senderPrivateKey } = {}) {
+// Én post: salt (16) | rs (4) | idlen (1) | avsenderens offentlige nøkkel (65) | kryptert (tekst + 0x02 + nuller) + tag (16).
+// Teksten fylles ut med nuller til et helt antall padTo byte (standard PAD_SIZE), så alle vanlige varsler er like
+// lange. salt, senderPrivateKey og padTo: 0 (ingen utfylling) er bare til testene (RFC 8291s eksempel); ellers er
+// salt og avsendernøkkel nye og tilfeldige hver gang.
+export function encryptPayload(plaintext, { p256dh, auth }, { salt = randomBytes(16), senderPrivateKey, padTo = PAD_SIZE } = {}) {
   const uaPublic = decodeKey(p256dh, 65);
   const authSecret = decodeKey(auth, 16);
   if (!uaPublic || !authSecret) throw new Error("Ugyldige nøkler i abonnementet");
@@ -198,8 +204,14 @@ export function encryptPayload(plaintext, { p256dh, auth }, { salt = randomBytes
   const ikm = Buffer.from(hkdfSync("sha256", shared, authSecret, Buffer.concat([Buffer.from("WebPush: info\0"), uaPublic, asPublic]), 32));
   const cek = Buffer.from(hkdfSync("sha256", ikm, salt, Buffer.from("Content-Encoding: aes128gcm\0"), 16));
   const nonce = Buffer.from(hkdfSync("sha256", ikm, salt, Buffer.from("Content-Encoding: nonce\0"), 12));
+  const text = Buffer.from(plaintext);
+  if (text.length + 1 > MAX_PADDED) throw new Error("Varselet er for stort for Web Push");
+  const size = padTo > 0 ? Math.min(Math.ceil((text.length + 1) / padTo) * padTo, MAX_PADDED) : text.length + 1;
+  const padded = Buffer.alloc(size); // nuller
+  text.copy(padded);
+  padded[text.length] = 2;           // skillet etter siste (og eneste) post
   const cipher = createCipheriv("aes-128-gcm", cek, nonce);
-  const record = Buffer.concat([cipher.update(Buffer.concat([Buffer.from(plaintext), Buffer.from([2])])), cipher.final(), cipher.getAuthTag()]);
+  const record = Buffer.concat([cipher.update(padded), cipher.final(), cipher.getAuthTag()]);
   const header = Buffer.alloc(21);
   Buffer.from(salt).copy(header, 0);
   header.writeUInt32BE(RECORD_SIZE, 16);
