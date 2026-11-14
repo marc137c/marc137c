@@ -10,7 +10,7 @@
 //  - hver aktive avtale (type «booking», ikke avlyst) fra FEED_PAST_DAYS dager tilbake til FEED_FUTURE_DAYS
 //    dager frem, nøyaktig én gang; blokkeringer og avlyste timer er ikke med, så de forsvinner fra telefonen;
 //  - norsk tid med TZID=Europe/Oslo og en VTIMEZONE med EUs sommertidsregler (siste søndag i mars/oktober),
-//    så klokkeslettene står riktig også over sommertid/vintertid;
+//    så klokkeslettene står riktig også over sommertid/vintertid; lengden er DURATION i nøyaktige minutter;
 //  - bare tjeneste (+ tillegg), kundens navn og telefonnummer: aldri Viggos egne notater (de er private, og Google
 //    Kalender henter og lagrer strømmen på sine servere);
 //  - en påminnelse ALARM_MIN minutter før hver time;
@@ -158,7 +158,10 @@ function eventLines(i, fallbackStamp) {
   if (utcDateTime(i.updatedAt)) lines.push(`LAST-MODIFIED:${utcDateTime(i.updatedAt)}`);
   lines.push(
     `DTSTART;TZID=${TZID}:${localDateTime(i.date, i.start)}`,
-    `DTEND;TZID=${TZID}:${localDateTime(i.date, i.start + i.dur)}`,
+    // Varighet, ikke sluttid: PT…M er nøyaktige minutter (RFC 5545 3.3.6), så timen varer alltid like lenge som
+    // den er booket, også natten sommertid starter eller slutter. En sluttid i lokal tid (start + varighet på
+    // klokken) ville gitt 0 minutter for 02:00–03:00 i mars og 90 minutter for 02:30–03:00 i oktober.
+    `DURATION:PT${i.dur}M`,
     `SUMMARY:${escapeText(summary)}`,
     `DESCRIPTION:${escapeText(description)}`,
     "STATUS:CONFIRMED",

@@ -6,7 +6,8 @@
 //     3.1   every unfolded content line is  name *(";" param) ":" value  with valid names and param values;
 //     3.3.11 TEXT values: «\», «;», «,» and newlines are escaped, and no control characters (except HTAB);
 //     3.4/3.6 one VCALENDAR with VERSION:2.0 and PRODID exactly once and at least one component; BEGIN/END nest;
-//     3.6.1 every VEVENT has exactly one UID, DTSTAMP (UTC, «…Z»), DTSTART; DTEND after DTSTART; not both DTEND
+//     3.6.1 every VEVENT has exactly one UID, DTSTAMP (UTC, «…Z»), DTSTART; it ends after it starts (DTEND, or
+//           DTSTART + a positive DURATION, 3.3.6), judged in real time with 3.3.5 for DST nights; not both DTEND
 //           and DURATION; UIDs are unique;
 //     3.6.5 every TZID= used names a VTIMEZONE in the stream, each with STANDARD/DAYLIGHT parts that have
 //           DTSTART, TZOFFSETFROM and TZOFFSETTO;
@@ -15,7 +16,9 @@
 //   prop(comp, "SUMMARY") → first property, text(comp, "SUMMARY") → its unescaped TEXT value
 //   toUtcMs(prop, calendar) → the instant a DATE-TIME property means, resolving TZID with the stream's own
 //     VTIMEZONE rules (RRULE FREQ=YEARLY;BYMONTH=m;BYDAY=nSU/-1SU), never with Intl. The tests compare it
-//     with Intl's Europe/Oslo to prove the VTIMEZONE is right across DST changes.
+//     with Intl's Europe/Oslo to prove the VTIMEZONE is right across DST changes. { resolve: true } applies
+//     RFC 5545 3.3.5 to a local time skipped by summer time (otherwise it throws).
+//   parseDuration(value) → { sign, days, exactMs } (3.3.6); eventEndMs(vevent, calendar) → when it ends.
 const NAME = /^(?:[A-Za-z0-9-]+)$/;
 const TEXT_PROPS = new Set(["SUMMARY", "DESCRIPTION", "LOCATION", "COMMENT", "NAME", "X-WR-CALNAME", "CATEGORIES", "CONTACT", "TZNAME"]);
 const CONTROL = /[\u0000-\u0008\u000a-\u001f\u007f]/;
@@ -104,17 +107,21 @@ function onsetLocal(obs, year) {
   return [fieldsMs(year, month, day, hh, mm, ss)];
 }
 
-// Observances of a VTIMEZONE as UTC onsets around a year: [{ utc, offsetTo }], sorted
+// Observances of a VTIMEZONE as UTC onsets around a year: [{ utc, offsetFrom, offsetTo }], sorted
 function transitions(vtz, year) {
   const out = [];
   for (const obs of vtz.children.filter((c) => c.name === "STANDARD" || c.name === "DAYLIGHT")) {
     const from = offsetMin(prop(obs, "TZOFFSETFROM").value), to = offsetMin(prop(obs, "TZOFFSETTO").value);
-    for (const y of [year - 1, year, year + 1]) for (const local of onsetLocal(obs, y)) out.push({ utc: local - from * 60e3, offsetTo: to, kind: obs.name });
+    for (const y of [year - 1, year, year + 1]) for (const local of onsetLocal(obs, y)) out.push({ utc: local - from * 60e3, offsetFrom: from, offsetTo: to, kind: obs.name });
   }
   return out.sort((a, b) => a.utc - b.utc);
 }
 
-export function toUtcMs(p, calendar) {
+// { resolve: true } applies RFC 5545 3.3.5 to a local time that does not exist (the hour skipped when summer time
+// starts): it «is interpreted using the UTC offset before the transition». Without it such a time throws, so a test
+// that never expects one notices at once. An ambiguous time (the hour repeated in October) is always its first
+// occurrence, as 3.3.5 says.
+export function toUtcMs(p, calendar, { resolve = false } = {}) {
   const m = DT.exec(p.value);
   if (!m) throw new Error(`not a DATE-TIME: ${p.value}`);
   const local = fieldsMs(Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]));
@@ -130,8 +137,40 @@ export function toUtcMs(p, calendar) {
     const cur = inEffect(utc);
     return cur && local - cur.offsetTo * 60e3 === utc;
   }).sort((a, b) => a - b);
-  if (!fits.length) throw new Error(`${p.value} does not exist in ${tzid}`);
-  return fits[0];
+  if (fits.length) return fits[0];
+  if (resolve) {
+    const gap = ts.find((t) => t.offsetTo > t.offsetFrom && local >= t.utc + t.offsetFrom * 60e3 && local < t.utc + t.offsetTo * 60e3);
+    if (gap) return local - gap.offsetFrom * 60e3;
+  }
+  throw new Error(`${p.value} does not exist in ${tzid}`);
+}
+
+// RFC 5545 3.3.6 DURATION: «PT90M», «P1DT2H», «P2W», «-PT15M». Weeks and days are nominal (calendar days in local
+// time); hours, minutes and seconds are exact. → { sign, days, exactMs }
+export function parseDuration(v) {
+  const m = /^([+-])?P(?:(\d+)W|(\d+)D(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?|T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)$/.exec(String(v));
+  if (!m || /T$/.test(v)) throw new Error(`not a DURATION: ${v}`);
+  const n = (i) => Number(m[i] || 0);
+  const days = m[2] !== undefined ? 7 * n(2) : n(3);
+  const exactMs = ((n(4) + n(7)) * 3600 + (n(5) + n(8)) * 60 + n(6) + n(9)) * 1000;
+  return { sign: m[1] === "-" ? -1 : 1, days, exactMs };
+}
+
+// When a VEVENT ends (RFC 5545 3.6.1 and 3.8.5): DTEND if it has one; else DTSTART + DURATION (days added on the
+// local calendar, then the exact part); else, for a DATE-TIME start, the same instant as DTSTART.
+export function eventEndMs(ev, calendar) {
+  const start = prop(ev, "DTSTART");
+  if (prop(ev, "DTEND")) return toUtcMs(prop(ev, "DTEND"), calendar, { resolve: true });
+  const dur = prop(ev, "DURATION");
+  if (!dur) return toUtcMs(start, calendar, { resolve: true });
+  const { sign, days, exactMs } = parseDuration(dur.value);
+  let base = start;
+  if (days) {
+    const m = DT.exec(start.value);
+    const shifted = new Date(fieldsMs(Number(m[1]), Number(m[2]), Number(m[3]), 0, 0, 0) + sign * days * 864e5).toISOString().slice(0, 10).replace(/-/g, "");
+    base = { ...start, value: `${shifted}T${m[4]}${m[5]}${m[6]}${m[7]}` };
+  }
+  return toUtcMs(base, calendar, { resolve: true }) + sign * exactMs;
 }
 
 // ---------- the rules ----------
@@ -181,8 +220,16 @@ export function rfc5545Problems(text) {
     if (!/^\d{8}T\d{6}Z$/.test(prop(ev, "DTSTAMP")?.value || "")) bad(`VEVENT ${uid}: DTSTAMP must be UTC: ${prop(ev, "DTSTAMP")?.value}`);
     for (const k of ["CREATED", "LAST-MODIFIED"]) if (prop(ev, k) && !/^\d{8}T\d{6}Z$/.test(prop(ev, k).value)) bad(`VEVENT ${uid}: ${k} must be UTC`);
     if (prop(ev, "DTEND") && prop(ev, "DURATION")) bad(`VEVENT ${uid}: both DTEND and DURATION`);
-    if (prop(ev, "DTEND") && prop(ev, "DTSTART")) {
-      try { if (toUtcMs(prop(ev, "DTEND"), cal) <= toUtcMs(prop(ev, "DTSTART"), cal)) bad(`VEVENT ${uid}: DTEND is not after DTSTART`); } catch (err) { bad(`VEVENT ${uid}: ${err.message}`); }
+    if (props(ev, "DURATION").length > 1) bad(`VEVENT ${uid}: DURATION more than once`);
+    if (prop(ev, "DURATION")) {
+      try { const d = parseDuration(prop(ev, "DURATION").value); if (d.sign < 0 || (!d.days && !d.exactMs)) bad(`VEVENT ${uid}: DURATION must be positive`); } catch (err) { bad(`VEVENT ${uid}: ${err.message}`); }
+    }
+    if ((prop(ev, "DTEND") || prop(ev, "DURATION")) && prop(ev, "DTSTART")) {
+      // 3.6.1: «the "DTEND" property … MUST be specified as a date with local time [that is] later in time than
+      // the value of the "DTSTART" property». Local times are resolved by 3.3.5, so a DST night is judged right.
+      try {
+        if (eventEndMs(ev, cal) <= toUtcMs(prop(ev, "DTSTART"), cal, { resolve: true })) bad(`VEVENT ${uid}: ${prop(ev, "DTEND") ? "DTEND" : "DTSTART + DURATION"} is not after DTSTART`);
+      } catch (err) { bad(`VEVENT ${uid}: ${err.message}`); }
     }
     for (const a of components(ev, "VALARM")) {
       if (props(a, "ACTION").length !== 1 || props(a, "TRIGGER").length !== 1) bad(`VALARM in ${uid}: needs ACTION and TRIGGER`);

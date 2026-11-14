@@ -11,7 +11,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { oslo } from "../helpers/clock.mjs";
 import { item } from "../helpers/bookings.mjs";
-import { rfc5545Problems, parseCalendar, components, prop, text, toUtcMs, unfold } from "../helpers/ical.mjs";
+import { rfc5545Problems, parseCalendar, components, prop, text, toUtcMs, unfold, eventEndMs } from "../helpers/ical.mjs";
 import {
   buildCalendar, escapeText, foldLine, localDateTime, utcDateTime, feedRange, feedLinks, feedPath,
   newFeedToken, isTokenShaped, tokenMatches, createFeed, readFeed, calendarFor, FEED_KEY, ALARM_MIN,
@@ -54,7 +54,9 @@ test("calendar: one booking becomes one event with service, add-ons, name, phone
   assert.equal(text(ev, "DESCRIPTION"), "Kunde: Ola Nordmann\nTelefon: 912 34 567\nTjeneste: Full service\nTillegg: Vask kort hår, Styling\nBestilt på nettsiden");
   assert.doesNotMatch(ics, /Kommer litt sent|Notat/, "the barber's note stays in /admin");
   assert.deepEqual([prop(ev, "DTSTART").params.TZID, prop(ev, "DTSTART").value], ["Europe/Oslo", "20261119T100000"]);
-  assert.equal(prop(ev, "DTEND").value, "20261119T110000");
+  assert.equal(prop(ev, "DURATION").value, "PT60M", "the booked length in exact minutes (RFC 5545 3.3.6)");
+  assert.equal(prop(ev, "DTEND"), undefined, "never both DTEND and DURATION");
+  assert.equal(eventEndMs(ev, parseCalendar(ics)), oslo("2026-11-19", 11, 0).getTime());
   assert.equal(prop(ev, "DTSTAMP").value, "20261102T083015Z", "DTSTAMP = when the booking was last changed, in UTC");
   assert.equal(prop(ev, "CREATED").value, "20261101T100000Z");
   assert.equal(prop(ev, "STATUS").value, "CONFIRMED");
@@ -124,7 +126,7 @@ test("calendar: an appointment ending at midnight ends at 00:00 the next day", (
   const late = item({ date: "2026-12-31", start: 1410, dur: 30 });
   const ics = buildCalendar([late], { now: NOW });
   assert.deepEqual(rfc5545Problems(ics), []);
-  assert.equal(prop(events(ics)[0], "DTEND").value, "20270101T000000");
+  assert.equal(eventEndMs(events(ics)[0], parseCalendar(ics)), oslo("2027-01-01", 0, 0).getTime());
 });
 
 test("calendar: Oslo times are right on both sides of the summer and winter time changes", () => {
@@ -177,8 +179,10 @@ test("calendar (property): every active booking appears exactly once with the ri
       const ev = map.get(uidOf(i));
       assert.equal(toUtcMs(prop(ev, "DTSTART"), cal), oslo(i.date, ...hm(i.start)).getTime());
       assert.equal(prop(ev, "DTSTART").value.slice(0, 8), i.date.replace(/-/g, ""), "the event starts on its stored date");
+      // Lasts exactly the booked minutes, and (no DST change at these hours) ends at start + dur on the clock
+      assert.equal(eventEndMs(ev, cal) - toUtcMs(prop(ev, "DTSTART"), cal), i.dur * 60e3);
       const end = i.start + i.dur;
-      assert.equal(toUtcMs(prop(ev, "DTEND"), cal), end >= 1440 ? oslo(addDays(i.date, 1), ...hm(end - 1440)).getTime() : oslo(i.date, ...hm(end)).getTime());
+      assert.equal(eventEndMs(ev, cal), end >= 1440 ? oslo(addDays(i.date, 1), ...hm(end - 1440)).getTime() : oslo(i.date, ...hm(end)).getTime());
       assert.ok(text(ev, "SUMMARY").startsWith(i.service || "Avtale"));
       if (i.name) assert.ok(text(ev, "SUMMARY").endsWith(" – " + i.name));
       assert.ok(text(ev, "DESCRIPTION").includes(`Telefon: ${i.phone}`));
@@ -242,4 +246,41 @@ test("calendar: no line of a real-sized feed is over 75 octets and every line en
   assert.deepEqual(rfc5545Problems(ics), []);
   assert.equal(unfold(ics).length > 300 * 15, true);
   assert.equal(events(ics).length, 300);
+});
+
+test("calendar (DST nights): every event lasts exactly its booked minutes and ends after it starts, 00:00–04:00 on the change days 2026–2028", () => {
+  // /admin accepts any 5-minute start, also 02:00–03:00 on the nights the clocks change. Times are read by
+  // RFC 5545 3.3.5 (a skipped local time uses the offset before the change; a repeated one is its first occurrence).
+  const wall = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Oslo", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const firstOccurrence = (date, min) => {
+    const [h, m] = hm(min).map((n) => String(n).padStart(2, "0"));
+    const want = `${date.slice(8, 10)}/${date.slice(5, 7)}/${date.slice(0, 4)}, ${h}:${m}`;
+    for (const off of ["+02:00", "+01:00"]) { // the CEST reading is the earlier instant
+      const d = new Date(`${date}T${h}:${m}:00${off}`);
+      if (wall.format(d) === want) return d.getTime();
+    }
+    return null; // skipped by summer time
+  };
+  const lastSunday = (y, m) => { for (let d = 31; d > 0; d--) { const t = new Date(Date.UTC(y, m - 1, d)); if (t.getUTCMonth() === m - 1 && t.getUTCDay() === 0) return t.toISOString().slice(0, 10); } };
+  const days = [2026, 2027, 2028].flatMap((y) => [lastSunday(y, 3), lastSunday(y, 10)]);
+  assert.deepEqual(days, ["2026-03-29", "2026-10-25", "2027-03-28", "2027-10-31", "2028-03-26", "2028-10-29"]);
+  const items = [];
+  for (const date of days) for (let start = 0; start <= 240; start += 5) for (const dur of [5, 30, 60, 90, 120]) items.push(item({ date, start, dur }));
+  const ics = buildCalendar(items, { now: NOW });
+  assert.deepEqual(rfc5545Problems(ics), [], "no event ends at or before its start");
+  const cal = parseCalendar(ics);
+  const evs = byUid(ics);
+  assert.equal(evs.size, items.length);
+  for (const i of items) {
+    const ev = evs.get(uidOf(i));
+    const start = toUtcMs(prop(ev, "DTSTART"), cal, { resolve: true });
+    const end = eventEndMs(ev, cal);
+    assert.equal(end - start, i.dur * 60e3, `${i.date} ${i.start}+${i.dur}: lasts the booked ${i.dur} min`);
+    assert.ok(end > start);
+    assert.equal(prop(ev, "DTSTART").value, `${i.date.replace(/-/g, "")}T${String(Math.floor(i.start / 60)).padStart(2, "0")}${String(i.start % 60).padStart(2, "0")}00`);
+    // A start that exists in Oslo is the instant Intl gives (for the repeated hour in October: the first one)
+    const real = firstOccurrence(i.date, i.start);
+    if (real !== null) assert.equal(start, real, `${i.date} ${i.start}`);
+    else assert.equal(start, Date.parse(`${i.date}T00:00:00Z`) + (i.start - 60) * 60e3, "a skipped time uses +01:00 (3.3.5)");
+  }
 });
