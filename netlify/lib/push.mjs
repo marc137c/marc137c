@@ -7,13 +7,16 @@
 //   VAPID_KEY  { publicKey, privateKey (JWK), createdAt }: lages én gang, av serveren selv, så ingen trenger å
 //              skrive inn en hemmelighet. Den private nøkkelen forlater aldri serveren og skrives aldri til
 //              loggen; nettleseren får bare den offentlige.
-//   SUBS_KEY   { subs: [{ endpoint, p256dh, auth, gen, createdAt, seenAt }], gone: [{ h, at }] }: én per enhet,
+//   SUBS_KEY   { subs: [{ endpoint, p256dh, auth, gen, createdAt, seenAt, until? }], gone: [{ h, at }] }: én per enhet,
 //              høyst MAX_DEVICES. gone: adresser push-tjenesten har sagt er borte (404/410), som SHA-256 (h), så de
 //              aldri lagres igjen (høyst GONE_MAX, i GONE_DAYS dager).
 //
 // Hver enhet er knyttet til admin-passordet den ble slått på med (gen = pushGen(ADMIN_PASSWORD)). Bytter Viggo
 // passordet, får ingen av de gamle enhetene flere varsler (de slettes ved neste sending), akkurat som alle blir
 // logget ut. «Slå av varsler på alle andre enheter» (clearSubscriptions) fjerner alle med en gang.
+// En enhet slått på med en kort innlogging («Hold meg innlogget» av, 12 timer) får until = når innloggingen går ut,
+// og får ingen varsler etter det (en lånt PC der innloggingen bare gikk ut, viser ikke kundenavn i ukevis). Hver
+// innlogging der fornyer until, og en lang innlogging fjerner den.
 //
 // Vi sender bare til adresser hos kjente push-tjenester (PUSH_SERVICES), aldri til en vilkårlig adresse en
 // nettleser har oppgitt. Svarer tjenesten 404/410, er abonnementet borte for godt: det slettes, og adressen
@@ -100,7 +103,9 @@ const initSubs = (d) => {
 const newestFirst = (a, b) => (a.seenAt < b.seenAt ? 1 : a.seenAt > b.seenAt ? -1 : 0);
 
 const isGen = (gen) => typeof gen === "string" && gen.length === 16;
-const current = (gen) => (s) => usable(s) && isGen(gen) && s.gen === gen;
+// Utløpt: slått på med en kort innlogging som har gått ut (en until som ikke kan leses, regnes som utløpt)
+const expired = (s, now) => typeof s.until === "string" && !(Date.parse(s.until) > now.getTime());
+const current = (gen, now = new Date()) => (s) => usable(s) && isGen(gen) && s.gen === gen && !expired(s, now);
 
 // Adresser push-tjenesten har sagt er borte. Bare en hash lagres: adressen er selv en slags nøkkel.
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -115,17 +120,19 @@ function markGone(doc, endpoints, now) {
     .slice(-GONE_MAX);
 }
 
-// Enhetene som hører til dette passordet (gen). Uten gen: alle som er hele (bare til tester og opprydding).
-export async function readSubscriptions(store, { gen } = {}) {
+// Enhetene som hører til dette passordet (gen) og ikke er utløpt ved now. Uten gen: alle som er hele (bare til
+// tester og opprydding).
+export async function readSubscriptions(store, { gen, now = new Date() } = {}) {
   const subs = initSubs(await store.get(SUBS_KEY, { type: "json" })).subs.filter(usable);
-  return gen === undefined ? subs : subs.filter(current(gen));
+  return gen === undefined ? subs : subs.filter(current(gen, now));
 }
 
 // Legger til (eller fornyer) en enhet for passordet gen. Enheter fra et gammelt passord ryddes bort samtidig.
 // Er det flere enn MAX_DEVICES, går den som er sett minst nylig ut. En adresse push-tjenesten har sagt er borte,
 // lagres aldri igjen: { error, status: 410, code: "gone" } (nettleseren må lage et nytt abonnement).
-// Svarer { ok, created, devices } (eller { error, status } hvis lagringen ikke ble enig med seg selv).
-export async function saveSubscription(store, sub, { now = new Date(), gen } = {}) {
+// until (Date): enheten får varsler bare til da (en kort innlogging); uten until får den varsler til den slås av.
+// Svarer { ok, created, devices, until? } (eller { error, status } hvis lagringen ikke ble enig med seg selv).
+export async function saveSubscription(store, sub, { now = new Date(), gen, until = null } = {}) {
   if (!isGen(gen)) return { error: "Varsler er ikke satt opp: mangler admin-passord.", status: 503 };
   let created = false;
   const r = await mutateJSON(store, SUBS_KEY, initSubs, (doc) => {
@@ -134,25 +141,28 @@ export async function saveSubscription(store, sub, { now = new Date(), gen } = {
     const at = now.toISOString();
     const same = doc.subs.find((s) => s && s.endpoint === sub.endpoint && s.gen === gen);
     created = !same;
-    doc.subs = doc.subs.filter((s) => s !== same && current(gen)(s) && s.endpoint !== sub.endpoint);
-    doc.subs.push(same
+    doc.subs = doc.subs.filter((s) => s !== same && current(gen, now)(s) && s.endpoint !== sub.endpoint);
+    const record = same
       ? Object.assign(same, { p256dh: sub.p256dh, auth: sub.auth, seenAt: at })
-      : { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth, gen, createdAt: at, seenAt: at });
+      : { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth, gen, createdAt: at, seenAt: at };
+    if (until) record.until = until.toISOString(); else delete record.until;
+    doc.subs.push(record);
     doc.subs = doc.subs.filter(usable).sort(newestFirst).slice(0, MAX_DEVICES);
     return { ok: true, devices: doc.subs.length };
   });
-  return r.error ? r : { ok: true, created, devices: r.devices };
+  if (r.error) return r;
+  return until ? { ok: true, created, devices: r.devices, until: until.toISOString() } : { ok: true, created, devices: r.devices };
 }
 
-// Fjerner enhetene med disse adressene (og, med gen, alle fra et gammelt passord). Med gone: true har push-tjenesten
-// sagt at adressene er borte, og de godtas ikke igjen (saveSubscription). Svarer { ok, removed, devices }.
+// Fjerner enhetene med disse adressene (og, med gen, alle fra et gammelt passord eller med en utløpt innlogging).
+// Med gone: true har push-tjenesten sagt at adressene er borte, og de godtas ikke igjen (saveSubscription). Svarer { ok, removed, devices }.
 export async function removeSubscriptions(store, endpoints, { gen, gone: markAsGone = false, now = new Date() } = {}) {
   const gone = new Set(endpoints.map(normalizeEndpoint).filter(Boolean));
   return mutateJSON(store, SUBS_KEY, initSubs, (doc) => {
     const before = doc.subs.length;
-    doc.subs = doc.subs.filter((s) => !(s && gone.has(s.endpoint)) && (gen === undefined || current(gen)(s)));
+    doc.subs = doc.subs.filter((s) => !(s && gone.has(s.endpoint)) && (gen === undefined || current(gen, now)(s)));
     if (markAsGone && gone.size) markGone(doc, [...gone], now);
-    const devices = doc.subs.filter(gen === undefined ? usable : current(gen)).length;
+    const devices = doc.subs.filter(gen === undefined ? usable : current(gen, now)).length;
     const removed = before - doc.subs.length;
     return removed || (markAsGone && gone.size) ? { ok: true, removed, devices } : { ok: true, noWrite: true, removed: 0, devices };
   });
@@ -291,22 +301,23 @@ export async function sendPush(sub, message, { keys, fetch, now = new Date(), su
 const why = (r) => (r.status ? `svarte ${r.status}` : r.error === "timeout" ? "svarte ikke i tide" : r.error === "crypto" ? "fikk ikke kryptert melding" : "kunne ikke nås");
 
 // Sender meldingen til alle lagrede enheter for passordet gen (eller bare den med adressen endpoint) samtidig.
-// Sletter enheter push-tjenesten sier er borte, og enheter fra et gammelt passord (de får aldri noe). Uten gen
+// Sletter enheter push-tjenesten sier er borte, og enheter fra et gammelt passord eller med en utløpt kort
+// innlogging (de får aldri noe). Uten gen
 // (admin-passordet mangler) sendes ingenting, og ingenting slettes.
 // Svarer { devices, targets, sent, failed, gone, stale }. Kaster bare hvis lagringen feiler.
 export async function pushToDevices(store, message, { fetch, now = new Date(), origin, endpoint, timeoutMs, gen } = {}) {
   const stored = await readSubscriptions(store);
-  const all = stored.filter(current(gen));
+  const all = stored.filter(current(gen, now));
   const stale = isGen(gen) ? stored.length - all.length : 0;
   const only = endpoint === undefined ? null : normalizeEndpoint(endpoint);
   const targets = endpoint === undefined ? all : all.filter((s) => s.endpoint === only);
   const summary = { devices: all.length, targets: targets.length, sent: 0, failed: 0, gone: 0, stale };
   if (stale) {
     try {
-      await removeSubscriptions(store, [], { gen });
-      console.warn(`Push: ${stale} ${stale === 1 ? "enhet" : "enheter"} fra et gammelt admin-passord er fjernet`);
+      await removeSubscriptions(store, [], { gen, now });
+      console.warn(`Push: ${stale} ${stale === 1 ? "enhet" : "enheter"} fra et gammelt admin-passord eller med utløpt innlogging er fjernet`);
     } catch (err) {
-      console.error("Push: kunne ikke fjerne enheter fra et gammelt passord:", err && err.name);
+      console.error("Push: kunne ikke fjerne enheter fra et gammelt passord eller med utløpt innlogging:", err && err.name);
     }
   }
   if (!targets.length) return summary;

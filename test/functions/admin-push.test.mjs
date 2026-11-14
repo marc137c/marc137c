@@ -28,7 +28,8 @@ function setup({ devices = [], reply } = {}) {
   const d = testDeps({ now: NOW, env: { ADMIN_PASSWORD: PASSWORD }, fetch: push.fetch });
   return Object.assign(d, { push });
 }
-const auth = (d) => ({ Authorization: "Bearer " + makeToken(PASSWORD, d.clock.now()) });
+// The login /admin makes by default («Hold meg innlogget» on: 60 days). Short logins: admin-push-expiry.test.mjs
+const auth = (d) => ({ Authorization: "Bearer " + makeToken(PASSWORD, d.clock.now(), 60 * 24 * 3600e3) });
 const call = (d, path, { method = "POST", json, headers = auth(d), ctx = PRODUCTION } = {}) =>
   admin.handle(request(path, { method, json, headers }), ctx, d).then(read);
 const info = (d, ctx) => call(d, "/api/admin/push", { method: "GET", ctx });

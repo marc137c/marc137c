@@ -271,16 +271,22 @@ export function checkPassword(given, password) {
   const b = createHash("sha256").update(password).digest();
   return timingSafeEqual(a, b);
 }
+// Billetten: { exp, iat } (utløper, laget; millisekunder) signert med passordet
 export function makeToken(password, now = Date.now(), ttlMs = 12 * 60 * 60 * 1000) {
-  const payload = b64url(JSON.stringify({ exp: now + ttlMs }));
+  const payload = b64url(JSON.stringify({ exp: now + ttlMs, iat: now }));
   const sig = b64url(createHmac("sha256", signingKey(password)).update(payload).digest());
   return `${payload}.${sig}`;
 }
-export function verifyToken(token, password, now = Date.now()) {
-  if (!password || typeof token !== "string" || !token.includes(".")) return false;
+// Innholdet i en gyldig billett ({ exp, iat }; iat mangler i billetter laget før det ble lagt til), ellers null
+export function readToken(token, password, now = Date.now()) {
+  if (!password || typeof token !== "string" || !token.includes(".")) return null;
   const [payload, sig] = token.split(".");
   const expected = b64url(createHmac("sha256", signingKey(password)).update(payload).digest());
   const a = Buffer.from(sig || ""), b = Buffer.from(expected);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
-  try { return JSON.parse(Buffer.from(payload, "base64url").toString()).exp > now; } catch { return false; }
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  let data;
+  try { data = JSON.parse(Buffer.from(payload, "base64url").toString()); } catch { return null; }
+  if (!data || !Number.isFinite(data.exp) || !(data.exp > now)) return null;
+  return { exp: data.exp, iat: Number.isFinite(data.iat) ? data.iat : undefined };
 }
+export const verifyToken = (token, password, now = Date.now()) => readToken(token, password, now) !== null;

@@ -70,7 +70,7 @@ test("push revoke: after ADMIN_PASSWORD changes, no device subscribed before get
   assert.equal(d.push.deliveries.length, 3);
   assert.deepEqual([d.push.deliveries[2].device, d.push.deliveries[2].payload.body.endsWith("Per Etterpå")], [phone, true]);
   const logged = JSON.stringify([out.log, out.warn, out.error]);
-  assert.match(logged, /fra et gammelt admin-passord er fjernet/);
+  assert.match(logged, /fra et gammelt admin-passord eller med utløpt innlogging er fjernet/);
   for (const secret of [phone.endpoint.slice(-24), pc.endpoint.slice(-24), "Kari", "Hemmelig", OLD, NEW]) assert.ok(!logged.includes(secret), secret);
 });
 

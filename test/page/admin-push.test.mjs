@@ -117,6 +117,20 @@ test("admin push panel: «Slå på varsler» subscribes in the tap itself with t
   assert.equal(page.$("push-on").disabled, false);
 });
 
+test("admin push panel: after a short login («Hold meg innlogget» off) the panel says until when notifications come", async () => {
+  const until = new Date(Date.now() + 5 * 3600e3);
+  const pad = (n) => String(n).padStart(2, "0");
+  const today = (d) => d.toDateString() === new Date().toDateString();
+  const b = fakePushBrowser({ device: makeDevice("wns") });
+  const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes({
+    "POST /api/admin/push/subscribe": () => ({ status: 201, body: { ok: true, devices: 1, until: until.toISOString() } }),
+  }) });
+  page.$("push-on").click();
+  await page.flush();
+  assert.equal(msg(page), `Varsler er på til innloggingen her går ut, ${today(until) ? "" : "i morgen "}kl. ${pad(until.getHours())}:${pad(until.getMinutes())}. Logger du inn med «Hold meg innlogget», får du dem hele tiden.`);
+  assert.deepEqual(buttons(page), ["push-test", "push-off"]);
+});
+
 test("admin push panel: refusing permission sends nothing; «blocked» offers only «Prøv igjen»", async () => {
   for (const [answer, text, left] of [["denied", /blokkert/, ["push-retry"]], ["default", /Du må tillate varsler/, ["push-on"]]]) {
     const b = fakePushBrowser({ device: makeDevice(), answer });

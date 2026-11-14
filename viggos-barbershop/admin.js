@@ -481,13 +481,23 @@
     return Promise.race([promise, late]).then((v) => { clearTimeout(timer); return v; }, (err) => { clearTimeout(timer); throw err; });
   }
   const others = (n) => (n > 0 ? ` ${n} ${n === 1 ? "annen enhet får" : "andre enheter får"} varsler.` : "");
-  // devices: alle enhetene serveren sender til (med denne, når den er på)
-  function pushShow(mode, devices) {
+  // Når en kort innlogging går ut (until fra serveren): «kl. 21:00», «i morgen kl. 09:00»
+  function untilText(until) {
+    const d = new Date(until);
+    if (isNaN(d.getTime())) return "";
+    const day = iso(d) === todayIso() ? "" : iso(d) === addDays(todayIso(), 1) ? "i morgen " : fmt(iso(d), { day: "numeric", month: "long" }) + " ";
+    return day + "kl. " + hhmm(d.getHours() * 60 + d.getMinutes());
+  }
+  // devices: alle enhetene serveren sender til (med denne, når den er på). until: er Viggo logget inn uten «Hold meg
+  // innlogget», får enheten varsler bare til den innloggingen går ut, og det står her.
+  function pushShow(mode, devices, until) {
     const n = Number(devices) || 0;
     pushState.others = mode === "on" ? Math.max(0, n - 1) : n;
     pushButtons(mode);
     if (mode === "on") pushState.lost = false;
-    if (mode === "on") pushMsg("Varsler er på. Du får et varsel her hver gang en kunde bestiller time." + others(pushState.others), "ok");
+    const when = mode === "on" && until ? untilText(until) : "";
+    if (when) pushMsg("Varsler er på til innloggingen her går ut, " + when + ". Logger du inn med «Hold meg innlogget», får du dem hele tiden." + others(pushState.others), "ok");
+    else if (mode === "on") pushMsg("Varsler er på. Du får et varsel her hver gang en kunde bestiller time." + others(pushState.others), "ok");
     else pushMsg((pushState.lost ? "Varslene må slås på igjen på denne enheten." : "Varsler er av på denne enheten.") + others(pushState.others), "info");
   }
   function pushError(err) {
@@ -554,7 +564,7 @@
       return saveSub(sub).then((res) => {
         if (seq !== pushSeq) return;
         pushState.sub = sub;
-        pushShow("on", res.devices);
+        pushShow("on", res.devices, res.until);
       }, (err) => {
         if (err.status === 410) return drop();
         throw err;
@@ -589,7 +599,7 @@
       saveSub(sub).then((res) => {
         if (seq !== pushSeq) return;
         pushState.sub = sub;
-        pushShow("on", res.devices);
+        pushShow("on", res.devices, res.until);
       }, () => {});
     }, () => {});
     withinTime(subscribing, SUBSCRIBE_WAIT_MS, NO_CONTACT).catch((err) => {
@@ -602,7 +612,7 @@
       .then((sub) => saveSub(sub).then((res) => {
         if (seq !== pushSeq) return;
         pushState.sub = sub;
-        pushShow("on", res.devices);
+        pushShow("on", res.devices, res.until);
       }, (err) => {
         // Serveren godtar det ikke (400), eller det er borte hos push-tjenesten (410): ikke la det henge igjen
         if (err.status === 400 || err.status === 410) sub.unsubscribe().catch(() => false);
@@ -676,7 +686,7 @@
       }
       return saveSub(sub).then((res) => {
         if (seq !== pushSeq) return;
-        pushShow("on", res.devices);
+        pushShow("on", res.devices, res.until);
         pushMsg("Varsler er slått av på alle andre enheter. Denne enheten får fortsatt varsler.", "ok");
       }, (err) => {
         if (seq !== pushSeq || err.status === 401) return;
