@@ -36,6 +36,16 @@ Gå til **/admin** (lenke «Admin» nederst på siden), skriv passordet og trykk
 - Admin kan legge inn timer utenom åpningstid. Kolliderer en endring med en annen avtale, spør siden om du vil dobbeltbooke.
 - Oversikten oppdaterer seg selv hvert 30. sekund, så nye nettbestillinger dukker opp.
 
+### Kalender på telefonen
+Alle timene kan ligge i kalenderen på telefonen (iPhone-kalenderen eller Google Kalender). Det settes opp én gang:
+1. Gå til **/admin → Oppsett** og trykk **Lag kalenderlenke**.
+2. **iPhone/iPad/Mac:** trykk **Legg til på iPhone** og så **Abonner**. La «Fjern varsler» være av hvis du vil ha påminnelse 15 minutter før hver time.
+   **Google Kalender (Android):** trykk **Legg til i Google Kalender**, logg inn og trykk «Legg til». Virker ikke knappen på telefonen, kopier lenken og legg den til som kalender «fra URL» på calendar.google.com på en PC.
+- Hver time vises med tjeneste (og tillegg), kundens navn og telefonnummer. Flytter du en time, flyttes den i kalenderen; avlyste og slettede timer forsvinner. Blokkeringer vises ikke. Kalenderen viser fra én måned tilbake til ett år frem.
+- Telefonen henter endringer selv, men ikke alltid med en gang (Google kan bruke flere timer).
+- **Hold lenken hemmelig:** den som har den, ser navn og telefonnummer til kundene. Har noen fått den som ikke skal ha den, eller er en telefon mistet: **Oppsett → Lag ny lenke**. Den gamle slutter å virke med en gang; slett den gamle kalenderen på telefonen og legg til den nye.
+- Teknisk: `/api/calendar/<hemmelighet>.ics` (`netlify/functions/calendar.mjs`, iCalendar etter RFC 5545, norsk tid med sommertid). Hemmeligheten ligger i Netlify Blobs (`calendar/feed` i timeboken), og forhåndsvisninger har sin egen lenke og sin egen timebok. Svaret mellomlagres aldri, og en feil eller gammel lenke gir bare «Fant ikke kalenderen».
+
 ## Google-anmeldelser
 Seksjonen «Hva kundene sier» viser snittkarakteren og 3–4 anmeldelser hentet automatisk fra Google (`/api/reviews`, mellomlagret i 12 timer).
 Før den er satt opp, vises en henvisning til Google med lenken «Se alle anmeldelser på Google».
