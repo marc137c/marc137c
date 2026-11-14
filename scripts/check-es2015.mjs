@@ -130,7 +130,7 @@ function check(where, code, lineOffset = 0) {
     return false;
   };
   const globalName = (node, parent) => {
-    if (node.type === "MemberExpression") return dotted(node).replace(/^window./, "");
+    if (node.type === "MemberExpression") return dotted(node).replace(/^window\./, "");
     if (node.type !== "Identifier") return null;
     if (parent && parent.type === "MemberExpression" && parent.property === node && !parent.computed) return null; // x.Notification
     if (parent && parent.type === "Property" && parent.key === node && !parent.computed) return null;           // { Notification: … }
