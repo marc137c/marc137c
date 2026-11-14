@@ -6,7 +6,7 @@
 //     ["https://example.test/api", (call) => ({ ok: true })],          // exact URL (query ignored)
 //     [/example\.test\/v2\//, () => new Response("x", { status: 500 })], // RegExp on the full URL
 //   ]);
-//   fetch.calls  → [{ url, method, headers, body, json(), signal }]
+//   fetch.calls  → [{ url, method, headers, body, bytes, json(), signal }]   (bytes: the body as a Buffer, for binary bodies)
 //
 // A route handler gets the call and returns a Response, a plain object (sent as JSON with status 200),
 // or throws (the fetch rejects with that error).
@@ -26,6 +26,13 @@ const bodyText = (b) => {
   return String(b);
 };
 
+const bodyBytes = (b) => {
+  if (b == null) return undefined;
+  if (ArrayBuffer.isView(b)) return Buffer.from(new Uint8Array(b.buffer, b.byteOffset, b.byteLength)); // a copy
+  if (b instanceof ArrayBuffer) return Buffer.from(new Uint8Array(b));
+  return Buffer.from(bodyText(b));
+};
+
 const matches = (pattern, url, call) => {
   if (typeof pattern === "function") return pattern(url, call);
   if (pattern instanceof RegExp) return pattern.test(url);
@@ -41,6 +48,7 @@ export function fakeFetch(routes = []) {
       method: String(init.method || "GET").toUpperCase(),
       headers: headerObject(init.headers),
       body: bodyText(init.body),
+      bytes: bodyBytes(init.body),
       signal: init.signal,
       json() { return JSON.parse(this.body); },
       form() { return Object.fromEntries(new URLSearchParams(this.body)); },
