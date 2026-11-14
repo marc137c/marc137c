@@ -447,7 +447,8 @@
   const isIos = () => /iPad|iPhone|iPod/.test(navigator.userAgent || "") || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const isStandalone = () => navigator.standalone === true || !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
   // others: hvor mange andre enheter som får varsler (da vises «Slå av varsler på alle andre enheter»)
-  const pushState = { key: null, sub: null, reg: null, others: 0 };
+  // lost: abonnementet her er fjernet fordi push-tjenesten sa at det var borte, så «av» sier at de må slås på igjen
+  const pushState = { key: null, sub: null, reg: null, others: 0, lost: false };
   let pushSeq = 0;
 
   function pushMsg(text, kind) {
@@ -485,8 +486,9 @@
     const n = Number(devices) || 0;
     pushState.others = mode === "on" ? Math.max(0, n - 1) : n;
     pushButtons(mode);
+    if (mode === "on") pushState.lost = false;
     if (mode === "on") pushMsg("Varsler er på. Du får et varsel her hver gang en kunde bestiller time." + others(pushState.others), "ok");
-    else pushMsg("Varsler er av på denne enheten." + others(pushState.others), "info");
+    else pushMsg((pushState.lost ? "Varslene må slås på igjen på denne enheten." : "Varsler er av på denne enheten.") + others(pushState.others), "info");
   }
   function pushError(err) {
     if (err && (err.status || err.user)) return err.message;
@@ -541,18 +543,21 @@
       const info = r[0], sub = r[1];
       pushState.key = info.publicKey;
       if (!sub || permission() !== "granted") return pushShow("off", info.devices);
-      if (!sameKey(sub, info.publicKey)) {
-        // Laget med en nøkkel serveren ikke har lenger: det virker ikke, så det fjernes
-        return sub.unsubscribe().catch(() => false).then(() => {
-          if (seq !== pushSeq) return;
-          pushShow("off", info.devices);
-          pushMsg("Varslene må slås på igjen på denne enheten.", "info");
-        });
-      }
+      // Laget med en nøkkel serveren ikke har lenger, eller push-tjenesten har sagt at det er borte (serveren svarer
+      // 410; Chrome beholder et slikt dødt abonnement): det virker ikke, så det fjernes. «Slå på varsler» lager et nytt.
+      const drop = () => sub.unsubscribe().catch(() => false).then(() => {
+        pushState.lost = true;
+        if (seq !== pushSeq) return;
+        pushShow("off", info.devices);
+      });
+      if (!sameKey(sub, info.publicKey)) return drop();
       return saveSub(sub).then((res) => {
         if (seq !== pushSeq) return;
         pushState.sub = sub;
         pushShow("on", res.devices);
+      }, (err) => {
+        if (err.status === 410) return drop();
+        throw err;
       });
     }).catch((err) => {
       if (seq !== pushSeq || err.status === 401) return;
@@ -599,7 +604,8 @@
         pushState.sub = sub;
         pushShow("on", res.devices);
       }, (err) => {
-        if (err.status === 400) sub.unsubscribe().catch(() => false); // serveren godtar det ikke: ikke la det henge igjen
+        // Serveren godtar det ikke (400), eller det er borte hos push-tjenesten (410): ikke la det henge igjen
+        if (err.status === 400 || err.status === 410) sub.unsubscribe().catch(() => false);
         throw err;
       }))
       .catch((err) => { if (seq === pushSeq && err.status !== 401) pushMsg(pushError(err)); })
@@ -674,8 +680,11 @@
         pushMsg("Varsler er slått av på alle andre enheter. Denne enheten får fortsatt varsler.", "ok");
       }, (err) => {
         if (seq !== pushSeq || err.status === 401) return;
+        if (err.status === 410) sub.unsubscribe().catch(() => false); // borte hos push-tjenesten
         pushShow("off", 0);
-        pushMsg("Varsler er slått av på alle andre enheter, men denne enheten ble ikke slått på igjen. Lukk og åpne Oppsett for å prøve igjen.");
+        pushMsg(err.status === 410
+          ? "Varsler er slått av på alle andre enheter. Varslene må slås på igjen på denne enheten."
+          : "Varsler er slått av på alle andre enheter, men denne enheten ble ikke slått på igjen. Lukk og åpne Oppsett for å prøve igjen.");
       });
     }).catch((err) => { if (seq === pushSeq && err.status !== 401) pushMsg(pushError(err)); }).then(() => { btn.disabled = false; });
   });
@@ -687,7 +696,10 @@
     if (!pushSupported() || permission() !== "granted" || !c.getRegistration) return Promise.resolve();
     return c.getRegistration(SW_SCOPE).then((reg) => (reg ? reg.pushManager.getSubscription() : null)).then((sub) => {
       if (!sub) return null;
-      return api("/api/admin/push").then((info) => (sameKey(sub, info.publicKey) ? saveSub(sub) : null));
+      return api("/api/admin/push").then((info) => (sameKey(sub, info.publicKey) ? saveSub(sub) : null)).catch((err) => {
+        // Borte hos push-tjenesten: fjern det, så «Oppsett» viser «av» og «Slå på varsler» lager et nytt
+        if (err && err.status === 410) { pushState.lost = true; return sub.unsubscribe(); }
+      });
     }).catch(() => {});
   }
 

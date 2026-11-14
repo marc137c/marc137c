@@ -10,7 +10,7 @@
 //   4. «Send testvarsel» asks the server to test this device only; «Slå av» unsubscribes in the browser first and
 //      only then tells the server, so a device can never turn itself back on;
 //   5. an existing subscription is given to the server again (when «Oppsett» opens and at start), and one made with
-//      another key is dropped;
+//      another key, or one the push service called gone (the server answers 410), is dropped and shown as off;
 //   6. /admin?dag=… and a tap on a notification open that day;
 //   7. end to end through the real handlers: «Slå på varsler» → a web booking → the device decrypts «Ny time».
 import { test } from "node:test";
@@ -167,6 +167,72 @@ test("admin push panel: a subscription made with another server key is dropped, 
   assert.match(msg(page), /må slås på igjen/);
   assert.deepEqual(buttons(page), ["push-on"]);
   assert.equal(pushCalls(page).filter((c) => c.path === "/api/admin/push/subscribe").length, 0, "the stale one is never sent");
+});
+
+const GONE = { status: 410, body: { error: "Denne enheten kan ikke lenger få varsler. Trykk «Slå på varsler» igjen.", code: "gone" } };
+
+test("admin push panel: a subscription the push service called gone is dropped in the browser and shown as off", async () => {
+  // gone at start (pushSync), or only by the time «Oppsett» opens (pushLoad)
+  for (const goneFrom of [1, 2]) {
+    const device = makeDevice("fcm");
+    const b = fakePushBrowser({ device, permission: "granted", subscribed: KEY_BYTES });
+    let n = 0;
+    const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes({
+      "GET /api/admin/push": () => ({ ...INFO, devices: 1 }),
+      "POST /api/admin/push/subscribe": () => (++n >= goneFrom ? GONE : { ok: true, devices: 2 }),
+    }) });
+    assert.equal(b.current(), null, "the dead subscription is gone from the browser");
+    assert.deepEqual(b.log.unsubscribed, [device.endpoint]);
+    assert.deepEqual(buttons(page), ["push-on"], String(goneFrom));
+    assert.equal(msg(page), "Varslene må slås på igjen på denne enheten. 1 annen enhet får varsler.", String(goneFrom));
+    // «Slå på varsler» with the same dead subscription (subscribe() hands back an existing one)
+    page.$("push-on").click();
+    await page.flush();
+    // (this fake browser gives the same endpoint again; a real one makes a new endpoint after unsubscribe())
+    assert.equal(msg(page), "Denne enheten kan ikke lenger få varsler. Trykk «Slå på varsler» igjen.", "the server still refuses this one");
+    assert.equal(b.current(), null, "and it is dropped again, so the next tap makes a new one");
+    assert.deepEqual(buttons(page), ["push-on"]);
+  }
+});
+
+test("admin push panel: at start, a subscription the server answers 410 for is dropped in the browser", async () => {
+  const b = fakePushBrowser({ device: makeDevice("fcm"), permission: "granted", subscribed: KEY_BYTES });
+  await loadAdmin({ navigator: b.navigator, globals: b.globals, routes: routes({ "POST /api/admin/push/subscribe": () => GONE }) });
+  assert.equal(b.current(), null);
+  for (const status of [400, 500, 503]) {
+    const c = fakePushBrowser({ device: makeDevice("fcm"), permission: "granted", subscribed: KEY_BYTES });
+    await loadAdmin({ navigator: c.navigator, globals: c.globals, routes: routes({ "POST /api/admin/push/subscribe": () => ({ status, body: { error: "x" } }) }) });
+    assert.ok(c.current(), `a ${status} at start keeps the subscription`);
+  }
+});
+
+test("admin push panel: end to end, after the push service answers 410 /admin shows off, never «på»", async (t) => {
+  t.mock.method(console, "warn", () => {});
+  const PASSWORD = "fake-admin-password";
+  const device = makeDevice("fcm");
+  let status = 201;
+  const push = fakePushService({ devices: [device], reply: () => status });
+  const d = testDeps({ now: "2026-11-12T09:00:00Z", env: { ADMIN_PASSWORD: PASSWORD }, fetch: push.fetch });
+  const token = makeToken(PASSWORD, d.clock.now());
+  const toServer = (call) => adminFn.handle(request(call.path, { method: call.method, headers: { Authorization: call.headers.Authorization }, json: call.body }), PRODUCTION, d).then(read);
+  const serverRoutes = {};
+  for (const r of ["GET /api/admin/push", "POST /api/admin/push/subscribe"]) serverRoutes[r] = toServer;
+  const b = fakePushBrowser({ device });
+  const page = await openSettings({ token, navigator: b.navigator, globals: b.globals, routes: serverRoutes });
+  page.$("push-on").click();
+  await page.flush();
+  assert.match(msg(page), /^Varsler er på/);
+  status = 410; // FCM unregisters the token; Chrome keeps the PushSubscription and fires no event
+  const res = await read(await bookingsFn.handle(request("/api/bookings", { method: "POST", json: {
+    service: "Herreklipp", date: "2026-11-14", start: 690, addons: [], name: "Per Hansen", phone: "41234567",
+  } }), PRODUCTION, d));
+  assert.equal(res.status, 201);
+  page.$("settings-close").click();
+  page.$("settings-open").click();
+  await page.flush();
+  assert.equal(msg(page), "Varslene må slås på igjen på denne enheten.");
+  assert.deepEqual(buttons(page), ["push-on"]);
+  assert.equal(b.current(), null);
 });
 
 test("admin push panel: «Send testvarsel» asks the server to test this device only", async () => {

@@ -7,7 +7,8 @@
 //      400 with nothing stored and no network call;
 //   4. a test send goes only to a device that is already stored (never to an address the browser just names), is
 //      decryptable with that device's private key, and its VAPID JWT verifies with the key /admin subscribed with;
-//   5. a device the push service reports gone (404/410) is removed; «Slå av» removes the device;
+//   5. a device the push service reports gone (404/410) is removed, and that subscription is refused afterwards
+//      (410 «gone»), so /admin can never show «på» for it; «Slå av» removes the device;
 //   6. a deploy preview has its own key pair and its own devices (F10).
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -16,6 +17,7 @@ import { makeDevice, fakePushService } from "../helpers/fake-push.mjs";
 import { makeToken } from "../../netlify/lib/booking-core.mjs";
 import { VAPID_KEY, SUBS_KEY, testMessage } from "../../netlify/lib/push.mjs";
 import * as admin from "../../netlify/functions/admin.mjs";
+import * as bookings from "../../netlify/functions/bookings.mjs";
 
 const PASSWORD = "fake-admin-password";
 const NOW = "2026-11-16T08:00:00Z";
@@ -148,6 +150,30 @@ test("admin push: a gone device is removed (410); a failing push service keeps i
   assert.equal((await info(d)).body.devices, 0);
   res = await call(d, "/api/admin/push/test", { json: { endpoint: phone.endpoint } });
   assert.equal(res.status, 404, "after removal it is no longer a device");
+});
+
+test("admin push: a subscription the push service called gone is refused when /admin sends it again (410 «gone»)", async (t) => {
+  quiet(t);
+  const phone = makeDevice("fcm");
+  const d = setup({ devices: [phone], reply: () => 410 }); // FCM has unregistered the token; Chrome keeps the subscription
+  await info(d);
+  assert.equal((await subscribe(d, phone)).status, 201);
+  const book = (start) => bookings.handle(request("/api/bookings", { method: "POST", json: {
+    service: "Herreklipp", date: "2026-11-18", start, addons: [], name: "Kari Nordmann", phone: "41234567",
+  } }), PRODUCTION, d).then(read);
+  assert.equal((await book(600)).status, 201);
+  assert.equal(d.push.deliveries.length, 1, "the push service answered 410");
+  assert.equal((await info(d)).body.devices, 0);
+  // /admin (pushSync at start, pushLoad in Oppsett) sends the same dead subscription again
+  const again = await subscribe(d, phone);
+  assert.deepEqual([again.status, again.body], [410, { error: "Denne enheten kan ikke lenger få varsler. Trykk «Slå på varsler» igjen.", code: "gone" }]);
+  assert.equal((await info(d)).body.devices, 0, "never counted as a device again");
+  assert.equal((await book(630)).status, 201);
+  assert.equal(d.push.deliveries.length, 1, "nothing is sent to it again");
+  // The browser makes a new subscription («Slå på varsler»): that one is stored as usual
+  const renewed = makeDevice("fcm");
+  d.push.devices.push(renewed);
+  assert.equal((await subscribe(d, renewed)).status, 201);
 });
 
 test("admin push: «Slå av» removes this device and only this one", async () => {

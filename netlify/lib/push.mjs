@@ -7,17 +7,20 @@
 //   VAPID_KEY  { publicKey, privateKey (JWK), createdAt }: lages én gang, av serveren selv, så ingen trenger å
 //              skrive inn en hemmelighet. Den private nøkkelen forlater aldri serveren og skrives aldri til
 //              loggen; nettleseren får bare den offentlige.
-//   SUBS_KEY   { subs: [{ endpoint, p256dh, auth, gen, createdAt, seenAt }] }: én per enhet, høyst MAX_DEVICES.
+//   SUBS_KEY   { subs: [{ endpoint, p256dh, auth, gen, createdAt, seenAt }], gone: [{ h, at }] }: én per enhet,
+//              høyst MAX_DEVICES. gone: adresser push-tjenesten har sagt er borte (404/410), som SHA-256 (h), så de
+//              aldri lagres igjen (høyst GONE_MAX, i GONE_DAYS dager).
 //
 // Hver enhet er knyttet til admin-passordet den ble slått på med (gen = pushGen(ADMIN_PASSWORD)). Bytter Viggo
 // passordet, får ingen av de gamle enhetene flere varsler (de slettes ved neste sending), akkurat som alle blir
 // logget ut. «Slå av varsler på alle andre enheter» (clearSubscriptions) fjerner alle med en gang.
 //
 // Vi sender bare til adresser hos kjente push-tjenester (PUSH_SERVICES), aldri til en vilkårlig adresse en
-// nettleser har oppgitt. Svarer tjenesten 404/410, er abonnementet borte for godt og slettes.
+// nettleser har oppgitt. Svarer tjenesten 404/410, er abonnementet borte for godt: det slettes, og adressen
+// godtas ikke igjen (Chrome beholder et slikt dødt abonnement, og /admin ville ellers meldt det på og vist «på»).
 // Sending kaster aldri, har kort tidsfrist (PUSH_TIMEOUT_MS) og logger bare tjenestens navn og svaret: aldri
 // adressen (den er selv en slags nøkkel), kundens navn eller noen nøkkel.
-import { ECDH, createECDH, createPrivateKey, generateKeyPairSync, hkdfSync, createCipheriv, randomBytes, sign } from "node:crypto";
+import { ECDH, createECDH, createHash, createPrivateKey, generateKeyPairSync, hkdfSync, createCipheriv, randomBytes, sign } from "node:crypto";
 import { isDate, mutateJSON, passwordGen } from "./booking-core.mjs";
 
 // Hvilket admin-passord en enhet hører til: de første 16 tegnene av SHA-256("viggos-push:" + passordet) i
@@ -27,6 +30,8 @@ export const pushGen = (password) => passwordGen(password, "push");
 export const VAPID_KEY = "push/vapid";
 export const SUBS_KEY = "push/subs";
 export const MAX_DEVICES = 10;
+export const GONE_MAX = 50;                   // så mange adresser som er «borte» huskes høyst …
+export const GONE_DAYS = 60;                  // … og så mange dager
 export const PUSH_TIMEOUT_MS = 4000;          // én melding til én push-tjeneste
 export const BOOKING_PUSH_WAIT_MS = 1500;     // så lenge venter en nettbestilling høyst på varslene (uten waitUntil)
 export const PUSH_TTL_S = 24 * 60 * 60;       // push-tjenesten tar vare på meldingen et døgn hvis enheten er av
@@ -87,11 +92,28 @@ export function parseSubscription(input) {
 }
 
 // ---------- Lagrede abonnementer (ett per enhet) ----------
-const initSubs = (d) => (d && Array.isArray(d.subs) ? d : { subs: [] });
+const initSubs = (d) => {
+  const doc = d && typeof d === "object" && Array.isArray(d.subs) ? d : { subs: [] };
+  if (!Array.isArray(doc.gone)) doc.gone = [];
+  return doc;
+};
 const newestFirst = (a, b) => (a.seenAt < b.seenAt ? 1 : a.seenAt > b.seenAt ? -1 : 0);
 
 const isGen = (gen) => typeof gen === "string" && gen.length === 16;
 const current = (gen) => (s) => usable(s) && isGen(gen) && s.gen === gen;
+
+// Adresser push-tjenesten har sagt er borte. Bare en hash lagres: adressen er selv en slags nøkkel.
+const DAY_MS = 24 * 60 * 60 * 1000;
+const goneHash = (endpoint) => createHash("sha256").update("viggos-push-gone:" + endpoint).digest("base64url");
+const goneFresh = (now) => (g) => g && typeof g.h === "string" && typeof g.at === "string" && now.getTime() - Date.parse(g.at) < GONE_DAYS * DAY_MS;
+const isGone = (doc, endpoint, now) => { const h = goneHash(endpoint); return doc.gone.some((g) => goneFresh(now)(g) && g.h === h); };
+// Legger til adressene i gone-listen (nyeste sist), og rydder bort gamle og det som er over GONE_MAX
+function markGone(doc, endpoints, now) {
+  const add = endpoints.map(goneHash);
+  doc.gone = doc.gone.filter((g) => goneFresh(now)(g) && !add.includes(g.h))
+    .concat(add.map((h) => ({ h, at: now.toISOString() })))
+    .slice(-GONE_MAX);
+}
 
 // Enhetene som hører til dette passordet (gen). Uten gen: alle som er hele (bare til tester og opprydding).
 export async function readSubscriptions(store, { gen } = {}) {
@@ -100,12 +122,15 @@ export async function readSubscriptions(store, { gen } = {}) {
 }
 
 // Legger til (eller fornyer) en enhet for passordet gen. Enheter fra et gammelt passord ryddes bort samtidig.
-// Er det flere enn MAX_DEVICES, går den som er sett minst nylig ut.
+// Er det flere enn MAX_DEVICES, går den som er sett minst nylig ut. En adresse push-tjenesten har sagt er borte,
+// lagres aldri igjen: { error, status: 410, code: "gone" } (nettleseren må lage et nytt abonnement).
 // Svarer { ok, created, devices } (eller { error, status } hvis lagringen ikke ble enig med seg selv).
 export async function saveSubscription(store, sub, { now = new Date(), gen } = {}) {
   if (!isGen(gen)) return { error: "Varsler er ikke satt opp: mangler admin-passord.", status: 503 };
   let created = false;
   const r = await mutateJSON(store, SUBS_KEY, initSubs, (doc) => {
+    if (isGone(doc, sub.endpoint, now)) return { error: "Denne enheten kan ikke lenger få varsler. Trykk «Slå på varsler» igjen.", status: 410, code: "gone" };
+    doc.gone = doc.gone.filter(goneFresh(now));
     const at = now.toISOString();
     const same = doc.subs.find((s) => s && s.endpoint === sub.endpoint && s.gen === gen);
     created = !same;
@@ -119,14 +144,17 @@ export async function saveSubscription(store, sub, { now = new Date(), gen } = {
   return r.error ? r : { ok: true, created, devices: r.devices };
 }
 
-// Fjerner enhetene med disse adressene (og, med gen, alle fra et gammelt passord). Svarer { ok, removed, devices }.
-export async function removeSubscriptions(store, endpoints, { gen } = {}) {
+// Fjerner enhetene med disse adressene (og, med gen, alle fra et gammelt passord). Med gone: true har push-tjenesten
+// sagt at adressene er borte, og de godtas ikke igjen (saveSubscription). Svarer { ok, removed, devices }.
+export async function removeSubscriptions(store, endpoints, { gen, gone: markAsGone = false, now = new Date() } = {}) {
   const gone = new Set(endpoints.map(normalizeEndpoint).filter(Boolean));
   return mutateJSON(store, SUBS_KEY, initSubs, (doc) => {
     const before = doc.subs.length;
     doc.subs = doc.subs.filter((s) => !(s && gone.has(s.endpoint)) && (gen === undefined || current(gen)(s)));
+    if (markAsGone && gone.size) markGone(doc, [...gone], now);
     const devices = doc.subs.filter(gen === undefined ? usable : current(gen)).length;
-    return doc.subs.length === before ? { ok: true, noWrite: true, removed: 0, devices } : { ok: true, removed: before - doc.subs.length, devices };
+    const removed = before - doc.subs.length;
+    return removed || (markAsGone && gone.size) ? { ok: true, removed, devices } : { ok: true, noWrite: true, removed: 0, devices };
   });
 }
 
@@ -303,7 +331,7 @@ export async function pushToDevices(store, message, { fetch, now = new Date(), o
   });
   if (gone.length) {
     try {
-      const removed = await removeSubscriptions(store, gone, { gen });
+      const removed = await removeSubscriptions(store, gone, { gen, gone: true, now });
       if (!removed.error) summary.devices = removed.devices;
     } catch (err) {
       console.error("Push: kunne ikke fjerne enheter som er borte:", err && err.name);

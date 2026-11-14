@@ -23,7 +23,7 @@ import {
   encryptPayload, vapidKeys, readVapidKeys, vapidAuthorization, contactFor, pushService, normalizeEndpoint,
   parseSubscription, saveSubscription, removeSubscriptions, readSubscriptions, sendPush, pushToDevices,
   bookingMessage, testMessage, notifyNewBooking, pushGen, clearSubscriptions, VAPID_KEY, SUBS_KEY, MAX_DEVICES, RECORD_SIZE, JWT_LIFETIME_S, PUSH_TIMEOUT_MS,
-  PAD_SIZE,
+  PAD_SIZE, GONE_MAX, GONE_DAYS,
 } from "../../netlify/lib/push.mjs";
 
 const NOW = new Date("2026-11-16T08:00:00Z");
@@ -419,9 +419,51 @@ test("push: saving under a new password drops the old password's devices; readin
 test("push: clearSubscriptions leaves no device, and writes nothing when there is none", async () => {
   const { store, blobs } = await setup(["apple", "fcm", "wns"]);
   assert.deepEqual(await clearSubscriptions(store), { ok: true, devices: 0 });
-  assert.deepEqual(blobs.json("bookings", SUBS_KEY), { subs: [] });
+  assert.deepEqual(blobs.json("bookings", SUBS_KEY), { subs: [], gone: [] });
   const writes = blobs.log.filter((e) => e.method === "PUT").length;
   assert.ok(writes >= 4, "the three saves and the clear were writes");
   assert.deepEqual(await clearSubscriptions(store), { ok: true, devices: 0 });
   assert.equal(blobs.log.filter((e) => e.method === "PUT").length, writes);
+});
+
+// ---------- 8. An endpoint the push service called gone ----------
+// Invariant: an endpoint the push service answered 404/410 for is never stored again (Chrome keeps such a dead
+// subscription and /admin would send it again and show «på»); only its hash is kept, at most GONE_MAX of them, for
+// GONE_DAYS days; other endpoints are unaffected.
+test("push: an endpoint the push service called gone is never stored again", async (t) => {
+  quiet(t);
+  for (const status of [404, 410]) {
+    const { store, blobs, devices, push } = await setup(["fcm", "apple"], (del) => (del.device.kind === "fcm" ? status : 201));
+    const [dead, alive] = devices;
+    const r = await pushToDevices(store, testMessage(), { fetch: push.fetch, now: NOW, gen: GEN });
+    assert.deepEqual([r.sent, r.gone, r.devices], [1, 1, 1], String(status));
+    assert.deepEqual(await saveSubscription(store, asStored(dead), { now: NOW, gen: GEN }),
+      { error: "Denne enheten kan ikke lenger få varsler. Trykk «Slå på varsler» igjen.", status: 410, code: "gone" });
+    assert.deepEqual((await readSubscriptions(store, { gen: GEN })).map((s) => s.endpoint), [alive.endpoint], "the dead one stays out");
+    assert.deepEqual(await saveSubscription(store, asStored(alive), { now: NOW, gen: GEN }), { ok: true, created: false, devices: 1 });
+    const fresh = makeDevice("fcm"); // the same browser after «Slå på varsler»: a new endpoint
+    assert.equal((await saveSubscription(store, asStored(fresh), { now: NOW, gen: GEN })).created, true);
+    const stored = JSON.stringify(blobs.json("bookings", SUBS_KEY));
+    assert.ok(!stored.includes(dead.endpoint) && !stored.includes(dead.endpoint.slice(-30)), "only a hash of the dead endpoint is stored");
+    assert.equal(blobs.json("bookings", SUBS_KEY).gone.length, 1);
+  }
+});
+
+test("push: at most GONE_MAX gone endpoints are remembered, for GONE_DAYS days", async () => {
+  const blobs = new FakeBlobs();
+  const store = storeOf(blobs);
+  const dead = Array.from({ length: GONE_MAX + 5 }, () => makeDevice("mozilla"));
+  for (const [i, d] of dead.entries()) await removeSubscriptions(store, [d.endpoint], { gone: true, now: new Date(NOW.getTime() + i * 1000) });
+  const gone = blobs.json("bookings", SUBS_KEY).gone;
+  assert.equal(gone.length, GONE_MAX);
+  const later = new Date(NOW.getTime() + 3600e3);
+  assert.equal((await saveSubscription(store, asStored(dead[0]), { now: later, gen: GEN })).created, true, "the oldest ones fell off the list");
+  assert.equal((await saveSubscription(store, asStored(dead.at(-1)), { now: later, gen: GEN })).status, 410);
+  const afterDays = new Date(NOW.getTime() + GONE_DAYS * 24 * 3600e3 + 3600e3);
+  assert.equal((await saveSubscription(store, asStored(dead.at(-1)), { now: afterDays, gen: GEN })).created, true, `forgotten after ${GONE_DAYS} days`);
+  assert.ok(blobs.json("bookings", SUBS_KEY).gone.length < GONE_MAX, "old entries are cleaned away on the next write");
+  // «Slå av varsler på alle andre enheter» keeps the list
+  await removeSubscriptions(store, [dead[1].endpoint], { gone: true, now: afterDays });
+  await clearSubscriptions(store);
+  assert.equal((await saveSubscription(store, asStored(dead[1]), { now: afterDays, gen: GEN })).status, 410);
 });

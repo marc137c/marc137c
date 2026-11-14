@@ -9,7 +9,8 @@
 //   POST   /api/admin/calendar         lag lenken { replace: false } (beholder en som finnes) eller lag en ny
 //                                      { replace: true } (den gamle slutter å virke med en gang)
 //   GET    /api/admin/push             varsler på enhetene: { publicKey, devices } (nøkkelparet lages første gang)
-//   POST   /api/admin/push/subscribe   { subscription } denne enheten får varsel om nye bestillinger
+//   POST   /api/admin/push/subscribe   { subscription } denne enheten får varsel om nye bestillinger (410 «gone»
+//                                      hvis push-tjenesten har sagt at abonnementet er borte: lag et nytt)
 //   POST   /api/admin/push/unsubscribe { endpoint }     denne enheten får ikke flere varsler
 //   POST   /api/admin/push/test        { endpoint }     send et testvarsel til denne enheten (bare en lagret enhet)
 //   POST   /api/admin/push/reset                        ingen enhet får varsler før de slås på igjen ({ devices: 0 })
@@ -127,7 +128,8 @@ export async function handle(req, context, deps) {
         const v = parseSubscription(body.subscription);
         if (v.error) return json({ error: v.error, code: v.code }, 400);
         const r = await saveSubscription(store, v.value, { now: deps.now(), gen });
-        if (r.error) return json({ error: r.error }, r.status);
+        // 410 «gone»: push-tjenesten har sagt at dette abonnementet er borte, så nettleseren må lage et nytt
+        if (r.error) return json(r.code ? { error: r.error, code: r.code } : { error: r.error }, r.status);
         return json({ ok: true, devices: r.devices }, r.created ? 201 : 200);
       }
       const endpoint = normalizeEndpoint(body.endpoint);
