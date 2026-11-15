@@ -29,7 +29,8 @@ export async function handle(req, context, deps) {
     const store = bookingStore(deps, context); // forhåndsvisninger har sin egen timebok (F10)
     // Tak mot flom (F2): per klient (IP eller IPv6 /64), per telefonnummer og totalt, telt konfliktsikkert før timen lagres
     const ip = (context && context.ip) || req.headers.get("x-nf-client-connection-ip") || "ukjent";
-    const slot = await takeBookingSlot(store, { ip, phone: v.value.phone }, deps.now().getTime());
+    // Med requestId er tokenet det samme i et nytt forsøk, så forsøket ikke telles to ganger (F1)
+    const slot = await takeBookingSlot(store, { ip, phone: v.value.phone, ...(v.value.requestId ? { token: v.value.requestId } : {}) }, deps.now().getTime());
     if (!slot.ok) {
       // Første gang det felles taket avviser i døgnet: ett varsel til Viggo (uten kundedata), så han vet hvorfor
       if (slot.tripped) {
@@ -46,9 +47,12 @@ export async function handle(req, context, deps) {
       await releaseBookingSlot(store, slot, ["phone", "all"]);
       return json({ error: r.error, code: r.code }, r.status);
     }
-    // Bare enheter slått på med dagens admin-passord får varselet (bytter Viggo passordet, stopper alle gamle)
-    const pushing = notifyNewBooking(store, r.item, { fetch: deps.fetch, now: deps.now(), origin: new URL(req.url).origin, gen: pushGen(deps.env.ADMIN_PASSWORD) });
-    await afterResponse(context, pushing, BOOKING_PUSH_WAIT_MS);
+    // Bare enheter slått på med dagens admin-passord får varselet (bytter Viggo passordet, stopper alle gamle).
+    // Et nytt forsøk på en bestilling som allerede er lagret (replay), varsler ikke igjen.
+    if (!r.replay) {
+      const pushing = notifyNewBooking(store, r.item, { fetch: deps.fetch, now: deps.now(), origin: new URL(req.url).origin, gen: pushGen(deps.env.ADMIN_PASSWORD) });
+      await afterResponse(context, pushing, BOOKING_PUSH_WAIT_MS);
+    }
     const { id, date, start, dur, service } = r.item;
     return json({ ok: true, booking: { id, date, start, dur, service } }, 201);
   } catch (err) {

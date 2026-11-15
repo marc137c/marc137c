@@ -134,8 +134,13 @@ export function validateCustomer(input, now = new Date()) {
   if (name.length < 2) return fail("bad_name", "Skriv inn navnet ditt.");
   if (!phoneOk(input.phone)) return fail("bad_phone", "Ugyldig telefonnummer.");
   const addons = (Array.isArray(input.addons) ? input.addons : []).filter((a) => CONFIG.addons.includes(a));
-  return { value: { date: input.date, start, dur, service, addons, name, phone } };
+  const value = { date: input.date, start, dur, service, addons, name, phone };
+  // Idempotens-nøkkel fra siden (SPEC R1): samme requestId igjen er et nytt forsøk på den samme bestillingen.
+  // Bare når siden sender en gyldig en, så en vanlig bestilling lagrer nøyaktig de samme feltene som før.
+  if (typeof input.requestId === "string" && REQUEST_ID_RE.test(input.requestId)) value.requestId = input.requestId;
+  return { value };
 }
+const REQUEST_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
 
 // Regler for admin: kan legge inn hva som helst på 5-minutters rutenett, også utenom åpningstid
 export function validateAdmin(input, { partial = false } = {}) {
@@ -180,9 +185,16 @@ export async function createItem(store, value, { source, force = false, now = ne
     service: value.service || "", addons: value.addons || [], name: value.name || "", phone: value.phone || "", note: value.note || "",
     createdAt: now.toISOString(), updatedAt: now.toISOString(),
   };
+  if (value.requestId) item.requestId = value.requestId;
   return mutateMonth(store, monthOf(item.date), (doc) => {
     // Ble første forsøk lagret selv om svaret gikk tapt, er jobben allerede gjort
     if (doc.items.some((o) => o.id === item.id)) return { ok: true, item };
+    // … også når forsøket kom i et nytt kall (siden prøvde igjen med samme requestId, F1): svar med den lagrede
+    // bestillingen i stedet for «tatt». Bare for den samme tiden, og bare mens den ikke er avlyst.
+    if (item.requestId) {
+      const same = doc.items.find((o) => o.requestId === item.requestId && active(o) && o.date === item.date && o.start === item.start);
+      if (same) return { ok: true, item: same, replay: true, noWrite: true };
+    }
     const clash = doc.items.find((o) => active(o) && o.date === item.date && overlaps(item.start, item.dur, o.start, o.dur));
     if (clash && !force) return { error: "Tidspunktet er allerede booket.", code: "taken", status: 409 };
     doc.items.push(item);
