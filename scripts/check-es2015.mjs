@@ -55,6 +55,9 @@ const RISKY_GLOBAL = {
   Notification: "iOS Safari < 16.4, og iPhone utenfor Hjem-skjermen",
   PushManager: "Safari < 16, iOS < 16.4, Chrome < 42, Firefox < 44",
 };
+// Oppslag i tabellene over: bare egne nøkler. Et vanlig TABELL[navn] finner også det som arves fra Object.prototype
+// (toString, hasOwnProperty, valueOf, constructor …), og meldte da korrekt ES5 som «Date.now().toString(36)» som manglende.
+const own = (T, k) => (Object.prototype.hasOwnProperty.call(T, k) ? T[k] : undefined);
 // Kall som alltid gir en ekte Array (trygt å spre)
 const ARRAY_CALLS = new Set(["map", "filter", "slice", "concat", "split", "from", "keys", "sort", "reverse", "fill", "of"]);
 
@@ -140,8 +143,8 @@ function check(where, code, lineOffset = 0) {
   walk(ast, [], (node, anc) => {
     // 4b) Objekter som må sjekkes før bruk
     const gname = (node.type === "MemberExpression" || node.type === "Identifier") ? globalName(node, anc[anc.length - 1]) : null;
-    if (gname && RISKY_GLOBAL[gname] && !isCheck(node, anc) && !guarded(node, anc, gname.split(".").pop())) {
-      report(where, L(node), `${gname} uten sjekk (mangler i ${RISKY_GLOBAL[gname]}). Sjekk først, f.eks. if (${gname.includes(".") ? gname + " && …" : `"${gname}" in window`}).`);
+    if (gname && own(RISKY_GLOBAL, gname) && !isCheck(node, anc) && !guarded(node, anc, gname.split(".").pop())) {
+      report(where, L(node), `${gname} uten sjekk (mangler i ${own(RISKY_GLOBAL, gname)}). Sjekk først, f.eks. if (${gname.includes(".") ? gname + " && …" : `"${gname}" in window`}).`);
     }
     // 3) Spredning / for-of over noe som kan være en DOM-samling
     const iterated = node.type === "SpreadElement" ? node.argument : node.type === "ForOfStatement" ? node.right : null;
@@ -154,13 +157,13 @@ function check(where, code, lineOffset = 0) {
     // 4) Nyere API-er uten sjekk
     if (node.type === "NewExpression") {
       const name = dotted(node.callee);
-      if (RISKY_NEW[name] && !guarded(node, anc, name.split(".").pop())) report(where, L(node), `new ${name} uten sjekk (mangler i ${RISKY_NEW[name]}).`);
+      if (own(RISKY_NEW, name) && !guarded(node, anc, name.split(".").pop())) report(where, L(node), `new ${name} uten sjekk (mangler i ${own(RISKY_NEW, name)}).`);
     }
     if (node.type === "CallExpression") {
       const name = dotted(node.callee);
       const method = node.callee.type === "MemberExpression" && !node.callee.computed ? node.callee.property.name : null;
-      if (RISKY_CALL[name] && !guarded(node, anc, name.split(".").pop())) report(where, L(node), `${name}() uten sjekk (mangler i ${RISKY_CALL[name]}).`);
-      else if (method && RISKY_METHOD[method] && !RISKY_CALL[name] && !guarded(node, anc, method)) report(where, L(node), `.${method}() uten sjekk (mangler i ${RISKY_METHOD[method]}).`);
+      if (own(RISKY_CALL, name) && !guarded(node, anc, name.split(".").pop())) report(where, L(node), `${name}() uten sjekk (mangler i ${own(RISKY_CALL, name)}).`);
+      else if (method && own(RISKY_METHOD, method) && !own(RISKY_CALL, name) && !guarded(node, anc, method)) report(where, L(node), `.${method}() uten sjekk (mangler i ${own(RISKY_METHOD, method)}).`);
     }
   });
 }
