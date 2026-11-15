@@ -2,8 +2,9 @@
 // site may promise an SMS. Invariants:
 //   1. no file in the repository (code, page, style, doc, config, test) mentions SMS or Sveve, promises a text
 //      message, or uses the old SMS fields on a booking; no file is named after them. This file is the only
-//      exception, because it has to name what it forbids. «påminnelse» on its own is allowed (a calendar alarm
-//      may use the word); «SMS-påminnelse» is caught by the SMS rule.
+//      exception, because it has to name what it forbids. Other files may point at this guard by its exact path
+//      (test/no-sms.test.mjs, as docs/SPEC.md does), and that path is the only form of the word they may use.
+//      «påminnelse» on its own is allowed (a calendar alarm may use the word); «SMS-påminnelse» is caught.
 //   2. the only scheduled function is the Instagram refresh;
 //   3. no code path calls Sveve, or anything else outside Netlify Blobs, even with the old Sveve variables still
 //      set in Netlify: a booking's whole life (book, see availability, move, cancel, delete) fetches nothing else,
@@ -33,6 +34,13 @@ const FORBIDDEN = [
   ["a promised text message", /tekstmelding|text message/i],
   ["an old SMS field", /\b(remindedAt|reminderRun|reminderSentAt|reminderError|reminderFails|reminderTestAt|confirmPending|confirmSentAt|shopPending|shopSentAt)\b/],
 ];
+// The exact path of this guard, which other files may use to point at it
+const SELF_PATH = "test/no-sms.test.mjs";
+// What a line breaks (labels from FORBIDDEN), after taking out references to this guard
+const forbiddenIn = (line) => {
+  const text = line.split(SELF_PATH).join(" ");
+  return FORBIDDEN.filter(([, re]) => re.test(text)).map(([what]) => what);
+};
 // The old Sveve settings may still be set in Netlify: they must change nothing
 const OLD_ENV = { SVEVE_USER: "old-user", SVEVE_PASSWD: "old-pass", SVEVE_FROM: "Viggos", SVEVE_TEST: "false", SHOP_SMS_TO: "40963911" };
 
@@ -53,11 +61,20 @@ test("no SMS: no file mentions SMS or Sveve, promises a text message or uses an 
     if (file === SELF || rel(file) === "package-lock.json" || BINARY.test(file)) continue;
     scanned++;
     readFileSync(file, "utf8").split("\n").forEach((line, i) => {
-      for (const [what, re] of FORBIDDEN) if (re.test(line)) hits.push(`${rel(file)}:${i + 1} ${what}: ${line.trim().slice(0, 120)}`);
+      for (const what of forbiddenIn(line)) hits.push(`${rel(file)}:${i + 1} ${what}: ${line.trim().slice(0, 120)}`);
     });
   }
   assert.ok(scanned >= 30, `scanned ${scanned} files`);
   assert.deepEqual(hits, []);
+});
+
+test("no SMS: other files may point at this guard by its exact path, and that is all", () => {
+  assert.deepEqual(forbiddenIn("| D1 | … | `test/no-sms.test.mjs` | now |"), []);
+  assert.deepEqual(forbiddenIn("see test/no-sms.test.mjs, then send an SMS"), ["SMS"]);
+  assert.deepEqual(forbiddenIn("test/no-sms.test.mjs Sveve"), ["Sveve"]);
+  assert.deepEqual(forbiddenIn("see no-sms.test.mjs"), ["SMS"], "only the full path from the repo root is allowed");
+  assert.deepEqual(forbiddenIn("test/no-sms.test.mjs: vi sender en tekstmelding"), ["a promised text message"]);
+  assert.deepEqual(forbiddenIn("SMS-påminnelse"), ["SMS"]);
 });
 
 test("no SMS: no file or folder is named after SMS, Sveve or reminders", () => {
