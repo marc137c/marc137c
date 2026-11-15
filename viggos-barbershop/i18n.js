@@ -167,6 +167,8 @@
       ratingOf: (r) => `${r} av 5 stjerner`,
       heroRating: (r, n) => `${r} på Google · ${n} anmeldelser`,
       reviewsFallback: "Les hva kundene våre sier om oss på Google.",
+      onGoogle: "på Google",
+      googleReview: "Google-anmeldelse",
       // Instagram
       followOn: (n) => `Følg oss på ${n}`,
       openPost: (n) => `Åpne innlegget på ${n}`,
@@ -209,6 +211,8 @@
       ratingOf: (r) => `${r} out of 5 stars`,
       heroRating: (r, n) => `${r} on Google · ${n} reviews`,
       reviewsFallback: "Read what our customers say about us on Google.",
+      onGoogle: "on Google",
+      googleReview: "Google review",
       // Instagram
       followOn: (n) => `Follow us on ${n}`,
       openPost: (n) => `Open the post on ${n}`,

@@ -9,6 +9,22 @@
   const MAX_CARDS = 4;
   let data = null;
 
+  // Ekte Google-anmeldelser som eieren valgte (lest 14.11.2026 fra delte lenker på Google Maps).
+  // Vises bare så lenge Google-koblingen (/api/reviews) ikke er satt opp; da tar Googles egne, oppdaterte
+  // tall og anmeldelser over. Teksten er ordrett; navnet er forkortet; hvert kort lenker til originalen.
+  const FEATURED = {
+    rating: 5,
+    url: "https://www.google.com/maps?cid=11492333145250102936",
+    reviews: [
+      { author: "Leon S. W.", rating: 5, authorUrl: "https://maps.app.goo.gl/QREBo7cj1MRCwQgD7",
+        text: "Klart den beste opplevelsen jeg har hatt. Stor forskjell på en barber og en frisør. Høflig ung mann med mye kunnskap." },
+      { author: "Edvard M. M.", rating: 5, authorUrl: "https://maps.app.goo.gl/XYkd2LQnLUvtRBva6",
+        text: "Viggos barbershop kan anbefales på det varmeste. En svært flink og utrolig kompetent frisør. Super fornøyd. Absolutt den beste frisøren jeg har vært hos noen gang." },
+      { author: "Gilbert L.", rating: 5, authorUrl: "https://maps.app.goo.gl/dqCgHtyePRZ4ZbaT8",
+        text: "Kjempeservice og en meget bra klipp. Prisen er også bra. Kan virkelig anbefale Viggo’s Barbershop" },
+    ],
+  };
+
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const safeUrl = (u) => (/^https:\/\//.test(u || "") ? u : null);
   const G_LOGO = '<svg class="g-logo" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.3-2.1 3.5-5.2 3.5-8.8z"/><path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6h-4a12 12 0 0 0 0 10.8l4-3.1z"/><path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1c.9-2.9 3.6-4.9 6.7-4.9z"/></svg>';
@@ -48,9 +64,23 @@
     </figure>`;
   }
 
+  // Uten Google-kobling: vis eierens utvalgte, ekte anmeldelser og snittet 5,0 med kilde «på Google»
+  function renderFeatured() {
+    const s = I18N.s();
+    link.href = FEATURED.url;
+    const r = FEATURED.rating.toFixed(1).replace(".", I18N.lang === "en" ? "." : ",");
+    summary.innerHTML = `${G_LOGO}<strong class="rating-num">${r}</strong>${stars(FEATURED.rating, "stars-lg")}<span class="rating-count">${esc(s.onGoogle)}</span>`;
+    summary.hidden = false;
+    if (heroRating) heroRating.hidden = true; // antall anmeldelser er ukjent uten Google-koblingen
+    list.innerHTML = FEATURED.reviews.map((x) => card(Object.assign({}, x, { when: s.googleReview }))).join("");
+    list.classList.remove("reviews--single");
+    list.setAttribute("aria-busy", "false");
+  }
+
   function render() {
     if (!data) return;
     const s = I18N.s();
+    if (!data.configured) { renderFeatured(); return; }
     const href = safeUrl(data.url);
     if (href) link.href = href;
 
