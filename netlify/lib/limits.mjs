@@ -141,6 +141,14 @@ export function phoneKey(phone) {
   return d;
 }
 
+// ---------- Admin-innlogging (F4, F5) ----------
+// Hvert forsøk telles før passordet sjekkes: per klient (rl/login/ip/<hash>) og totalt (LOGIN_ALL_KEY).
+export const LOGIN_LIMITS = {
+  ip: [{ max: 10, windowMs: 15 * 60 * 1000 }],
+  all: [{ max: 100, windowMs: 15 * 60 * 1000 }],
+};
+export const LOGIN_ALL_KEY = "rl/login/all";
+
 // ---------- Nettbestillinger (F2, NEW-lockout, SPEC R5) ----------
 // Uten tak kunne et skript fylle hele kalenderen på sekunder med falske bestillinger.
 // Tellerne gjelder forespørsler som har bestått valideringen. En avvist bestilling (taket, eller tiden var tatt)

@@ -1,5 +1,6 @@
 // Admin-API for timebestillinger. Alt krever innlogging med ADMIN_PASSWORD (settes i Netlify).
-//   POST   /api/admin/login            { password, remember } → { token }
+//   POST   /api/admin/login            { password, remember, device? } → { token, expiresIn, device } (60 dager bare
+//                                      med remember: true, ellers 12 timer; device: enhetsmerket, gyldig et år)
 //   GET    /api/admin/items?from&to    alle avtaler og blokkeringer i perioden
 //   POST   /api/admin/items            ny avtale/blokkering   (?force=1 = lagre selv om det kolliderer)
 //   PATCH  /api/admin/items/:id        endre (flytte, ny tjeneste, avlyse …)
@@ -21,8 +22,9 @@
 import { liveDeps, bookingStore } from "../lib/runtime.mjs";
 import {
   CONFIG, addDays, isDate, osloNow, readMonths, validateAdmin,
-  createItem, updateItem, deleteItem, checkPassword, makeToken, readToken,
+  createItem, updateItem, deleteItem, checkPassword, makeToken, readToken, makeDeviceMark, verifyDeviceMark,
 } from "../lib/booking-core.mjs";
+import { take, release, newToken, counterKey, limiterSecret, clientKey, LOGIN_LIMITS, LOGIN_ALL_KEY } from "../lib/limits.mjs";
 import { readFeedState, createFeed, feedLinks, feedGen } from "../lib/calendar.mjs";
 import {
   vapidKeys, readSubscriptions, parseSubscription, saveSubscription, removeSubscriptions, normalizeEndpoint,
@@ -56,26 +58,40 @@ export async function handle(req, context, deps) {
   if (path === "/api/admin/login") {
     if (req.method !== "POST") return json({ error: "Bruk POST." }, 405);
     let body = {};
-    try { body = await req.json(); } catch {}
-    // Sperre mot gjetting: maks 10 feil per IP og 100 totalt per 15 minutter
+    try { body = (await req.json()) || {}; } catch {}
+    // Sperre mot gjetting (F4, F5): hvert forsøk tar en plass i telleren FØR passordet sjekkes, konfliktsikkert,
+    // så parallelle forsøk aldri får sjekket flere enn taket: høyst 10 per klient (IPv6 per /64) og 100 totalt per
+    // 15 minutter. En enhet med et gyldig enhetsmerke (fra en tidligere innlogging her) slipper det felles taket.
+    // En riktig innlogging gir plassene tilbake.
     const authStore = bookingStore(deps, context); // forhåndsvisninger har sin egen lagring (F10)
-    const ip = (context?.ip || req.headers.get("x-nf-client-connection-ip") || "ukjent").replace(/[^\w.:-]/g, "");
-    const limits = [[`auth/ip/${ip}`, 10], ["auth/all", 100]];
-    const WINDOW = 15 * 60 * 1000;
-    const counts = await Promise.all(limits.map(([k]) => authStore.get(k, { type: "json" }).catch(() => null)));
-    if (limits.some(([, max], i) => counts[i] && nowMs - counts[i].start < WINDOW && counts[i].n >= max)) {
-      return json({ error: "For mange feil forsøk. Vent et kvarter og prøv igjen." }, 429);
+    const ip = context?.ip || req.headers.get("x-nf-client-connection-ip") || "ukjent";
+    const attempt = newToken();
+    const taken = [];
+    try {
+      const ipKey = counterKey(await limiterSecret(authStore), "login/ip", clientKey(ip));
+      const checks = [[ipKey, LOGIN_LIMITS.ip]];
+      if (!verifyDeviceMark(body.device, password, nowMs)) checks.push([LOGIN_ALL_KEY, LOGIN_LIMITS.all]);
+      for (const [key, rules] of checks) {
+        const r = await take(authStore, key, rules, { nowMs, token: attempt });
+        if (r.error || !r.ok) {
+          for (const k of taken) await release(authStore, k, attempt).catch(() => {});
+          if (r.error) return json({ error: "Innloggingen er ikke tilgjengelig akkurat nå. Prøv igjen om litt." }, 503);
+          return json({ error: "For mange feil forsøk. Vent et kvarter og prøv igjen." }, 429);
+        }
+        taken.push(key);
+      }
+    } catch (err) {
+      console.error("Admin: innloggingstelleren svarte ikke:", err && err.name);
+      return json({ error: "Innloggingen er ikke tilgjengelig akkurat nå. Prøv igjen om litt." }, 503);
     }
     if (!checkPassword(String(body.password ?? ""), password)) {
-      await Promise.all(limits.map(([k], i) => {
-        const c = counts[i] && nowMs - counts[i].start < WINDOW ? counts[i] : { start: nowMs, n: 0 };
-        return authStore.setJSON(k, { start: c.start, n: c.n + 1 }).catch(() => {});
-      }));
       await deps.sleep(500);
       return json({ error: "Feil passord." }, 401);
     }
-    const ttl = body.remember === false ? DAY / 2 : 60 * DAY;
-    return json({ token: makeToken(password, nowMs, ttl), expiresIn: ttl });
+    for (const k of taken) await release(authStore, k, attempt).catch(() => {});
+    // 60 dager bare når «Hold meg innlogget» er krysset av (remember: true), ellers 12 timer (F34)
+    const ttl = body.remember === true ? 60 * DAY : SHORT_LOGIN;
+    return json({ token: makeToken(password, nowMs, ttl), expiresIn: ttl, device: makeDeviceMark(password, nowMs) });
   }
 
   const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");

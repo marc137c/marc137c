@@ -3,9 +3,12 @@
 // clock or the network.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { testDeps, request, read, PRODUCTION, PREVIEW } from "../helpers/deps.mjs";
+import { testDeps, request, read, quiet, PRODUCTION, PREVIEW } from "../helpers/deps.mjs";
 import { item, seedItems, storedItems, CUSTOMER_PHONE } from "../helpers/bookings.mjs";
-import { makeToken } from "../../netlify/lib/booking-core.mjs";
+import { FakeBlobs } from "../helpers/fake-blobs.mjs";
+import { FakeClock } from "../helpers/clock.mjs";
+import { makeToken, makeDeviceMark, verifyDeviceMark } from "../../netlify/lib/booking-core.mjs";
+import { counterKey, limiterSecret, clientKey } from "../../netlify/lib/limits.mjs";
 import { handle, config } from "../../netlify/functions/admin.mjs";
 
 const PASSWORD = "fake-admin-password";
@@ -41,8 +44,10 @@ test("admin: a wrong password waits 500 ms on the injected clock, counts the fai
   const res = await read(await handle(request("/api/admin/login", { method: "POST", json: { password: "nope" } }), { ...PRODUCTION, ip: "203.0.113.9" }, d));
   assert.equal(res.status, 401);
   assert.ok(d.clock.now() - before >= 500);
-  assert.equal(d.blobs.json("bookings", "auth/ip/203.0.113.9").n, 1);
-  assert.equal(d.blobs.json("bookings", "auth/all").start, before);
+  const ipKey = counterKey(await limiterSecret(d.getStore({ name: "bookings", consistency: "strong" })), "login/ip", "203.0.113.9");
+  assert.deepEqual(d.blobs.json("bookings", ipKey).hits.map((h) => h.t), [before]);
+  assert.deepEqual(d.blobs.json("bookings", "rl/login/all").hits.map((h) => h.t), [before]);
+  assert.equal(d.blobs.keys("bookings").filter((k) => k.startsWith("auth/")).length, 0, "the old auth/* counters are gone");
 });
 
 test("admin: a token expires by the injected clock (12 h without «Hold meg innlogget»)", async () => {
@@ -82,4 +87,89 @@ test("admin: create, move and delete use the injected clock and the deploy's own
   const listed = await read(await handle(request("/api/admin/items?from=2026-11-20&to=2026-11-20", { headers: auth(d) }), PREVIEW, d));
   assert.deepEqual(listed.body.items, []);
   assert.equal(d.fetch.calls.length, 0);
+});
+
+// ---------- Login limits (F4, F5): counted atomically before the password is checked ----------
+const live = (d) => d.getStore({ name: "bookings", consistency: "strong" });
+const loginKey = async (d, ip) => counterKey(await limiterSecret(live(d)), "login/ip", clientKey(ip));
+const hitCount = (d, key) => (d.blobs.json("bookings", key) || { hits: [] }).hits.length;
+const tryLogin = (d, password, ip, extra = {}) =>
+  handle(request("/api/admin/login", { method: "POST", json: { password, ...extra } }), { ...PRODUCTION, ip }, d).then(read);
+const tally = (rs) => rs.reduce((m, r) => ({ ...m, [r.status]: (m[r.status] || 0) + 1 }), {});
+
+test("admin login: 50 parallel wrong logins from one IP check the password at most 10 times; the rest are 429", async () => {
+  const clock = new FakeClock(NOW);
+  const blobs = new FakeBlobs({ clock, latencyMs: 30 });
+  const d = testDeps({ clock, blobs, env });
+  const rs = await Promise.all(Array.from({ length: 50 }, (_, i) => tryLogin(d, "guess" + i, "203.0.113.5")));
+  const st = tally(rs);
+  assert.ok((st[401] || 0) <= 10, JSON.stringify(st));
+  assert.equal((st[401] || 0) + (st[429] || 0), 50, JSON.stringify(st));
+  assert.equal(hitCount(d, await loginKey(d, "203.0.113.5")), 10, "the counter holds exactly 10 hits");
+  for (const r of rs.filter((x) => x.status === 429)) assert.match(r.body.error, /For mange feil forsøk/);
+});
+
+test("admin login: an IPv6 /64 is one client for the login limit too", async () => {
+  const d = testDeps({ now: NOW, env });
+  const rs = [];
+  for (let i = 1; i <= 12; i++) rs.push(await tryLogin(d, "nope", `2a01:79c:cebd:1000::${i.toString(16)}`));
+  assert.deepEqual(rs.map((r) => r.status), [401, 401, 401, 401, 401, 401, 401, 401, 401, 401, 429, 429]);
+});
+
+test("admin login: 100 failures from 100 /64s still let a barber in with a device mark, and lock out the rest", async (t) => {
+  quiet(t);
+  const d = testDeps({ now: NOW, env });
+  const first = await tryLogin(d, PASSWORD, "84.210.1.1", { remember: true });
+  assert.equal(first.status, 200);
+  const device = first.body.device;
+  assert.equal(typeof device, "string");
+  for (let i = 0; i < 100; i++) assert.equal((await tryLogin(d, "guess" + i, `2a01:79c:${i.toString(16)}:1::1`)).status, 401);
+  assert.equal(hitCount(d, "rl/login/all"), 100);
+  const without = await tryLogin(d, PASSWORD, "84.210.1.2");
+  assert.equal(without.status, 429, "without the mark the global limit holds");
+  const withMark = await tryLogin(d, PASSWORD, "84.210.1.3", { device });
+  assert.equal(withMark.status, 200, JSON.stringify(withMark.body));
+  assert.equal(typeof withMark.body.token, "string");
+  // a mark for another password, a tampered or a junk mark do not skip the limit
+  for (const bad of [makeDeviceMark("other", d.clock.now()), device.replace(/.$/, (c) => (c === "A" ? "B" : "A")), "x.y", 5]) {
+    assert.equal((await tryLogin(d, PASSWORD, "84.210.1.4", { device: bad })).status, 429, String(bad));
+  }
+  // the mark lasts a year
+  d.clock.advance(364 * 864e5);
+  for (let i = 0; i < 100; i++) await tryLogin(d, "guess" + i, `2a01:79d:${i.toString(16)}:1::1`);
+  assert.equal((await tryLogin(d, PASSWORD, "84.210.1.5", { device })).status, 200);
+  d.clock.advance(2 * 864e5);
+  for (let i = 0; i < 100; i++) await tryLogin(d, "guess" + i, `2a01:79e:${i.toString(16)}:1::1`);
+  assert.equal((await tryLogin(d, PASSWORD, "84.210.1.6", { device })).status, 429, "an expired mark does not");
+});
+
+test("admin login: a successful login gives back its hits and returns a device mark", async () => {
+  const d = testDeps({ now: NOW, env });
+  for (let i = 0; i < 9; i++) assert.equal((await tryLogin(d, "nope", "203.0.113.7")).status, 401);
+  const ok = await tryLogin(d, PASSWORD, "203.0.113.7");
+  assert.equal(ok.status, 200);
+  assert.deepEqual(Object.keys(ok.body).sort(), ["device", "expiresIn", "token"]);
+  assert.equal(verifyDeviceMark(ok.body.device, PASSWORD, d.clock.now()), true);
+  assert.equal(hitCount(d, await loginKey(d, "203.0.113.7")), 9, "the successful attempt left no hit");
+  assert.equal(hitCount(d, "rl/login/all"), 9);
+  assert.equal((await tryLogin(d, PASSWORD, "203.0.113.7")).status, 200, "the barber can log in again");
+});
+
+test("admin login: a store outage gives 503 and checks no password", async (t) => {
+  quiet(t);
+  const d = testDeps({ now: NOW, env });
+  d.blobs.inject({ method: "GET", fault: "fail-before", status: 500, times: Infinity });
+  const r = await tryLogin(d, PASSWORD, "203.0.113.8");
+  assert.equal(r.status, 503);
+  assert.equal(r.body.token, undefined);
+  assert.equal(d.blobs.requests({ method: "PUT" }).length, 0);
+});
+
+test("admin login: the 60-day token only with remember === true, otherwise 12 hours (F34)", async () => {
+  const d = testDeps({ now: NOW, env });
+  for (const [remember, ttl] of [[true, 60 * 864e5], [false, 864e5 / 2], [undefined, 864e5 / 2], ["true", 864e5 / 2], [1, 864e5 / 2]]) {
+    const r = await tryLogin(d, PASSWORD, "203.0.113.20", remember === undefined ? {} : { remember });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.expiresIn, ttl, JSON.stringify(remember));
+  }
 });

@@ -302,3 +302,10 @@ export function readToken(token, password, now = Date.now()) {
   return { exp: data.exp, iat: Number.isFinite(data.iat) ? data.iat : undefined };
 }
 export const verifyToken = (token, password, now = Date.now()) => readToken(token, password, now) !== null;
+
+// Enhetsmerket (F5): en innlogging med riktig passord gir enheten et merke som varer i et år. Med det slipper
+// innloggingen det felles taket mot gjetting (rl/login/all), så en som gjetter fra mange adresser ikke stenger
+// Viggo ute. Taket per klient gjelder fortsatt, og passordet må fortsatt være riktig.
+export const DEVICE_MARK_MS = 365 * 24 * 60 * 60 * 1000;
+export const makeDeviceMark = (password, now = Date.now()) => makeToken(password + "|device", now, DEVICE_MARK_MS);
+export const verifyDeviceMark = (mark, password, now = Date.now()) => !!password && verifyToken(mark, password + "|device", now);

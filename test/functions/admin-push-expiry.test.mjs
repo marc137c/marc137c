@@ -46,7 +46,7 @@ const stored = (d) => (d.blobs.has("bookings", SUBS_KEY) ? d.blobs.json("booking
 
 test("push expiry: the login itself makes a 12-hour token without «Hold meg innlogget» and a 60-day one with it", async () => {
   const d = setup([]);
-  for (const [remember, ttl] of [[false, SHORT], [true, LONG], [undefined, LONG]]) {
+  for (const [remember, ttl] of [[false, SHORT], [true, LONG], [undefined, SHORT]]) { // 60 days only with remember === true (F34)
     const t = readToken(await login(d, remember), PASSWORD, d.clock.now());
     assert.deepEqual(t, { exp: d.clock.now() + ttl, iat: d.clock.now() }, String(remember));
   }
