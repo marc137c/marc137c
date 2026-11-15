@@ -1,14 +1,22 @@
 // Audit finding F2: a booking flood must not fill the calendar with fake bookings.
-// POST /api/bookings counts every validated request per client IP (5/h, 10/24 h), per phone
-// number (3/24 h, whatever the formatting) and in total (20/h, 40/24 h), atomically in Netlify Blobs, and answers
-// 429 { error, code: "rate_limited" } when a limit is reached. Cross-site and non-JSON posts are refused first.
+// POST /api/bookings counts every validated request per client (IPv4 address, or IPv6 /64: 5/h, 10/24 h), per
+// phone number (6/24 h, whatever the formatting; owner to confirm) and in total (20/h, 40/24 h), atomically in
+// Netlify Blobs, and answers 429 { error, code: "rate_limited" } when a limit is reached. Cross-site and non-JSON
+// posts are refused first. NEW-lockout / NEW-429 / NEW-pii-keys (SPEC R5, R4):
+//   - all three counters are checked before any is written, and a refused attempt is refunded, so a full global
+//     counter never burns a customer's own phone or IP counter;
+//   - an attempt on a taken slot (409) keeps only its IP hit: 409 spam costs nothing globally;
+//   - the barber gets one push the first time the global cap refuses in a window;
+//   - counter keys are keyed hashes: no store key holds a phone number or an IP address.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { testDeps, request, read, quiet, PRODUCTION } from "../helpers/deps.mjs";
 import { oslo } from "../helpers/clock.mjs";
-import { storedItems } from "../helpers/bookings.mjs";
+import { item, seedItems, storedItems } from "../helpers/bookings.mjs";
+import { makeDevice, fakePushService } from "../helpers/fake-push.mjs";
 import { addDays, dayOfWeek, CONFIG } from "../../netlify/lib/booking-core.mjs";
-import { BOOKING_LIMITS, phoneKey } from "../../netlify/lib/limits.mjs";
+import { BOOKING_LIMITS, phoneKey, clientKey, counterKey, limiterSecret, ALL_KEY } from "../../netlify/lib/limits.mjs";
+import { vapidKeys, saveSubscription, parseSubscription, pushGen } from "../../netlify/lib/push.mjs";
 import { handle } from "../../netlify/functions/bookings.mjs";
 
 const NOW = oslo("2026-11-12", 10, 0); // Thursday 10:00 in Oslo
@@ -37,11 +45,15 @@ async function flood(d, n, { ip = (i) => `203.0.113.${i % 250}`, phone = mobile,
   return out;
 }
 const statuses = (rs) => rs.reduce((m, r) => ({ ...m, [r.status]: (m[r.status] || 0) + 1 }), {});
+const live = (d) => d.getStore({ name: "bookings", consistency: "strong" });
+// The stored key of a counter, as limits.mjs names it (a keyed hash of the value)
+const keyOf = async (d, kind, value) => counterKey(await limiterSecret(live(d)), kind, value);
+const hits = (d, key) => (d.blobs.json("bookings", key) || { hits: [] }).hits.length;
 
 test("rate limit: the limits are the documented ones", () => {
   assert.deepEqual(BOOKING_LIMITS, {
     ip: [{ max: 5, windowMs: HOUR }, { max: 10, windowMs: 24 * HOUR }],
-    phone: [{ max: 3, windowMs: 24 * HOUR }],
+    phone: [{ max: 6, windowMs: 24 * HOUR }],
     all: [{ max: 20, windowMs: HOUR }, { max: 40, windowMs: 24 * HOUR }],
   });
 });
@@ -67,12 +79,12 @@ test("rate limit: one client gets at most 5 bookings per hour and 10 per 24 h; t
   assert.equal(storedItems(d.blobs).length, 11);
 });
 
-test("rate limit: one phone number gets at most 3 bookings per 24 h, whatever the formatting and the client", async () => {
+test("rate limit: one phone number gets at most 6 bookings per 24 h, whatever the formatting and the client", async () => {
   const d = testDeps({ now: NOW });
-  const formats = ["+47 912 34 567", "91234567", "0047 912 34 567", "912-34-567", "912 34 567"];
+  const formats = ["+47 912 34 567", "91234567", "0047 912 34 567", "912-34-567", "912 34 567", "+47 91234567", "0047-912-34-567", "912.34.567"];
   const rs = await flood(d, formats.length, { phone: (i) => formats[i], slots: allSlots() });
-  assert.deepEqual(rs.map((r) => r.status), [201, 201, 201, 429, 429]);
-  assert.equal(storedItems(d.blobs).length, 3);
+  assert.deepEqual(rs.map((r) => r.status), [201, 201, 201, 201, 201, 201, 429, 429]);
+  assert.equal(storedItems(d.blobs).length, 6);
 });
 
 test("rate limit: the phone counter key ignores formatting and the +47/0047 prefix, landlines too", () => {
@@ -85,10 +97,10 @@ test("rate limit: the phone counter key ignores formatting and the +47/0047 pref
 
 test("rate limit: a landline written with and without +47 shares one counter", async () => {
   const d = testDeps({ now: NOW });
-  const formats = ["+47 69 17 00 00", "69170000", "0047 69 17 00 00", "69 17 00 00"];
+  const formats = ["+47 69 17 00 00", "69170000", "0047 69 17 00 00", "69 17 00 00", "+4769170000", "0047 69170000", "69-17-00-00"];
   const rs = await flood(d, formats.length, { phone: (i) => formats[i], slots: allSlots() });
-  assert.deepEqual(rs.map((r) => r.status), [201, 201, 201, 429]);
-  assert.deepEqual(d.blobs.keys("bookings").filter((k) => k.startsWith("rl/phone/")), ["rl/phone/69170000"]);
+  assert.deepEqual(rs.map((r) => r.status), [201, 201, 201, 201, 201, 201, 429]);
+  assert.deepEqual(d.blobs.keys("bookings").filter((k) => k.startsWith("rl/phone/")), [await keyOf(d, "phone", "69170000")]);
 });
 
 test("rate limit: a flood from rotating clients and numbers stores at most 20 per hour and 40 per 24 h", async (t) => {
@@ -100,7 +112,7 @@ test("rate limit: a flood from rotating clients and numbers stores at most 20 pe
     const rs = [];
     for (let k = 0; k < n; k++, i++) {
       const phone = mobile(i);
-      const r = await read(await handle(post(body(slots.next().value, phone)), from(`2001:db8::${i}`), d));
+      const r = await read(await handle(post(body(slots.next().value, phone)), from(`2001:db8:${i.toString(16)}::1`), d));
       rs.push({ ...r, phone });
     }
     return rs;
@@ -142,8 +154,9 @@ test("rate limit: a lost reply on a counter write is not counted twice", async (
   d.blobs.inject({ method: "PUT", key: /^rl\/ip\//, fault: "lost-response" });
   const res = await read(await handle(post(body({ date: "2026-11-13", start: 600 }, mobile(1))), from("198.51.100.5"), d));
   assert.equal(res.status, 201);
-  assert.equal(d.blobs.json("bookings-preview", "rl/ip/198.51.100.5"), undefined);
-  assert.equal(d.blobs.json("bookings", "rl/ip/198.51.100.5").hits.length, 1);
+  const key = await keyOf(d, "ip", "198.51.100.5");
+  assert.equal(d.blobs.json("bookings-preview", key), undefined);
+  assert.equal(hits(d, key), 1);
 });
 
 test("rate limit: cross-site and non-JSON posts are refused before anything is counted or stored", async () => {
@@ -171,4 +184,165 @@ test("rate limit: honeypot and invalid requests write nothing", async () => {
   }
   assert.equal(d.blobs.requests({ method: "PUT" }).length, 0);
   assert.equal((await handle(post(body({ date: "2026-11-13", start: 600 }, mobile(1))), from("198.51.100.8"), d)).status, 201);
+});
+
+// ---------- clients: IPv6 per /64, IPv4-mapped as IPv4 (NEW-lockout) ----------
+test("rate limit: clientKey keys IPv4 by address, IPv6 by its /64, and anything else as 'ukjent'", () => {
+  for (const [given, key] of [
+    ["198.51.100.5", "198.51.100.5"], ["198.51.100.5:443", "198.51.100.5"], [" 198.51.100.5 ", "198.51.100.5"],
+    ["::ffff:198.51.100.5", "198.51.100.5"], ["::FFFF:198.51.100.5", "198.51.100.5"], ["::ffff:c633:6405", "198.51.100.5"],
+    ["[::ffff:198.51.100.5]:8080", "198.51.100.5"], ["0:0:0:0:0:ffff:198.51.100.5", "198.51.100.5"],
+    ["2a01:79c:cebd:1000::1", "2a01:79c:cebd:1000::/64"], ["2a01:79c:cebd:1000::28", "2a01:79c:cebd:1000::/64"],
+    ["2a01:079c:cebd:1000:aaaa:bbbb:cccc:dddd", "2a01:79c:cebd:1000::/64"], ["2A01:79C:CEBD:1000::1", "2a01:79c:cebd:1000::/64"],
+    ["[2a01:79c:cebd:1000::1]:443", "2a01:79c:cebd:1000::/64"], ["fe80::1%eth0", "fe80:0:0:0::/64"],
+    ["2001:db8::", "2001:db8:0:0::/64"], ["::1", "0:0:0:0::/64"], ["::", "0:0:0:0::/64"], ["64:ff9b::198.51.100.5", "64:ff9b:0:0::/64"],
+    ["2a01:79c:cebd:1001::1", "2a01:79c:cebd:1001::/64"],
+  ]) assert.equal(clientKey(given), key, String(given));
+  for (const bad of ["", "ukjent", undefined, null, "999.1.1.1", "1.2.3", "1.2.3.4.5", "01.2.3.4.5", "2001:db8:::1", "1::2::3",
+    "2001:db8:0:0:0:0:0:0:1", "1:2:3:4:5:6:7", "g::1", "2001:db8::12345", "::ffff:999.1.1.1", ":1::", "<script>", "a".repeat(100)]) {
+    assert.equal(clientKey(bad), "ukjent", String(bad));
+  }
+});
+
+test("rate limit: 12 bookings from 12 addresses in one IPv6 /64 give 5 x 201, then 429", async () => {
+  const d = testDeps({ now: NOW });
+  const rs = await flood(d, 12, { ip: (i) => `2a01:79c:cebd:1000::${(i + 1).toString(16)}`, slots: allSlots() });
+  assert.deepEqual(rs.map((r) => r.status), [201, 201, 201, 201, 201, 429, 429, 429, 429, 429, 429, 429]);
+  assert.equal(storedItems(d.blobs).length, 5);
+});
+
+test("rate limit: ::ffff:198.51.100.5 and 198.51.100.5 are one client", async () => {
+  const d = testDeps({ now: NOW });
+  const rs = await flood(d, 7, { ip: (i) => (i % 2 ? "::ffff:198.51.100.5" : "198.51.100.5"), slots: allSlots() });
+  assert.deepEqual(rs.map((r) => r.status), [201, 201, 201, 201, 201, 429, 429]);
+  assert.equal(d.blobs.keys("bookings").filter((k) => k.startsWith("rl/ip/")).length, 1);
+});
+
+// ---------- the lockout demo (audit/ready/server/demo-lockout.mjs) ----------
+const phoneHits = (d) => d.blobs.keys("bookings").filter((k) => k.startsWith("rl/phone/")).reduce((n, k) => n + hits(d, k), 0);
+
+test("rate limit: 40 attempts on a taken slot from one /64 stop at the client cap, cost the global counter nothing, and a real customer still books", async () => {
+  const d = testDeps({ now: oslo("2026-11-16", 9, 0) }); // Monday 09:00
+  const at = (start) => ({ date: "2026-11-20", start });
+  const real = await read(await handle(post(body(at(720), "41234567")), from("84.210.1.1"), d));
+  assert.equal(real.status, 201);
+  const attack = async (from0) => {
+    const out = [];
+    for (let i = from0; i < from0 + 20; i++) {
+      out.push(await read(await handle(post(body(at(720), "9" + String(2000000 + i))), from(`2a01:79c:cebd:1000::${(i + 1).toString(16)}`), d)));
+    }
+    return out;
+  };
+  const first = await attack(0);
+  d.clock.advance(HOUR + 1000);
+  const second = await attack(20);
+  assert.deepEqual(statuses(first), { 409: 5, 429: 15 }, "the /64 is one client: 5 per hour");
+  assert.deepEqual(statuses(second), { 409: 5, 429: 15 }, "and 10 per 24 h");
+  assert.equal(hits(d, ALL_KEY), 1, "only the real booking is in the global counter");
+  assert.equal(phoneHits(d), 1, "no attacker phone kept a hit");
+  const customer = await read(await handle(post(body(at(600), "98765432")), from("62.249.1.7"), d));
+  assert.equal(customer.status, 201, JSON.stringify(customer.body));
+  assert.equal(storedItems(d.blobs).length, 2);
+});
+
+test("rate limit: with the global counter full, refused tries leave the customer's IP and phone counters unchanged", async (t) => {
+  quiet(t);
+  const d = testDeps({ now: NOW });
+  const full = Array.from({ length: 40 }, (_, i) => ({ t: NOW.getTime() - 60e3 - i, id: "seed" + i }));
+  d.blobs.seed("bookings", ALL_KEY, { hits: full });
+  for (let k = 0; k < 3; k++) {
+    const r = await read(await handle(post(body({ date: "2026-11-13", start: 600 + 30 * k }, "98765432")), from("62.249.1.7"), d));
+    assert.deepEqual([r.status, r.body.code], [429, "rate_limited"]);
+    assert.match(r.body.error, /409 63 911/);
+  }
+  assert.equal(hits(d, await keyOf(d, "phone", "98765432")), 0);
+  assert.equal(hits(d, await keyOf(d, "ip", "62.249.1.7")), 0);
+  assert.equal(hits(d, ALL_KEY), 40);
+  // A day later the global counter has room again, and the same customer books at once
+  d.clock.advance(24 * HOUR);
+  const later = await read(await handle(post(body({ date: "2026-11-16", start: 630 }, "98765432")), from("62.249.1.8"), d));
+  assert.equal(later.status, 201, JSON.stringify(later.body));
+});
+
+test("rate limit: a refused phone attempt leaves the IP counter unchanged, and a refused IP attempt the phone counter", async () => {
+  const d = testDeps({ now: NOW });
+  const slots = allSlots();
+  // 6 bookings from one phone on 6 different clients fill the phone counter
+  await flood(d, 6, { ip: (i) => `198.51.100.${20 + i}`, phone: () => "41234567", slots });
+  const r = await read(await handle(post(body(slots.next().value, "41234567")), from("198.51.100.40"), d));
+  assert.equal(r.status, 429);
+  assert.equal(hits(d, await keyOf(d, "ip", "198.51.100.40")), 0, "the refused phone attempt took no IP hit");
+  assert.equal(hits(d, ALL_KEY), 6);
+  // 5 bookings from one client fill its IP counter; the 6th, from a new phone, does not count for that phone
+  await flood(d, 5, { ip: () => "198.51.100.50", phone: (i) => mobile(100 + i), slots });
+  const r2 = await read(await handle(post(body(slots.next().value, "47111222")), from("198.51.100.50"), d));
+  assert.equal(r2.status, 429);
+  assert.equal(hits(d, await keyOf(d, "phone", "47111222")), 0);
+  assert.equal(hits(d, ALL_KEY), 11);
+});
+
+test("rate limit: three 409s and then a free slot from the same phone give 201", async () => {
+  const d = testDeps({ now: NOW });
+  seedItems(d.blobs, [600, 630, 660].map((start) => item({ date: "2026-11-13", start, name: "Tatt" })));
+  for (const start of [600, 630, 660]) {
+    const r = await read(await handle(post(body({ date: "2026-11-13", start }, "91234567")), from("62.249.1.7"), d));
+    assert.deepEqual([r.status, r.body.code], [409, "taken"]);
+  }
+  assert.equal(hits(d, await keyOf(d, "phone", "91234567")), 0, "a taken slot costs the phone nothing");
+  assert.equal(hits(d, ALL_KEY), 0, "nor the global counter");
+  assert.equal(hits(d, await keyOf(d, "ip", "62.249.1.7")), 3, "the client counter keeps them (spam from one client is still capped)");
+  const ok = await read(await handle(post(body({ date: "2026-11-13", start: 690 }, "91234567")), from("62.249.1.7"), d));
+  assert.equal(ok.status, 201, JSON.stringify(ok.body));
+});
+
+test("rate limit: the barber gets exactly one push the first time the global cap refuses in a window", async (t) => {
+  quiet(t);
+  const phone = makeDevice("apple");
+  const push = fakePushService({ devices: [phone] });
+  const PASSWORD = "fake-admin-password";
+  const d = testDeps({ now: NOW, env: { ADMIN_PASSWORD: PASSWORD }, fetch: push.fetch });
+  await vapidKeys(live(d), { now: d.now() });
+  const sub = parseSubscription(phone.subscription).value;
+  assert.equal((await saveSubscription(live(d), sub, { now: d.now(), gen: pushGen(PASSWORD), until: new Date(NOW.getTime() + 30 * 24 * HOUR) })).ok, true);
+  const paused = () => push.deliveries.filter((x) => x.payload && x.payload.title !== "Ny time");
+  const slots = allSlots();
+  const rs = await flood(d, 25, { ip: (i) => `198.51.${i}.1`, slots });
+  assert.deepEqual(statuses(rs), { 201: 20, 429: 5 });
+  assert.equal(paused().length, 1, JSON.stringify(push.deliveries.map((x) => x.payload)));
+  const [msg] = paused();
+  assert.equal(msg.error, undefined, msg.error);
+  assert.equal(msg.payload.title, "Nettbestilling er satt på pause");
+  assert.match(msg.payload.body, /^For mange bestillinger siste døgn\./);
+  assert.match(msg.payload.body, /409 63 911/);
+  assert.equal(msg.payload.url, "/admin");
+  assert.ok(!/Flom|910\d{5}/.test(JSON.stringify(msg.payload)), "no customer data");
+  // later refusals in the same window send nothing more
+  d.clock.advance(HOUR + 1000);
+  const more = await flood(d, 25, { ip: (i) => `198.52.${i}.1`, slots });
+  assert.deepEqual(statuses(more), { 201: 20, 429: 5 });
+  assert.equal(paused().length, 1);
+  d.clock.advance(HOUR);
+  assert.deepEqual(statuses(await flood(d, 3, { ip: (i) => `198.53.${i}.1`, slots })), { 429: 3 });
+  assert.equal(paused().length, 1, "still the same 24 h window");
+  assert.equal(push.deliveries.filter((x) => x.payload && x.payload.title === "Ny time").length, 40);
+});
+
+test("rate limit: no key in any store holds the customer's phone number or IP address", async () => {
+  const d = testDeps({ now: NOW });
+  const slots = allSlots();
+  for (const [ip, phone] of [["62.249.1.7", "987 65 432"], ["2a01:79c:cebd:1000::7", "+47 41 23 45 67"], ["::ffff:84.210.9.9", "0047 22 33 44 55"]]) {
+    assert.equal((await read(await handle(post(body(slots.next().value, phone)), from(ip), d))).status, 201);
+  }
+  const keys = [...d.blobs.stores.keys()].flatMap((s) => d.blobs.keys(s));
+  assert.ok(keys.some((k) => k.startsWith("rl/ip/")) && keys.some((k) => k.startsWith("rl/phone/")), keys.join(" "));
+  for (const k of keys) {
+    for (const secret of ["98765432", "41234567", "22334455", "62.249", "2a01", "cebd", "84.210"]) assert.ok(!k.includes(secret), `${k} holds ${secret}`);
+    assert.doesNotMatch(k, /\d{8}|\d{1,3}\.\d{1,3}\.\d{1,3}/, k);
+  }
+  // the keyed hash is the same for the same value, differs per kind, and is never the value itself
+  const secret = await limiterSecret(live(d));
+  assert.equal(counterKey(secret, "phone", "98765432"), counterKey(secret, "phone", "98765432"));
+  assert.notEqual(counterKey(secret, "phone", "98765432"), counterKey(secret, "ip", "98765432"));
+  assert.match(counterKey(secret, "phone", "98765432"), /^rl\/phone\/[A-Za-z0-9_-]{22}$/);
+  assert.equal(d.blobs.json("bookings", "rl/secret").k, secret);
 });

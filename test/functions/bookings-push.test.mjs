@@ -169,16 +169,18 @@ test("booking push: nothing is sent without a new web booking", async (t) => {
     assert.equal((await run()).status, status, label);
     assert.equal(sent(), 1, label);
   }
-  // The same phone number may book 3 times in 24 h (F2): the 4th is refused, and sends nothing
+  // One client may try 5 times an hour (F2; the taken attempt above counts): the 6th is refused, and sends nothing.
+  // Only the global cap sends the barber a notice (rate-limit.test.mjs), never a client's or a phone's.
   assert.equal((await book(d, { ...BODY, start: 660 })).status, 201);
   assert.equal((await book(d, { ...BODY, start: 720 })).status, 201);
-  assert.equal(sent(), 3);
-  assert.equal((await book(d, { ...BODY, start: 780 })).status, 429);
-  assert.equal(sent(), 3, "a rate-limited booking sends nothing");
+  assert.equal((await book(d, { ...BODY, start: 780 })).status, 201);
+  assert.equal(sent(), 4);
+  assert.equal((await book(d, { ...BODY, start: 810 })).status, 429);
+  assert.equal(sent(), 4, "a rate-limited booking sends nothing");
   // A booking the barber makes himself in /admin sends nothing
   const made = await adminCall(d, "/api/admin/items", { json: { date: "2026-11-14", start: 600, dur: 30, service: "Herreklipp", name: "Per", phone: "41234568" } });
   assert.equal(made.status, 201);
-  assert.equal(sent(), 3);
+  assert.equal(sent(), 4);
 });
 
 test("booking push: a preview booking notifies only the preview's devices; a live booking only the live ones (F10)", async () => {

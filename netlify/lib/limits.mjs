@@ -1,44 +1,138 @@
 // Tellere med glidende tidsvindu i Netlify Blobs, konfliktsikre (ETag): to samtidige forespørsler kan aldri
-// begge få den siste plassen. Brukes mot flom av nettbestillinger (F2).
-// Et dokument per teller: { hits: [{ t: ms, id }] }. id gjør skrivingen trygg å gjenta: gikk svaret tapt
-// etter at skrivingen ble lagret, finner neste forsøk sin egen id og teller ikke to ganger.
-import { randomBytes } from "node:crypto";
+// begge få den siste plassen. Brukes mot flom av nettbestillinger (F2) og mot gjetting av admin-passordet (F4/F5).
+// Et dokument per teller: { hits: [{ t: ms, id }], alertedAt? }. id gjør skrivingen trygg å gjenta: gikk svaret
+// tapt etter at skrivingen ble lagret, finner neste forsøk sin egen id og teller ikke to ganger, og release() kan
+// ta tilbake akkurat det treffet.
+//
+// Personvern (NEW-pii-keys, SPEC R4): nøkkelen til en teller er aldri telefonnummeret eller IP-adressen selv, men en
+// nøkkel-hash av den: rl/<slag>/<HMAC-SHA256(hemmelighet, slag + ":" + verdi), 22 tegn base64url>. Hemmeligheten er
+// 32 tilfeldige byte i dokumentet SECRET_KEY i samme lagring (en forhåndsvisning har sin egen), laget én gang.
+// Tellerne slettes av den daglige oppryddingen (netlify/functions/retention.mjs) når nyeste treff er over et døgn gammelt.
+import { randomBytes, createHmac } from "node:crypto";
 import { mutateJSON } from "./booking-core.mjs";
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
-const newToken = () => randomBytes(8).toString("hex");
+export const newToken = () => randomBytes(8).toString("hex");
 
-const initHits = (data) => (data && Array.isArray(data.hits) ? data : { hits: [] });
+const initHits = (data) => (data && typeof data === "object" && Array.isArray(data.hits) ? data : { hits: [] });
 const longest = (rules) => Math.max(...rules.map((r) => r.windowMs));
+const validHit = (h) => h && typeof h === "object" && Number.isFinite(h.t);
+const recent = (hits, rules, nowMs) => hits.filter((h) => validHit(h) && nowMs - h.t < longest(rules));
+const isFull = (hits, rules, nowMs) => rules.some((r) => hits.filter((h) => nowMs - h.t < r.windowMs).length >= r.max);
+const hasOwn = (hits, token) => hits.some((h) => h && h.id === token);
 
-// Tar én plass i telleren key hvis alle reglene ({ max, windowMs }) har plass. Svarer { ok: true } eller
-// { ok: false, limited: true } (eller { error, status } hvis lagringen ikke ble enig med seg selv).
-export async function take(store, key, rules, { nowMs, token = newToken() } = {}) {
+// Tar én plass i telleren key hvis alle reglene ({ max, windowMs }) har plass. Svarer { ok: true } (own: true når
+// dette forsøket allerede er telt), { ok: false, limited: true } eller { error, status } hvis lagringen ikke ble enig
+// med seg selv. Med alertMs > 0 svarer den første avvisningen innen alertMs også tripped: true (alertedAt i samme
+// skriving), så Viggo bare får ett varsel om at taket er nådd.
+export async function take(store, key, rules, { nowMs, token = newToken(), alertMs = 0 } = {}) {
   return mutateJSON(store, key, initHits, (doc) => {
-    if (doc.hits.some((h) => h.id === token)) return { ok: true, own: true, noWrite: true }; // vårt forrige forsøk ble lagret
-    doc.hits = doc.hits.filter((h) => nowMs - h.t < longest(rules));
-    for (const r of rules) {
-      const used = doc.hits.filter((h) => nowMs - h.t < r.windowMs).length;
-      if (used >= r.max) return { ok: false, limited: true, noWrite: true };
+    if (hasOwn(doc.hits, token)) return { ok: true, own: true, noWrite: true }; // vårt forrige forsøk ble lagret
+    doc.hits = recent(doc.hits, rules, nowMs);
+    if (isFull(doc.hits, rules, nowMs)) {
+      if (alertMs > 0 && !(Number.isFinite(doc.alertedAt) && nowMs - doc.alertedAt < alertMs)) {
+        doc.alertedAt = nowMs;
+        return { ok: false, limited: true, tripped: true };
+      }
+      return { ok: false, limited: true, noWrite: true };
     }
     doc.hits.push({ t: nowMs, id: token });
     return { ok: true };
   });
 }
 
-// ---------- Nettbestillinger (F2) ----------
-// Uten tak kunne et skript fylle hele kalenderen på sekunder med falske bestillinger.
-// Tellerne gjelder forespørsler som har bestått valideringen (også en tid som var tatt).
-export const BOOKING_LIMITS = {
-  ip: [{ max: 5, windowMs: HOUR }, { max: 10, windowMs: DAY }],      // én klient
-  phone: [{ max: 3, windowMs: DAY }],                                // ett telefonnummer, uansett skrivemåte
-  all: [{ max: 20, windowMs: HOUR }, { max: 40, windowMs: DAY }],    // alle nettbestillinger til sammen
-};
+// Bare lesing: er telleren full for et nytt forsøk? Et forsøk som allerede er telt (samme token), er aldri «fullt».
+export async function peek(store, key, rules, { nowMs, token } = {}) {
+  const doc = initHits(await store.get(key, { type: "json" }));
+  if (token !== undefined && hasOwn(doc.hits, token)) return { full: false, own: true };
+  return { full: isFull(recent(doc.hits, rules, nowMs), rules, nowMs), alertedAt: doc.alertedAt };
+}
 
-const keyPart = (s) => String(s).replace(/[^\w.:-]/g, "_").slice(0, 64) || "ukjent";
+// Tar tilbake treffet med denne id-en (et forsøk som likevel ikke ble noe av). Svarer { ok } eller { error, status }.
+export async function release(store, key, token) {
+  return mutateJSON(store, key, initHits, (doc) => {
+    if (!hasOwn(doc.hits, token)) return { ok: true, noWrite: true };
+    doc.hits = doc.hits.filter((h) => !(h && h.id === token));
+    return { ok: true, released: true };
+  });
+}
 
-// Telefonnummeret som teller-nøkkel, uansett skrivemåte: bare sifrene, og et norsk nummer skrevet med landskode
+// Taket er nådd uten at noen har fått varsel innen alertMs: skriv alertedAt og svar tripped (bare én gang)
+async function trip(store, key, rules, nowMs, alertMs) {
+  return mutateJSON(store, key, initHits, (doc) => {
+    if (!isFull(recent(doc.hits, rules, nowMs), rules, nowMs)) return { noWrite: true, tripped: false };
+    if (Number.isFinite(doc.alertedAt) && nowMs - doc.alertedAt < alertMs) return { noWrite: true, tripped: false };
+    doc.alertedAt = nowMs;
+    return { ok: true, tripped: true };
+  });
+}
+
+// ---------- Hemmeligheten bak teller-nøklene ----------
+export const SECRET_KEY = "rl/secret";
+const SECRET_RE = /^[A-Za-z0-9_-]{43}$/; // 32 byte i base64url
+// Hemmeligheten i denne lagringen, laget første gang (to samtidige førstegangs-forespørsler ender med den samme).
+// Leses hver gang (én sterk lesing), så en lagring aldri bruker en annen lagrings hemmelighet.
+export async function limiterSecret(store) {
+  const cur = await store.get(SECRET_KEY, { type: "json" });
+  if (cur && SECRET_RE.test(cur.k)) return cur.k;
+  const r = await mutateJSON(store, SECRET_KEY, (d) => (d && typeof d === "object" && !Array.isArray(d) ? d : {}), (doc) => {
+    if (SECRET_RE.test(doc.k)) return { ok: true, noWrite: true, k: doc.k };
+    doc.k = randomBytes(32).toString("base64url");
+    return { ok: true, k: doc.k };
+  });
+  if (r.error) throw new Error("Kunne ikke lage teller-hemmeligheten: " + r.error);
+  return r.k;
+}
+// Nøkkelen til telleren for verdien (et telefonnummer fra phoneKey, en klient fra clientKey)
+export const counterKey = (secret, kind, value) =>
+  `rl/${kind}/${createHmac("sha256", secret).update(`${kind}:${value}`).digest("base64url").slice(0, 22)}`;
+
+// ---------- Hvem som spør ----------
+function ipv4(s) {
+  const p = s.split(".");
+  if (p.length !== 4 || !p.every((x) => /^\d{1,3}$/.test(x) && Number(x) <= 255)) return null;
+  return p.map(Number).join(".");
+}
+// De åtte 16-bits gruppene i en IPv6-adresse (med «::» og en IPv4-hale), eller null
+function ipv6Groups(s) {
+  if (!/^[0-9a-fA-F:.]+$/.test(s) || !s.includes(":") || s.length > 45) return null;
+  const lastColon = s.lastIndexOf(":");
+  const last = s.slice(lastColon + 1);
+  if (last.includes(".")) {
+    const v4 = ipv4(last);
+    if (!v4) return null;
+    const o = v4.split(".").map(Number);
+    s = s.slice(0, lastColon + 1) + ((o[0] << 8) | o[1]).toString(16) + ":" + ((o[2] << 8) | o[3]).toString(16);
+  }
+  const halves = s.split("::");
+  if (halves.length > 2) return null;
+  const part = (h) => (h === "" ? [] : h.split(":"));
+  const head = part(halves[0]);
+  const tail = halves.length === 2 ? part(halves[1]) : [];
+  if (![...head, ...tail].every((g) => /^[0-9a-fA-F]{1,4}$/.test(g))) return null;
+  const n = head.length + tail.length;
+  if (halves.length === 1 ? n !== 8 : n > 7) return null;
+  return [...head, ...Array(8 - n).fill("0"), ...tail].map((g) => parseInt(g, 16));
+}
+// Klienten som teller-verdi: en IPv4-adresse som den er (også skrevet som IPv4 i IPv6, «::ffff:198.51.100.5»), en
+// IPv6-adresse som sitt /64-nett (én tilkobling har et helt /64 å velge adresser fra, så hver adresse alene ville vært
+// ubegrenset med «nye» klienter), uten [], port og sone. Alt annet blir «ukjent».
+export function clientKey(raw) {
+  let s = String(raw ?? "").trim();
+  const bracket = /^\[([^\]]+)\](?::\d{1,5})?$/.exec(s);
+  if (bracket) s = bracket[1];
+  else if (/^\d{1,3}(\.\d{1,3}){3}:\d{1,5}$/.test(s)) s = s.slice(0, s.lastIndexOf(":"));
+  s = s.replace(/%[0-9A-Za-z._~-]{1,32}$/, ""); // sone (fe80::1%eth0)
+  const v4 = ipv4(s);
+  if (v4) return v4;
+  const g = ipv6Groups(s);
+  if (!g) return "ukjent";
+  if (g.slice(0, 5).every((x) => x === 0) && g[5] === 0xffff) return `${g[6] >> 8}.${g[6] & 255}.${g[7] >> 8}.${g[7] & 255}`;
+  return g.slice(0, 4).map((x) => x.toString(16)).join(":") + "::/64";
+}
+
+// Telefonnummeret som teller-verdi, uansett skrivemåte: bare sifrene, og et norsk nummer skrevet med landskode
 // («+47 912 34 567», «0047 912 34 567», «47 22 33 44 55») blir de åtte sifrene uten den («91234567», «22334455»).
 export function phoneKey(phone) {
   const d = String(phone ?? "").replace(/\D/g, "");
@@ -47,18 +141,64 @@ export function phoneKey(phone) {
   return d;
 }
 
-// Teller én nettbestilling for IP-en, telefonnummeret og totalen, i den rekkefølgen. Svarer { ok: true } eller
-// { ok: false, limited: "ip" | "phone" | "all" }. Er en tidligere teller full, telles ikke de neste.
-export async function takeBookingSlot(store, { ip, phone }, nowMs) {
-  const checks = [
-    ["ip", `rl/ip/${keyPart(ip || "ukjent")}`],
-    ["phone", `rl/phone/${keyPart(phoneKey(phone))}`],
-    ["all", "rl/all"],
-  ];
-  for (const [name, key] of checks) {
-    const r = await take(store, key, BOOKING_LIMITS[name], { nowMs });
-    if (r.error) return { ok: false, limited: name, error: r.error, status: r.status };
-    if (!r.ok) return { ok: false, limited: name };
+// ---------- Nettbestillinger (F2, NEW-lockout, SPEC R5) ----------
+// Uten tak kunne et skript fylle hele kalenderen på sekunder med falske bestillinger.
+// Tellerne gjelder forespørsler som har bestått valideringen. En avvist bestilling (taket, eller tiden var tatt)
+// gir pengene tilbake, så et angrep på det felles taket aldri brenner en kundes egne tellere.
+export const BOOKING_LIMITS = {
+  ip: [{ max: 5, windowMs: HOUR }, { max: 10, windowMs: DAY }],      // én klient (IPv4-adresse eller IPv6 /64)
+  phone: [{ max: 6, windowMs: DAY }],                                // ett telefonnummer, uansett skrivemåte (eieren bekrefter 6)
+  all: [{ max: 20, windowMs: HOUR }, { max: 40, windowMs: DAY }],    // alle nettbestillinger til sammen
+};
+export const ALL_KEY = "rl/all";
+export const ALERT_MS = DAY; // Viggo får høyst ett varsel per døgn om at nettbestillingen er satt på pause
+const ORDER = ["ip", "phone", "all"];
+
+// Nøklene til de tre tellerne for denne klienten og dette nummeret
+export async function bookingKeys(store, { ip, phone }) {
+  const secret = await limiterSecret(store);
+  return { ip: counterKey(secret, "ip", clientKey(ip)), phone: counterKey(secret, "phone", phoneKey(phone)), all: ALL_KEY };
+}
+
+// Teller én nettbestilling for klienten, telefonnummeret og totalen. Alle tre leses først, og er én full, avvises
+// forsøket uten at noe skrives. Så tas plassene i rekkefølgen ip → phone → all med samme token; avviser en senere
+// teller, gis de tidligere tilbake. token: bestillingens requestId (et nytt forsøk telles ikke to ganger) eller et
+// nytt. Svarer { ok: true, keys, token }, { ok: false, limited: "ip" | "phone" | "all", tripped } (tripped: det
+// felles taket avviste for første gang i ALERT_MS, si fra til Viggo) eller { ok: false, error, status }.
+export async function takeBookingSlot(store, { ip, phone, token = newToken() }, nowMs) {
+  const keys = await bookingKeys(store, { ip, phone });
+  const peeks = await Promise.all(ORDER.map((k) => peek(store, keys[k], BOOKING_LIMITS[k], { nowMs, token })));
+  const fullAt = ORDER.find((k, i) => peeks[i].full);
+  if (fullAt) {
+    const tripped = peeks[2].full ? (await trip(store, ALL_KEY, BOOKING_LIMITS.all, nowMs, ALERT_MS)).tripped === true : false;
+    return { ok: false, limited: fullAt, tripped };
   }
-  return { ok: true };
+  const taken = [];
+  for (const k of ORDER) {
+    const r = await take(store, keys[k], BOOKING_LIMITS[k], { nowMs, token, alertMs: k === "all" ? ALERT_MS : 0 });
+    if (r.error || !r.ok) {
+      await releaseKeys(store, taken, token);
+      if (r.error) return { ok: false, limited: k, error: r.error, status: r.status };
+      return { ok: false, limited: k, tripped: r.tripped === true };
+    }
+    if (!r.own) taken.push(keys[k]);
+  }
+  return { ok: true, keys, token };
+}
+
+// Gir tilbake plassene en bestilling tok (slot fra takeBookingSlot) i tellerne kinds, f.eks. ["phone", "all"] når
+// tiden var tatt. Feiler aldri: går det ikke, blir treffet stående til det går ut av vinduet.
+export async function releaseBookingSlot(store, slot, kinds) {
+  if (!slot || !slot.keys) return;
+  await releaseKeys(store, kinds.map((k) => slot.keys[k]).filter(Boolean), slot.token);
+}
+async function releaseKeys(store, keys, token) {
+  for (const key of keys) {
+    try {
+      const r = await release(store, key, token);
+      if (r.error) console.warn("Teller: kunne ikke gi tilbake en plass:", r.error);
+    } catch (err) {
+      console.warn("Teller: kunne ikke gi tilbake en plass:", err && err.name);
+    }
+  }
 }

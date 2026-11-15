@@ -4,8 +4,8 @@
 // timen er lagret, og får aldri felle bestillingen eller holde igjen svaret mer enn BOOKING_PUSH_WAIT_MS.
 import { liveDeps, bookingStore, afterResponse } from "../lib/runtime.mjs";
 import { validateCustomer, createItem } from "../lib/booking-core.mjs";
-import { takeBookingSlot } from "../lib/limits.mjs";
-import { notifyNewBooking, pushGen, BOOKING_PUSH_WAIT_MS } from "../lib/push.mjs";
+import { takeBookingSlot, releaseBookingSlot } from "../lib/limits.mjs";
+import { notifyNewBooking, pushToDevices, bookingsPausedMessage, pushGen, BOOKING_PUSH_WAIT_MS } from "../lib/push.mjs";
 
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
@@ -27,15 +27,25 @@ export async function handle(req, context, deps) {
   if (v.error) return json({ error: v.error, code: v.code }, v.status);
   try {
     const store = bookingStore(deps, context); // forhåndsvisninger har sin egen timebok (F10)
-    // Tak mot flom (F2): per klient (IP), per telefonnummer og totalt, telt konfliktsikkert før timen lagres
+    // Tak mot flom (F2): per klient (IP eller IPv6 /64), per telefonnummer og totalt, telt konfliktsikkert før timen lagres
     const ip = (context && context.ip) || req.headers.get("x-nf-client-connection-ip") || "ukjent";
     const slot = await takeBookingSlot(store, { ip, phone: v.value.phone }, deps.now().getTime());
     if (!slot.ok) {
+      // Første gang det felles taket avviser i døgnet: ett varsel til Viggo (uten kundedata), så han vet hvorfor
+      if (slot.tripped) {
+        const paused = pushToDevices(store, bookingsPausedMessage(), { fetch: deps.fetch, now: deps.now(), origin: new URL(req.url).origin, gen: pushGen(deps.env.ADMIN_PASSWORD) });
+        await afterResponse(context, paused, BOOKING_PUSH_WAIT_MS);
+      }
       if (slot.error) return json({ error: slot.error }, slot.status || 503);
       return json({ error: "For mange bestillinger akkurat nå. Ring oss på 409 63 911.", code: "rate_limited" }, 429);
     }
     const r = await createItem(store, { ...v.value, type: "booking" }, { source: "nettside", now: deps.now() });
-    if (r.error) return json({ error: r.error, code: r.code }, r.status);
+    if (r.error) {
+      // Ble ingenting lagret (tiden var tatt), koster forsøket verken nummeret eller det felles taket noe.
+      // Klientens treff blir stående, så én klient fortsatt ikke kan prøve uten grense.
+      await releaseBookingSlot(store, slot, ["phone", "all"]);
+      return json({ error: r.error, code: r.code }, r.status);
+    }
     // Bare enheter slått på med dagens admin-passord får varselet (bytter Viggo passordet, stopper alle gamle)
     const pushing = notifyNewBooking(store, r.item, { fetch: deps.fetch, now: deps.now(), origin: new URL(req.url).origin, gen: pushGen(deps.env.ADMIN_PASSWORD) });
     await afterResponse(context, pushing, BOOKING_PUSH_WAIT_MS);

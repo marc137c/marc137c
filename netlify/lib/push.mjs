@@ -393,6 +393,15 @@ export function bookingMessage(item) {
   return { title: "Ny time", body: [when, what, item.name].filter(Boolean).join(" · "), url: `/admin?dag=${item.date}`, tag: `ny-time-${item.id}` };
 }
 
+// Det felles taket for nettbestillinger er nådd (netlify/lib/limits.mjs): kundene får beskjed om å ringe. Ingen
+// kundedata. Sendes høyst én gang per døgn.
+export const bookingsPausedMessage = () => ({
+  title: "Nettbestilling er satt på pause",
+  body: "For mange bestillinger siste døgn. Kunder som prøver å bestille, får beskjed om å ringe 409 63 911.",
+  url: "/admin",
+  tag: "nettbestilling-pause",
+});
+
 export const testMessage = () => ({
   title: "Testvarsel",
   body: "Varsler virker på denne enheten. Slik ser det ut når en kunde bestiller time.",
