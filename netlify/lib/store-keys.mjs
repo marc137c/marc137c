@@ -38,10 +38,10 @@ export const KEY_RULES = Object.freeze([
     deletion: "renewed by the hourly refresh, replaced when the account is connected again" },
   { stores: ["social"], key: "feed", holds: "the shop's latest public Instagram posts (links, captions, image addresses)",
     deletion: "replaced by every hourly refresh" },
-  { stores: ["reviews"], key: "place-id", holds: "the shop's Google place id, name and address",
-    deletion: "replaced when the place is looked up again" },
-  { stores: ["reviews"], key: "reviews", holds: "the shop's rating and the reviews Google shows (reviewer names and texts as published on Google)",
-    deletion: "replaced whenever the reviews are fetched again" },
+  { stores: ["reviews"], key: "place-id", holds: "the shop's Google place id, name and address (only a place called Viggo… at Violgata 22 is stored)",
+    deletion: "replaced when the place is looked up again, also when a stored place fails the Violgata 22 check" },
+  { stores: ["reviews"], key: "reviews", holds: "the shop's rating and the reviews Google shows (reviewer names and texts as published on Google), which place they belong to and when they were last fetched",
+    deletion: "replaced whenever the reviews are fetched again; when Google has failed for 3 days after the last good fetch (STALE_LIMIT_MS in netlify/lib/reviews.mjs), the names and texts are replaced by an empty answer" },
 ]);
 
 // The row for this key in this store, or null

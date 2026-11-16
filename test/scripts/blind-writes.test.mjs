@@ -10,7 +10,7 @@ import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const NETLIFY = fileURLToPath(new URL("../../netlify", import.meta.url));
-export const PENDING = ["functions/social-connect.mjs", "lib/social.mjs", "lib/reviews.mjs"];
+export const PENDING = ["functions/social-connect.mjs", "lib/social.mjs"];
 
 function* mjs(dir) {
   for (const name of readdirSync(dir)) {

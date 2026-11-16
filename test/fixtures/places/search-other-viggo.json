@@ -1,0 +1,14 @@
+{
+  "places": [
+    {
+      "id": "ChIJFixtureFrisorViolgata20",
+      "formattedAddress": "Violgata 20, 1776 Halden, Norge",
+      "displayName": { "text": "Frisør Violgata", "languageCode": "no" }
+    },
+    {
+      "id": "ChIJFixtureViggoBilAS000001",
+      "formattedAddress": "Storgata 5, 1771 Halden, Norge",
+      "displayName": { "text": "Viggo Bil AS", "languageCode": "no" }
+    }
+  ]
+}

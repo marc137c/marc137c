@@ -1,0 +1,56 @@
+{
+  "rating": 4.7,
+  "userRatingCount": 41,
+  "googleMapsUri": "https://maps.google.com/?cid=1000000000000000001",
+  "googleMapsLinks": {
+    "directionsUri": "https://www.google.com/maps/dir//''/data=fixture-directions",
+    "placeUri": "https://maps.google.com/?cid=1000000000000000001",
+    "writeAReviewUri": "https://www.google.com/maps/place//data=fixture-write-review",
+    "reviewsUri": "https://www.google.com/maps/place//data=fixture-reviews",
+    "photosUri": "https://www.google.com/maps/place//data=fixture-photos"
+  },
+  "reviews": [
+    {
+      "name": "places/ChIJFixtureViggosBarbershop01/reviews/FixtureReview1",
+      "relativePublishTimeDescription": "for 2 uker siden",
+      "rating": 5,
+      "text": { "text": "Fin klipp og god prat.", "languageCode": "no" },
+      "originalText": { "text": "Fin klipp og god prat. ", "languageCode": "no" },
+      "authorAttribution": {
+        "displayName": "Fixture Kunde En",
+        "uri": "https://www.google.com/maps/contrib/100000000000000000001/reviews",
+        "photoUri": "https://lh3.googleusercontent.com/a/fixture-photo-1=s128-c0x00000000-cc-rp-mo"
+      },
+      "publishTime": "2026-11-02T10:15:00.000000Z",
+      "flagContentUri": "https://www.google.com/local/review/rap/report?postId=fixture1",
+      "googleMapsUri": "https://www.google.com/maps/reviews/data=fixture-review-1"
+    },
+    {
+      "name": "places/ChIJFixtureViggosBarbershop01/reviews/FixtureReview2",
+      "relativePublishTimeDescription": "for en måned siden",
+      "rating": 5,
+      "authorAttribution": {
+        "displayName": "Fixture Kunde To",
+        "uri": "https://www.google.com/maps/contrib/100000000000000000002/reviews",
+        "photoUri": "https://lh3.googleusercontent.com/a/fixture-photo-2=s128-c0x00000000-cc-rp-mo"
+      },
+      "publishTime": "2026-10-10T08:00:00.000000Z",
+      "flagContentUri": "https://www.google.com/local/review/rap/report?postId=fixture2",
+      "googleMapsUri": "https://www.google.com/maps/reviews/data=fixture-review-2"
+    },
+    {
+      "name": "places/ChIJFixtureViggosBarbershop01/reviews/FixtureReview3",
+      "relativePublishTimeDescription": "a month ago",
+      "rating": 4,
+      "text": { "text": "Ble veldig fornøyd, litt ventetid.", "languageCode": "en" },
+      "originalText": { "text": "Ble veldig fornøyd, litt ventetid.", "languageCode": "no" },
+      "authorAttribution": {
+        "displayName": "Fixture Kunde Tre",
+        "uri": "https://www.google.com/maps/contrib/100000000000000000003/reviews"
+      },
+      "publishTime": "2026-10-01T16:30:00.000000Z",
+      "flagContentUri": "https://www.google.com/local/review/rap/report?postId=fixture3",
+      "googleMapsUri": "https://www.google.com/maps/reviews/data=fixture-review-3"
+    }
+  ]
+}
