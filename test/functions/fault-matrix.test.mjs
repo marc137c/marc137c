@@ -204,3 +204,121 @@ test("fault matrix: a failed removal after a cross-month move says so (503), and
   const ics = await calendarFor(d.getStore({ name: "bookings", consistency: "strong" }), d.now());
   assert.equal((ics.match(/BEGIN:VEVENT/g) || []).length, 1);
 });
+
+// ---------- Round 2: the interleaved competing write axis (SPEC R16) ----------
+// A cross-month move is two documents: add to the new month, remove from the old. Its precondition (expect) was
+// checked on a read taken before both writes, so another device's change landing in between was lost (a cancel
+// came back as confirmed), and two moves at once left the booking twice. Here device B's PATCH or DELETE runs
+// right before each store call device A makes during the move. Invariant: one copy per id suffix; whoever lost
+// gets 412 (or 404 when the booking is already gone), never 2xx, unless both asked for the very same result; and
+// the store holds exactly the winner's change.
+const MOVE_FROM = "2026-11-27";
+const B_ACTIONS = {
+  "cancel": { patch: { status: "cancelled" }, expect: (s) => s.length === 1 && s[0].date === MOVE_FROM && s[0].status === "cancelled" },
+  "a new phone number": { patch: { phone: "400 11 222" }, expect: (s) => s.length === 1 && s[0].date === MOVE_FROM && s[0].phone === "400 11 222" },
+  "a move to 8 January": { patch: { date: "2027-01-08" }, expect: (s) => s.length === 1 && s[0].date === "2027-01-08" },
+  "a move to 8 December (the same month as A's)": { patch: { date: "2026-12-08" }, expect: (s) => s.length === 1 && s[0].date === "2026-12-08" },
+  "DELETE": { del: true, expect: (s) => s.length === 0 },
+  "the very same move": { patch: { date: "2026-12-02" }, same: true, expect: (s) => s.length === 1 && s[0].date === "2026-12-02" },
+};
+const A_DONE = (s) => s.length === 1 && s[0].date === "2026-12-02" && s[0].status === "confirmed" && s[0].phone === CUSTOMER_PHONE;
+
+// deps for device A whose store runs hook(n) before its n-th call (get, getWithMetadata, setJSON, delete)
+function hooked(d, hook) {
+  let n = 0;
+  return { ...d, getStore: (o) => {
+    const s = d.getStore(o);
+    return new Proxy(s, { get(t, p) {
+      const v = t[p];
+      if (typeof v !== "function") return v;
+      if (!["get", "getWithMetadata", "setJSON", "delete"].includes(p)) return v.bind(t);
+      return async (...args) => { await hook(n++); return v.apply(t, args); };
+    } });
+  } };
+}
+const patchAs = (deps, id, json) => admin.handle(request(`/api/admin/items/${id}`, { method: "PATCH", json, headers: auth(deps) }), { ...PRODUCTION, params: { id } }, deps).then(read);
+const deleteAs = (deps, id) => admin.handle(request(`/api/admin/items/${id}`, { method: "DELETE", headers: auth(deps) }), { ...PRODUCTION, params: { id } }, deps).then(read);
+
+function moveSetup() {
+  const d = testDeps({ now: "2026-11-20T08:00:00Z", env: { ADMIN_PASSWORD: PW } });
+  const [b] = seedItems(d.blobs, [item({ date: MOVE_FROM, start: 600 })]);
+  return { d, b };
+}
+// How many store calls an undisturbed move makes
+async function callsInMove() {
+  const { d, b } = moveSetup();
+  let calls = 0;
+  const r = await patchAs(hooked(d, async () => { calls++; }), b.id, { date: "2026-12-02", expect: b.updatedAt });
+  assert.equal(r.status, 200);
+  return calls;
+}
+
+test("fault matrix (interleaved): another device's change at every step of a cross-month move: one copy, and the loser gets 412, never 2xx", async (t) => {
+  quiet(t);
+  const calls = await callsInMove();
+  assert.ok(calls >= 4, `a move makes ${calls} store calls`);
+  for (const [label, bAct] of Object.entries(B_ACTIONS)) {
+    for (let k = 0; k < calls; k++) {
+      const { d, b } = moveSetup();
+      let byB;
+      const depsA = hooked(d, async (n) => {
+        if (n !== k) return;
+        d.clock.advance(1000);
+        byB = bAct.del ? await deleteAs(d, b.id) : await patchAs(d, b.id, { ...bAct.patch, expect: b.updatedAt });
+        d.clock.advance(1000);
+      });
+      const byA = await patchAs(depsA, b.id, { date: "2026-12-02", expect: b.updatedAt });
+      const where = `B: ${label} before A's store call ${k}: A ${byA.status}, B ${byB && byB.status}`;
+      const ids = storedItems(d.blobs).map((i) => suffix(i.id));
+      assert.equal(new Set(ids).size, ids.length, `${where}: one copy per id suffix: ${storedItems(d.blobs).map((i) => i.id)}`);
+      const stored = storedItems(d.blobs);
+      const aWon = byA.status >= 200 && byA.status < 300;
+      const bWon = byB.status >= 200 && byB.status < 300;
+      if (bAct.same) {
+        assert.ok(aWon || bWon, where);
+        assert.ok(bAct.expect(stored), `${where} | stored ${JSON.stringify(stored.map((i) => [i.id, i.status]))}`);
+        continue;
+      }
+      assert.ok(aWon !== bWon, `${where}: exactly one wins`);
+      const loser = aWon ? byB : byA;
+      assert.ok([412, 404].includes(loser.status), `${where}: the loser is told (${loser.status} ${JSON.stringify(loser.body)})`);
+      assert.ok((aWon ? A_DONE : bAct.expect)(stored), `${where} | stored ${JSON.stringify(stored.map((i) => [i.id, i.status, i.phone]))}`);
+    }
+  }
+});
+
+// demo-crossmonth-race.mjs and demo-crossmonth-double.mjs, as found: B acts right before A writes December
+test("fault matrix: a cancel made while another device moves the booking to December is kept, and the move answers 412", async (t) => {
+  quiet(t);
+  const { d, b } = moveSetup();
+  let byB;
+  const depsA = { ...d, getStore: (o) => new Proxy(d.getStore(o), { get(tg, p) {
+    if (p === "setJSON") return async (key, val, opts) => {
+      if (key === "m/2026-12" && !byB) { d.clock.advance(1000); byB = await patchAs(d, b.id, { status: "cancelled", expect: b.updatedAt }); }
+      return tg.setJSON(key, val, opts);
+    };
+    const v = tg[p]; return typeof v === "function" ? v.bind(tg) : v;
+  } }) };
+  const byA = await patchAs(depsA, b.id, { date: "2026-12-02", expect: b.updatedAt });
+  assert.equal(byB.status, 200);
+  assert.equal(byA.status, 412, JSON.stringify(byA.body));
+  assert.deepEqual(storedItems(d.blobs).map((i) => `${i.id} ${i.status}`), [`${b.id} cancelled`]);
+});
+
+test("fault matrix: two moves at once (to 2 December and to 8 January) leave one copy and one VEVENT", async (t) => {
+  quiet(t);
+  const { d, b } = moveSetup();
+  let byB;
+  const depsA = { ...d, getStore: (o) => new Proxy(d.getStore(o), { get(tg, p) {
+    if (p === "setJSON") return async (key, val, opts) => {
+      if (key === "m/2026-12" && !byB) byB = await patchAs(d, b.id, { date: "2027-01-08", expect: b.updatedAt });
+      return tg.setJSON(key, val, opts);
+    };
+    const v = tg[p]; return typeof v === "function" ? v.bind(tg) : v;
+  } }) };
+  const byA = await patchAs(depsA, b.id, { date: "2026-12-02", expect: b.updatedAt });
+  assert.deepEqual([byA.status, byB.status], [412, 200]);
+  assert.deepEqual(storedItems(d.blobs).map((i) => i.id), [`2027-01-08_${suffix(b.id)}`]);
+  const ics = await calendarFor(d.getStore({ name: "bookings", consistency: "strong" }), d.now());
+  assert.equal((ics.match(/BEGIN:VEVENT/g) || []).length, 1);
+});

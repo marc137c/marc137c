@@ -270,6 +270,7 @@ const idSuffix = (id) => { const s = String(id); return s.slice(s.indexOf("_") +
 const hasChanges = (item, changes) => Object.keys(changes).every((k) => JSON.stringify(item[k]) === JSON.stringify(changes[k]));
 const STALE = { error: "Avtalen er endret på en annen enhet. Lukk og åpne den på nytt.", code: "stale", status: 412 };
 const MOVE_HALF_DONE = "Avtalen er lagt inn på den nye datoen, men den gamle tiden ble ikke fjernet. Trykk Lagre én gang til.";
+const MOVE_RACE_HALF = "Avtalen ble endret på en annen enhet mens du flyttet den. Oppdater siden og sjekk avtalen.";
 
 // Endrer en avtale. changes: feltene fra validateAdmin (partial). expect: updatedAt slik /admin så avtalen; er den
 // lagrede endret siden og endringen ikke allerede gjort, svarer det 412 «stale» (X1.1/X1.2). Uten expect (en gammel
@@ -320,7 +321,20 @@ export async function updateItem(store, id, changes, { force = false, now = new 
   const { next, error, status } = build(current);
   if (error) return { error, status };
   next.id = `${next.date}_${idSuffix(currentId)}`;
+  const suffix = idSuffix(currentId);
+  // Hver forutsetning sjekkes inne i skrivingen som bygger på den (vakt-regel SPEC R16): en annen enhets endring
+  // mellom lesingen over og de to skrivingene under, skal gi 412, aldri bli borte eller gi to kopier (runde 2).
+  // adopted: den nye måneden har allerede nøyaktig denne flyttingen (et tidligere forsøk fra oss, eller den samme
+  // flyttingen fra en annen enhet). Da står den, og bare den gamle tiden skal fjernes.
+  let adopted = null;
   const addToNewMonth = () => mutateMonth(store, toMonth, (doc) => {
+    adopted = null;
+    const twin = doc.items.find((o) => o && idSuffix(o.id) === suffix);
+    if (twin && twin.updatedAt !== next.updatedAt) {
+      if (!sameExceptVersion(twin, next)) return STALE; // en annen enhet har flyttet eller endret den hit
+      adopted = twin;
+      return { ok: true, item: twin, noWrite: true };
+    }
     if (clashIn(doc, next, next.id) && !force) return CLASH;
     const same = doc.items.findIndex((o) => o.id === next.id);
     if (same >= 0) doc.items[same] = next; else doc.items.push(next);
@@ -336,19 +350,57 @@ export async function updateItem(store, id, changes, { force = false, now = new 
     added = { ok: true, item: there };
   }
   if (added.error) return added;
+  // Fjern den gamle tiden, men bare den versjonen flyttingen bygde på. Er den endret (avlyst, nytt nummer …) eller
+  // borte (slettet eller flyttet et annet sted) siden, tas vår kopi i den nye måneden bort igjen, og svaret er 412.
+  // movedOut: en kort logg i den gamle måneden over flyttinger ut av den (id, ny id, et tilfeldig merke, tid; ingen
+  // kundedata, høyst et døgn og 20 stykker). Går svaret på vår egen fjerning tapt, prøver klienten skrivingen igjen og
+  // finner avtalen borte; bare merket skiller det fra at en annen enhet slettet eller flyttet den i mellomtiden.
+  const moveMark = randomBytes(6).toString("hex");
   let removed;
   try {
     removed = await mutateMonth(store, fromMonth, (doc) => {
-      const before = doc.items.length;
+      const log = Array.isArray(doc.movedOut) ? doc.movedOut : [];
+      const old = doc.items.find((i) => i.id === currentId);
+      if (!old) {
+        // vår egen fjerning, eller en annen enhet har gjort nøyaktig samme flytting (den tok vår kopi som sin)
+        if (adopted || log.some((m) => m && m.id === currentId && (m.m === moveMark || m.to === next.id))) return { ok: true, noWrite: true };
+        return { conflict: true, noWrite: true };
+      }
+      if (old.updatedAt !== current.updatedAt) return { conflict: true, noWrite: true };
       doc.items = doc.items.filter((i) => i.id !== currentId);
-      return doc.items.length === before ? { ok: true, noWrite: true } : { ok: true };
+      doc.movedOut = log.filter((m) => m && Date.parse(m.at) > now.getTime() - 864e5)
+        .concat({ id: currentId, to: next.id, m: moveMark, at: now.toISOString() }).slice(-20);
+      return { ok: true };
     });
   } catch (err) {
     console.error("Flytting: kunne ikke fjerne den gamle tiden:", err && err.name);
     removed = { error: true };
   }
+  if (removed.conflict) {
+    if (adopted) return STALE; // kopien er ikke vår: la den stå
+    try {
+      const undone = await mutateMonth(store, toMonth, (doc) => {
+        const before = doc.items.length;
+        doc.items = doc.items.filter((o) => !(o.id === next.id && o.updatedAt === next.updatedAt));
+        return doc.items.length === before ? { ok: true, noWrite: true } : { ok: true };
+      });
+      if (undone.error) throw new Error(undone.error);
+    } catch (err) {
+      console.error("Flytting: kunne ikke ta tilbake kopien etter en samtidig endring:", err && err.name);
+      return { error: MOVE_RACE_HALF, code: "move_conflict", status: 503 };
+    }
+    return STALE;
+  }
   if (removed.error) return { error: MOVE_HALF_DONE, code: "move_half_done", status: 503 };
   return { ok: true, item: added.item };
+}
+// To avtaler er like bortsett fra versjonen (updatedAt) og varselmerket
+function sameExceptVersion(a, b) {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  keys.delete("updatedAt");
+  keys.delete("notifiedAt");
+  for (const k of keys) if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) return false;
+  return true;
 }
 
 export async function deleteItem(store, id) {
