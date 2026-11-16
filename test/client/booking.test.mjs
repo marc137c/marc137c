@@ -213,6 +213,61 @@ test("F90: an availability answer that hangs gives up after 15 s, and an older a
   assert.equal(site.server.requests.filter((r) => r.url === "/api/availability").length, gets + 2, "polling goes on after a hung load");
 });
 
+// F8: a message about the service, the day or the time is shown at that step (where focus goes), scrolled into view
+// first, and still announced through #form-msg (role=status, visually hidden then). Name and phone stay under the button.
+function oneMessageAt(site, boxId, text) {
+  const shown = site.visibleMessages();
+  assert.deepEqual(shown.map((el) => el.id), [boxId], "exactly one visible message, in #" + boxId);
+  assert.equal(shown[0].textContent, text);
+  const step = site.$(boxId).closest(".step");
+  assert.ok(step && step.contains(site.focused), "focus is inside the step with the message: " + (site.focused && site.focused.outerHTML.slice(0, 80)));
+  assert.ok(site.announced().includes(text), "screen readers get the text");
+  assert.equal(site.$(boxId).getAttribute("aria-hidden"), "true", "the step box is not announced twice");
+}
+
+test("F8: a submit with no service, no day or no time shows one message at that step, scrolls to it, then moves focus there", async () => {
+  const site = await boot();
+  const before = site.scrolls.length;
+  await site.book();
+  oneMessageAt(site, "msg-service", site.s().needService);
+  assert.ok(site.focused === site.select, "focus on the service select");
+  const sc = site.scrolls.slice(before);
+  assert.equal(sc.length, 1, "scrolled once");
+  assert.equal(sc[0].behavior, "auto", "no smooth scroll fighting the focus scroll");
+  assert.ok(sc[0].focused !== site.select, "the scroll happens before focus moves");
+  assert.equal(sc[0].y, -90, "the box ends 90 px below the top (under the fixed menu)");
+  assert.equal(site.doc.documentElement.style.scrollBehavior || "", "", "the page's scroll behaviour is put back");
+
+  site.choose(site.select, "Herreklipp"); await site.flush();
+  await site.book();
+  oneMessageAt(site, "msg-day", site.s().needDay);
+  assert.ok(site.focused.classList.contains("cal-day") && !site.focused.disabled, "focus on the first open day");
+
+  await site.pick({ date: "2026-11-13" });
+  assert.equal(site.message(), "", "choosing clears the message");
+  await site.book();
+  oneMessageAt(site, "msg-time", site.s().needTime);
+  assert.ok(site.focused.classList.contains("slot") && !site.focused.disabled, "focus on the first free time");
+
+  await site.pick({ time: 840 });
+  await site.book();
+  const shown = site.visibleMessages();
+  assert.deepEqual(shown.map((el) => el.id), ["form-msg"], "the name message stays under the button");
+  assert.equal(shown[0].textContent, site.s().needName);
+  assert.ok(site.focused === site.$("f-name"));
+});
+
+test("F8: a 409 puts 'takenNow' in #msg-time with focus on a free time", async () => {
+  const site = await boot();
+  await site.pick(FRIDAY);
+  site.server.add({ date: FRIDAY.date, start: FRIDAY.time, dur: 30 });
+  await site.book();
+  await site.advance(1000);
+  oneMessageAt(site, "msg-time", site.s().takenNow);
+  assert.ok(site.focused.classList.contains("slot") && !site.focused.disabled);
+  assert.ok(!site.slot(FRIDAY.time), "14:00 is no longer offered");
+});
+
 test("F73: a successful booking is stored once and nothing else is sent (no Netlify Forms copy)", async () => {
   const site = await boot();
   await site.pick(FRIDAY);

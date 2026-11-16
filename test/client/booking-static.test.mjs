@@ -111,3 +111,15 @@ test("R2: every fetch( in viggos-barbershop/*.js is inside withTimeout(…), exc
   assert.deepEqual(bareFetches(bookingJs), [], "booking.js has no bare fetch");
   assert.ok(bookingJs.includes('withTimeout(fetch("/api/bookings"'), "the booking POST is the first argument of withTimeout");
 });
+
+test("F8: index.html has a message box at steps 1-3, and a focused day or time is visibly outlined", () => {
+  const html = bestill();
+  for (const id of ["msg-service", "msg-day", "msg-time"]) {
+    assert.match(html, new RegExp(`<p class="step-msg" id="${id}" aria-hidden="true"></p>`), id);
+  }
+  assert.match(html, /<p class="form-msg" id="form-msg" role="status"><\/p>/, "#form-msg stays the announcement");
+  const css = read("styles.css");
+  assert.match(css, /\.cal-day:focus, \.slot:focus \{ box-shadow: 0 0 0 3px rgba\(201, 163, 92, \.55\); \}/);
+  assert.match(css, /\.step-msg:empty \{ display: none; \}/);
+  assert.match(css, /\.sr-only \{[^}]*clip: rect\(0, 0, 0, 0\)/);
+});

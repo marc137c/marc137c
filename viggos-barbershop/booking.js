@@ -29,6 +29,8 @@
   const slotsEl = $("slots");
   const summaryEl = $("booking-summary");
   const msg = $("form-msg");
+  // Feil som gjelder tjeneste, dag eller tid vises ved det steget (der fokuset havner), resten under knappen (F8)
+  const boxes = { service: $("msg-service"), day: $("msg-day"), time: $("msg-time") };
 
   const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const sameDay = (a, b) => a && b && a.getTime() === b.getTime();
@@ -208,24 +210,50 @@
     });
   });
 
-  // Meldingen lagres som en funksjon av språket, så den oversettes når man bytter språk
+  // Meldingen lagres som en funksjon av språket, så den oversettes når man bytter språk.
+  // where: "service" | "day" | "time" viser den ved det steget, ellers under knappen.
   let lastMsg = null;
-  function setMsg(kind, textFn) { lastMsg = { kind, textFn }; renderMsg(); }
+  function setMsg(kind, textFn, where) { lastMsg = { kind, textFn, where: where || null }; renderMsg(); }
   function renderMsg() {
-    msg.className = "form-msg" + (lastMsg && lastMsg.kind ? " " + lastMsg.kind : "");
-    msg.textContent = lastMsg ? lastMsg.textFn(I18N.s()) : "";
+    const text = lastMsg ? lastMsg.textFn(I18N.s()) : "";
+    const kind = lastMsg && lastMsg.kind ? " " + lastMsg.kind : "";
+    const box = lastMsg && lastMsg.where ? boxes[lastMsg.where] : null;
+    Object.keys(boxes).forEach((k) => {
+      const b = boxes[k];
+      if (!b) return;
+      b.className = "step-msg" + (b === box ? kind : "");
+      b.textContent = b === box ? text : "";
+    });
+    // Skjermlesere får meldingen alltid fra #form-msg (role=status); står den ved et steg, er den bare skjult for øyet her
+    msg.className = "form-msg" + kind + (box ? " sr-only" : "");
+    msg.textContent = text;
   }
-  function clearMsg() { setMsg("", () => ""); lastMsg = null; }
-  function fail(textFn, focusEl) {
-    setMsg("err", typeof textFn === "function" ? textFn : () => textFn);
+  function clearMsg() { lastMsg = null; renderMsg(); }
+  // Vis feilen og flytt fokus dit den gjelder. Meldingen ved steget rulles inn i bildet før fokus flyttes,
+  // så telefonen ikke hopper til et felt langt oppe uten at kunden ser hvorfor.
+  function fail(textFn, where, focusEl) {
+    setMsg("err", typeof textFn === "function" ? textFn : () => textFn, where);
+    const box = where ? boxes[where] : null;
+    const root = document.documentElement;
+    const smooth = root.style.scrollBehavior;
+    root.style.scrollBehavior = "auto"; // en myk rulling ville kjempe med fokus-rullingen
+    if (box && box.getBoundingClientRect) {
+      const top = box.getBoundingClientRect().top;
+      const h = window.innerHeight || root.clientHeight || 0;
+      if (top < 90 || top > h - 60) window.scrollBy(0, top - 90); // 90 px: under den faste menyen
+    }
     focusOn(focusEl);
+    root.style.scrollBehavior = smooth;
   }
-  // Feilkoder fra serveren → tekst på riktig språk
+  const firstFreeSlot = () => slotsEl.querySelector(".slot:not([disabled])");
+  const firstOpenDay = () => grid.querySelector(".cal-day:not([disabled])");
+  // Feilkoder fra serveren → tekst på riktig språk, og steget den gjelder
   const ERR = {
-    bad_service: (s) => s.needService, bad_date: (s) => s.needDay, closed: (s) => s.needDay,
-    bad_time: (s) => s.needTime, too_early: (s) => s.needTime, bad_name: (s) => s.needName,
-    bad_phone: (s) => s.needPhone, taken: (s) => s.takenNow, rate_limited: (s) => s.rateLimited,
+    bad_service: [(s) => s.needService, "service"], bad_date: [(s) => s.needDay, "day"], closed: [(s) => s.needDay, "day"],
+    bad_time: [(s) => s.needTime, "time"], too_early: [(s) => s.needTime, "time"],
+    bad_name: [(s) => s.needName, null, () => $("f-name")], bad_phone: [(s) => s.needPhone, null, () => $("f-phone")],
   };
+  const FOCUS = { service: () => select, day: firstOpenDay, time: firstFreeSlot };
   const nameOk = (v) => v.trim().length >= 2;
   // Samme regler som serveren: navn minst 2 tegn, telefon 8–15 sifre uansett skrivemåte
   const phoneOk = (v) => { const n = v.replace(/\D/g, "").length; return n >= 8 && n <= 15; };
@@ -299,14 +327,14 @@
     if (sending) return;
     const name = $("f-name");
     const phone = $("f-phone");
-    if (!select.value) return fail((t) => t.needService, select);
-    if (!state.date) return fail((t) => t.needDay, grid.querySelector(".cal-day:not([disabled])"));
+    if (!select.value) return fail((t) => t.needService, "service", select);
+    if (!state.date) return fail((t) => t.needDay, "day", firstOpenDay());
     if (state.time === null || !freeSlots(state.date).includes(state.time)) {
       state.time = null; renderSlots(); renderSummary();
-      return fail((t) => t.needTime, slotsEl.querySelector(".slot:not([disabled])"));
+      return fail((t) => t.needTime, "time", firstFreeSlot());
     }
-    if (!nameOk(name.value)) return fail((t) => t.needName, name);
-    if (!phoneOk(phone.value)) return fail((t) => t.needPhone, phone);
+    if (!nameOk(name.value)) return fail((t) => t.needName, null, name);
+    if (!phoneOk(phone.value)) return fail((t) => t.needPhone, null, phone);
 
     const addons = Array.prototype.map.call(form.querySelectorAll(".addon-picks input:checked"), (c) => c.value);
 
@@ -345,7 +373,7 @@
         return loadAvailability().then(() => end(() => {
           state.time = null;
           renderAll();
-          fail((t) => t.takenNow, slotsEl.querySelector(".slot:not([disabled])"));
+          fail((t) => t.takenNow, "time", firstFreeSlot());
         }));
       }
       // For mange bestillinger (fra nummeret, nettet eller totalt): et nytt forsøk hjelper ikke, så be om en telefon
@@ -353,7 +381,8 @@
       if (status >= 500 || status < 400) return uncertain();
       // 404: bookingsystemet finnes ikke her, så ingenting ble lagret. Andre 4xx: serveren sa nei, ingenting ble lagret.
       if (status === 404) return end(() => setMsg("err", (t) => t.notSaved));
-      end(() => fail(ERR[data.code] || ((t) => t.notSaved)));
+      const e = ERR[data.code];
+      end(() => (e ? fail(e[0], e[1], (e[2] || FOCUS[e[1]])()) : setMsg("err", (t) => t.notSaved)));
     };
     const sent = withTimeout(fetch("/api/bookings", {
       method: "POST",

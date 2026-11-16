@@ -114,6 +114,7 @@
           <div class="booking-col">
             <div class="step">
               <label class="step-label" for="f-service"><span class="step-no">1</span><span data-i18n="book.s1">Velg tjeneste</span></label>
+              <p class="step-msg" id="msg-service" aria-hidden="true"></p>
               <select name="tjeneste" id="f-service" required>
                 <option value="" data-i18n="f.choose">– Velg –</option>
                 <option value="Full service" data-i18n="s.full">Full service</option>
@@ -133,6 +134,7 @@
 
             <div class="step">
               <p class="step-label" id="cal-label"><span class="step-no">2</span><span data-i18n="book.s2">Velg dag</span></p>
+              <p class="step-msg" id="msg-day" aria-hidden="true"></p>
               <div class="cal" id="cal">
                 <div class="cal-head">
                   <button type="button" class="cal-nav" id="cal-prev" data-i18n-attr="aria-label:cal.prev" aria-label="Forrige måned">‹</button>
@@ -147,6 +149,7 @@
           <div class="booking-col">
             <div class="step">
               <p class="step-label" id="slots-label"><span class="step-no">3</span><span data-i18n="book.s3">Velg tid</span></p>
+              <p class="step-msg" id="msg-time" aria-hidden="true"></p>
               <div class="slots" id="slots" role="group" aria-labelledby="slots-label"></div>
               <ul class="slot-legend" aria-hidden="true">
                 <li><span class="dot dot-free"></span><span data-i18n="book.free">Ledig</span></li>
