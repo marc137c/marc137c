@@ -78,3 +78,35 @@ test("two devices X1.2: a booking stored before versions existed (no updatedAt) 
   await page.flush();
   assert.deepEqual(patches(page)[0].body, { note: "x" });
 });
+
+// X1.3: moved to another month (its id changed) or deleted on the other device
+const GONE_SAVE = "Avtalen er flyttet eller slettet fra en annen enhet, så endringen ble ikke lagret. Listen oppdateres nå.";
+const GONE_DELETE = "Avtalen er flyttet eller slettet fra en annen enhet, så den ble ikke slettet her. Listen oppdateres nå.";
+const NOT_FOUND = { status: 404, body: { error: "Fant ikke avtalen." } };
+
+test("two devices X1.3: a 404 on Lagre closes the sheet, reloads and says the booking was moved or deleted elsewhere", async () => {
+  const page = await setup(() => NOT_FOUND);
+  page.field("note").value = "ny";
+  const before = gets(page);
+  page.submit();
+  await page.flush();
+  assert.deepEqual(page.alerts, [GONE_SAVE]);
+  assert.equal(page.$("editor").open, false);
+  assert.ok(gets(page) > before, "the list is fetched again");
+  assert.deepEqual(page.confirms, []);
+});
+
+test("two devices X1.3: a 404 on Slett says the same, and the stale card is gone after the reload", async () => {
+  const list = [kari()];
+  const page = await loadAdmin({ now: DAY + "T09:00", routes: {
+    "GET /api/admin/items": itemsRoute(() => list),
+    [`DELETE /api/admin/items/${encodeURIComponent(list[0].id)}`]: () => { list.length = 0; return NOT_FOUND; },
+  } });
+  page.tap("timeline", `[data-id="${list[0].id}"] button.item-open`);
+  page.$("delete").click();
+  await page.flush();
+  assert.equal(page.confirms.length, 1, "the delete confirm");
+  assert.deepEqual(page.alerts, [GONE_DELETE]);
+  assert.equal(page.$("editor").open, false);
+  assert.doesNotMatch(page.$("timeline").innerHTML, /Kari/);
+});

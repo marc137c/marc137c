@@ -456,6 +456,9 @@
   }
   // Avtalen er endret på en annen enhet siden arket ble åpnet (412 «stale», X1.1)
   const STALE_TEXT = "Avtalen er endret på en annen enhet, så endringen ble ikke lagret. Listen oppdateres nå.";
+  // Avtalen er flyttet til en annen måned (ny id) eller slettet på en annen enhet (404, X1.3)
+  const GONE_SAVE = "Avtalen er flyttet eller slettet fra en annen enhet, så endringen ble ikke lagret. Listen oppdateres nå.";
+  const GONE_DELETE = "Avtalen er flyttet eller slettet fra en annen enhet, så den ble ikke slettet her. Listen oppdateres nå.";
 
   function save(force = false) {
     const target = state.editing;
@@ -478,9 +481,9 @@
       if (body.date && body.date !== state.day) state.day = body.date;
       return load();
     }).catch((err) => {
-      if (err.status === 412 && target) {
+      if ((err.status === 412 || err.status === 404) && target) {
         // Aldri «lagre likevel» her: da ville endringen fra den andre enheten blitt overskrevet
-        alert(STALE_TEXT);
+        alert(err.status === 412 ? STALE_TEXT : GONE_SAVE);
         dlg.close();
         return load();
       }
@@ -502,7 +505,11 @@
     api(`/api/admin/items/${encodeURIComponent(it.id)}`, { method: "DELETE" }).then(() => {
       dlg.close();
       return load();
-    }).catch((err) => { if (err.status !== 401) $("edit-msg").textContent = errText(err); });
+    }).catch((err) => {
+      if (err.status === 401) return;
+      if (err.status === 404) { alert(GONE_DELETE); dlg.close(); return load(); }
+      $("edit-msg").textContent = errText(err);
+    });
   });
 
   // ---------- Oppsett: kalender på telefonen ----------
