@@ -68,8 +68,8 @@ Hver gang en kunde bestiller time på nettsiden, kommer det et varsel på telefo
 - Teknisk: standard Web Push (RFC 8030/8291/8292) i `netlify/lib/push.mjs`, `/api/admin/push` i `netlify/functions/admin.mjs`, service worker `admin-sw.js` (bytter nettleseren ut abonnementet, gir den serveren det nye på `/api/push/renew`, `netlify/functions/push-renew.mjs`, som bare godtar det med den gamle adressen og dens hemmelige nøkkel; går ikke det, kommer et varsel fra Timebok som åpner **Oppsett** med **Slå på varsler** når du trykker på det) og app-filen `admin.webmanifest` (ikonene lages av `scripts/make-admin-icons.mjs`). Varselet går kryptert via Apple, Google, Mozilla eller Microsoft sin push-tjeneste, så bare enheten kan lese det, og telefonnummeret sendes ikke med. Alle varsler er like lange, så push-tjenesten ikke kan se hvor langt kundens navn er. Serveren sender bare til disse fire tjenestene, fjerner enheter tjenesten sier er borte og godtar dem ikke igjen (da står det under Oppsett at varslene må slås på igjen), og en bestilling venter aldri mer enn 1,5 sekunder på varslene.
 
 ## Google-anmeldelser
-Seksjonen «Hva kundene sier» viser snittkarakteren og 3–4 anmeldelser hentet automatisk fra Google (`/api/reviews`, mellomlagret i 12 timer).
-Før den er satt opp, vises en henvisning til Google med lenken «Se alle anmeldelser på Google».
+Seksjonen «Hva kundene sier» viser snittkarakteren og opptil 4 anmeldelser med tekst hentet automatisk fra Google (`/api/reviews`, mellomlagret i 12 timer). Kilden står som «Google Maps», hvert kort lenker til anmeldelsen på Google Maps, og en linje under kortene sier hvordan de er valgt ut (Googles krav, se `docs/contracts/google-places.md`). Stjernene øverst på siden vises fra 5 anmeldelser, uansett snitt. Har Google bare karakterer uten tekst, vises bare snittet.
+Før den er satt opp (og hvis `/api/reviews` ikke svarer innen 15 sekunder), vises eierens tre utvalgte Google-anmeldelser med «5,0 på Google» (`FEATURED` i `reviews.js`). Feiler Google i mer enn 3 døgn, slettes de lagrede anmeldelsene fra Google, og de tre utvalgte vises igjen.
 
 Oppsett (ca. 10 minutter):
 1. Gå til console.cloud.google.com, lag et prosjekt og slå på **Places API (New)**.
@@ -106,7 +106,8 @@ Seksjonen «Ferskt fra stolen» viser de 6 nyeste Instagram-postene (2 per rad, 
 Slik fungerer det:
 - `netlify/functions/social-refresh.mjs` kjører **hver time**. Den henter nye poster, fornyer tilgangsnøkkelen automatisk og lagrer feeden i Netlify Blobs.
 - `/api/social` (`netlify/functions/social.mjs`) leverer feeden til siden (`social-feed.js`).
-- Før kontoen er koblet til, vises et «Følg oss på Instagram»-kort.
+- Før kontoen er koblet til, og når Instagram ikke har svart på 2 døgn, skjules postene og teksten over dem; knappene «Instagram», «TikTok» og «Facebook» under står igjen. Er antallet poster et oddetall, fyller et «Følg oss på Instagram»-kort den tomme ruten.
+- Slutter feeden å oppdatere (for eksempel etter passordbytte på Instagram), åpner du koblingslenken i steg 6 under på nytt. Den erstatter den lagrede nøkkelen. Mer om Instagrams regler: `docs/contracts/instagram.md`.
 
 ### Engangsoppsett (ca. 15 minutter)
 Instagram-kontoen må være en **profesjonell konto** (Bedrift eller Innholdsskaper). Det er gratis å bytte i Instagram-appen under Innstillinger → Kontotype.
