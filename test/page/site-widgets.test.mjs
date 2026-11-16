@@ -226,6 +226,35 @@ test("F64: the hidden attribute wins over display:grid on the feed, the review l
   assert.doesNotMatch(readSite("i18n.js"), /reviewsFallback/);
 });
 
+// F85: (a) a single Google card gets the narrow single-card layout instead of stretching over the row;
+// (b) the hero badge, filled in when /api/reviews answers, sits last in the hero so it pushes nothing down.
+test("F85: one Google card gets reviews--single, two or more do not", async () => {
+  const one = await reviewsPage(REVIEWS.one);
+  assert.equal(one.$("reviews").classList.contains("reviews--single"), true);
+  const two = await reviewsPage(REVIEWS.two);
+  assert.equal(two.$("reviews").classList.contains("reviews--single"), false);
+  // Switching back and forth (language change re-renders) keeps the class right
+  await one.setLang("en");
+  assert.equal(one.$("reviews").classList.contains("reviews--single"), true);
+  assert.equal((await reviewsPage(REVIEWS.unconfigured)).$("reviews").classList.contains("reviews--single"), false);
+});
+
+test("F85: #hero-rating is the last thing in the hero, after #open-status, on its own line with space above", async () => {
+  const site = await reviewsPage(REVIEWS.many);
+  const status = site.$("open-status");
+  const badge = site.$("hero-rating");
+  assert.ok(badge.parentNode === status.parentNode, "same parent");
+  const kids = badge.parentNode.children;
+  assert.ok(kids.indexOf(status) < kids.indexOf(badge), "after the status line");
+  assert.ok(kids[kids.length - 1] === badge, "last in .hero-inner");
+  const css = readSite("styles.css");
+  const rule = /\n\.hero-rating \{([^}]*)\}/.exec(css);
+  assert.ok(rule, ".hero-rating rule");
+  assert.match(rule[1], /display: -webkit-box; display: -ms-flexbox; display: flex;|display: flex;/, "block-level, so it never shares the status line");
+  assert.match(rule[1], /width: -webkit-fit-content; width: -moz-fit-content; width: fit-content;/, "as wide as its content, with prefixes for Safari 10 and Firefox 55");
+  assert.match(rule[1], /margin: 16px auto 0;/);
+});
+
 test("widgets: every string reviews.js, social-feed.js and i18n.js wrote in this file is well-formed Unicode", () => {
   const writes = SITES.reduce((all, s) => all.concat(s.html), []);
   assert.ok(writes.length > 20, `${writes.length} writes checked`);

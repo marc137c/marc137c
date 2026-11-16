@@ -113,7 +113,7 @@
     if (withText.length) {
       // Googles krav: en linje om hvordan anmeldelsene er valgt ut og sortert
       list.innerHTML = withText.map((x) => card(x, GM)).join("") + `<p class="reviews-note">${brand(s.reviewsNote)}</p>`;
-      list.classList.remove("reviews--single");
+      list.classList.toggle("reviews--single", withText.length === 1); // ett kort: smalt og midtstilt
       list.hidden = false;
     } else {
       // Ingen anmeldelser med tekst: ingen tom boks; overskriften og «Se alle anmeldelser» står igjen

@@ -347,7 +347,8 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 .hero-socials a { width: 46px; height: 46px; border-radius: 50%; }
 .hero-socials svg { width: 22px; height: 22px; }
 .socials-label { font: 600 .78rem var(--caps); letter-spacing: .22em; text-transform: uppercase; color: var(--logo-gold); margin-right: 4px; }
-.hero-rating { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 16px; padding: 6px 14px; border-radius: 999px; background: rgba(var(--bg-rgb), .55); border: 1px solid rgba(241, 207, 58, .4); color: var(--text); font-size: .92rem; }
+/* Sist i toppen, på egen linje under åpent/stengt-linjen: når Google svarer, skyver den ikke noe annet ned (F85) */
+.hero-rating { display: flex; width: -webkit-fit-content; width: -moz-fit-content; width: fit-content; align-items: center; gap: 10px; margin: 16px auto 0; padding: 6px 14px; border-radius: 999px; background: rgba(var(--bg-rgb), .55); border: 1px solid rgba(241, 207, 58, .4); color: var(--text); font-size: .92rem; }
 .hero-rating:hover { border-color: var(--logo-gold); color: var(--text); }
 /* Mindre stjerner: raden og gull-stjernene må ha samme bredde, ellers viser fyllingen for mye */
 .hero-rating .stars-row { width: 90px; height: 18px; -webkit-box-flex: 0; flex: none; } /* stjernene krymper aldri; teksten brytes heller */
