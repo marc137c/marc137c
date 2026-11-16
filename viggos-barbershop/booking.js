@@ -11,7 +11,7 @@
   let MAX_DAYS = 60;       // hvor langt frem man kan bestille
   const SEND_TIMEOUT = 20000; // så lenge venter vi på svar på en bestilling før kunden får beskjed om å ringe
   const LOAD_TIMEOUT = 15000; // så lenge venter vi på ledige tider
-  // Varighet per tjeneste (minutter). Overskrives av serveren hvis den svarer.
+  // Varighet per tjeneste (minutter). Serverens liste legges oppå denne (F24).
   let DURATIONS = {
     "Full service": 60, "Herreklipp": 30, "Herreklipp + skjeggtrim": 30,
     "Knivbarbering": 30, "Skjegg & line-up": 30, "Barneklipp": 30,
@@ -259,7 +259,7 @@
   const firstOpenDay = () => grid.querySelector(".cal-day:not([disabled])");
   // Feilkoder fra serveren → tekst på riktig språk, og steget den gjelder
   const ERR = {
-    bad_service: [(s) => s.needService, "service"], bad_date: [(s) => s.needDay, "day"], closed: [(s) => s.needDay, "day"],
+    bad_service: [(s) => s.reloadPage, "service"], bad_date: [(s) => s.needDay, "day"], closed: [(s) => s.needDay, "day"],
     bad_time: [(s) => s.needTime, "time"], too_early: [(s) => s.needTime, "time"],
     bad_name: [(s) => s.needName, null, () => $("f-name")], bad_phone: [(s) => s.needPhone, null, () => $("f-phone")],
   };
@@ -282,7 +282,9 @@
   // Serverens svar vinner: klokke, åpningstider, varigheter og bestillingsregler (tall bare innenfor rimelige grenser)
   function useServer(data) {
     busy = data.busy && typeof data.busy === "object" ? data.busy : {};
-    if (data.durations) DURATIONS = data.durations;
+    // Slås sammen, ikke erstattes: en tjeneste serveren ikke lister lenger (f.eks. et gammelt navn i en fane som har
+    // stått åpen) beholder sin kjente varighet i stedet for å falle tilbake til 30 minutter
+    if (data.durations && typeof data.durations === "object") DURATIONS = Object.assign({}, DURATIONS, data.durations);
     // Åpningstidene kommer fra serveren, så kalenderen og bestillingsreglene alltid er like
     if (data.hours) for (let d = 0; d < 7; d++) if (d in data.hours) HOURS[d] = data.hours[d];
     const num = (v, lo, hi) => typeof v === "number" && v % 1 === 0 && v >= lo && v <= hi;

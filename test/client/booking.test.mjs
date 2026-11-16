@@ -333,6 +333,30 @@ test("F19: slotMin, leadMin and maxDays come from the server after a range check
   assert.deepEqual(offered(odd).slice(0, 3), [600, 630, 660], "out-of-range values are ignored");
 });
 
+// F24: the server's durations are merged into the page's, never replace them, so a service the server stops listing
+// keeps its known length instead of falling back to 30 minutes.
+test("F24: when the server stops listing 'Full service', its 17:30 slot stays too short and nothing is sent", async () => {
+  const site = await boot({ setup: (s) => { delete s.config.durations["Full service"]; s.config.durations["Full pakke"] = 60; } });
+  await site.pick({ service: "Full service", date: "2026-11-16", name: FRIDAY.name, phone: FRIDAY.phone });
+  const last = site.slots().filter((x) => /^17:30\b/.test(x.text))[0];
+  assert.ok(last && /is-short/.test(last.cls) && last.disabled, "17:30 + 60 min does not fit before 18:00: " + (last && last.cls));
+  assert.equal(site.click(last.el), false, "it cannot be tapped");
+  await site.book();
+  assert.equal(site.bookingPosts().length, 0, "nothing is sent");
+});
+
+test("F24: a bad_service answer asks the customer to reload the page, at step 1", async () => {
+  const site = await boot({ setup: (s) => s.when((r) => r.url === "/api/bookings", { status: 400, body: { code: "bad_service", error: "Ukjent tjeneste." } }, 1) });
+  await site.pick(FRIDAY);
+  await site.book();
+  await site.advance(500);
+  assert.deepEqual(site.visibleMessages().map((el) => el.id), ["msg-service"]);
+  assert.equal(site.message(), site.s().reloadPage);
+  assert.equal(site.s().reloadPage, "Siden er oppdatert. Last inn siden på nytt og prøv igjen.");
+  assert.ok(site.focused === site.select);
+  kept(site);
+});
+
 test("F73: a successful booking is stored once and nothing else is sent (no Netlify Forms copy)", async () => {
   const site = await boot();
   await site.pick(FRIDAY);
