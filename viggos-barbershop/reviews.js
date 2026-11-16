@@ -124,9 +124,16 @@
     list.setAttribute("aria-busy", "false");
   }
 
+  // Svarer ikke serveren innen WAIT_MS, gis forsøket opp og eierens utvalgte anmeldelser vises (SPEC R2)
+  const WAIT_MS = 15000;
+  const withTimeout = (p, ms) => new Promise((ok, no) => {
+    const timer = setTimeout(() => no(new Error("timeout")), ms);
+    p.then((v) => { clearTimeout(timer); ok(v); }, (err) => { clearTimeout(timer); no(err); });
+  });
+
   function load() {
-    fetch("/api/reviews", { headers: { Accept: "application/json" } })
-      .then((res) => { if (!res.ok) throw new Error(res.status); return res.json(); })
+    withTimeout(fetch("/api/reviews", { headers: { Accept: "application/json" } })
+      .then((res) => { if (!res.ok) throw new Error(res.status); return res.json(); }), WAIT_MS)
       .catch(() => ({ reviews: [] }))
       .then((d) => { data = d; render(); });
   }

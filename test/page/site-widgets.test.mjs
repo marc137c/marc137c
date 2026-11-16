@@ -315,6 +315,24 @@ test("X3.5: 0 to 7 posts give 1 tile at 0 posts and an even number of tiles othe
   }
 });
 
+// R2: a request that never answers is given up after 15 s, and the widget shows its fallback instead of
+// skeletons forever
+test("R2: a hanging /api/reviews gives the FEATURED reviews after 15 s; a hanging /api/social hides the feed", async () => {
+  const rev = await open(["reviews.js"], { "/api/reviews": { hang: true } });
+  assert.equal(rev.$("reviews").getAttribute("aria-busy"), "true", "still loading");
+  await rev.advance(14000);
+  assert.equal(rev.$("reviews").getAttribute("aria-busy"), "true", "still waiting at 14 s");
+  await rev.advance(1000);
+  assertFeatured(rev);
+
+  const soc = await open(["social-feed.js"], { "/api/social": { hang: true } });
+  assert.equal(soc.$("social-feed").getAttribute("aria-busy"), "true");
+  await soc.advance(15000);
+  assert.equal(soc.$("social-feed").getAttribute("aria-busy"), "false");
+  assert.equal(soc.$("social-feed").hidden, true);
+  assert.equal(soc.qs("#sosiale .section-lead").hidden, true);
+});
+
 // Static CSS checks for what a browser would show (the painted geometry itself is in the manual browser pack).
 // The declaration blocks of every rule (also inside @media/@supports) whose selector list holds `selector`.
 function rulesFor(css, selector) {

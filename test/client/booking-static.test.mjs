@@ -83,9 +83,8 @@ test("D3: no i18n text promises a confirmation or says a request was received", 
 });
 
 // SPEC R2: every fetch( in viggos-barbershop/*.js runs inside withTimeout(…) (its first argument), so no request
-// can leave the page waiting for ever. RATCHET: the files below still have a bare fetch and are fixed in steps 4-6.
-// The list can only shrink: a file listed here that has no bare fetch left fails the test until it is removed.
-const PENDING_TIMEOUT = ["reviews.js", "social-feed.js"];
+// can leave the page waiting for ever. Step 5 emptied the ratchet list (reviews.js and social-feed.js were the last):
+// there are no exceptions any more.
 function bareFetches(src) {
   const out = [];
   walk(ast(src), (n, parents) => {
@@ -104,10 +103,12 @@ test("R2: the timeout guard finds a bare fetch and accepts one inside withTimeou
   assert.deepEqual(bareFetches('fetch("/a").then(f);\nwithTimeout(fetch("/b").then(g), 1);\nwithTimeout(p, fetch("/c"));\nself.fetch("/d");'), [1, 3, 4]);
 });
 
-test("R2: every fetch( in viggos-barbershop/*.js is inside withTimeout(…), except the files still on the ratchet list", () => {
+test("R2: every fetch( in viggos-barbershop/*.js is inside withTimeout(…)", () => {
   const files = readdirSync(SITE).filter((f) => f.endsWith(".js")).sort();
+  const withFetch = files.filter((f) => /\bfetch\s*\(/.test(read(f)));
+  assert.ok(withFetch.length >= 6, "the scan sees the site's requests: " + withFetch.join(", "));
   const bare = files.filter((f) => bareFetches(read(f)).length > 0);
-  assert.deepEqual(bare, PENDING_TIMEOUT, "files with a fetch outside withTimeout: wrap it, or (only for a listed file) keep it listed");
+  assert.deepEqual(bare, [], "files with a fetch outside withTimeout: wrap it");
   assert.deepEqual(bareFetches(bookingJs), [], "booking.js has no bare fetch");
   assert.ok(bookingJs.includes('withTimeout(fetch("/api/bookings"'), "the booking POST is the first argument of withTimeout");
 });
