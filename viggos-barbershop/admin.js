@@ -51,6 +51,13 @@
     } catch (e) { /* privat modus */ }
   }
 
+  // Enhetsmerket fra serveren (F5): sendes med hver innlogging, så Viggos egen telefon kommer inn selv om fremmede har
+  // fylt opp grensen for feil passord. Det er ingen innlogging, så det blir liggende ved «Logg ut». Privat modus
+  // uten lagring: da logges det inn uten.
+  const DEVICE_KEY = "viggo-admin-device";
+  const getDevice = () => { try { return localStorage.getItem(DEVICE_KEY) || ""; } catch (e) { return ""; } };
+  const setDevice = (m) => { try { if (typeof m === "string" && m) localStorage.setItem(DEVICE_KEY, m); } catch (e) { /* privat modus */ } };
+
   // Lukker åpne dialoger (f.eks. når innloggingen har gått ut mens «Oppsett» er åpen)
   const closeDialogs = () => Array.prototype.forEach.call(document.querySelectorAll("dialog"), (d) => { if (d.open) d.close(); });
 
@@ -138,13 +145,14 @@
     withTimeout(fetch("/api/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: $("pw").value, remember: $("remember").checked }),
+      body: JSON.stringify(Object.assign({ password: $("pw").value, remember: $("remember").checked }, getDevice() ? { device: getDevice() } : {})),
     }).then((res) => res.json().catch(() => ({})).then((data) => ({ res, data }))), API_WAIT_MS, "")
       .then((r) => r, () => { throw Object.assign(new Error("Ingen forbindelse – prøv igjen."), { user: true, network: true }); })
       .then((r) => {
         const res = r.res, data = r.data || {};
         if (!res.ok) throw Object.assign(new Error(data.error || (res.status === 404 ? "Timeboken er ikke publisert ennå." : "Kunne ikke logge inn.")), { user: true });
         setToken(data.token, $("remember").checked);
+        setDevice(data.device);
         $("pw").value = "";
         showApp();
         load();
