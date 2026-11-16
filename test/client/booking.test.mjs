@@ -4,7 +4,7 @@
 // customer is told to call 409 63 911, keeps what they typed, and is never told the time is confirmed.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { boot, FRIDAY } from "./booking-harness.mjs";
+import { boot, FRIDAY, RATE_LIMITED } from "./booking-harness.mjs";
 
 const CALL = "409 63 911";
 const PROMISE = /mottatt|bekrefter|received|confirm/i;
@@ -31,6 +31,8 @@ const FAILURES = [
   { label: "503", answer: { status: 503, body: { error: "Mange endringer samtidig. Prøv igjen." } }, kind: "uncertain" },
   { label: "504", answer: { status: 504, body: "<html>Gateway timeout</html>" }, kind: "uncertain" },
   { label: "404", answer: { status: 404, body: "<!doctype html><title>Not found</title>" }, kind: "notSaved" },
+  { label: "429", answer: RATE_LIMITED, kind: "rateLimited" },
+  { label: "429 without a JSON body", answer: { status: 429, body: "Too Many Requests" }, kind: "rateLimited" },
 ];
 
 for (const f of FAILURES) {
@@ -57,6 +59,19 @@ test("F6: in English, every failure text names the phone number and promises not
     assert.deepEqual(site.otherRequests(), [], f.label);
     kept(site);
   }
+});
+
+test("NEW-429: the rate-limit text asks for a phone call and never says to try again", async () => {
+  for (const lang of [null, "en"]) {
+    const site = await failedBooking(RATE_LIMITED, { lang });
+    const msg = site.message();
+    assert.equal(msg, site.s().rateLimited);
+    assert.ok(msg.includes(CALL), msg);
+    assert.doesNotMatch(msg, /prøv igjen|try again|noe gikk galt|something went wrong/i);
+    assert.equal(site.bookingPosts().length, 1, "the page does not retry by itself");
+  }
+  const s = (await boot()).s();
+  assert.equal(s.rateLimited, "For mange bestillinger fra dette nummeret akkurat nå. Ring oss på 409 63 911.");
 });
 
 test("F73: a successful booking is stored once and nothing else is sent (no Netlify Forms copy)", async () => {

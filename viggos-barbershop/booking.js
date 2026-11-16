@@ -220,7 +220,7 @@
   const ERR = {
     bad_service: (s) => s.needService, bad_date: (s) => s.needDay, closed: (s) => s.needDay,
     bad_time: (s) => s.needTime, too_early: (s) => s.needTime, bad_name: (s) => s.needName,
-    bad_phone: (s) => s.needPhone, taken: (s) => s.takenNow,
+    bad_phone: (s) => s.needPhone, taken: (s) => s.takenNow, rate_limited: (s) => s.rateLimited,
   };
   const nameOk = (v) => v.trim().length >= 2;
   // Samme regler som serveren: navn minst 2 tegn, telefon 8–15 sifre uansett skrivemåte
@@ -291,6 +291,11 @@
           renderAll();
           fail((t) => t.takenNow, slotsEl.querySelector(".slot:not([disabled])"));
         });
+      }
+      // For mange bestillinger (fra nummeret, nettet eller totalt): et nytt forsøk hjelper ikke, så be om en telefon
+      if (res && res.status === 429) {
+        setMsg("err", (t) => t.rateLimited);
+        return;
       }
       if (res && res.status >= 400 && res.status < 500 && res.status !== 404) {
         return res.json().catch(() => ({})).then((data) => { fail(ERR[data.code] || ((t) => t.notSaved)); });

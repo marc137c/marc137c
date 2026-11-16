@@ -155,6 +155,7 @@
       // Bestillingen: et svar vi ikke kan stole på er «uncertain», et sikkert nei er «notSaved» (eierens beslutning D3)
       uncertain: "Vi fikk ikke svar fra bookingsystemet, så vi vet ikke om timen ble lagret. Ring oss på 409 63 911 før du prøver igjen.",
       notSaved: "Timen ble ikke lagret. Ring oss på 409 63 911.",
+      rateLimited: "For mange bestillinger fra dette nummeret akkurat nå. Ring oss på 409 63 911.",
       taken: "Opptatt",
       tooShort: "Ikke nok tid til valgt tjeneste",
       fullDay: "Fullbooket",
@@ -198,6 +199,7 @@
       sending: "Sending …",
       uncertain: "We didn't get an answer from the booking system, so we don't know if your appointment was booked. Please call us on 409 63 911 before you try again.",
       notSaved: "Your appointment was not booked. Please call us on 409 63 911.",
+      rateLimited: "Too many bookings from this number right now. Please call us on 409 63 911.",
       taken: "Booked",
       tooShort: "Not enough time for the selected service",
       fullDay: "Fully booked",
