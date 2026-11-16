@@ -356,6 +356,49 @@ export async function deleteItem(store, id) {
   });
 }
 
+// Månedene («ÅÅÅÅ-MM») fra og med fromDate til og med toDate
+export function monthsBetween(fromDate, toDate) {
+  const out = [];
+  for (let ym = monthOf(fromDate); ym <= monthOf(toDate);) {
+    out.push(ym);
+    const [y, m] = ym.split("-").map(Number);
+    ym = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+  }
+  return out;
+}
+
+// Avlyser (status «cancelled», ny updatedAt; aldri slettet) alle aktive avtaler match(item) godtar i disse
+// månedene. Teller bare det dette kallet avlyste, også når et svar gikk tapt og skrivingen ble prøvd igjen.
+// Svarer { ok, cancelled } eller { error, status: 503, cancelled } (det som rakk å bli avlyst; kall igjen).
+export async function cancelMatching(store, months, match, now = new Date()) {
+  const stamp = now.toISOString();
+  let total = 0;
+  for (const ym of months) {
+    const attempted = new Set();
+    let r;
+    try {
+      r = await mutateMonth(store, ym, (doc) => {
+        let changed = false;
+        for (const i of doc.items) {
+          if (!active(i) || !match(i)) continue;
+          i.status = "cancelled";
+          i.updatedAt = stamp;
+          attempted.add(i.id);
+          changed = true;
+        }
+        const cancelled = doc.items.filter((i) => attempted.has(i.id) && i.status === "cancelled" && i.updatedAt === stamp).length;
+        return changed ? { ok: true, cancelled } : { ok: true, noWrite: true, cancelled };
+      });
+    } catch (err) {
+      console.error("Avlysning: lagringen svarte ikke:", err && err.name);
+      r = { error: true };
+    }
+    if (r.error) return { error: "Fikk ikke avlyst alle. Prøv igjen om litt.", status: 503, cancelled: total };
+    total += r.cancelled;
+  }
+  return { ok: true, cancelled: total };
+}
+
 // ---------- Admin-innlogging ----------
 // Passordet settes i Netlify som ADMIN_PASSWORD. Et nytt passord gjelder først etter en ny utrulling (Netlify bruker
 // miljøverdiene fra da utrullingen ble laget, docs/contracts/netlify.md); da blir alle gamle billetter, varsler på

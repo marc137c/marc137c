@@ -5,6 +5,8 @@
 //   POST   /api/admin/items            ny avtale/blokkering   (?force=1 = lagre selv om det kolliderer)
 //   PATCH  /api/admin/items/:id        endre (flytte, ny tjeneste, avlyse …)
 //   DELETE /api/admin/items/:id        slette for godt
+//   POST   /api/admin/cancel-phone     { phone } avlys alle kommende nettbestillinger fra dette nummeret, uansett
+//                                      skrivemåte (etter en flom av falske bestillinger, X2.4) → { ok, cancelled }
 //   GET    /api/admin/calendar         lenken til kalenderen på telefonen: { enabled, createdAt, links }, eller
 //                                      { enabled: false, expired: true } når passordet er byttet siden den ble laget
 //   POST   /api/admin/calendar         lag lenken { replace: false } (beholder en som finnes) eller lag en ny
@@ -23,9 +25,9 @@
 import { liveDeps, bookingStore, isRetiredDeploy, retiredResponse } from "../lib/runtime.mjs";
 import {
   CONFIG, addDays, isDate, osloNow, readMonths, validateAdmin,
-  createItem, updateItem, deleteItem, checkPassword, makeToken, readSession, bumpEpoch, makeDeviceMark, verifyDeviceMark,
+  createItem, updateItem, deleteItem, cancelMatching, monthsBetween, checkPassword, makeToken, readSession, bumpEpoch, makeDeviceMark, verifyDeviceMark,
 } from "../lib/booking-core.mjs";
-import { take, release, newToken, counterKey, limiterSecret, clientKey, LOGIN_LIMITS, LOGIN_ALL_KEY } from "../lib/limits.mjs";
+import { take, release, newToken, counterKey, limiterSecret, clientKey, phoneKey, LOGIN_LIMITS, LOGIN_ALL_KEY } from "../lib/limits.mjs";
 import { readFeedState, createFeed, feedLinks, feedGen } from "../lib/calendar.mjs";
 import {
   vapidKeys, readSubscriptions, parseSubscription, saveSubscription, removeSubscriptions, normalizeEndpoint,
@@ -144,6 +146,17 @@ export async function handle(req, context, deps) {
       const r = await updateItem(store, decodeURIComponent(id), v.value, { force, now: deps.now(), expect: v.expect });
       return r.error ? json(r, r.status) : json({ ok: true, item: r.item });
     }
+    if (path === "/api/admin/cancel-phone" && req.method === "POST") {
+      const body = await readBody(req);
+      const raw = body && typeof body.phone === "string" ? body.phone.trim() : "";
+      const key = phoneKey(raw);
+      if (raw.length > 30 || key.length < 8 || key.length > 15) return json({ error: "Ugyldig telefonnummer.", code: "bad_phone" }, 400);
+      const today = osloNow(deps.now()).date;
+      const r = await cancelMatching(store, monthsBetween(today, addDays(today, 92)), (i) =>
+        i.source === "nettside" && (i.type ?? "booking") === "booking" && isDate(i.date) && i.date >= today && phoneKey(i.phone) === key, deps.now());
+      if (r.error) return json({ error: r.error, cancelled: r.cancelled }, r.status);
+      return json({ ok: true, cancelled: r.cancelled });
+    }
     if (path === "/api/admin/calendar" && req.method === "GET") {
       const { feed, stale } = await readFeedState(store, feedGen(password));
       return json(calendarInfo(url.origin, feed, stale));
@@ -212,6 +225,6 @@ export async function handle(req, context, deps) {
 export default (req, context) => handle(req, context, liveDeps());
 
 export const config = { path: [
-  "/api/admin/login", "/api/admin/items", "/api/admin/items/:id", "/api/admin/calendar",
+  "/api/admin/login", "/api/admin/items", "/api/admin/items/:id", "/api/admin/cancel-phone", "/api/admin/calendar",
   "/api/admin/push", "/api/admin/push/subscribe", "/api/admin/push/unsubscribe", "/api/admin/push/test", "/api/admin/push/reset",
 ] };

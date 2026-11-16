@@ -1,6 +1,6 @@
 // RC2 (failure paths never ran): every server write under every way a Blobs write can go wrong.
 // Writes: web create, admin create, same-month PATCH, cross-month PATCH (the new month's write failing, and the old
-// month's removal failing), DELETE and a rate-limit take(). Faults, on the key that write touches:
+// month's removal failing), DELETE, cancel-phone and a rate-limit take(). Faults, on the key that write touches:
 //   fail-before 500 on every attempt (nothing stored), a lost response (stored, the reply never came),
 //   fail-after 502 on every attempt (stored, then an error), and 8 CAS losses in a row to a competing write.
 // Invariant: one copy per booking id suffix, and the reply matches the store: a 2xx means the change is stored;
@@ -107,6 +107,16 @@ const WRITES = {
     call: (d, { b }) => adminCall(d, `/api/admin/items/${b.id}`, "DELETE"),
     done: (d) => assert.deepEqual(storedItems(d.blobs).map((i) => i.name), ["Blir"]),
     retryOk: [200, 404], // the delete is in: «Fant ikke avtalen» matches the store
+  },
+  "cancel-phone": {
+    key: "m/2026-11",
+    setup: (d) => ({ seeded: seedItems(d.blobs, [
+      item({ date: "2026-11-13", phone: "400 00 000", name: "Falsk 1" }),
+      item({ date: "2026-11-20", phone: "+47 400 00 000", name: "Falsk 2" }),
+      item({ date: "2026-11-20", start: 720, phone: CUSTOMER_PHONE, name: "Ekte" }),
+    ]) }),
+    call: (d) => adminCall(d, "/api/admin/cancel-phone", "POST", { phone: "400 00 000" }),
+    done: (d) => assert.deepEqual(storedItems(d.blobs).map((i) => `${i.name} ${i.status}`), ["Falsk 1 cancelled", "Falsk 2 cancelled", "Ekte confirmed"]),
   },
   "take() on a rate-limit counter": {
     key: "rl/test",
