@@ -152,3 +152,17 @@ test("stats: a store error while counting is logged without details and still an
   assert.equal((await hit(d)).status, 204);
   assert.equal(out.error.length, 1);
 });
+
+// Round 2 (demo-stats-burst.mjs, last part): a day whose document cannot be read was reported as 0 visits with
+// status 200. Unreadable is not «no visits»: the reply is 503 and carries no numbers (SPEC R18).
+test("stats: GET /api/stats answers 503 without numbers when a day's document cannot be read", async (t) => {
+  quiet(t);
+  const d = testDeps({ now: "2026-11-16T09:00:00Z", env: { ADMIN_PASSWORD: PW } });
+  d.blobs.seed("stats", "d/2026-11-16", { views: 37, pages: { forside: 37 }, sources: { direkte: 37 } });
+  d.blobs.inject({ method: "GET", key: "d/2026-11-16", fault: "fail-before", status: 500, times: Infinity });
+  const res = await getStats(d, makeToken(PW, d.clock.now()));
+  assert.equal(res.status, 503, JSON.stringify(res.body));
+  assert.deepEqual(res.body, { error: "Kunne ikke hente statistikken." });
+  d.blobs.clearFaults();
+  assert.equal((await getStats(d, makeToken(PW, d.clock.now()))).body.totals.today, 37);
+});

@@ -97,7 +97,8 @@ export async function handle(req, context, deps) {
     const store = statsStore(deps, context);
     const today = osloNow(deps.now()).date;
     const dates = Array.from({ length: 30 }, (_, i) => addDays(today, -i));
-    const docs = await Promise.all(dates.map((d) => store.get(`d/${d}`, { type: "json" }).catch(() => null)));
+    // En dag som ikke kan leses, er ikke «0 besøk»: feilen går til catch nedenfor (503), aldri et sikkert tall (SPEC R18)
+    const docs = await Promise.all(dates.map((d) => store.get(`d/${d}`, { type: "json" })));
     const days = dates.map((date, i) => { const doc = dayDoc(docs[i]); return { date, views: doc.views, sources: doc.sources }; });
     const sum = (n) => days.slice(0, n).reduce((a, d) => a + d.views, 0);
     const sources = {};
