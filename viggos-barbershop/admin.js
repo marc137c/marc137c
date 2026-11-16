@@ -232,7 +232,8 @@
     const title = fmt(d, { weekday: "long", day: "numeric", month: "long" });
     $("day-title").textContent = d === todayIso() ? `I dag, ${title}` : title;
     const hours = hoursOn(d);
-    const items = state.items.filter((i) => i.date === d);
+    // I starttidsrekkefølge (serveren sorterer, men et kort skal aldri havne feil om den ikke gjorde det)
+    const items = state.items.filter((i) => i.date === d).sort((a, b) => a.start - b.start);
     const live = items.filter(active);
     const clashes = new Set();
     live.forEach((a) => live.forEach((b) => { if (a !== b && a.start < b.start + b.dur && b.start < a.start + a.dur) clashes.add(a.id); }));
@@ -249,7 +250,10 @@
       $("timeline").innerHTML = '<li class="empty">Henter avtaler …</li>';
       return;
     }
+    const row = (i) => `<li class="row"><time>${hhmm(i.start)}</time><div>${itemHtml(i, clashes.has(i.id))}</div></li>`;
     if (hours) {
+      // En kunde før åpningstid (f.eks. 09:30) står først, i rekkefølge, ikke nederst etter dagen (F31)
+      live.filter((i) => i.start < hours[0]).forEach((i) => { shown.add(i.id); rows.push(row(i)); });
       // Fast halvtimesrutenett. Alt som starter innenfor en rad (også skjeve tider og overlapp) vises i raden;
       // «Ledig» vises bare når ingenting starter der og ingen tidligere avtale fortsatt pågår.
       for (let t = hours[0]; t < hours[1]; t += 30) {
@@ -265,8 +269,8 @@
     }
     const rest = items.filter((i) => !shown.has(i.id));
     if (rest.length) {
-      rows.push(`<li><h4 class="extra-h">${hours ? "Utenfor åpningstid / avlyste" : "Avtaler"}</h4></li>`);
-      rest.forEach((i) => rows.push(`<li class="row"><time>${hhmm(i.start)}</time><div>${itemHtml(i, clashes.has(i.id))}</div></li>`));
+      rows.push(`<li><h4 class="extra-h">${hours ? "Etter stengetid / avlyste" : "Avtaler"}</h4></li>`);
+      rest.forEach((i) => rows.push(row(i)));
     }
     if (!rows.length) rows.push('<li class="empty">Ingen avtaler.</li>');
     $("timeline").innerHTML = rows.join("");
