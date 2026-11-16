@@ -102,7 +102,23 @@
     } catch (e) { return null; }
   }
   const putNote = (v) => { try { localStorage.setItem(NOTE_KEY, JSON.stringify(v)); } catch (e) { /* privat modus */ } };
-  const clearNote = () => { try { localStorage.removeItem(NOTE_KEY); } catch (e) { /* privat modus */ } };
+  const clearNote = () => { try { localStorage.removeItem(NOTE_KEY); } catch (e) { /* privat modus */ } showLost(false); };
+  // Linjen i timeboken: «Varsler om nye bestillinger er slått av på denne enheten.» med «Slå på varsler igjen»
+  const LOST_TEXT = "Varsler om nye bestillinger er slått av på denne enheten.";
+  const showLost = (on) => { $("push-lost-msg").textContent = on ? LOST_TEXT : ""; $("push-lost").hidden = !on; };
+  // Nettleseren eller push-tjenesten har mistet abonnementet her (ikke Viggo): enheten husker det, timeboken sier
+  // det, og serveren får beskjed om å glemme den døde adressen, så Oppsett ikke teller den som «en annen enhet»
+  function markLost(endpoint) {
+    putNote({ endpoint, lost: true });
+    showLost(true);
+    forgetLost(endpoint);
+  }
+  function forgetLost(endpoint) {
+    return api("/api/admin/push/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint }) }).then(() => {
+      const n = getNote();
+      if (n && n.endpoint === endpoint && n.lost) putNote({ endpoint, lost: true, forgotten: true });
+    }, () => {}); // prøves igjen neste gang (Oppsett eller oppstart)
+  }
   // Er tiden varslene her gjaldt til, ute? (bare for dette abonnementet)
   function noteEnded(sub) {
     const n = getNote();
@@ -190,7 +206,7 @@
           resumeEdit = false;
           $("edit-msg").textContent = "Du er logget inn igjen – trykk Lagre.";
           $("editor").showModal();
-        }
+        } else openPushIfAsked();
       }).catch((err) => {
       loginMsg(errText(err));
       $("pw").select();
@@ -755,7 +771,20 @@
 
   // Fokus på «Lukk» (har autofocus i admin.html; satt her også for nettlesere som ikke følger det i en <dialog>):
   // ellers kunne fokus havne på «Logg ut», og ett Enter eller mellomrom logget Viggo ut
-  $("settings-open").addEventListener("click", () => { settings.showModal(); $("settings-close").focus(); calLoad(); pushLoad(); });
+  // focusPush: åpnet fra påminnelsen eller linjen om mistede varsler: «Slå på varsler» får fokus når det vises
+  function openSettings(focusPush) {
+    if (settings.open) return;
+    // Et åpent redigeringsark lukkes aldri av seg selv (det Viggo har skrevet, ville gått tapt): linjen om varslene
+    // står i timeboken når han er ferdig
+    if (dlg.open) { if (focusPush) showLost(true); return; }
+    settings.showModal();
+    $("settings-close").focus();
+    calLoad();
+    const loading = pushLoad();
+    if (focusPush) Promise.resolve(loading).then(() => { if (settings.open && !$("push-on").hidden) $("push-on").focus(); });
+  }
+  $("settings-open").addEventListener("click", () => openSettings(false));
+  $("push-lost-on").addEventListener("click", () => openSettings(true));
   $("settings-close").addEventListener("click", () => { settings.close(); calClear(); pushClear(); });
   settings.addEventListener("close", () => { calClear(); pushClear(); }); // Esc i nettlesere med ekte <dialog>
   $("cal-create").addEventListener("click", () => calMake(false));
@@ -893,6 +922,7 @@
   // Serveren har tatt imot abonnementet: enheten husker adressen og hvor lenge det gjelder (until)
   const saveSub = (sub) => api("/api/admin/push/subscribe", { method: "POST", body: JSON.stringify({ subscription: sub }) }).then((res) => {
     putNote(res && res.until ? { endpoint: sub.endpoint, until: res.until } : { endpoint: sub.endpoint });
+    showLost(false);
     return res;
   });
   function swRegistration() {
@@ -932,15 +962,28 @@
     }
     if (permission() === "denied") return pushLimited(seq, "blocked", retry === true ? STILL_BLOCKED : BLOCKED);
     pushMsg("Henter …", "info");
-    return Promise.all([api("/api/admin/push"), swRegistration().then((reg) => { pushState.reg = reg; return reg.pushManager.getSubscription(); })]).then((r) => {
+    // Husker enheten en egen adresse, spør serveren om den (thisDevice), så den ikke telles som en annen enhet
+    const note = getNote();
+    const info = note ? "/api/admin/push?endpoint=" + encodeURIComponent(note.endpoint) : "/api/admin/push";
+    return Promise.all([api(info), swRegistration().then((reg) => { pushState.reg = reg; return reg.pushManager.getSubscription(); })]).then((r) => {
       if (seq !== pushSeq) return;
       const info = r[0], sub = r[1];
       pushState.key = info.publicKey;
-      if (!sub || permission() !== "granted") return pushShow("off", info.devices);
+      if (!sub || permission() !== "granted") {
+        let n = Number(info.devices) || 0;
+        if (note && info.thisDevice) {
+          // Serveren har fortsatt den døde adressen herfra: tell den ikke, og be serveren glemme den
+          n = Math.max(0, n - 1);
+          forgetLost(note.endpoint);
+        }
+        if (note && (note.lost || info.thisDevice)) pushState.lost = true;
+        return pushShow("off", n);
+      }
       // Laget med en nøkkel serveren ikke har lenger, eller push-tjenesten har sagt at det er borte (serveren svarer
       // 410; Chrome beholder et slikt dødt abonnement): det virker ikke, så det fjernes. «Slå på varsler» lager et nytt.
       const drop = () => sub.unsubscribe().catch(() => false).then(() => {
         pushState.lost = true;
+        markLost(sub.endpoint);
         if (seq !== pushSeq) return;
         pushShow("off", info.devices);
       });
@@ -1096,10 +1139,22 @@
     const c = sw();
     if (!pushSupported() || permission() !== "granted" || !c.getRegistration) return Promise.resolve();
     return c.getRegistration(SW_SCOPE).then((reg) => (reg ? reg.pushManager.getSubscription() : null)).then((sub) => {
-      if (!sub) return null;
+      const note = getNote();
+      if (!sub) {
+        // Varslene var på her, men nettleseren har ikke abonnementet lenger (byttet ut uten at serveren fikk det nye,
+        // eller fjernet): si det i timeboken, og la serveren glemme den døde adressen
+        if (note && !note.lost) markLost(note.endpoint);
+        else if (note && note.lost) { showLost(true); if (!note.forgotten) forgetLost(note.endpoint); }
+        return null;
+      }
       return api("/api/admin/push").then((info) => (sameKey(sub, info.publicKey) ? saveSub(sub) : null)).catch((err) => {
         // Borte hos push-tjenesten: fjern det, så «Oppsett» viser «av» og «Slå på varsler» lager et nytt
-        if (err && err.status === 410) { pushState.lost = true; return sub.unsubscribe(); }
+        if (err && err.status === 410) {
+          pushState.lost = true;
+          putNote({ endpoint: sub.endpoint, lost: true, forgotten: true }); // serveren har allerede fjernet den
+          showLost(true);
+          return sub.unsubscribe();
+        }
       });
     }).catch(() => {});
   }
@@ -1178,7 +1233,20 @@
     sw().addEventListener("message", (e) => {
       const d = e.data;
       if (d && d.type === "open-day" && typeof d.date === "string" && toIso(d.date) === d.date && getToken()) go(d.date);
+      if (d && d.type === "open-push" && getToken() && !$("app").hidden) openSettings(true);
     });
+  }
+
+  // /admin?varsler=1 (påminnelsen fra admin-sw.js når varslene her må slås på igjen): åpne Oppsett med «Slå på
+  // varsler» klar, også etter en ny innlogging. Én gang: parameteren fjernes fra adressen.
+  let pushAsked = /[?&]varsler=1(?:&|$)/.test((window.location && window.location.search) || "");
+  function openPushIfAsked() {
+    if (!pushAsked) return;
+    pushAsked = false;
+    try {
+      if (window.history && history.replaceState) history.replaceState(history.state, "", location.pathname + location.search.replace(/([?&])varsler=1(&|$)/, "$1").replace(/[?&]$/, ""));
+    } catch (e) { /* adressen blir stående */ }
+    openSettings(true);
   }
 
   // ---------- Oppstart ----------
@@ -1186,5 +1254,5 @@
   setInterval(() => { if (!document.hidden && !dlg.open && getToken() && !$("app").hidden) load(); }, 30000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden && getToken() && !$("app").hidden) load(); });
 
-  if (getToken()) { showApp(); load(); pushSync(); } else showLogin();
+  if (getToken()) { showApp(); load(); pushSync(); openPushIfAsked(); } else showLogin();
 })();

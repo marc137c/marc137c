@@ -47,7 +47,7 @@ function loadSw({ windows = [], fetch = () => new Response(JSON.stringify({ ok: 
       openWindow: (url) => { opened.push(url); return Promise.resolve(null); },
     },
   };
-  vm.runInNewContext(SW, { self, URL, console }, { filename: "admin-sw.js" });
+  vm.runInNewContext(SW, { self, URL, console, setTimeout, clearTimeout }, { filename: "admin-sw.js" });
   const fire = (type, event = {}) => {
     const e = { ...event, waitUntil: (p) => waits.push(Promise.resolve(p)) };
     for (const fn of listeners[type] || []) fn(e);
@@ -148,7 +148,8 @@ const browserSub = (device, key = arrayBuffer([4, 1, 2, 3])) => ({
   getKey: (name) => (name === "auth" ? arrayBuffer(device.auth) : name === "p256dh" ? arrayBuffer(device.publicKey) : null),
   toJSON: () => device.subscription,
 });
-const REMINDER = { title: "Timebok", body: "Åpne Timebok for å fortsette å få varsel om nye bestillinger.", url: "/admin" };
+// The reminder must be actionable (notify leftover, major): its tap opens Oppsett at «Slå på varsler»
+const REMINDER = { title: "Timebok", body: "Varslene om nye bestillinger må slås på igjen på denne enheten. Trykk her, og så «Slå på varsler».", url: "/admin?varsler=1" };
 const shownAs = (n) => ({ title: n.title, body: n.options.body, url: n.options.data.url });
 
 test("admin sw: a replaced subscription is renewed with the same server key and given to the server", async () => {
@@ -195,10 +196,17 @@ test("admin sw: if the subscription cannot be renewed or the server does not tak
     assert.equal(sw.shown[0].options.tag, "forny-varsler", label);
     assert.ok(sw.fetches.every((f) => f.url === "/api/push/renew"), label);
   }
-  // A tap on the reminder opens the timebook (which gives the server the subscription)
+  // A tap on the reminder opens the timebook at Oppsett → «Slå på varsler» (admin.js reads ?varsler=1) …
   const sw = loadSw();
   await sw.fire("notificationclick", clickEvent(REMINDER.url));
-  assert.deepEqual(sw.opened, ["/admin"]);
+  assert.deepEqual(sw.opened, ["/admin?varsler=1"]);
+  // … or, with the timebook already open, focuses it and tells it to open Oppsett there
+  const timebook = windowAt("/admin");
+  const open = loadSw({ windows: [timebook] });
+  await open.fire("notificationclick", clickEvent(REMINDER.url));
+  assert.deepEqual(timebook.messages.map((m) => JSON.parse(JSON.stringify(m))), [{ type: "open-push" }]);
+  assert.equal(timebook.focused, 1);
+  assert.deepEqual(open.opened, []);
 });
 
 test("admin sw: end to end, after pushsubscriptionchange the next booking reaches the new subscription", async (t) => {

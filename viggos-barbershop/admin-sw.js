@@ -17,6 +17,8 @@
     } catch (e) { /* ugyldig adresse */ }
     return HOME;
   }
+  // /admin?varsler=1: timeboken åpner Oppsett ved «Slå på varsler» (påminnelsen nedenfor)
+  function wantsPush(url) { return /[?&]varsler=1(?:&|$)/.test(url); }
   function dayIn(url) {
     var m = /[?&]dag=(\d{4}-\d{2}-\d{2})(?:&|$)/.exec(url);
     return m ? m[1] : null;
@@ -52,7 +54,7 @@
         var path = "";
         try { path = new URL(client.url).pathname; } catch (e) { path = ""; }
         if (ADMIN_PATH.test(path) && typeof client.focus === "function") {
-          client.postMessage({ type: "open-day", date: dayIn(url) });
+          client.postMessage(wantsPush(url) ? { type: "open-push" } : { type: "open-day", date: dayIn(url) });
           return client.focus();
         }
       }
@@ -72,23 +74,29 @@
     var auth = null;
     try { auth = old && typeof old.getKey === "function" ? old.getKey("auth") : null; } catch (e) { auth = null; }
     if (!sub || !old || typeof old.endpoint !== "string" || !auth) return Promise.resolve(false);
-    return self.fetch("/api/push/renew", {
+    return withTimeout(self.fetch("/api/push/renew", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
       body: JSON.stringify({ oldEndpoint: old.endpoint, oldAuth: b64u(auth), subscription: sub })
-    }).then(function (res) { return !!(res && res.ok); }, function () { return false; });
+    }), 15000).then(function (res) { return !!(res && res.ok); }, function () { return false; });
   }
-  // Gikk det ikke, sier et varsel fra Timebok det. Et trykk åpner timeboken, som gir serveren abonnementet (eller
-  // viser «Slå på varsler» hvis nettleseren ikke har noe).
+  // Gikk det ikke, sier et varsel fra Timebok det. Et trykk åpner timeboken i Oppsett med «Slå på varsler» klar
+  // (admin.js leser ?varsler=1, eller meldingen «open-push» når timeboken allerede er åpen).
   function remind() {
     return self.registration.showNotification("Timebok", {
-      body: "Åpne Timebok for å fortsette å få varsel om nye bestillinger.",
+      body: "Varslene om nye bestillinger må slås på igjen på denne enheten. Trykk her, og så «Slå på varsler».",
       icon: ICON,
       lang: "nb",
       tag: "forny-varsler",
-      data: { url: HOME }
+      data: { url: HOME + "?varsler=1" }
     });
+  }
+  // Svarer ikke serveren innen ms, regnes det som at det ikke gikk (da kommer påminnelsen)
+  function withTimeout(promise, ms) {
+    var timer;
+    var late = new Promise(function (resolve, reject) { timer = setTimeout(function () { reject(new Error("timeout")); }, ms); });
+    return Promise.race([promise, late]).then(function (v) { clearTimeout(timer); return v; }, function (err) { clearTimeout(timer); throw err; });
   }
 
   // Nettleseren har byttet ut abonnementet: bruk det nye den har laget, eller lag et med samme nøkkel, og gi det til

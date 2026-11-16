@@ -57,6 +57,12 @@
     </header>
 
     <main class="day">
+      <!-- Vises når varslene på denne enheten er mistet uten at Viggo slo dem av (nettleseren eller push-tjenesten
+           mistet abonnementet). Knappen åpner Oppsett med «Slå på varsler» (admin.js). -->
+      <p class="push-lost" id="push-lost" role="status" hidden>
+        <span id="push-lost-msg"></span>
+        <button class="link" type="button" id="push-lost-on">Slå på varsler igjen</button>
+      </p>
       <!-- Søk: en kunde ringer for å avlyse eller flytte. Finner timer fra i dag og tre måneder frem på telefonnummer
            eller navn; et trykk åpner avtalen (admin.js). -->
       <form class="find" id="find" role="search">

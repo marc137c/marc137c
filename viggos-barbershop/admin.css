@@ -73,6 +73,9 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 .week button.is-active strong, .week button.is-active .n { color: var(--on-gold); }
 
 .day { max-width: 900px; margin: 0 auto; padding: 18px 16px 60px; }
+/* Varslene på denne enheten er mistet: en linje over dagen med knapp til Oppsett */
+.push-lost { margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--gold); border-radius: 12px; color: var(--text); font-size: .92rem; }
+.push-lost .link { margin-left: 6px; padding: 0; border: 0; background: none; color: var(--gold); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 /* Søk etter en kunde (navn eller telefon) */
 .find { display: flex; align-items: center; margin: 0 0 12px; }
 .find input { flex: 1; min-width: 0; max-width: 320px; }
