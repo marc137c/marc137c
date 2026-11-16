@@ -109,6 +109,25 @@ test("F84: Google data is attributed 'Google Maps' in the summary, every card an
   assertFeatured(await reviewsPage(REVIEWS.unconfigured));
 });
 
+test("F51: one review is 'anmeldelse' / 'review', two are plural, in the strings and on the page", async () => {
+  const site = await reviewsPage(REVIEWS.one);
+  const no = site.s();
+  assert.equal(no.basedOn(1), "basert på 1 anmeldelse på Google Maps");
+  assert.equal(no.heroRating("5,0", 1), "5,0 på Google Maps · 1 anmeldelse");
+  assert.equal(no.basedOn(2), "basert på 2 anmeldelser på Google Maps");
+  assert.equal(no.heroRating("4,5", 2), "4,5 på Google Maps · 2 anmeldelser");
+  assert.equal(text(site.$("rating-summary").querySelector(".rating-count")), "basert på 1 anmeldelse på Google Maps");
+  await site.setLang("en");
+  const en = site.s();
+  assert.equal(en.basedOn(1), "based on 1 review on Google Maps");
+  assert.equal(en.heroRating("5.0", 1), "5.0 on Google Maps · 1 review");
+  assert.equal(en.basedOn(2), "based on 2 reviews on Google Maps");
+  assert.equal(en.heroRating("4.5", 2), "4.5 on Google Maps · 2 reviews");
+  assert.equal(text(site.$("rating-summary").querySelector(".rating-count")), "based on 1 review on Google Maps");
+  const two = await reviewsPage(REVIEWS.two);
+  assert.equal(text(two.$("rating-summary").querySelector(".rating-count")), "basert på 2 anmeldelser på Google Maps");
+});
+
 test("widgets: every string reviews.js, social-feed.js and i18n.js wrote in this file is well-formed Unicode", () => {
   const writes = SITES.reduce((all, s) => all.concat(s.html), []);
   assert.ok(writes.length > 20, `${writes.length} writes checked`);
