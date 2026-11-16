@@ -4,7 +4,10 @@
 // key in every store must match a row in netlify/lib/store-keys.mjs KEY_RULES (with a non-empty deletion rule).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { testDeps, request, read, PRODUCTION } from "../helpers/deps.mjs";
+import { testDeps, request, read, quiet, PRODUCTION } from "../helpers/deps.mjs";
+import { FakeBlobs } from "../helpers/fake-blobs.mjs";
+import { FakeClock } from "../helpers/clock.mjs";
+import { fakeFetch } from "../helpers/fake-fetch.mjs";
 import { makeDevice, fakePushService } from "../helpers/fake-push.mjs";
 import { KEY_RULES, ruleFor } from "../../netlify/lib/store-keys.mjs";
 import { EPOCH_KEY } from "../../netlify/lib/booking-core.mjs";
@@ -16,6 +19,8 @@ import * as admin from "../../netlify/functions/admin.mjs";
 import * as bookingIcs from "../../netlify/functions/booking-ics.mjs";
 import * as retention from "../../netlify/functions/retention.mjs";
 import * as stats from "../../netlify/functions/stats.mjs";
+import { getReviews, STALE_LIMIT_MS } from "../../netlify/lib/reviews.mjs";
+import { buildFeed, KEEP_POSTS_MS } from "../../netlify/lib/social.mjs";
 
 const PW = "fake-admin-password";
 const PHONE = "+47 912 34 567";
@@ -91,4 +96,39 @@ test("store keys: after every handler has run, every stored key has a deletion r
     assert.ok(keys.some((k) => k.startsWith(prefix)), `${prefix} in ${keys.join(", ")}`);
   }
   assert.deepEqual(d.blobs.keys("stats"), ["d/2026-11-12"]);
+});
+
+test("store keys: the Google reviews and Instagram code writes only keys with a deletion rule, and the rows name its limits", async (t) => {
+  quiet(t);
+  const DAY = 24 * 60 * 60 * 1000;
+  const clock = new FakeClock(NOW);
+  const blobs = new FakeBlobs({ clock });
+  const google = { down: false };
+  const fetch = fakeFetch([
+    ["https://places.googleapis.com/v1/places:searchText", () => ({ places: [{ id: "ChIJFixture", displayName: { text: "Viggos Barbershop Kurti" }, formattedAddress: "Violgata 22, 1776 Halden" }] })],
+    [/^https:\/\/places\.googleapis\.com\/v1\/places\//, () => (google.down ? new Response("{}", { status: 403 }) : { rating: 5, userRatingCount: 7, reviews: [{ rating: 5, text: { text: "Bra" }, authorAttribution: { displayName: "Fixture Kunde" } }] })],
+    ["https://graph.instagram.com/refresh_access_token", () => ({ access_token: "IGFixture2", expires_in: 5183944 })],
+    ["https://graph.instagram.com/me/media", () => ({ data: [{ id: "1", caption: "Klipp", media_type: "IMAGE", media_url: "https://cdn.test/1.jpg", permalink: "https://www.instagram.com/p/1/" }] })],
+  ]);
+  const reviews = blobs.getStore("reviews");
+  const social = blobs.getStore("social");
+  await getReviews({ GOOGLE_PLACES_API_KEY: "fixture-key" }, reviews, fetch, { now: clock.date() });
+  await buildFeed(social, { INSTAGRAM_ACCESS_TOKEN: "IGFixture1" }, fetch, { now: clock.date() });
+  // Google fails for longer than the limit: the names and texts leave the store
+  google.down = true;
+  clock.advance(STALE_LIMIT_MS + DAY);
+  await getReviews({ GOOGLE_PLACES_API_KEY: "fixture-key" }, reviews, fetch, { now: clock.date() });
+  assert.ok(!blobs.text("reviews", "reviews").includes("Fixture Kunde"));
+
+  assert.deepEqual(blobs.keys("reviews"), ["place-id", "reviews"]);
+  assert.deepEqual(blobs.keys("social"), ["feed", "instagram-token"]);
+  for (const store of ["reviews", "social"]) {
+    for (const key of blobs.keys(store)) assert.ok(ruleFor(store, key) && ruleFor(store, key).deletion, `${store} ${key} has a deletion rule`);
+  }
+  assert.equal(STALE_LIMIT_MS, 3 * DAY);
+  assert.match(ruleFor("reviews", "reviews").deletion, /3 days after the last good fetch/);
+  assert.equal(KEEP_POSTS_MS, 2 * DAY);
+  assert.match(ruleFor("social", "feed").deletion, /at most 2 days after the last good fetch/);
+  assert.match(ruleFor("social", "instagram-token").deletion, /INSTAGRAM_ACCESS_TOKEN changes/);
+  assert.ok(ruleFor("social", "oauth-state-" + "a".repeat(48)), "unfinished Instagram connections have a row too");
 });

@@ -33,7 +33,7 @@ export default async (req, context) => {
   if (!url.pathname.endsWith("/callback")) {
     if (!keyOk(url.searchParams.get("key"), env.SOCIAL_ADMIN_KEY)) return page(403, "Ingen tilgang", "Feil eller manglende nøkkel.");
     const state = randomBytes(24).toString("hex");
-    await store.setJSON(`oauth-state-${state}`, { platform, created_at: Date.now() });
+    await store.setJSON(`oauth-state-${state}`, { platform, created_at: Date.now() }, { onlyIfNew: true }); // 24 tilfeldige byte: alltid en ny nøkkel
 
     const auth = new URL("https://www.instagram.com/oauth/authorize");
     auth.searchParams.set("client_id", env.INSTAGRAM_APP_ID);
@@ -76,7 +76,9 @@ export default async (req, context) => {
     ll.searchParams.set("access_token", short);
     const long = await (await fetch(ll)).json();
     if (!long.access_token) throw new Error(long.error?.message || "kunne ikke hente langtidstoken");
-    await store.setJSON("instagram-token", {
+    // Eierens egen, nye kobling erstatter med vilje et lagret token (også et fra INSTAGRAM_ACCESS_TOKEN: uten seed tar
+    // miljøvariabelen aldri over igjen, se netlify/lib/social.mjs).
+    await store.setJSON("instagram-token", { // blind-write-ok: the owner's own new connection replaces the stored token on purpose
       access_token: long.access_token,
       refreshed_at: Date.now(),
       expires_at: Date.now() + long.expires_in * 1000,

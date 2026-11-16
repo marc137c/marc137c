@@ -1,0 +1,22 @@
+{
+  "data": [
+    {
+      "id": "18000000000000001",
+      "caption": "Skin fade og skjeggtrim i dag ✂️",
+      "media_type": "IMAGE",
+      "media_url": "https://scontent.cdninstagram.com/v/t51.fixture/1.jpg?oh=fixture&oe=69300000",
+      "permalink": "https://www.instagram.com/p/FixturePost1/",
+      "timestamp": "2026-11-15T14:02:11+0000"
+    },
+    {
+      "id": "18000000000000002",
+      "caption": "Ny uke, nye klipp",
+      "media_type": "VIDEO",
+      "media_url": "https://scontent.cdninstagram.com/v/t50.fixture/2.mp4?oh=fixture&oe=69300000",
+      "thumbnail_url": "https://scontent.cdninstagram.com/v/t51.fixture/2.jpg?oh=fixture&oe=69300000",
+      "permalink": "https://www.instagram.com/reel/FixturePost2/",
+      "timestamp": "2026-11-10T09:30:00+0000"
+    }
+  ],
+  "paging": { "cursors": { "before": "fixture-before", "after": "fixture-after" } }
+}

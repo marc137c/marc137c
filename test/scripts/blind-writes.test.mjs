@@ -1,8 +1,7 @@
 // SPEC R6 (RC4/RC6): a Blobs write that does not say what it expects to overwrite is a lost update waiting to
 // happen (two requests read, both write, one change vanishes). Rule: every `.setJSON(` under netlify/ passes
 // onlyIfMatch or onlyIfNew in that call, or carries `// blind-write-ok: <reason>` on the line where the call starts.
-// PENDING lists the files step 5 still has to fix; the test also fails when a PENDING file no longer has a blind
-// write, so the list only ever shrinks.
+// Step 5 emptied the list of files that were still allowed a blind write; there is no such list any more.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -10,7 +9,6 @@ import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const NETLIFY = fileURLToPath(new URL("../../netlify", import.meta.url));
-export const PENDING = ["functions/social-connect.mjs", "lib/social.mjs"];
 
 function* mjs(dir) {
   for (const name of readdirSync(dir)) {
@@ -55,18 +53,16 @@ test("blind writes: the checker sees conditional calls, the comment with a reaso
   assert.deepEqual(calls.filter(isBlind).map((c) => c.line), [6, 7, 8]);
 });
 
-test("blind writes: every .setJSON( under netlify/ is conditional or explains itself, except the files step 5 fixes", () => {
+test("blind writes: every .setJSON( under netlify/ is conditional or explains itself", () => {
   const blind = [];
-  const blindFiles = new Set();
+  let calls = 0;
   for (const file of mjs(NETLIFY)) {
     const rel = relative(NETLIFY, file).split(sep).join("/");
     for (const c of setJsonCalls(readFileSync(file, "utf8").replace(/\r\n/g, "\n"))) {
-      if (!isBlind(c)) continue;
-      blindFiles.add(rel);
-      if (!PENDING.includes(rel)) blind.push(`netlify/${rel}:${c.line} ${c.lineText.trim()}`);
+      calls++;
+      if (isBlind(c)) blind.push(`netlify/${rel}:${c.line} ${c.lineText.trim()}`);
     }
   }
+  assert.ok(calls >= 5, `the scan found the server's writes (${calls})`);
   assert.deepEqual(blind, [], "add onlyIfMatch/onlyIfNew (or mutateJSON), or `// blind-write-ok: <reason>`");
-  const stale = PENDING.filter((f) => !blindFiles.has(f));
-  assert.deepEqual(stale, [], "these files have no blind write any more: take them off PENDING");
 });
