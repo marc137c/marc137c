@@ -3,6 +3,7 @@
 //   viggos-barbershop/admin-icon-180.png  apple-touch-icon (iPhone/iPad)
 //   viggos-barbershop/admin-icon-192.png  manifest og fane-ikon
 //   viggos-barbershop/admin-icon-512.png  manifest (Android, oppstartsbilde)
+//   viggos-barbershop/apple-touch-icon.png og favicon.ico (32 + 48 px)  nettsidens egne ikoner (index.html)
 // Bunnen går helt ut i kantene (iPhone runder hjørnene selv), og V-en holder seg innenfor den midterste sirkelen
 // (radius 40 %) som Android beholder når ikonet beskjæres («maskable»).
 // Bruk: node scripts/make-admin-icons.mjs   (test/page/admin-icons.test.mjs sjekker at filene er oppdatert)
@@ -86,10 +87,42 @@ export function encodePng(size, rgb) {
   ]);
 }
 
+// ---------- ICO (Windows-ikonmappe med PNG-bilder inni; alle målnettleserne leser det) ----------
+export const ICO_SIZES = [32, 48];
+export function encodeIco(sizes) {
+  const pngs = sizes.map((s) => encodePng(s, renderIcon(s)));
+  const head = Buffer.alloc(6 + 16 * sizes.length);
+  head.writeUInt16LE(0, 0); // reservert
+  head.writeUInt16LE(1, 2); // 1 = ikon
+  head.writeUInt16LE(sizes.length, 4);
+  let offset = head.length;
+  sizes.forEach((s, i) => {
+    const e = 6 + 16 * i;
+    head[e] = s >= 256 ? 0 : s;     // bredde (0 = 256)
+    head[e + 1] = s >= 256 ? 0 : s; // høyde
+    head.writeUInt16LE(1, e + 4);   // fargeplan
+    head.writeUInt16LE(32, e + 6);  // bit per piksel
+    head.writeUInt32LE(pngs[i].length, e + 8);
+    head.writeUInt32LE(offset, e + 12);
+    offset += pngs[i].length;
+  });
+  return Buffer.concat([head, ...pngs]);
+}
+
+// Nettsidens egne ikoner (F63): samme V, for iPhone-bokmerker og for nettlesere som spør etter /favicon.ico
+export const SITE_ICONS = {
+  "apple-touch-icon.png": () => encodePng(180, renderIcon(180)),
+  "favicon.ico": () => encodeIco(ICO_SIZES),
+};
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const dir = fileURLToPath(new URL("../viggos-barbershop/", import.meta.url));
   for (const size of SIZES) {
     writeFileSync(dir + fileFor(size), encodePng(size, renderIcon(size)));
     console.log(`Laget viggos-barbershop/${fileFor(size)}`);
+  }
+  for (const [name, make] of Object.entries(SITE_ICONS)) {
+    writeFileSync(dir + name, make());
+    console.log(`Laget viggos-barbershop/${name}`);
   }
 }

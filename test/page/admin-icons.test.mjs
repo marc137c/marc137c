@@ -78,3 +78,40 @@ for (const size of SIZES) {
     assert.ok(gold > size * size * 0.06 && gold < size * size * 0.3, `the V covers ${(100 * gold / size / size).toFixed(1)} %`);
   });
 }
+
+// F63: the public site's own icons come from the same script: /apple-touch-icon.png (180) for iPhone bookmarks and
+// /favicon.ico (an ICO directory holding a 32 and a 48 px PNG) for browsers and crawlers that ask for it by name.
+// index.html links both before the inline SVG icon, so old Safari and Google's favicon fetcher find a real file.
+test("F63: apple-touch-icon.png is a valid 180×180 PNG, exactly what the script draws", () => {
+  const png = decodePng(readFileSync(SITE + "apple-touch-icon.png"));
+  assert.deepEqual([png.width, png.height], [180, 180]);
+  assert.ok(png.rgb.equals(renderIcon(180)), "run «node scripts/make-admin-icons.mjs» to update apple-touch-icon.png");
+});
+
+test("F63: favicon.ico is an ICO with a 32 and a 48 px PNG, exactly what the script draws", () => {
+  const ico = readFileSync(SITE + "favicon.ico");
+  assert.deepEqual([ico.readUInt16LE(0), ico.readUInt16LE(2), ico.readUInt16LE(4)], [0, 1, 2], "reserved 0, type 1 (icon), 2 images");
+  const seen = [];
+  for (let i = 0; i < 2; i++) {
+    const e = 6 + 16 * i;
+    const size = ico[e] || 256;
+    assert.equal(ico[e + 1] || 256, size, "square");
+    const len = ico.readUInt32LE(e + 8), off = ico.readUInt32LE(e + 12);
+    assert.ok(off + len <= ico.length, "image data inside the file");
+    const png = decodePng(ico.subarray(off, off + len));
+    assert.deepEqual([png.width, png.height], [size, size]);
+    assert.ok(png.rgb.equals(renderIcon(size)), `the ${size} px image is what the script draws`);
+    seen.push(size);
+  }
+  assert.deepEqual(seen.sort((a, b) => a - b), [32, 48]);
+});
+
+test("F63: index.html links /favicon.ico and /apple-touch-icon.png before the inline SVG icon", () => {
+  const index = readFileSync(SITE + "index.html", "utf8");
+  const ico = index.indexOf('<link rel="icon" href="/favicon.ico" sizes="48x48">');
+  const touch = index.indexOf('<link rel="apple-touch-icon" href="/apple-touch-icon.png">');
+  const svg = index.indexOf('<link rel="icon" href="data:image/svg+xml,');
+  assert.ok(ico > 0, "favicon.ico link");
+  assert.ok(touch > 0, "apple-touch-icon link");
+  assert.ok(svg > ico && svg > touch, "both come before the SVG icon");
+});
