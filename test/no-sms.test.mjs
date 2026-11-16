@@ -106,7 +106,12 @@ test("no SMS: with the old Sveve settings set, a web booking calls nothing and r
   const av = await read(await availabilityFn.handle(request("/api/availability"), PRODUCTION, d));
   assert.equal(av.status, 200);
   assert.equal("sms" in av.body, false);
-  assert.deepEqual(Object.keys(storedItems(d.blobs)[0]).sort(),
+  // The booking's own fields; notifiedAt (round 2: «Ny time» was sent for it) and requestId (F1) only when they apply.
+  // Nothing about a text message, ever.
+  const ALLOWED = ["addons", "createdAt", "date", "dur", "id", "name", "note", "phone", "service", "source", "start", "status", "type", "updatedAt", "notifiedAt", "requestId"];
+  const keys = Object.keys(storedItems(d.blobs)[0]).sort();
+  assert.deepEqual(keys.filter((k) => !ALLOWED.includes(k)), [], keys.join(", "));
+  assert.deepEqual(keys.filter((k) => !["notifiedAt", "requestId"].includes(k)),
     ["addons", "createdAt", "date", "dur", "id", "name", "note", "phone", "service", "source", "start", "status", "type", "updatedAt"]);
   assert.deepEqual(fetch.calls, []);
 });

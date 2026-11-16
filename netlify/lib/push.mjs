@@ -24,7 +24,7 @@
 // Sending kaster aldri, har kort tidsfrist (PUSH_TIMEOUT_MS) og logger bare tjenestens navn og svaret: aldri
 // adressen (den er selv en slags nøkkel), kundens navn eller noen nøkkel.
 import { ECDH, createECDH, createHash, createPrivateKey, generateKeyPairSync, hkdfSync, createCipheriv, randomBytes, sign, timingSafeEqual } from "node:crypto";
-import { isDate, mutateJSON, passwordGen } from "./booking-core.mjs";
+import { isDate, mutateJSON, mutateMonth, monthOf, findItem, passwordGen } from "./booking-core.mjs";
 
 // Hvilket admin-passord en enhet hører til: passwordGen(passordet, «push») i booking-core.mjs (16 tegn fra den
 // langsomme hovednøkkelen, F34). Uten passord (admin ikke satt opp) null: da sendes ingenting.
@@ -448,3 +448,46 @@ export async function notifyNewBooking(store, item, opts = {}) {
     return { error: true };
   }
 }
+
+// «Ny time» for en lagret nettbestilling, nøyaktig én gang uansett hvilken forespørsel som lagret den (runde 2,
+// SPEC R15). Før gikk varselet bare fra forespørselen som skrev avtalen: feilet den etter at skrivingen var lagret,
+// og siden prøvde igjen med samme requestId (replay), varslet ingen. Nå styres det av merket notifiedAt på avtalen:
+// før sending settes merket med en betinget skriving, og bare den som setter det, sender (to samtidige forsøk gir
+// ett varsel, som dropStale gjør med det siste varselet). Kom varselet ikke fram til noen enhet, tas merket bort
+// igjen, så et nytt forsøk prøver på nytt. Uten lagrede enheter skrives ingenting. Kaster aldri.
+export async function announceBooking(store, item, opts = {}) {
+  if (!item || item.notifiedAt || !isDate(item.date)) return { skipped: true };
+  try {
+    if (!(await readSubscriptions(store)).length) return { skipped: true, devices: 0 };
+    const stamp = (opts.now || new Date()).toISOString();
+    if (!(await setNotified(store, item, stamp))) return { skipped: true };
+    const r = await notifyNewBooking(store, item, opts);
+    if (r.error || (r.targets > 0 && !r.sent)) await clearNotified(store, item, stamp).catch(() => {});
+    return r;
+  } catch (err) {
+    console.error("Push: kunne ikke varsle om ny time:", err && err.name);
+    return { error: true };
+  }
+}
+// Setter notifiedAt = stamp hvis avtalen finnes og ikke har merket. true bare for den som satte det. Kom svaret på
+// skrivingen aldri, avgjør en ny lesing om det var denne skrivingen som ble lagret.
+async function setNotified(store, item, stamp) {
+  try {
+    const r = await mutateMonth(store, monthOf(item.date), (doc) => {
+      const it = doc.items.find((i) => i && i.id === item.id);
+      if (!it || it.notifiedAt) return { noWrite: true, claimed: false };
+      it.notifiedAt = stamp;
+      return { ok: true, claimed: true };
+    });
+    return r.claimed === true;
+  } catch {
+    const now = await findItem(store, item.id).catch(() => null);
+    return !!now && now.notifiedAt === stamp;
+  }
+}
+const clearNotified = (store, item, stamp) => mutateMonth(store, monthOf(item.date), (doc) => {
+  const it = doc.items.find((i) => i && i.id === item.id);
+  if (!it || it.notifiedAt !== stamp) return { noWrite: true };
+  delete it.notifiedAt;
+  return { ok: true };
+});

@@ -225,3 +225,47 @@ test("booking push: an admin-made booking also keeps each add-on once", async ()
   assert.equal(res.status, 201, JSON.stringify(res.body));
   assert.deepEqual(storedItems(d.blobs)[0].addons, ["Vask kort hår", "Styling"]);
 });
+
+// ---------- Round 2: «Ny time» belongs to the stored booking, not to the request that happened to write it ----------
+// demo-replay-no-push.mjs: the month write commits but the store answers 502 on every attempt; the first POST
+// answers 500 and the page's retry with the same requestId is a 201 replay. Before, no request ever notified.
+test("bookings push: a booking stored during a Blobs write error is announced once, by the replay", async (t) => {
+  quiet(t);
+  const d = await site(["fcm"]);
+  const body = { ...BODY, requestId: "req-abcdef12345" };
+  d.blobs.inject({ method: "PUT", key: /^m\//, fault: "fail-after", status: 502, times: 6 });
+  const first = await book(d, body);
+  assert.equal(first.status, 500);
+  const retry = await book(d, body);
+  assert.equal(retry.status, 201);
+  assert.equal(storedItems(d.blobs).length, 1);
+  assert.equal(d.push.deliveries.filter((x) => x.payload && x.payload.title === "Ny time").length, 1, "one «Ny time»");
+  // a third try (another lost reply on the page) does not announce it again
+  assert.equal((await book(d, body)).status, 201);
+  assert.equal(d.push.deliveries.filter((x) => x.payload && x.payload.title === "Ny time").length, 1);
+  assert.equal(typeof storedItems(d.blobs)[0].notifiedAt, "string");
+});
+
+test("bookings push: two replays at the same moment announce the booking once", async (t) => {
+  quiet(t);
+  const d = await site(["fcm"]);
+  const body = { ...BODY, requestId: "req-abcdef12345" };
+  d.blobs.inject({ method: "PUT", key: /^m\//, fault: "fail-after", status: 502, times: 6 });
+  assert.equal((await book(d, body)).status, 500);
+  const [a, b] = await Promise.all([book(d, body), book(d, body)]);
+  assert.deepEqual([a.status, b.status], [201, 201]);
+  assert.equal(d.push.deliveries.filter((x) => x.payload && x.payload.title === "Ny time").length, 1);
+});
+
+test("bookings push: when no device got «Ny time» (the push service failed), a replay tries again", async (t) => {
+  quiet(t);
+  let fail = true;
+  const d = await site(["fcm"], { reply: () => (fail ? 500 : 201) });
+  const body = { ...BODY, requestId: "req-abcdef12345" };
+  assert.equal((await book(d, body)).status, 201);
+  assert.equal(storedItems(d.blobs)[0].notifiedAt, undefined, "not announced, so not marked");
+  fail = false;
+  assert.equal((await book(d, body)).status, 201);
+  assert.equal(d.push.deliveries.filter((x) => x.payload && x.payload.title === "Ny time").length, 2, "the failed one, then the one that came through");
+  assert.equal(typeof storedItems(d.blobs)[0].notifiedAt, "string");
+});

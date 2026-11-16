@@ -6,6 +6,8 @@
 // Invariant: one copy per booking id suffix, and the reply matches the store: a 2xx means the change is stored;
 // a 5xx (or a throw) means a plain retry, with the fault gone, converges to exactly the intended state. The one
 // state with two copies is a cross-month move whose removal failed, and its reply is the 503 that says so.
+// Side effects too (round 2, SPEC R15): with one subscribed device, after the retry converges each stored web
+// booking has produced exactly one «Ny time» delivery, whichever request did the write (none for admin writes).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { testDeps, request, read, quiet, PRODUCTION } from "../helpers/deps.mjs";
@@ -15,6 +17,8 @@ import { calendarFor } from "../../netlify/lib/calendar.mjs";
 import { take } from "../../netlify/lib/limits.mjs";
 import * as bookings from "../../netlify/functions/bookings.mjs";
 import * as admin from "../../netlify/functions/admin.mjs";
+import { makeDevice, fakePushService } from "../helpers/fake-push.mjs";
+import { vapidKeys, saveSubscription, parseSubscription, pushGen } from "../../netlify/lib/push.mjs";
 
 const PW = "fake-admin-password";
 // mutateJSON backs off in real time between CAS attempts (about 5 s for 8 losses); no waiting in this file
@@ -60,6 +64,7 @@ const WRITES = {
       assert.equal(items.length, 1, JSON.stringify(items));
       assert.deepEqual([items[0].date, items[0].start, items[0].requestId], ["2026-11-20", 600, "web-req-0001"]);
     },
+    newTimePushes: 1,
   },
   "admin create": {
     key: "m/2026-11",
@@ -135,13 +140,23 @@ const oneCopyPerSuffix = (d) => {
   const ids = storedItems(d.blobs).map((i) => suffix(i.id));
   assert.equal(new Set(ids).size, ids.length, "one copy per booking id suffix: " + ids.join(", "));
 };
+const newTimes = (push) => push.deliveries.filter((x) => x.payload && x.payload.title === "Ny time").length;
+// One device with push on (a 60-day login), before any fault is injected
+async function subscribed(d, push) {
+  const store = d.getStore({ name: "bookings", consistency: "strong" });
+  await vapidKeys(store, { now: d.now() });
+  const r = await saveSubscription(store, parseSubscription(push.devices[0].subscription).value, { now: d.now(), gen: pushGen(PW), until: new Date(d.clock.now() + 60 * 864e5) });
+  assert.equal(r.ok, true);
+}
 const content = (d) => JSON.stringify(storedItems(d.blobs).map(({ updatedAt, ...rest }) => rest));
 
 for (const [writeName, w] of Object.entries(WRITES)) {
   for (const [faultName, inject] of Object.entries(FAULTS)) {
     test(`fault matrix: ${writeName} with ${faultName}: the reply matches the store, and a retry converges to one copy`, async (t) => {
       quiet(t);
-      const d = testDeps({ now: NOW, env: { ADMIN_PASSWORD: PW } });
+      const push = fakePushService({ devices: [makeDevice("fcm")] });
+      const d = testDeps({ now: NOW, env: { ADMIN_PASSWORD: PW }, fetch: push.fetch });
+      await subscribed(d, push);
       const ctx = w.setup(d);
       inject(d.blobs, w.key);
       const first = await attempt(() => w.call(d, ctx));
@@ -167,6 +182,7 @@ for (const [writeName, w] of Object.entries(WRITES)) {
       oneCopyPerSuffix(d);
       w.done(d, ctx);
       assert.equal(content(d), before);
+      assert.equal(newTimes(push), w.newTimePushes || 0, `«Ny time» deliveries after convergence: ${newTimes(push)}`);
     });
   }
 }

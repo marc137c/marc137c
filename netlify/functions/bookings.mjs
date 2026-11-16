@@ -5,7 +5,7 @@
 import { liveDeps, bookingStore, afterResponse, isRetiredDeploy, retiredResponse, jsonObject } from "../lib/runtime.mjs";
 import { validateCustomer, createItem } from "../lib/booking-core.mjs";
 import { takeBookingSlot, releaseBookingSlot } from "../lib/limits.mjs";
-import { notifyNewBooking, pushToDevices, bookingsPausedMessage, pushGen, BOOKING_PUSH_WAIT_MS } from "../lib/push.mjs";
+import { announceBooking, pushToDevices, bookingsPausedMessage, pushGen, BOOKING_PUSH_WAIT_MS } from "../lib/push.mjs";
 
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
@@ -50,11 +50,10 @@ export async function handle(req, context, deps) {
       return json({ error: r.error, code: r.code }, r.status);
     }
     // Bare enheter slått på med dagens admin-passord får varselet (bytter Viggo passordet, stopper alle gamle).
-    // Et nytt forsøk på en bestilling som allerede er lagret (replay), varsler ikke igjen.
-    if (!r.replay) {
-      const pushing = notifyNewBooking(store, r.item, { fetch: deps.fetch, now: deps.now(), origin: new URL(req.url).origin, gen: pushGen(deps.env.ADMIN_PASSWORD) });
-      await afterResponse(context, pushing, BOOKING_PUSH_WAIT_MS);
-    }
+    // Varselet hører til den lagrede avtalen (merket notifiedAt), ikke til forespørselen: et nytt forsøk (replay) på
+    // en bestilling som ble lagret uten at noen varslet (første kall feilet etter skrivingen), varsler; ellers ikke (SPEC R15).
+    const pushing = announceBooking(store, r.item, { fetch: deps.fetch, now: deps.now(), origin: new URL(req.url).origin, gen: pushGen(deps.env.ADMIN_PASSWORD) });
+    await afterResponse(context, pushing, BOOKING_PUSH_WAIT_MS);
     const { id, date, start, dur, service } = r.item;
     return json({ ok: true, booking: { id, date, start, dur, service } }, 201);
   } catch (err) {
