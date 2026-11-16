@@ -34,6 +34,7 @@
   const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 
   const state = { date: null, time: null, view: null };
+  let sending = false;     // en bestilling er på vei (se lock)
 
   // «I dag» og klokka følger norsk tid (osloNow i script.js), ikke besøkerens tidssone
   // Regnes ut høyst én gang i sekundet (kalenderen spør hundrevis av ganger per tegning)
@@ -169,18 +170,18 @@
   }
 
   grid.addEventListener("click", (e) => {
-    const btn = e.target.closest(".cal-day");
-    if (!btn || btn.disabled) return;
-    const [y, m, d] = btn.dataset.date.split("-").map(Number);
+    const b = e.target.closest(".cal-day");
+    if (!b || b.disabled || sending) return;
+    const [y, m, d] = b.dataset.date.split("-").map(Number);
     state.date = new Date(y, m - 1, d);
     clearMsg();
     renderAll();
     focusOn(grid.querySelector(".is-selected"));
   });
   slotsEl.addEventListener("click", (e) => {
-    const btn = e.target.closest(".slot");
-    if (!btn || btn.disabled) return;
-    state.time = Number(btn.dataset.time);
+    const b = e.target.closest(".slot");
+    if (!b || b.disabled || sending) return;
+    state.time = Number(b.dataset.time);
     clearMsg();
     renderSlots();
     renderSummary();
@@ -194,6 +195,7 @@
   // Klikk på en tjeneste i prislisten: gå til kalenderen med tjenesten ferdig valgt
   document.querySelectorAll(".svc-link").forEach((link) => {
     link.addEventListener("click", () => {
+      if (sending) return;
       select.value = link.dataset.service;
       select.classList.add("picked");
       form.classList.remove("flash");
@@ -254,9 +256,29 @@
     return id;
   }
 
+  // Mens en bestilling er på vei, er skjemaet låst: det som sendes, er det som lagres (F22)
+  const btn = form.querySelector("button[type=submit]");
+  function lock(on) {
+    sending = on;
+    btn.disabled = on;
+    select.disabled = on;
+    $("f-name").readOnly = on;
+    $("f-phone").readOnly = on;
+    Array.prototype.forEach.call(form.querySelectorAll(".addon-picks input"), (c) => { c.disabled = on; });
+    form.setAttribute("aria-busy", on ? "true" : "false");
+  }
+  function done(textFn) {
+    form.reset();
+    select.classList.remove("picked");
+    state.date = null;
+    state.time = null;
+    lastMsg = { kind: "ok", textFn };
+    renderAll();
+  }
+
   form.addEventListener("submit", (e) => {
     e.preventDefault();
-    const s = I18N.s();
+    if (sending) return;
     const name = $("f-name");
     const phone = $("f-phone");
     if (!select.value) return fail((t) => t.needService, select);
@@ -270,19 +292,8 @@
 
     const addons = Array.prototype.map.call(form.querySelectorAll(".addon-picks input:checked"), (c) => c.value);
 
-    const btn = form.querySelector("button[type=submit]");
-    btn.disabled = true;
     const d0 = state.date, svcValue = select.value, t0 = state.time;
     const whenFor = (t) => t.summary(selectedServiceLabelFor(svcValue), dateLabel(d0), t.time(t0));
-    setMsg("", (t) => t.sending);
-    const done = (textFn) => {
-      form.reset();
-      select.classList.remove("picked");
-      state.date = null;
-      state.time = null;
-      lastMsg = { kind: "ok", textFn };
-      renderAll();
-    };
     const bot = form.querySelector("[name=bot-field]");
     const body = {
       service: select.value, date: iso(state.date), start: state.time, addons,
@@ -292,6 +303,10 @@
     if (!attempt || attempt.sig !== sig) attempt = { sig, id: newRequestId() };
     body.botField = bot ? bot.value : "";
     body.requestId = attempt.id;
+    lock(true);
+    setMsg("", (t) => t.sending);
+    // Hver vei ut låser opp skjemaet først, så feilmeldingen kan flytte fokus og kunden kan rette eller prøve igjen
+    const end = (fn) => { lock(false); fn(); };
     fetch("/api/bookings", {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -299,31 +314,26 @@
     }).catch(() => null).then((res) => {
       if (res && res.ok) {
         attempt = null;
-        return loadAvailability().then(() => { done((t) => t.booked(whenFor(t))); });
+        return loadAvailability().then(() => end(() => done((t) => t.booked(whenFor(t)))));
       }
       if (res && res.status === 409) {
         // Noen andre rakk å ta tiden: vis oppdatert kalender
-        return loadAvailability().then(() => {
+        return loadAvailability().then(() => end(() => {
           state.time = null;
           renderAll();
           fail((t) => t.takenNow, slotsEl.querySelector(".slot:not([disabled])"));
-        });
+        }));
       }
       // For mange bestillinger (fra nummeret, nettet eller totalt): et nytt forsøk hjelper ikke, så be om en telefon
-      if (res && res.status === 429) {
-        setMsg("err", (t) => t.rateLimited);
-        return;
-      }
+      if (res && res.status === 429) return end(() => setMsg("err", (t) => t.rateLimited));
       if (res && res.status >= 400 && res.status < 500 && res.status !== 404) {
-        return res.json().catch(() => ({})).then((data) => { fail(ERR[data.code] || ((t) => t.notSaved)); });
+        return res.json().catch(() => ({})).then((data) => end(() => fail(ERR[data.code] || ((t) => t.notSaved))));
       }
       // 404: bookingsystemet finnes ikke her, så ingenting ble lagret. Ellers (ingen svar, nettfeil, serverfeil)
       // vet vi ikke om timen ble lagret. Begge ganger: ring oss, og skjemaet beholder alt kunden har valgt og skrevet.
-      setMsg("err", (t) => (res && res.status === 404 ? t.notSaved : t.uncertain));
+      end(() => setMsg("err", (t) => (res && res.status === 404 ? t.notSaved : t.uncertain)));
     }).catch(() => {
-      setMsg("err", (t) => t.uncertain);
-    }).then(() => {
-      btn.disabled = false;
+      end(() => setMsg("err", (t) => t.uncertain));
     });
   });
 

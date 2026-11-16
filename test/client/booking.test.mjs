@@ -4,7 +4,7 @@
 // customer is told to call 409 63 911, keeps what they typed, and is never told the time is confirmed.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { boot, FRIDAY, RATE_LIMITED } from "./booking-harness.mjs";
+import { boot, later, FRIDAY, RATE_LIMITED } from "./booking-harness.mjs";
 
 const CALL = "409 63 911";
 const PROMISE = /mottatt|bekrefter|received|confirm/i;
@@ -110,6 +110,57 @@ test("F1: a changed booking gets a new requestId, and the body carries no langua
   assert.notEqual(ids[2], ids[0], "another phone number: a new id");
   for (const p of site.bookingPosts()) {
     assert.deepEqual(Object.keys(p.json).sort(), ["addons", "botField", "date", "name", "phone", "requestId", "service", "start"]);
+  }
+});
+
+test("F22: while 'Sender …' shows, the form is locked, and the stored booking is what was on screen at submit", async () => {
+  const gate = later();
+  const site = await boot({ setup: (s) => s.when((r) => r.url === "/api/bookings", (req, srv) => gate.then(() => srv.book(req)), 1) });
+  await site.pick(FRIDAY);
+  const addon = site.qs(".addon-picks input");
+  site.click(addon);
+  await site.book();
+  assert.equal(site.message(), site.s().sending);
+  assert.equal(site.form.getAttribute("aria-busy"), "true");
+  assert.equal(site.submitButton.disabled, true);
+  assert.equal(site.type(site.$("f-phone"), "409 63 911"), false, "the phone field is read-only");
+  assert.equal(site.type(site.$("f-name"), "Ola Nordmann"), false, "the name field is read-only");
+  assert.equal(site.choose(site.select, "Barneklipp"), false, "the service cannot change");
+  assert.equal(site.click(addon), false, "the add-ons cannot change");
+  const summary = site.summary();
+  site.click(site.slot(870)); await site.flush();
+  site.click(await site.day("2026-11-16")); await site.flush();
+  site.click(site.qs('.svc-link[data-service="Barneklipp"]')); await site.flush();
+  assert.equal(site.summary(), summary, "day, time and price-list taps are ignored while sending");
+  assert.equal(site.select.value, FRIDAY.service);
+  gate.resolve();
+  await site.advance(1000);
+  const stored = site.server.bookings();
+  assert.equal(stored.length, 1);
+  assert.deepEqual([stored[0].service, stored[0].date, stored[0].start, stored[0].name, stored[0].phone, stored[0].addons],
+    [FRIDAY.service, FRIDAY.date, FRIDAY.time, FRIDAY.name, FRIDAY.phone, ["Vask kort hår"]]);
+  assert.match(site.message(), /^Timen er booket: Herreklipp · fredag 13\. november kl\. 14:00\./);
+  assert.deepEqual(site.otherRequests(), []);
+  // unlocked again
+  assert.equal(site.form.getAttribute("aria-busy"), "false");
+  assert.equal(site.select.disabled, false);
+  assert.equal(site.$("f-phone").readOnly, false);
+  assert.equal(addon.disabled, false);
+});
+
+test("F22: every way a send ends unlocks the form", async () => {
+  for (const answer of [{ network: true }, { status: 500, body: {} }, { status: 404, body: "x" }, RATE_LIMITED,
+    { status: 409, body: { code: "taken", error: "taken" } }, { status: 400, body: { code: "bad_phone", error: "bad_phone" } }]) {
+    const site = await failedBooking(answer);
+    const label = JSON.stringify(answer);
+    assert.notEqual(site.message(), site.s().sending, label);
+    assert.equal(site.submitButton.disabled, false, label);
+    assert.equal(site.select.disabled, false, label);
+    assert.equal(site.$("f-name").readOnly, false, label);
+    assert.equal(site.$("f-phone").readOnly, false, label);
+    assert.ok(site.qsa(".addon-picks input").every((c) => !c.disabled), label);
+    assert.notEqual(site.form.getAttribute("aria-busy"), "true", label);
+    assert.equal(site.type(site.$("f-phone"), "409 63 912"), true, label);
   }
 });
 
