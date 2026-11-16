@@ -446,6 +446,42 @@ test("F49: choosing again clears the reason", async () => {
   assert.match(site.summary(), /16:00/);
 });
 
+// F50: the calendar opens on the first month with a bookable day, decided after the server has answered, unless the
+// customer has moved it themselves.
+const LATE_NOVEMBER = { now: "2026-11-28T09:00:00+01:00", setup: (s) => { s.add({ date: "2026-11-28", start: 600, dur: 420 }); s.add({ date: "2026-11-30", start: 600, dur: 480 }); } };
+test("F50: on Sat 28 Nov with 28 and 30 Nov full (29th is a Sunday), the calendar opens on December", async () => {
+  const site = await boot(LATE_NOVEMBER);
+  await site.advance(1000);
+  assert.equal(site.monthShown(), "Desember 2026");
+  assert.ok(site.$("cal-grid").querySelectorAll(".cal-day").some((b) => !b.disabled), "a day can be chosen");
+});
+
+test("F50: a ‹/› tap before the first answer keeps the customer's month", async () => {
+  const first = later();
+  const site = await boot(Object.assign({}, LATE_NOVEMBER, { setup: (s) => { LATE_NOVEMBER.setup(s); s.when((r) => r.url === "/api/availability", () => first, 1); } }));
+  assert.equal(site.monthShown(), "November 2026", "before any answer, the device's guess");
+  site.click(site.$("cal-next")); await site.flush();
+  site.click(site.$("cal-next")); await site.flush();
+  assert.equal(site.monthShown(), "Januar 2027");
+  first.resolve({ status: 200, body: site.server.availability() });
+  await site.advance(1000);
+  assert.equal(site.monthShown(), "Januar 2027", "the answer does not move it back");
+  await site.poll();
+  assert.equal(site.monthShown(), "Januar 2027", "nor does the 30-s refresh");
+});
+
+test("F50: a tab left open over midnight into a new month moves to that month", async () => {
+  const site = await boot({ now: "2026-11-30T10:00:00+01:00" });
+  await site.advance(1000);
+  assert.equal(site.monthShown(), "November 2026");
+  await site.hide();
+  site.clock.ms += 22 * 3600 * 1000; // the phone slept until 08:00 on 1 December
+  await site.show();
+  await site.advance(1000);
+  assert.equal(site.monthShown(), "Desember 2026");
+  assert.ok(site.$("cal-prev").disabled, "November is in the past now");
+});
+
 test("F73: a successful booking is stored once and nothing else is sent (no Netlify Forms copy)", async () => {
   const site = await boot();
   await site.pick(FRIDAY);

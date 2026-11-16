@@ -43,6 +43,7 @@
 
   const state = { date: null, time: null, view: null };
   let sending = false;     // en bestilling er på vei (se lock)
+  let userMoved = false;   // kunden har bladd i kalenderen selv: da blir måneden stående
 
   // «Nå» i norsk tid: serverens klokke (talt videre fra da svaret kom) når serveren har svart, ellers enhetens klokke
   // (osloNow i script.js). Enhetsklokka kan gå feil; serveren avgjør hva som er for tidlig.
@@ -210,9 +211,12 @@
   }
 
   // Første synlige måned: den første med en ledig dag
+  // (ingen ledig dag i hele vinduet: denne måneden)
   function initView() {
-    const d = today();
-    while (!bookable(d) && d < lastDay()) d.setDate(d.getDate() + 1);
+    let d = today();
+    const last = lastDay();
+    while (!bookable(d) && d < last) d.setDate(d.getDate() + 1);
+    if (!bookable(d)) d = today();
     state.view = new Date(d.getFullYear(), d.getMonth(), 1);
   }
 
@@ -234,8 +238,8 @@
     renderSummary();
     focusOn(slotsEl.querySelector(".is-selected"));
   });
-  prevBtn.addEventListener("click", () => { state.view = new Date(state.view.getFullYear(), state.view.getMonth() - 1, 1); renderCalendar(); });
-  nextBtn.addEventListener("click", () => { state.view = new Date(state.view.getFullYear(), state.view.getMonth() + 1, 1); renderCalendar(); });
+  prevBtn.addEventListener("click", () => { userMoved = true; state.view = new Date(state.view.getFullYear(), state.view.getMonth() - 1, 1); renderCalendar(); });
+  nextBtn.addEventListener("click", () => { userMoved = true; state.view = new Date(state.view.getFullYear(), state.view.getMonth() + 1, 1); renderCalendar(); });
   // Ny tjeneste kan ha en annen varighet, så ledige tider tegnes på nytt
   select.addEventListener("change", () => { select.classList.remove("picked"); clearMsg(); renderAll(); });
 
@@ -346,8 +350,11 @@
       });
   }
   // Etter nye data fra serveren: tegn på nytt uten å miste fokus
+  // Etter nye data fra serveren: velg måned på nytt hvis kunden ikke har bladd eller valgt dag selv, eller hvis den
+  // viste måneden er passert (en fane som sto åpen over midnatt), og tegn på nytt uten å miste fokus (F50, F57)
   function afterLoad() {
-    if (!state.view) initView();
+    const t0 = today();
+    if (!state.view || (!userMoved && !state.date) || state.view < new Date(t0.getFullYear(), t0.getMonth(), 1)) initView();
     renderKeepFocus();
   }
   const refresh = () => loadAvailability().then(afterLoad);
