@@ -129,3 +129,22 @@ test("layout: below 390 px the top row never wraps; the status and «Se nettside
   assert.match(top, /<span class="sync" id="sync"/);
   assert.match(top, /<a class="link" href="\/"/);
 });
+
+// F92: the day title is written with only its first letter upper-case (no CSS capitalize, which gave
+// 'I Dag, Torsdag 12. November'), and the date row never squeezes «I dag» onto two lines.
+test("layout F92: the day title has only its first letter upper-case, today and any other day", async () => {
+  const { itemsRoute } = await import("../helpers/admin-page.mjs");
+  const page = await loadAdmin({ now: "2026-11-12T09:00", routes: { "GET /api/admin/items": itemsRoute([]) } });
+  assert.equal(page.$("day-title").textContent, "I dag, torsdag 12. november");
+  page.$("next").click();
+  await page.flush();
+  assert.equal(page.$("day-title").textContent, "Fredag 13. november");
+  assert.doesNotMatch(ruleIn(null, ".day-head h2"), /text-transform/, "no text-transform on the title");
+});
+
+test("layout F92: «I dag» never wraps and keeps its width; the date field may shrink", () => {
+  const chip = ruleIn(null, ".chip");
+  assert.match(chip, /white-space:\s*nowrap/);
+  assert.match(chip, /flex:\s*0 0 auto/);
+  assert.match(ruleIn(null, ".day-nav input"), /min-width:\s*0/);
+});

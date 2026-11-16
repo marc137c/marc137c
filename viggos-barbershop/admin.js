@@ -290,7 +290,9 @@
     const d = state.day;
     $("day").value = d;
     const title = fmt(d, { weekday: "long", day: "numeric", month: "long" });
-    $("day-title").textContent = d === todayIso() ? `I dag, ${title}` : title;
+    // Bare første bokstav stor («I dag, torsdag 12. november», «Fredag 13. november»), ikke CSS capitalize (F92)
+    const t = d === todayIso() ? `I dag, ${title}` : title;
+    $("day-title").textContent = t.charAt(0).toUpperCase() + t.slice(1);
     if (state.itemsDay !== d) {
       // Dagens avtaler er ikke hentet ennå (eller nettet er borte): ingen oppsummering fra en annen dags liste, og
       // ingenting vist som «ledig» før vi vet (F29). load() skriver «Kunne ikke hente …» hvis hentingen feiler.

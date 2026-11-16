@@ -56,9 +56,9 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 .title { font-family: var(--caps); color: var(--gold); letter-spacing: .08em; margin-right: auto; }
 .sync { font-size: .8rem; color: var(--muted); }
 .day-nav { display: flex; align-items: center; gap: 8px; max-width: 900px; margin: 10px auto 0; }
-.day-nav input { flex: 1; max-width: 220px; }
+.day-nav input { flex: 1; max-width: 220px; min-width: 0; }
 .icon { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--gold); font-size: 1.4rem; cursor: pointer; padding: 0; }
-.chip { min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; cursor: pointer; }
+.chip { min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; cursor: pointer; white-space: nowrap; flex: 0 0 auto; }
 .week { display: flex; gap: 6px; overflow-x: auto; max-width: 900px; margin: 10px auto 0; padding-bottom: 2px; scrollbar-width: none; }
 .week button {
   flex: 0 0 auto; min-width: 58px; display: grid; justify-items: center; grid-gap: 2px; gap: 2px; padding: 6px 8px; border-radius: 12px;
@@ -74,7 +74,7 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 
 .day { max-width: 900px; margin: 0 auto; padding: 18px 16px 60px; }
 .day-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; justify-content: space-between; }
-.day-head h2 { margin: 0; font-size: 1.35rem; text-transform: capitalize; }
+.day-head h2 { margin: 0; font-size: 1.35rem; }
 .day-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .day-info { color: var(--muted); margin: 8px 0 14px; font-size: .92rem; }
 
