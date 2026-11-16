@@ -63,7 +63,8 @@
       : esc(r.author);
     const avatar = safeUrl(r.photo)
       ? `<img class="review-avatar" src="${esc(r.photo)}" alt="" width="40" height="40" loading="lazy" referrerpolicy="no-referrer">`
-      : `<span class="review-avatar review-avatar--initial" aria-hidden="true">${esc((r.author || "?").charAt(0).toUpperCase())}</span>`;
+      // Første hele tegn (Array.from deler på kodepunkt, så en emoji eller 𝓜 aldri kuttes i to)
+      : `<span class="review-avatar review-avatar--initial" aria-hidden="true">${esc((Array.from(r.author || "")[0] || "?").toUpperCase())}</span>`;
     // Lenken til akkurat denne anmeldelsen på Google Maps (Googles krav; teksten kan også være kuttet her)
     const more = safeUrl(r.mapsUri);
     return `<figure class="review">

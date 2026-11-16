@@ -255,6 +255,15 @@ test("F85: #hero-rating is the last thing in the hero, after #open-status, on it
   assert.match(rule[1], /margin: 16px auto 0;/);
 });
 
+// X3.3: the avatar initial is the author's first character (code point), never half an emoji
+test("X3.3: the avatar initial is the first whole character of the name, also for emoji and math letters", async () => {
+  const site = await reviewsPage(REVIEWS.names);
+  const initials = cards(site).map((c) => c.querySelector(".review-avatar--initial").textContent);
+  assert.deepEqual(initials, ["K", "🔥", "𝓜", "Ø"]);
+  for (const i of initials) assert.ok(i.isWellFormed(), JSON.stringify(i));
+  assert.ok(site.html.filter((w) => w.id === "reviews").every((w) => w.html.isWellFormed()));
+});
+
 test("widgets: every string reviews.js, social-feed.js and i18n.js wrote in this file is well-formed Unicode", () => {
   const writes = SITES.reduce((all, s) => all.concat(s.html), []);
   assert.ok(writes.length > 20, `${writes.length} writes checked`);
