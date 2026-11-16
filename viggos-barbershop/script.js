@@ -129,34 +129,83 @@ function osloNow() {
   }
 }
 
+// Datoer som tekst (ÅÅÅÅ-MM-DD), regnet i UTC så sommertid ikke flytter dagen
+const isoDate = (y, m, d) => y + "-" + (m < 10 ? "0" : "") + m + "-" + (d < 10 ? "0" : "") + d;
+const dateParts = (s) => s.split("-").map(Number);
+function addDaysTo(s, n) {
+  const p = dateParts(s);
+  const t = new Date(Date.UTC(p[0], p[1] - 1, p[2] + n));
+  return isoDate(t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate());
+}
+const weekdayOf = (s) => { const p = dateParts(s); return new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay(); };
+
+// Siste svar fra /api/availability (booking.js sier fra): serverens dato og klokke, åpningstidene og dagene
+// barberen har blokkert helt (eierens beslutning D4). Før første svar brukes HOURS og klokka i Norge.
+let shopInfo = null;
+function onAvailability(a) {
+  const d = a && a.data;
+  if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d.today) || typeof d.nowMinutes !== "number" || typeof a.at !== "number") return;
+  shopInfo = {
+    today: d.today, nowMinutes: d.nowMinutes, at: a.at,
+    hours: d.hours && typeof d.hours === "object" ? d.hours : null,
+    closed: Array.isArray(d.closed) ? d.closed : [],
+  };
+  updateStatus();
+}
+if (!Array.isArray(window.bookingAvailabilityListeners)) window.bookingAvailabilityListeners = [];
+window.bookingAvailabilityListeners.push(onAvailability);
+
+function shopNow() {
+  if (shopInfo) {
+    const total = shopInfo.nowMinutes + Math.max(0, Math.floor((Date.now() - shopInfo.at) / 60000));
+    const date = addDaysTo(shopInfo.today, Math.floor(total / 1440));
+    return { date, day: weekdayOf(date), minutes: total % 1440 };
+  }
+  const o = osloNow();
+  return { date: isoDate(o.y, o.m, o.d), day: o.day, minutes: o.minutes };
+}
+function hoursOn(day) {
+  const h = shopInfo && shopInfo.hours ? shopInfo.hours[day] : HOURS[day];
+  return Array.isArray(h) && h.length === 2 && typeof h[0] === "number" && typeof h[1] === "number" ? h : null;
+}
+const blockedDay = (date) => !!shopInfo && shopInfo.closed.indexOf(date) >= 0;
+
 // Når åpner vi? (ikke «åpent nå») + marker dagens rad i tabellen
 function updateStatus() {
-  const { day, minutes } = osloNow();
-  const today = HOURS[day];
+  const now = shopNow();
+  const blocked = blockedDay(now.date);
+  const today = blocked ? null : hoursOn(now.day);
   const el = document.getElementById("open-status");
   const s = I18N.s();
 
   document.querySelectorAll("#hours-table tr").forEach((tr) => {
-    tr.classList.toggle("today", tr.dataset.days.split(" ").includes(String(day)));
+    tr.classList.toggle("today", tr.dataset.days.split(" ").includes(String(now.day)));
   });
 
-  const openNow = !!(today && minutes >= today[0] && minutes < today[1]);
+  const openNow = !!(today && now.minutes >= today[0] && now.minutes < today[1]);
   el.classList.toggle("closed", !openNow); // rød så lenge det er stengt; beholder "anim"-klassen
   if (openNow) {
     el.textContent = s.hoursToday(s.time(today[0]), s.time(today[1]));
     return;
   }
-  if (today && minutes < today[0]) {
+  if (today && now.minutes < today[0]) {
     el.textContent = s.opensToday(s.time(today[0]));
     return;
   }
-  for (let i = 1; i <= 7; i++) {
-    const d = (day + i) % 7;
-    if (HOURS[d]) {
-      el.textContent = s.opensOn(i === 1 ? s.tomorrow : s.days[d], s.time(HOURS[d][0]));
-      return;
+  // Neste dag med åpningstid som ikke er blokkert (en ferie kan vare lenge: se like langt frem som kalenderen)
+  let next = "";
+  for (let i = 1; i <= 62; i++) {
+    const date = addDaysTo(now.date, i);
+    const d = weekdayOf(date);
+    const h = hoursOn(d);
+    if (h && !blockedDay(date)) {
+      const p = dateParts(date);
+      const when = i === 1 ? s.tomorrow : i < 7 ? s.days[d] : s.onDate(s.days[d], p[2], p[1]);
+      next = s.opensOn(when, s.time(h[0]));
+      break;
     }
   }
+  el.textContent = blocked ? s.closedToday(next) : next;
 }
 updateStatus();
 setInterval(updateStatus, 60000);

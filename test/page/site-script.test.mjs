@@ -5,6 +5,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadSite } from "../helpers/site-page.mjs";
 import { click, Event } from "../helpers/mini-dom.mjs";
+import { CASES, closed as CLOSED } from "../fixtures/closed-days.mjs";
+import { CONFIG } from "../../netlify/lib/booking-core.mjs";
 
 // A browser with <dialog>: showModal/close as the platform does them, and «close» fired on every close
 function nativeDialogs(ctx) {
@@ -118,3 +120,94 @@ test("F47: in English the button says so too", async () => {
   const site = await page({ lang: "en" });
   assert.equal(site.$("map-load").textContent, "Show map (Google Maps)");
 });
+
+// ---------- F7 / owner decision D4: the hero status line knows the barber's fully blocked days ----------
+// The page runs booking.js for real; its /api/availability answer reaches script.js through
+// window.bookingAvailabilityListeners. The server's date and clock win over the visitor's.
+const DAY_NO = ["søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"];
+const weekday = (date) => new Date(date + "T12:00:00Z").getUTCDay();
+const addDays = (date, n) => new Date(Date.parse(date + "T12:00:00Z") + n * 864e5).toISOString().slice(0, 10);
+const availability = (today, nowMinutes, closed = []) => ({
+  today, nowMinutes, lastDate: addDays(today, 60), hours: CONFIG.hours, slotMin: 30, leadMin: 60, maxDays: 60,
+  durations: { "Full service": 60, "Herreklipp": 30 }, busy: {}, closed,
+});
+async function hero(answer, opts = {}) {
+  const routes = answer ? { "/api/availability": { body: answer } } : {};
+  const site = await loadSite(Object.assign({ scripts: ["compat.js", "script.js", "booking.js"], routes }, opts));
+  await site.advance(10);
+  return site;
+}
+const status = (site) => site.$("open-status");
+
+test("D4: before any answer the static hours are used (Monday 12:00 in Oslo is open, not red)", async () => {
+  const site = await hero(null, { now: "2026-11-16T12:00:00+01:00" });
+  assert.equal(status(site).textContent, "I dag kl. 10:00–18:00");
+  assert.equal(status(site).classList.contains("closed"), false);
+  assert.ok(status(site).classList.contains("anim"));
+});
+
+test("D4: a fully blocked today says «Stengt i dag», turns red, keeps «anim» and names the next open day", async () => {
+  const site = await hero(availability("2026-11-16", 720, ["2026-11-16"]), { now: "2026-11-16T12:00:00+01:00" });
+  assert.equal(status(site).textContent, "Stengt i dag · Åpner i morgen kl. 10:00");
+  assert.ok(status(site).classList.contains("closed"));
+  assert.ok(status(site).classList.contains("anim"), "the entrance animation class stays");
+});
+
+test("D4: «opens on» skips blocked days, and a day a week or more away is named with its date", async () => {
+  const site = await hero(availability("2026-11-16", 720, ["2026-11-16", "2026-11-17", "2026-11-18"]));
+  assert.equal(status(site).textContent, "Stengt i dag · Åpner torsdag kl. 10:00");
+  const holiday = Array.from({ length: 12 }, (_, i) => addDays("2026-11-16", i));
+  const long = await hero(availability("2026-11-16", 720, holiday));
+  assert.equal(long.$("open-status").textContent, "Stengt i dag · Åpner lørdag 28. november kl. 10:00");
+});
+
+test("D4: after closing on Saturday, a blocked Monday is skipped too", async () => {
+  const site = await hero(availability("2026-11-21", 1030, ["2026-11-23"]));
+  assert.equal(status(site).textContent, "Åpner tirsdag kl. 10:00");
+  assert.ok(status(site).classList.contains("closed"));
+});
+
+test("D4: the server's date and clock win over the visitor's (a phone set to the wrong day)", async () => {
+  const site = await hero(availability("2026-11-15", 720), { now: "2026-11-16T12:00:00+01:00" });
+  assert.equal(status(site).textContent, "Åpner i morgen kl. 10:00", "Sunday on the server");
+  assert.ok(status(site).classList.contains("closed"));
+});
+
+test("D4: the line follows the clock from the server's answer (17:59 open, 18:01 closed)", async () => {
+  const site = await hero(availability("2026-11-16", 1079));
+  assert.equal(status(site).textContent, "I dag kl. 10:00–18:00");
+  site.ctx.bookingAvailabilityListeners.length = 0; // no newer answer: only the passing minutes count
+  site.requests.length = 0;
+  await site.advance(2 * 60000);
+  assert.equal(status(site).textContent, "Åpner i morgen kl. 10:00");
+  assert.ok(status(site).classList.contains("closed"));
+});
+
+test("D4: in English the blocked day reads «Closed today»", async () => {
+  const site = await hero(availability("2026-11-16", 720, ["2026-11-16"]), { lang: "en" });
+  assert.equal(status(site).textContent, "Closed today · Opens tomorrow at 10:00 AM");
+});
+
+// The shared fixture (test/fixtures/closed-days.mjs): the same dates the server lists as closed, at noon
+for (const c of CASES) {
+  test(`D4 fixture: ${c.label} (${c.date}) → ${c.closed ? "Stengt i dag" : "not blocked"}`, async () => {
+    const site = await hero(availability(c.date, 720, CLOSED));
+    const el = status(site);
+    const hours = CONFIG.hours[weekday(c.date)];
+    if (c.closed) {
+      assert.match(el.textContent, /^Stengt i dag · Åpner /);
+      assert.ok(el.classList.contains("closed"));
+    } else if (hours) {
+      assert.equal(el.textContent, `I dag kl. 10:00–${hours[1] === 1080 ? "18" : "17"}:00`);
+      assert.equal(el.classList.contains("closed"), false);
+    } else {
+      assert.ok(el.classList.contains("closed"), "Sunday");
+    }
+    if (!(c.closed || !hours)) return;
+    let i = 1;
+    while (!CONFIG.hours[weekday(addDays(c.date, i))] || CLOSED.includes(addDays(c.date, i))) i++;
+    const next = addDays(c.date, i);
+    const name = i === 1 ? "i morgen" : DAY_NO[weekday(next)];
+    assert.ok(el.textContent.includes(`Åpner ${name}`), `${el.textContent} names ${next}`);
+  });
+}

@@ -139,6 +139,10 @@
       hoursToday: (a, b) => `I dag kl. ${a}–${b}`,
       opensToday: (t) => `Åpner i dag kl. ${t}`,
       opensOn: (when, t) => `Åpner ${when} kl. ${t}`,
+      // En dag barberen har blokkert helt i timeboken (eierens beslutning D4)
+      closedToday: (next) => (next ? `Stengt i dag · ${next}` : "Stengt i dag"),
+      // «Åpner …» en uke eller mer frem: med dato
+      onDate: (dayName, d, m) => `${dayName} ${d}. ${["januar", "februar", "mars", "april", "mai", "juni", "juli", "august", "september", "oktober", "november", "desember"][m - 1]}`,
       price: (n) => `fra ${n},-`,
       menuOpen: "Åpne meny",
       menuClose: "Lukk meny",
@@ -196,6 +200,8 @@
       hoursToday: (a, b) => `Today ${a}–${b}`,
       opensToday: (t) => `Opens today at ${t}`,
       opensOn: (when, t) => `Opens ${when} at ${t}`,
+      closedToday: (next) => (next ? `Closed today · ${next}` : "Closed today"),
+      onDate: (dayName, d, m) => `${dayName} ${d} ${["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][m - 1]}`,
       price: (n) => `from ${n} NOK`,
       menuOpen: "Open menu",
       menuClose: "Close menu",
