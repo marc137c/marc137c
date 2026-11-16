@@ -235,6 +235,11 @@
       state.week = week.items;
       state.config = day.config;
       render();
+      // Arket står åpent (fanen kom tilbake), og avtalen er endret eller borte på serveren siden det ble åpnet (X1.2)
+      if (dlg.open && state.editing && state.editing.date === d) {
+        const fresh = day.items.filter((i) => i.id === state.editing.id)[0];
+        if (!fresh || fresh.updatedAt !== state.editing.updatedAt) $("edit-msg").textContent = "Avtalen er endret et annet sted – lukk og åpne den på nytt.";
+      }
       $("sync").textContent = `Oppdatert ${hhmm(new Date().getHours() * 60 + new Date().getMinutes())}`;
     }).catch((err) => {
       if (seq !== loadSeq) return; // et nyere svar er på vei
@@ -438,20 +443,47 @@
     };
   }
 
+  // Feltene som er endret siden arket ble åpnet (X1.2). Endrer to enheter hvert sitt felt, overskriver de ikke
+  // hverandre: en avlysning på telefonen blir ikke angret av et notat skrevet på PC-en.
+  function changedFields(was, body) {
+    const out = {};
+    Object.keys(body).forEach((k) => {
+      const before = k === "status" ? (was.status === "cancelled" ? "cancelled" : "confirmed")
+        : k === "addons" ? was.addons || [] : was[k] == null ? "" : was[k];
+      if (JSON.stringify(body[k]) !== JSON.stringify(before)) out[k] = body[k];
+    });
+    return out;
+  }
+  // Avtalen er endret på en annen enhet siden arket ble åpnet (412 «stale», X1.1)
+  const STALE_TEXT = "Avtalen er endret på en annen enhet, så endringen ble ikke lagret. Listen oppdateres nå.";
+
   function save(force = false) {
-    const body = payload();
+    const target = state.editing;
+    let body = payload();
     if (!body.date || Number.isNaN(body.start)) return ($("edit-msg").textContent = "Velg dato og tid.");
     if (body.type === "booking" && !body.service && !body.name) return ($("edit-msg").textContent = "Skriv inn tjeneste eller navn.");
+    if (target) {
+      body = changedFields(target, body);
+      if (!Object.keys(body).length) { dlg.close(); return Promise.resolve(); }
+      // expect: avtalen slik denne enheten så den; serveren svarer 412 hvis den er endret et annet sted siden (R3)
+      if (target.updatedAt) body.expect = target.updatedAt;
+    }
     const q = force ? "?force=1" : "";
     $("save").disabled = true;
-    const sent = state.editing
-      ? api(`/api/admin/items/${encodeURIComponent(state.editing.id)}${q}`, { method: "PATCH", body: JSON.stringify(body) })
+    const sent = target
+      ? api(`/api/admin/items/${encodeURIComponent(target.id)}${q}`, { method: "PATCH", body: JSON.stringify(body) })
       : api(`/api/admin/items${q}`, { method: "POST", body: JSON.stringify(body) });
     return sent.then(() => {
       dlg.close();
-      if (body.date !== state.day) state.day = body.date;
+      if (body.date && body.date !== state.day) state.day = body.date;
       return load();
     }).catch((err) => {
+      if (err.status === 412 && target) {
+        // Aldri «lagre likevel» her: da ville endringen fra den andre enheten blitt overskrevet
+        alert(STALE_TEXT);
+        dlg.close();
+        return load();
+      }
       if (err.status === 409 && !force) {
         if (confirm(`${err.message}\n\nVil du lagre likevel (dobbeltbooking)?`)) return save(true);
       }
