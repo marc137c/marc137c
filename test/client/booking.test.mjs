@@ -74,6 +74,45 @@ test("NEW-429: the rate-limit text asks for a phone call and never says to try a
   assert.equal(s.rateLimited, "For mange bestillinger fra dette nummeret akkurat nå. Ring oss på 409 63 911.");
 });
 
+test("F1: a booking the server stored but whose reply was lost: the retry sends the same requestId and ends booked, stored once", async () => {
+  let first = true;
+  const site = await boot({
+    setup: (s) => s.when((r) => r.url === "/api/bookings" && first, (req, srv) => { first = false; srv.book(req); return { network: true }; }),
+  });
+  await site.pick(FRIDAY);
+  await site.book();
+  await site.advance(1000);
+  assert.equal(site.message(), site.s().uncertain, "the lost reply is an uncertain outcome");
+  assert.equal(site.server.bookings().length, 1, "the server did store it");
+  await site.book();
+  await site.advance(1000);
+  const posts = site.bookingPosts();
+  assert.equal(posts.length, 2);
+  assert.match(posts[0].json.requestId, /^[A-Za-z0-9_-]{8,64}$/, "the server's requestId pattern");
+  assert.equal(posts[1].json.requestId, posts[0].json.requestId, "the retry is the same request");
+  assert.match(site.message(), /^Timen er booket: Herreklipp · fredag 13\. november kl\. 14:00\./);
+  assert.equal(site.server.bookings().length, 1, "one stored booking, not a second one or a 'taken'");
+});
+
+test("F1: a changed booking gets a new requestId, and the body carries no language field", async () => {
+  const site = await boot({ setup: (s) => s.when((r) => r.url === "/api/bookings", { network: true }) });
+  await site.pick(FRIDAY);
+  await site.book();
+  await site.advance(1000);
+  await site.book();
+  await site.advance(1000);
+  site.type(site.$("f-phone"), "409 63 956");
+  await site.book();
+  await site.advance(1000);
+  const ids = site.bookingPosts().map((p) => p.json.requestId);
+  assert.equal(ids.length, 3);
+  assert.equal(ids[1], ids[0], "unchanged: same id");
+  assert.notEqual(ids[2], ids[0], "another phone number: a new id");
+  for (const p of site.bookingPosts()) {
+    assert.deepEqual(Object.keys(p.json).sort(), ["addons", "botField", "date", "name", "phone", "requestId", "service", "start"]);
+  }
+});
+
 test("F73: a successful booking is stored once and nothing else is sent (no Netlify Forms copy)", async () => {
   const site = await boot();
   await site.pick(FRIDAY);

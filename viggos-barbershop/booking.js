@@ -243,6 +243,17 @@
   }
   const refresh = () => loadAvailability().then(() => { if (!state.view) initView(); renderAll(); });
 
+  // Samme bestilling sendt på nytt (etter et tapt svar, tidsavbrudd eller nettfeil) får samme requestId, så serveren
+  // lagrer den bare én gang og svarer med timen som allerede er lagret. En endret bestilling får en ny (SPEC R1).
+  let attempt = null; // { sig, id }
+  function newRequestId() {
+    let bytes = null;
+    try { if (window.crypto && window.crypto.getRandomValues) bytes = window.crypto.getRandomValues(new Uint8Array(12)); } catch (e) { bytes = null; }
+    let id = Date.now().toString(36) + "-";
+    for (let i = 0; i < 12; i++) id += ((bytes ? bytes[i] : Math.floor(Math.random() * 256)) % 36).toString(36);
+    return id;
+  }
+
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     const s = I18N.s();
@@ -273,15 +284,21 @@
       renderAll();
     };
     const bot = form.querySelector("[name=bot-field]");
+    const body = {
+      service: select.value, date: iso(state.date), start: state.time, addons,
+      name: name.value.trim(), phone: phone.value.trim(),
+    };
+    const sig = JSON.stringify([body.service, body.date, body.start, body.addons, body.name, body.phone]);
+    if (!attempt || attempt.sig !== sig) attempt = { sig, id: newRequestId() };
+    body.botField = bot ? bot.value : "";
+    body.requestId = attempt.id;
     fetch("/api/bookings", {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({
-        service: select.value, date: iso(state.date), start: state.time, addons,
-        name: name.value.trim(), phone: phone.value.trim(), botField: bot ? bot.value : "",
-      }),
+      body: JSON.stringify(body),
     }).catch(() => null).then((res) => {
       if (res && res.ok) {
+        attempt = null;
         return loadAvailability().then(() => { done((t) => t.booked(whenFor(t))); });
       }
       if (res && res.status === 409) {
