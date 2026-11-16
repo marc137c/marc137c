@@ -54,7 +54,11 @@
     $("login-msg").textContent = text || "";
     $("login-msg").className = "msg" + (kind ? " " + kind : "");
   }
+  // Gikk innloggingen ut mens en avtale var åpen for redigering, kommer arket tilbake (med det som var skrevet) når
+  // Viggo har logget inn igjen (F28). Bare redigeringsarket: «Oppsett» har kalenderhemmeligheten og forblir lukket.
+  let resumeEdit = false;
   function showLogin(message = "", kind = "") {
+    if ($("editor").open) resumeEdit = true;
     closeDialogs();
     $("app").hidden = true;
     $("login").hidden = false;
@@ -140,6 +144,12 @@
         showApp();
         load();
         pushSync();
+        if (resumeEdit) {
+          // dialog.close() tømmer ikke skjemaet, og state.editing er den samme: bare vis arket igjen
+          resumeEdit = false;
+          $("edit-msg").textContent = "Du er logget inn igjen – trykk Lagre.";
+          $("editor").showModal();
+        }
       }).catch((err) => {
       loginMsg(errText(err));
       $("pw").select();
@@ -972,6 +982,7 @@
       btn.disabled = false;
       setToken(null);
       showLogin(msg[0], msg[1]);
+      resumeEdit = false; // logget ut med vilje: ingen avtale skal dukke opp for neste som logger inn
     });
   });
 
