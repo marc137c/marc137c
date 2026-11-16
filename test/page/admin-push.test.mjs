@@ -499,7 +499,8 @@ test("admin push panel: without push here (iPhone Safari tab, old browser) or wi
       page.$("push-reset").click();
       await page.flush();
       assert.match(page.confirms[0], /^Slå av varsler på de 2 andre enhetene?/, label);
-      assert.match(page.confirms[0], /bytt også admin-passordet/, label);
+      assert.match(page.confirms[0], /og logge ut alle andre enheter\?/, label);
+      assert.match(page.confirms[0], /Bytt passordet i Netlify, og publiser på nytt/, label);
       const reset = pushCalls(page).find((c) => c.path === "/api/admin/push/reset");
       assert.deepEqual([reset.method, reset.headers.Authorization], ["POST", "Bearer test-admin-token"], label);
       assert.equal(msg(page), "Varsler er slått av på alle andre enheter.", label);
@@ -546,7 +547,7 @@ test("admin push panel: reset asks first, needs the token, and turns this device
   order.length = 0;
   page.$("push-reset").click();
   await page.flush();
-  assert.match(page.confirms[0], /^Slå av varsler på de 2 andre enhetene\?/);
+  assert.match(page.confirms[0], /^Slå av varsler på de 2 andre enhetene, og logge ut alle andre enheter\?/);
   assert.deepEqual(order, [], "nothing happens unless the barber confirms");
   answer = true;
   page.$("push-reset").click();
@@ -570,7 +571,7 @@ test("admin push panel: reset from a device that is off does not turn it on", as
   assert.equal(resetShown(page), true);
   page.$("push-reset").click();
   await page.flush();
-  assert.match(page.confirms[0], /^Slå av varsler på den andre enheten\?/);
+  assert.match(page.confirms[0], /^Slå av varsler på den andre enheten, og logge ut alle andre enheter\?/);
   assert.equal(pushCalls(page).filter((c) => c.path === "/api/admin/push/subscribe").length, 0);
   assert.equal(msg(page), "Varsler er slått av på alle andre enheter.");
   assert.deepEqual(buttons(page), ["push-on"]);

@@ -1022,7 +1022,7 @@
   $("push-reset").addEventListener("click", () => {
     const n = pushState.others;
     const which = n === 1 ? "den andre enheten" : `de ${n} andre enhetene`;
-    if (!confirm(`Slå av varsler på ${which}?\n\nDe får ikke flere varsler om nye bestillinger. En enhet som fortsatt er logget inn, slår dem på igjen neste gang timeboken åpnes der. Er en telefon mistet eller stjålet, bytt også admin-passordet: da blir den logget ut for godt.`)) return;
+    if (!confirm(`Slå av varsler på ${which}, og logge ut alle andre enheter?\n\nDe får ikke flere varsler om nye bestillinger, og må logge inn igjen for å bruke timeboken. Denne enheten forblir innlogget.\n\nEr en telefon mistet eller stjålet, og du vil bytte admin-passordet også: Bytt passordet i Netlify, og publiser på nytt (Deploys → Trigger deploy → Deploy site). Først da gjelder det nye passordet.`)) return;
     const btn = $("push-reset");
     const seq = ++pushSeq;
     const sub = pushState.sub;

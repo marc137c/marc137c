@@ -185,7 +185,7 @@ test("admin calendar panel: after a password change the barber is told the old l
 
 test("admin calendar panel: the page says plainly that a password change stops the link", async () => {
   const html = (await import("node:fs")).readFileSync(new URL("../../viggos-barbershop/admin.html", import.meta.url), "utf8");
-  assert.match(html, /Bytter du admin-passordet, slutter lenken også å virke, og du må lage en ny\./);
+  assert.match(html, /Bytter du admin-passordet \(i Netlify, og publiserer på nytt\), slutter lenken også å virke, og du må lage en ny\./);
 });
 
 // compat.js's <dialog> stand-in (Firefox < 98, Safari < 15.4) must say «close» like a real <dialog>, or Esc would
