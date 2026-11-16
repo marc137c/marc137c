@@ -13,15 +13,16 @@
 //                                      { replace: true } (den gamle slutter å virke med en gang)
 //   GET    /api/admin/push             varsler på enhetene: { publicKey, devices } (nøkkelparet lages første gang)
 //   POST   /api/admin/push/subscribe   { subscription } denne enheten får varsel om nye bestillinger (410 «gone»
-//                                      hvis push-tjenesten har sagt at abonnementet er borte: lag et nytt). Med en
-//                                      kort innlogging bare til den går ut: svaret har da { until }
+//                                      hvis push-tjenesten har sagt at abonnementet er borte: lag et nytt). Bare til
+//                                      innloggingen går ut: svaret har { until }
 
 //   POST   /api/admin/push/unsubscribe { endpoint }     denne enheten får ikke flere varsler
 //   POST   /api/admin/push/test        { endpoint }     send et testvarsel til denne enheten (bare en lagret enhet)
 //   POST   /api/admin/push/reset                        ingen enhet får varsler før de slås på igjen, og alle andre
 //                                                       innlogginger slutter å virke ({ ok, devices: 0, token }: ny billett)
 // Enhetene er knyttet til ADMIN_PASSWORD: bytter Viggo passordet, får ingen av de gamle enhetene flere varsler.
-// En enhet slått på med en kort innlogging («Hold meg innlogget» av) får varsler bare til den innloggingen går ut.
+// En enhet får varsler bare til innloggingen den ble slått på med, går ut (12 timer, eller 60 dager med «Hold meg
+// innlogget»); da får den ett siste varsel uten kundedata.
 import { liveDeps, bookingStore, isRetiredDeploy, retiredResponse } from "../lib/runtime.mjs";
 import {
   CONFIG, addDays, isDate, osloNow, readMonths, validateAdmin,
@@ -37,9 +38,11 @@ import {
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 const DAY = 24 * 60 * 60 * 1000;
 const SHORT_LOGIN = DAY / 2; // «Hold meg innlogget» av
-// En enhet slått på med en kort innlogging får varsler bare til den går ut (en lånt PC der innloggingen bare gikk ut,
-// eller fanen ble lukket, skal ikke vise kundenavn i ukevis).
-const pushUntil = (session) => (session.exp - session.iat <= SHORT_LOGIN ? new Date(session.exp) : null);
+// En enhet får varsler med kundenavn bare så lenge innloggingen den ble slått på med varer, kort (12 timer) eller
+// lang (60 dager): en lånt eller videregitt enhet der innloggingen har gått ut, skal ikke vise kundenavn. Hver ny
+// innlogging der fornyer det (siden sender abonnementet på nytt), og når det går ut, får enheten ett siste varsel
+// uten kundedata (loginExpiredMessage i netlify/lib/push.mjs).
+const pushUntil = (session) => new Date(session.exp);
 // Det /admin får vite om kalenderlenken. Hemmeligheten står bare inne i lenkene.
 const calendarInfo = (origin, feed, stale) => (feed
   ? { enabled: true, createdAt: feed.createdAt, links: feedLinks(origin, feed.token) }

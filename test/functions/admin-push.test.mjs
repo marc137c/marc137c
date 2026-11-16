@@ -76,10 +76,11 @@ test("admin push: subscribing stores the device once; unknown push services and 
   const phone = makeDevice("apple"), pc = makeDevice("wns");
   const d = setup({ devices: [phone, pc] });
   await info(d);
+  const until = new Date(d.clock.now() + 60 * 24 * 3600e3).toISOString(); // the 60-day token's expiry
   let res = await subscribe(d, phone);
-  assert.deepEqual([res.status, res.body], [201, { ok: true, devices: 1 }]);
+  assert.deepEqual([res.status, res.body], [201, { ok: true, devices: 1, until }]);
   res = await subscribe(d, phone);
-  assert.deepEqual([res.status, res.body], [200, { ok: true, devices: 1 }], "the same device twice is one device");
+  assert.deepEqual([res.status, res.body], [200, { ok: true, devices: 1, until }], "the same device twice is one device");
   res = await subscribe(d, pc);
   assert.deepEqual([res.status, res.body.devices], [201, 2]);
   assert.equal((await info(d)).body.devices, 2);

@@ -327,11 +327,27 @@ export async function sendPush(sub, message, { keys, fetch, now = new Date(), su
 
 const why = (r) => (r.status ? `svarte ${r.status}` : r.error === "timeout" ? "svarte ikke i tide" : r.error === "crypto" ? "fikk ikke kryptert melding" : "kunne ikke nås");
 
+// Fjerner enhetene som ikke lenger skal ha varsler (et gammelt passord, eller innloggingen de ble slått på med har
+// gått ut). Svarer enhetene med utløpt innlogging (for dette passordet) som akkurat DENNE skrivingen fjernet: bare
+// den som fjerner en enhet, sender den det siste varselet, så to bestillinger samtidig gir ett varsel, ikke to.
+async function dropStale(store, gen, now) {
+  let loggedOut = [];
+  const r = await mutateJSON(store, SUBS_KEY, initSubs, (doc) => {
+    const keep = doc.subs.filter(current(gen, now));
+    loggedOut = doc.subs.filter((s) => usable(s) && s.gen === gen && expired(s, now));
+    if (keep.length === doc.subs.length) return { ok: true, noWrite: true };
+    doc.subs = keep;
+    return { ok: true };
+  });
+  return r.error || r.noWrite ? [] : loggedOut;
+}
+
 // Sender meldingen til alle lagrede enheter for passordet gen (eller bare den med adressen endpoint) samtidig.
-// Sletter enheter push-tjenesten sier er borte, og enheter fra et gammelt passord eller med en utløpt kort
-// innlogging (de får aldri noe). Uten gen
-// (admin-passordet mangler) sendes ingenting, og ingenting slettes.
-// Svarer { devices, targets, sent, failed, gone, stale }. Kaster bare hvis lagringen feiler.
+// Sletter enheter push-tjenesten sier er borte, og enheter fra et gammelt passord eller med en utløpt innlogging
+// (de får aldri noe med kundedata igjen). En enhet med utløpt innlogging får i stedet ett siste varsel uten
+// kundedata (loginExpiredMessage), så Viggo vet at han må logge inn der igjen. Uten gen (admin-passordet mangler)
+// sendes ingenting, og ingenting slettes.
+// Svarer { devices, targets, sent, failed, gone, stale } (og loggedOut: siste varsler som kom fram). Kaster bare hvis lagringen feiler.
 export async function pushToDevices(store, message, { fetch, now = new Date(), origin, endpoint, timeoutMs, gen } = {}) {
   const stored = await readSubscriptions(store);
   const all = stored.filter(current(gen, now));
@@ -339,22 +355,25 @@ export async function pushToDevices(store, message, { fetch, now = new Date(), o
   const only = endpoint === undefined ? null : normalizeEndpoint(endpoint);
   const targets = endpoint === undefined ? all : all.filter((s) => s.endpoint === only);
   const summary = { devices: all.length, targets: targets.length, sent: 0, failed: 0, gone: 0, stale };
+  let loggedOut = [];
   if (stale) {
     try {
-      await removeSubscriptions(store, [], { gen, now });
+      loggedOut = await dropStale(store, gen, now);
       console.warn(`Push: ${stale} ${stale === 1 ? "enhet" : "enheter"} fra et gammelt admin-passord eller med utløpt innlogging er fjernet`);
     } catch (err) {
       console.error("Push: kunne ikke fjerne enheter fra et gammelt passord eller med utløpt innlogging:", err && err.name);
     }
   }
-  if (!targets.length) return summary;
+  if (!targets.length && !loggedOut.length) return summary;
   const keys = await readVapidKeys(store);
   if (!keys) {
     console.error("Push: VAPID-nøklene mangler, så ingen varsler ble sendt");
     return { ...summary, failed: targets.length };
   }
   const subject = contactFor(origin);
-  const results = await Promise.all(targets.map((s) => sendPush(s, message, { keys, fetch, now, subject, timeoutMs })));
+  const notices = Promise.all(loggedOut.map((s) => sendPush(s, loginExpiredMessage(), { keys, fetch, now, subject, timeoutMs })));
+  const [results, noticed] = await Promise.all([Promise.all(targets.map((s) => sendPush(s, message, { keys, fetch, now, subject, timeoutMs }))), notices]);
+  if (noticed.length) summary.loggedOut = noticed.filter((r) => r.ok).length;
   const gone = [];
   results.forEach((r, i) => {
     if (r.ok) summary.sent++;
@@ -400,6 +419,14 @@ export const bookingsPausedMessage = () => ({
   body: "For mange bestillinger siste døgn. Kunder som prøver å bestille, får beskjed om å ringe 409 63 911.",
   url: "/admin",
   tag: "nettbestilling-pause",
+});
+
+// Det siste varselet til en enhet når innloggingen den ble slått på med, har gått ut. Ingen kundedata.
+export const loginExpiredMessage = () => ({
+  title: "Timebok",
+  body: "Innloggingen på denne enheten har gått ut. Åpne Timebok og logg inn for å få varsler igjen.",
+  url: "/admin",
+  tag: "innlogging-utlopt",
 });
 
 export const testMessage = () => ({

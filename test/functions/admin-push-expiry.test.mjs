@@ -1,13 +1,14 @@
-// A device turned on with a short login («Hold meg innlogget» off: 12 hours) gets notifications with customers'
-// names only until that login runs out (fix-up 2, item 1: a borrowed PC where the session simply expired, or the
-// tab was closed, must not keep showing «Ny time» for weeks). Through the real /admin and /api/bookings handlers,
-// with a fake push service and a fixed clock. Invariants:
-//   1. subscribed with a 12-hour token: 13 hours later a new booking reaches no device, and the record is gone;
-//      30 days later still nothing; the device count says 0 once it has run out;
-//   2. subscribed with a 60-day token: unaffected, also 30 days later;
-//   3. every login on the device renews it (pushSync sends the subscription again with the new token): a new short
-//      login moves the end, a long login removes it;
-//   4. the subscribe answer says until when (the token's expiry) for a short login, and nothing for a long one;
+// A device gets notifications with customers' names only while the login it was turned on with is valid: 12 hours
+// with «Hold meg innlogget» off, 60 days with it on (fix-up 2, item 1, and the notify audit's re-check 1: a shared
+// or handed-on device logged in with the default must not show «Ny time» with names after that login has run out).
+// Through the real /admin and /api/bookings handlers, with a fake push service and a fixed clock. Invariants:
+//   1. subscribed with any login, the subscribe answer and the record carry until = that login's expiry;
+//   2. after until, the next booking gives that device exactly one notice with no customer data («Innloggingen på
+//      denne enheten har gått ut …»), never «Ny time», and the record is gone; later bookings send nothing more;
+//      two bookings at the same moment still give one notice; the device count says 0 once it has run out;
+//   3. every login on the device renews it (pushSync sends the subscription again with the new token): a new login
+//      moves the end to that login's expiry, short or long;
+//   4. a 60-day login keeps notifications going for 60 days, also 30 days later;
 //   5. tokens made before F34 (no iat, signed with the old fast key) are refused;
 //   6. nothing personal is logged when an expired device is removed.
 import { test } from "node:test";
@@ -52,7 +53,15 @@ test("push expiry: the login itself makes a 12-hour token without «Hold meg inn
   }
 });
 
-test("push expiry: subscribed with a 12-hour token, 13 hours later a booking reaches no device and the record is gone", async (t) => {
+const EXPIRED_NOTICE = {
+  title: "Timebok",
+  body: "Innloggingen på denne enheten har gått ut. Åpne Timebok og logg inn for å få varsler igjen.",
+  url: "/admin",
+  tag: "innlogging-utlopt",
+};
+const noCustomerData = (x) => !/Kari|41234567|Ny time/.test(JSON.stringify(x.payload));
+
+test("push expiry: subscribed with a 12-hour token, 13 hours later the device gets one notice without customer data, then nothing", async (t) => {
   const out = quiet(t);
   const pc = makeDevice("fcm");
   const d = setup([pc]);
@@ -67,15 +76,35 @@ test("push expiry: subscribed with a 12-hour token, 13 hours later a booking rea
   d.clock.advance(13 * HOUR);
   assert.equal((await call(d, "/api/admin/push", { method: "GET", token })).status, 401, "the login has run out");
   assert.equal((await book(d)).status, 201, "the booking itself is unaffected");
-  assert.equal(d.push.deliveries.length, 1, "no delivery after the login ran out");
+  assert.equal(d.push.deliveries.length, 2);
+  const notice = d.push.deliveries[1];
+  assert.equal(notice.device, pc);
+  assert.deepEqual(notice.payload, EXPIRED_NOTICE);
+  assert.ok(noCustomerData(notice), "no name, phone or «Ny time»");
+  assert.equal(notice.bytes.length, 1126, "padded like every other message");
   assert.deepEqual(stored(d), [], "the expired device is removed");
   d.clock.advance(30 * DAY);
   assert.equal((await book(d, "Kari Senere")).status, 201);
-  assert.equal(d.push.deliveries.length, 1, "30 days later still nothing");
+  assert.equal(d.push.deliveries.length, 2, "30 days later still nothing");
   assert.equal((await subscribe(d, pc, token)).status, 401, "an expired token cannot add the device again");
   const logged = JSON.stringify([out.log, out.warn, out.error]);
   assert.match(logged, /utløpt innlogging er fjernet/);
   for (const secret of ["Kari", "41234567", pc.endpoint.slice(-24), pc.subscription.keys.auth]) assert.ok(!logged.includes(secret), secret);
+});
+
+test("push expiry: two bookings at the same moment after the login ran out still give exactly one notice", async (t) => {
+  quiet(t);
+  const pc = makeDevice("fcm"), other = makeDevice("apple");
+  const d = setup([pc, other]);
+  await subscribe(d, pc, await login(d, false));
+  await subscribe(d, other, await login(d, true));
+  d.clock.advance(13 * HOUR);
+  const rs = await Promise.all([book(d, "Kari En"), book(d, "Kari To")]);
+  assert.deepEqual(rs.map((r) => r.status), [201, 201]);
+  const toPc = d.push.deliveries.filter((x) => x.device === pc);
+  assert.equal(toPc.length, 1, JSON.stringify(toPc.map((x) => x.payload)));
+  assert.deepEqual(toPc[0].payload, EXPIRED_NOTICE);
+  assert.equal(d.push.deliveries.filter((x) => x.device === other && x.payload.title === "Ny time").length, 2, "the valid device gets both bookings");
 });
 
 test("push expiry: the device count leaves out a device whose short login has run out, even before it is cleaned away", async () => {
@@ -90,22 +119,41 @@ test("push expiry: the device count leaves out a device whose short login has ru
   assert.equal(await devices(d, later()), 1, "but not counted");
 });
 
-test("push expiry: a device subscribed with a 60-day token is unaffected, also 30 days later", async () => {
+// A weekday two to eight days after the clock, 10:00 + n slots (the clock moves months in these tests)
+function bookSoon(d, name = "Kari Etterpå") {
+  const day = new Date(d.clock.now() + 2 * DAY);
+  while (day.getUTCDay() === 0) day.setUTCDate(day.getUTCDate() + 1);
+  return bookings.handle(request("/api/bookings", { method: "POST", json: {
+    service: "Herreklipp", addons: [], name, phone: "41234567", date: day.toISOString().slice(0, 10), start: 600 + 30 * (slot++ % 14),
+  } }), PRODUCTION, d).then(read);
+}
+
+test("push expiry: a 60-day login keeps notifications for 60 days, then the device gets one notice without customer data", async (t) => {
+  quiet(t);
   const phone = makeDevice("apple");
   const d = setup([phone]);
   const token = await login(d, true);
   const res = await subscribe(d, phone, token);
-  assert.deepEqual([res.status, res.body], [201, { ok: true, devices: 1 }], "no until for a long login");
-  assert.equal(stored(d)[0].until, undefined);
+  assert.deepEqual([res.status, res.body], [201, { ok: true, devices: 1, until: new Date(d.clock.now() + LONG).toISOString() }]);
+  assert.equal(stored(d)[0].until, res.body.until);
   for (const wait of [13 * HOUR, 30 * DAY]) {
     d.clock.advance(wait);
-    assert.equal((await book(d)).status, 201);
+    assert.equal((await bookSoon(d)).status, 201);
   }
   assert.equal(d.push.deliveries.length, 2);
   assert.ok(d.push.deliveries.every((x) => x.device === phone && x.payload.title === "Ny time"));
+  d.clock.advance(31 * DAY); // 61 days after the login
+  assert.equal((await call(d, "/api/admin/push", { method: "GET", token })).status, 401);
+  assert.equal((await bookSoon(d, "Kari Dag 61")).status, 201);
+  assert.equal(d.push.deliveries.length, 3);
+  assert.deepEqual(d.push.deliveries[2].payload, EXPIRED_NOTICE);
+  assert.ok(noCustomerData(d.push.deliveries[2]));
+  assert.deepEqual(stored(d), []);
+  assert.equal((await bookSoon(d, "Kari Dag 62")).status, 201);
+  assert.equal(d.push.deliveries.length, 3, "nothing more");
 });
 
-test("push expiry: every login renews it; a new short login moves the end, a long login removes it", async () => {
+test("push expiry: every login renews it, and moves the end to that login's expiry, short or long", async () => {
   const pc = makeDevice("wns");
   const d = setup([pc]);
   await subscribe(d, pc, await login(d, false));
@@ -117,12 +165,12 @@ test("push expiry: every login renews it; a new short login moves the end, a lon
   assert.equal((await book(d)).status, 201);
   assert.equal(d.push.deliveries.length, 1, "the second login keeps it going");
   const long = await subscribe(d, pc, await login(d, true));
-  assert.deepEqual(long.body, { ok: true, devices: 1 });
-  assert.equal(stored(d)[0].until, undefined, "a long login removes the end");
+  assert.deepEqual(long.body, { ok: true, devices: 1, until: new Date(d.clock.now() + LONG).toISOString() });
+  assert.equal(stored(d)[0].until, long.body.until, "a long login moves the end 60 days out");
   d.clock.advance(5 * DAY);
   assert.equal((await book(d)).status, 201);
   assert.equal(d.push.deliveries.length, 2);
-  // … and a later short login on the same device sets it again
+  // … and a later short login on the same device moves it again
   const short = await subscribe(d, pc, await login(d, false));
   assert.equal(short.body.until, new Date(d.clock.now() + SHORT).toISOString());
 });
