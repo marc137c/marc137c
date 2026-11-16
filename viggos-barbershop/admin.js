@@ -991,11 +991,24 @@
   }
   // JSON.stringify bruker PushSubscription.toJSON(): { endpoint, expirationTime, keys: { p256dh, auth } }
   // Serveren har tatt imot abonnementet: enheten husker adressen og hvor lenge det gjelder (until)
-  const saveSub = (sub) => api("/api/admin/push/subscribe", { method: "POST", body: JSON.stringify({ subscription: sub }) }).then((res) => {
-    putNote(res && res.until ? { endpoint: sub.endpoint, until: res.until } : { endpoint: sub.endpoint });
-    showLost(false);
-    return res;
-  });
+  // Gir serveren abonnementet. Husker enheten en annen adresse enn nettleserens (nettleseren byttet abonnement, og
+  // fornyelsen i admin-sw.js nådde ikke serveren), er den gamle død: serveren får beskjed om å glemme den først, så
+  // Oppsett aldri teller denne enheten som «en annen enhet» (runde 2, SPEC R24). Gikk det ikke, huskes den gamle
+  // (stale) til neste gang, og res.devices regnes uten den.
+  const saveSub = (sub) => {
+    const n = getNote();
+    const old = n && n.endpoint !== sub.endpoint ? n.endpoint : n && n.stale && n.stale !== sub.endpoint ? n.stale : null;
+    const forget = old
+      ? api("/api/admin/push/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint: old }) }).then(() => true, () => false)
+      : Promise.resolve(true);
+    return forget.then((forgotten) => api("/api/admin/push/subscribe", { method: "POST", body: JSON.stringify({ subscription: sub }) }).then((res) => {
+      const note = res && res.until ? { endpoint: sub.endpoint, until: res.until } : { endpoint: sub.endpoint };
+      if (!forgotten) note.stale = old;
+      putNote(note);
+      showLost(false);
+      return !forgotten && res && Number(res.devices) > 1 ? Object.assign({}, res, { devices: Number(res.devices) - 1 }) : res;
+    }));
+  };
   function swRegistration() {
     const c = sw();
     if (!c) return Promise.reject(new Error("Denne nettleseren kan ikke vise varsler."));

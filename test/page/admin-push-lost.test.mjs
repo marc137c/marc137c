@@ -179,3 +179,36 @@ for (const [type, m] of Object.entries(MESSAGES)) {
     });
   }
 }
+
+// Round 2 (probe P4): the browser replaced its subscription (pushsubscriptionchange) but /api/push/renew failed, so
+// the server still had this device's OLD endpoint. Oppsett counted it as «1 annen enhet» and offered to turn the
+// «other» device off. Guard (SPEC R24): note endpoint (none, the browser's, an old one) × browser subscription (none,
+// one) × the note's endpoint on the server (yes, no). After start-up (pushSync) and Oppsett (pushLoad) the server
+// lists exactly one endpoint for this device when it has a subscription (none otherwise), and Oppsett's «andre
+// enheter» is the server count minus this device.
+test("push endpoints: every combination of remembered endpoint, browser subscription and server list ends with one entry for this device", async () => {
+  const device = makeDevice("fcm");
+  const OLD = makeDevice("fcm").endpoint, OTHER = makeDevice("apple").endpoint;
+  for (const note of [null, "browser", "old"]) {
+    for (const browserHas of [true, false]) {
+      for (const onServer of [true, false]) {
+        if (!note && onServer) continue;
+        const noteEp = note === "browser" ? device.endpoint : note === "old" ? OLD : null;
+        const server = pushServer([OTHER].concat(onServer && noteEp ? [noteEp] : []));
+        const b = browserHas
+          ? fakePushBrowser({ device, permission: "granted", subscribed: KEY_BYTES })
+          : fakePushBrowser({ device, permission: "granted", registered: true });
+        const storage = noteEp ? { "viggo-push": JSON.stringify({ endpoint: noteEp, until: "2027-01-15T09:00:00.000Z" }) } : {};
+        const page = await loadAdmin({ search: "?varsler=1", storage, navigator: b.navigator, globals: b.globals, routes: server.routes });
+        await page.flush();
+        const label = `note ${note || "none"}, browser ${browserHas ? "has one" : "none"}, on server ${onServer}`;
+        const mine = [...server.devices].filter((e) => e !== OTHER);
+        assert.deepEqual(mine, browserHas ? [device.endpoint] : [], `${label}: this device on the server`);
+        assert.ok(server.devices.has(OTHER), label);
+        const text = page.$("push-msg").textContent;
+        assert.match(text, /1 annen enhet får varsler\./, `${label}: ${text}`);
+        assert.doesNotMatch(text, /andre enheter/, `${label}: ${text}`);
+      }
+    }
+  }
+});
