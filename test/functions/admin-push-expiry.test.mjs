@@ -20,6 +20,7 @@ import { makeToken, readToken, verifyToken } from "../../netlify/lib/booking-cor
 import { SUBS_KEY } from "../../netlify/lib/push.mjs";
 import * as admin from "../../netlify/functions/admin.mjs";
 import * as bookings from "../../netlify/functions/bookings.mjs";
+import * as pushRenew from "../../netlify/functions/push-renew.mjs";
 
 const PASSWORD = "fake-admin-password";
 const NOW = "2026-11-12T09:00:00Z"; // Thursday 10:00 in Oslo
@@ -206,3 +207,44 @@ test("push expiry: readToken gives { exp, iat } only for a valid, unexpired toke
   }
   assert.equal(verifyToken(token, PASSWORD, now), true);
 });
+
+// ---------- Round 2: every writer of push/subs leaves an expired other device for its one last notice ----------
+// demo-expired-notice-lost.mjs: the PC's 12-hour login runs out overnight; in the morning Viggo logs in on his
+// phone (pushSync saves its subscription again) and the PC was silently dropped: it never got its notice.
+// Guard rule (SPEC R17): only the send path (dropStale) removes expired devices, and it always yields them for
+// the notice; subscribe, unsubscribe and renew keep an expired other device of the same password.
+const WRITERS = {
+  "the phone subscribes again (a new login)": async (d, phone) => {
+    const token = await login(d, true);
+    assert.equal((await subscribe(d, phone, token)).status, 200);
+  },
+  "the phone unsubscribes": async (d, phone, phoneToken) => {
+    assert.equal((await call(d, "/api/admin/push/unsubscribe", { json: { endpoint: phone.endpoint }, token: phoneToken })).status, 200);
+  },
+  "the phone's browser renews its subscription": async (d, phone) => {
+    const fresh = makeDevice("fcm");
+    d.push.devices.push(fresh);
+    const res = await pushRenew.handle(request("/api/push/renew", { method: "POST", json: {
+      subscription: fresh.subscription, oldEndpoint: phone.endpoint, oldAuth: phone.subscription.keys.auth,
+    } }), PRODUCTION, d).then(read);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+  },
+};
+for (const [label, writer] of Object.entries(WRITERS)) {
+  test(`push expiry: after ${label}, the PC whose login ran out still gets exactly one notice at the next booking`, async (t) => {
+    quiet(t);
+    const pc = makeDevice("mozilla"), phone = makeDevice("fcm");
+    const d = setup([pc, phone]);
+    assert.equal((await subscribe(d, pc, await login(d, false))).status, 201);
+    const phoneToken = await login(d, true);
+    assert.equal((await subscribe(d, phone, phoneToken)).status, 201);
+    d.clock.advance(13 * HOUR);
+    await writer(d, phone, phoneToken);
+    assert.equal((await book(d)).status, 201);
+    const toPc = () => d.push.deliveries.filter((x) => x.device === pc);
+    assert.deepEqual(toPc().map((x) => x.payload), [EXPIRED_NOTICE], `deliveries: ${JSON.stringify(d.push.deliveries.map((x) => x.payload && x.payload.tag))}`);
+    assert.equal((await book(d, "Neste")).status, 201);
+    assert.equal(toPc().length, 1, "and nothing more");
+    assert.ok(!stored(d).some((s) => s.endpoint === pc.endpoint), "the PC's record is gone after its notice");
+  });
+}

@@ -106,6 +106,9 @@ const isGen = (gen) => typeof gen === "string" && gen.length === 16;
 // Utløpt: slått på med en kort innlogging som har gått ut (en until som ikke kan leses, regnes som utløpt)
 const expired = (s, now) => typeof s.until === "string" && !(Date.parse(s.until) > now.getTime());
 const current = (gen, now = new Date()) => (s) => usable(s) && isGen(gen) && s.gen === gen && !expired(s, now);
+// Hører til dette passordet, utløpt eller ikke. En utløpt enhet blir liggende til neste sending (dropStale), som er
+// den eneste som fjerner utløpte enheter, og som alltid gir dem det siste varselet (vakt-regel SPEC R17).
+const samePassword = (gen) => (s) => usable(s) && isGen(gen) && s.gen === gen;
 
 // Adresser push-tjenesten har sagt er borte. Bare en hash lagres: adressen er selv en slags nøkkel.
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -127,7 +130,8 @@ export async function readSubscriptions(store, { gen, now = new Date() } = {}) {
   return gen === undefined ? subs : subs.filter(current(gen, now));
 }
 
-// Legger til (eller fornyer) en enhet for passordet gen. Enheter fra et gammelt passord ryddes bort samtidig.
+// Legger til (eller fornyer) en enhet for passordet gen. Enheter fra et gammelt passord ryddes bort samtidig; en
+// annen enhet med utløpt innlogging blir stående til neste varsel, så den får sitt siste varsel (SPEC R17).
 // Er det flere enn MAX_DEVICES, går den som er sett minst nylig ut. En adresse push-tjenesten har sagt er borte,
 // lagres aldri igjen: { error, status: 410, code: "gone" } (nettleseren må lage et nytt abonnement).
 // until (Date): enheten får varsler bare til da (en kort innlogging); uten until får den varsler til den slås av.
@@ -141,26 +145,27 @@ export async function saveSubscription(store, sub, { now = new Date(), gen, unti
     const at = now.toISOString();
     const same = doc.subs.find((s) => s && s.endpoint === sub.endpoint && s.gen === gen);
     created = !same;
-    doc.subs = doc.subs.filter((s) => s !== same && current(gen, now)(s) && s.endpoint !== sub.endpoint);
+    doc.subs = doc.subs.filter((s) => s !== same && samePassword(gen)(s) && s.endpoint !== sub.endpoint);
     const record = same
       ? Object.assign(same, { p256dh: sub.p256dh, auth: sub.auth, seenAt: at })
       : { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth, gen, createdAt: at, seenAt: at };
     if (until) record.until = until.toISOString(); else delete record.until;
     doc.subs.push(record);
     doc.subs = doc.subs.filter(usable).sort(newestFirst).slice(0, MAX_DEVICES);
-    return { ok: true, devices: doc.subs.length };
+    return { ok: true, devices: doc.subs.filter(current(gen, now)).length };
   });
   if (r.error) return r;
   return until ? { ok: true, created, devices: r.devices, until: until.toISOString() } : { ok: true, created, devices: r.devices };
 }
 
-// Fjerner enhetene med disse adressene (og, med gen, alle fra et gammelt passord eller med en utløpt innlogging).
+// Fjerner enhetene med disse adressene (og, med gen, alle fra et gammelt passord). En annen enhet med utløpt
+// innlogging blir stående til neste varsel, som gir den det siste varselet (SPEC R17).
 // Med gone: true har push-tjenesten sagt at adressene er borte, og de godtas ikke igjen (saveSubscription). Svarer { ok, removed, devices }.
 export async function removeSubscriptions(store, endpoints, { gen, gone: markAsGone = false, now = new Date() } = {}) {
   const gone = new Set(endpoints.map(normalizeEndpoint).filter(Boolean));
   return mutateJSON(store, SUBS_KEY, initSubs, (doc) => {
     const before = doc.subs.length;
-    doc.subs = doc.subs.filter((s) => !(s && gone.has(s.endpoint)) && (gen === undefined || current(gen, now)(s)));
+    doc.subs = doc.subs.filter((s) => !(s && gone.has(s.endpoint)) && (gen === undefined || samePassword(gen)(s)));
     if (markAsGone && gone.size) markGone(doc, [...gone], now);
     const devices = doc.subs.filter(gen === undefined ? usable : current(gen, now)).length;
     const removed = before - doc.subs.length;
