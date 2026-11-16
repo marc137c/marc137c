@@ -132,7 +132,7 @@ Instagram-kontoen må være en **profesjonell konto** (Bedrift eller Innholdsska
 6. Publiser siden på nytt, og åpne `https://<din-side>/api/connect/instagram?key=<SOCIAL_ADMIN_KEY>`.
    Logg inn med @viggos.barbershop og godkjenn. Siden bekrefter når kontoen er koblet, og postene vises med en gang.
 
-`<din-side>` må være den samme adressen som er registrert i steg 3, for eksempel `viggos-barbershop.netlify.app`.
+`<din-side>` må være den samme adressen som er registrert i steg 3, det vil si `www.viggosbarbershop.no` (nettsidens adresse).
 
 ## Farger
 Siden har bare mørkt tema. Fargene står som variabler i `:root` øverst i `styles.css`.

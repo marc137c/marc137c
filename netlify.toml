@@ -25,3 +25,11 @@
   to = "/404.html"
   status = 404
   force = true
+
+# Bare én adresse (eierens beslutning D8): den gamle netlify.app-adressen sendes til www.viggosbarbershop.no.
+# Eldre utrullinger (<id>--…netlify.app) er andre adresser og svarer selv 410 (netlify/lib/runtime.mjs).
+[[redirects]]
+  from = "https://boisterous-salamander-9c6b34.netlify.app/*"
+  to = "https://www.viggosbarbershop.no/:splat"
+  status = 301
+  force = true
