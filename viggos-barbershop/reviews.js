@@ -69,9 +69,9 @@
     const more = safeUrl(r.mapsUri);
     return `<figure class="review">
       <div class="review-top">${stars(r.rating)}${attr}</div>
-      <blockquote>${esc(r.text)}</blockquote>
+      <blockquote dir="auto">${esc(r.text)}</blockquote>
       ${more ? `<a class="review-more" href="${esc(more)}" target="_blank" rel="noopener">${esc(I18N.s().readOnGoogle)}</a>` : ""}
-      <figcaption>${avatar}<span><strong>${author}</strong><small>${esc(ago(r))}</small></span></figcaption>
+      <figcaption>${avatar}<span><strong dir="auto">${author}</strong><small>${esc(ago(r))}</small></span></figcaption>
     </figure>`;
   }
 

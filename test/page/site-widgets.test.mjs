@@ -8,7 +8,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadSite, readSite } from "../helpers/site-page.mjs";
-import { REVIEWS, FEATURED, FEATURED_URL, feed } from "../fixtures/widgets.mjs";
+import { REVIEWS, FEATURED, FEATURED_URL, CAPTIONS, feed } from "../fixtures/widgets.mjs";
 
 const SITES = [];
 async function open(scripts, routes, opts = {}) {
@@ -262,6 +262,21 @@ test("X3.3: the avatar initial is the first whole character of the name, also fo
   assert.deepEqual(initials, ["K", "🔥", "𝓜", "Ø"]);
   for (const i of initials) assert.ok(i.isWellFormed(), JSON.stringify(i));
   assert.ok(site.html.filter((w) => w.id === "reviews").every((w) => w.html.isWellFormed()));
+});
+
+// X3.4: a review, a name or a caption in a right-to-left script is laid out right-to-left
+test("X3.4: every review text, reviewer name and Instagram caption has dir=auto", async () => {
+  for (const body of [REVIEWS.rtl, REVIEWS.many, REVIEWS.unconfigured]) {
+    const site = await reviewsPage(body);
+    const els = site.qsa("#reviews blockquote").concat(site.qsa("#reviews .review figcaption strong"));
+    assert.ok(els.length >= 4);
+    for (const el of els) assert.equal(el.getAttribute("dir"), "auto", el.outerHTML.slice(0, 60));
+  }
+  const site = await socialPage(feed(2, [{ caption: CAPTIONS.arabic }]));
+  const caps = site.qsa("#social-feed .post-caption");
+  assert.equal(caps.length, 2);
+  for (const el of caps) assert.equal(el.getAttribute("dir"), "auto");
+  assert.equal(caps[0].textContent, CAPTIONS.arabic);
 });
 
 test("widgets: every string reviews.js, social-feed.js and i18n.js wrote in this file is well-formed Unicode", () => {

@@ -33,7 +33,7 @@
       <span class="post-badge" title="${name}">${ICON}</span>
       ${p.video ? `<span class="post-play">${PLAY}</span>` : ""}
       <span class="post-meta">
-        ${caption ? `<span class="post-caption">${caption}</span>` : ""}
+        ${caption ? `<span class="post-caption" dir="auto">${caption}</span>` : ""}
         <span class="post-date">${esc(ago(p.date))}</span>
       </span>
     </a>`;
