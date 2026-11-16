@@ -816,6 +816,11 @@ dialog:not([open]) { display: none; }
   .socials.header-socials { gap: 6px; }
   .socials.header-socials a { width: 30px; height: 30px; }
   .socials.header-socials svg { width: 15px; height: 15px; }
+  /* Større trykkflate (F69) uten at noe flytter seg: et usynlig felt over og under knappen og ikonene */
+  .lang-toggle { position: relative; }
+  .lang-toggle::after { content: ""; position: absolute; top: -11px; bottom: -11px; left: 0; right: 0; }
+  .socials.header-socials a { position: relative; }
+  .socials.header-socials a::after { content: ""; position: absolute; top: -8px; bottom: -8px; left: -2px; right: -2px; }
 }
 @media (max-width: 360px) {
   .lang-toggle { padding: 3px 8px; margin-left: 4px; margin-right: 2px; }

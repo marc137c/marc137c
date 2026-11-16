@@ -7,6 +7,10 @@
 //   site.advance(ms) moves the clock and runs due timers; site.html lists every string a script assigned to
 //   innerHTML ({ id, html }), so a test can check what was generated, not only what the parser made of it.
 //   site.setLang("en") switches the language like the toggle does.
+//   More options: search ("?lang=en"), storage (share site.storage to "reload"), page ("personvern.html"),
+//   before(ctx) (change the window before any script runs: PointerEvent, HTMLDialogElement, saved values …).
+//   site.replaced lists history.replaceState URLs, site.beacons the visit counter's XHRs, site.fire(type) runs
+//   window listeners.
 import vm from "node:vm";
 import fs from "node:fs";
 import path from "node:path";
@@ -98,7 +102,21 @@ export async function loadSite({ scripts = [], routes = {}, lang = null, now = "
     Event,
     innerHeight: 740,
     innerWidth: 375,
+    pageYOffset: 0,
+    scrollY: 0,
+    scrollTo() {},
+    // script.js counts the visit with a plain XHR (no fetch): recorded in site.beacons, never sent
+    XMLHttpRequest: class {
+      open(method, url) { this.method = method; this.url = url; }
+      setRequestHeader() {}
+      send(body) { beacons.push({ method: this.method, url: this.url, body }); }
+    },
+    // window as an event target (load, scroll, pageshow …): site.fire(type) runs its listeners
+    addEventListener(type, fn) { (winListeners[type] || (winListeners[type] = [])).push(fn); },
+    removeEventListener(type, fn) { const l = winListeners[type]; if (l && l.indexOf(fn) >= 0) l.splice(l.indexOf(fn), 1); },
   };
+  const beacons = [];
+  const winListeners = {};
   ctx.window = ctx;
   ctx.self = ctx;
   if (before) before(ctx);
@@ -109,8 +127,9 @@ export async function loadSite({ scripts = [], routes = {}, lang = null, now = "
 
   const $ = (id) => doc.getElementById(id);
   return {
-    doc, ctx, html, requests, replaced, location, clock, advance, flush, $,
+    doc, ctx, html, requests, replaced, location, beacons, clock, advance, flush, $,
     storage: ctx.localStorage,
+    fire(type, init = {}) { const ev = Object.assign(new Event(type), init); for (const fn of (winListeners[type] || []).slice()) fn.call(ctx, ev); },
     I18N: ctx.I18N,
     s: () => ctx.I18N.s(),
     qs: (sel) => doc.querySelector(sel),

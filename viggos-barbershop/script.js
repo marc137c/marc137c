@@ -58,22 +58,41 @@ document.querySelectorAll("[data-socials-wrap]").forEach((w) => {
   w.hidden = !w.querySelector("[data-social]:not([hidden])");
 });
 
-// Mobilmeny
+// Mobilmeny: åpnes med knappen (fokus går til første lenke), lukkes med en lenke, Esc eller et trykk utenfor
 const toggle = document.querySelector(".nav-toggle");
 const menu = document.getElementById("nav-menu");
+const menuIsOpen = () => toggle.getAttribute("aria-expanded") === "true";
+function setMenu(open) {
+  toggle.setAttribute("aria-expanded", String(open));
+  toggle.setAttribute("aria-label", open ? I18N.s().menuClose : I18N.s().menuOpen);
+  menu.classList.toggle("open", open);
+}
+function closeMenu(refocus) {
+  if (!menuIsOpen()) return;
+  setMenu(false);
+  if (refocus) toggle.focus();
+}
 toggle.addEventListener("click", () => {
-  const open = toggle.getAttribute("aria-expanded") === "true";
-  toggle.setAttribute("aria-expanded", String(!open));
-  toggle.setAttribute("aria-label", open ? I18N.s().menuOpen : I18N.s().menuClose);
-  menu.classList.toggle("open", !open);
+  const open = !menuIsOpen();
+  setMenu(open);
+  if (open) { const first = menu.querySelector("a"); if (first) first.focus(); }
 });
 menu.addEventListener("click", (e) => {
-  if (e.target.closest("a")) {
-    toggle.setAttribute("aria-expanded", "false");
-    toggle.setAttribute("aria-label", I18N.s().menuOpen);
-    menu.classList.remove("open");
-  }
+  if (e.target.closest("a")) closeMenu(false);
 });
+// KeyboardEvent.key mangler i Safari 10.0 og iOS < 10.3 (bare keyCode), og gamle Edge sier «Esc»
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" || e.key === "Esc" || e.keyCode === 27) closeMenu(true);
+});
+// Trykk utenfor menyen og knappen lukker. pointerdown finnes ikke i iOS < 13: der brukes touchstart og mousedown.
+const outsideMenu = (e) => {
+  if (menuIsOpen() && !menu.contains(e.target) && !toggle.contains(e.target)) closeMenu(false);
+};
+if (window.PointerEvent) document.addEventListener("pointerdown", outsideMenu);
+else {
+  document.addEventListener("touchstart", outsideMenu, { passive: true });
+  document.addEventListener("mousedown", outsideMenu);
+}
 
 // Kantlinje på header ved scroll
 const header = document.querySelector(".site-header");
@@ -162,6 +181,9 @@ document.querySelectorAll(".gallery-item").forEach((btn) => {
   });
 });
 document.getElementById("lightbox-close").addEventListener("click", () => lightboxDlg.close());
+// Slipp det store bildet når boksen lukkes (knapp, Esc eller bakgrunn), så forrige bilde aldri blinker forbi
+// neste gang. compat.js sender også «close» i nettlesere uten <dialog>.
+lightboxDlg.addEventListener("close", () => { lightboxImg.removeAttribute("src"); lightboxImg.alt = ""; });
 lightboxDlg.addEventListener("click", (e) => { if (e.target === lightboxDlg) lightboxDlg.close(); });
 
 // Animasjon når seksjoner kommer til syne

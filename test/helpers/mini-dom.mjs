@@ -113,7 +113,7 @@ class Text extends Node {
 }
 
 const BOOL_ATTRS = { hidden: "hidden", disabled: "disabled", readOnly: "readonly", required: "required", multiple: "multiple" };
-const STR_ATTRS = { id: "id", className: "class", title: "title", lang: "lang", name: "name", href: "href", htmlFor: "for", placeholder: "placeholder", src: "src" };
+const STR_ATTRS = { id: "id", className: "class", title: "title", lang: "lang", name: "name", href: "href", htmlFor: "for", placeholder: "placeholder", src: "src", alt: "alt" };
 
 export class Element extends Node {
   constructor(doc, tag) {
