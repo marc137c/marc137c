@@ -85,7 +85,7 @@ test("D3: no i18n text promises a confirmation or says a request was received", 
 // SPEC R2: every fetch( in viggos-barbershop/*.js runs inside withTimeout(…) (its first argument), so no request
 // can leave the page waiting for ever. RATCHET: the files below still have a bare fetch and are fixed in steps 4-6.
 // The list can only shrink: a file listed here that has no bare fetch left fails the test until it is removed.
-const PENDING_TIMEOUT = ["admin-stats.js", "reviews.js", "social-feed.js"];
+const PENDING_TIMEOUT = ["reviews.js", "social-feed.js"];
 function bareFetches(src) {
   const out = [];
   walk(ast(src), (n, parents) => {

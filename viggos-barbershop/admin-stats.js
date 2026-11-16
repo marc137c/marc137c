@@ -35,14 +35,25 @@
       (src ? '<p class="sp-sub">Kom fra (30 dager):</p><ul class="sp-src">' + src + "</ul>" : '<p class="sp-sub">Ingen besøk registrert ennå.</p>') +
       '<p class="sp-note">Sidevisninger på forsiden. Telles uten informasjonskapsler og uten IP-adresser; roboter telles ikke.</p>';
   }
+  // Svarer ikke serveren innen WAIT_MS (dårlig nett), gis forsøket opp; neste tidtaker-tikk prøver igjen. Mens ett
+  // forsøk venter, startes ikke et nytt (ellers hopet de seg opp bak tidtakeren).
+  var WAIT_MS = 15000;
+  var waiting = false;
+  function withTimeout(promise, ms) {
+    var timer;
+    var late = new Promise(function (resolve, reject) { timer = setTimeout(function () { reject(new Error("timeout")); }, ms); });
+    return Promise.race([promise, late]).then(function (v) { clearTimeout(timer); return v; }, function (err) { clearTimeout(timer); throw err; });
+  }
   function load() {
     var t = token();
     var app = document.getElementById("app");
-    if (!t || !app || app.hidden || document.hidden) return;
-    fetch("/api/stats", { headers: { Authorization: "Bearer " + t, Accept: "application/json" }, cache: "no-store" })
-      .then(function (r) { return r.ok ? r.json() : null; })
+    if (!t || !app || app.hidden || document.hidden || waiting) return;
+    waiting = true;
+    withTimeout(fetch("/api/stats", { headers: { Authorization: "Bearer " + t, Accept: "application/json" }, cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; }), WAIT_MS)
       .then(function (d) { if (d && d.days) render(d); })
-      .catch(function () {});
+      .catch(function () {})
+      .then(function () { waiting = false; });
   }
   setTimeout(load, 1200);
   setInterval(load, 60000);
