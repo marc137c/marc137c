@@ -1189,7 +1189,7 @@
     const done = ["Du er logget ut.", "ok"];
     thisDeviceSubscription().then((sub) => {
       if (!sub) return done;
-      const yes = confirm("Slå av varsler om nye bestillinger på denne enheten også?\n\nOK: varslene slås av her (lurt på en lånt eller delt telefon eller PC).\nAvbryt: du får fortsatt varsel om nye bestillinger her, også når du er logget ut.");
+      const yes = confirm("Slå av varsler om nye bestillinger på denne enheten også?\n\nOK: varslene slås av her (lurt på en lånt eller delt telefon eller PC).\nAvbryt: du får fortsatt varsel om nye bestillinger her, også når du er logget ut, til innloggingen ville gått ut.");
       if (!yes) return done; // innloggingssiden sier at varslene fortsatt er på, med «Slå av varsler her»
       return turnOffHere(sub).then((stopped) => { if (stopped) clearNote(); return stopped; }).then((stopped) => (stopped
         ? ["Du er logget ut, og varsler om nye bestillinger er slått av på denne enheten.", "ok"]

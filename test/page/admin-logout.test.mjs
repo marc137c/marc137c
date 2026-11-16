@@ -173,3 +173,13 @@ test("logout: a login that ran out says «Logg inn på nytt.» neutrally, not as
   assert.equal(page.$("login-msg").textContent, "Logg inn på nytt.");
   assert.equal(style(page), "info msg");
 });
+
+// Every subscription ends with the login it was turned on with (step 2), so the question must not promise
+// notifications after logout without an end
+test("logout: the question says notifications here go on only until the login would have run out", async () => {
+  const b = fakePushBrowser({ device: makeDevice("fcm"), permission: "granted", subscribed: KEY_BYTES });
+  const page = await loadAdmin({ navigator: b.navigator, globals: b.globals, confirm: () => false, routes: routes() });
+  page.$("logout").click();
+  await page.flush();
+  assert.match(page.confirms[0], /Avbryt: du får fortsatt varsel om nye bestillinger her, også når du er logget ut, til innloggingen ville gått ut\.$/);
+});
