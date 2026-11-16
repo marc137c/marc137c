@@ -8,6 +8,8 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.45 var(--sans); }
+/* Fokus og «rull inn i bildet» havner aldri under den faste toppen (tittel, dato, ukestripe: om lag 200 px) */
+html { scroll-padding-top: 210px; }
 [hidden] { display: none !important; }
 button, input, select, textarea { font: inherit; color: inherit; }
 a { color: var(--gold); }
@@ -170,6 +172,13 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 @media (max-width: 389px) {
   .top-row { flex-wrap: nowrap; }
   .top-row .sync, .top-row a.link { min-width: 0; }
+}
+
+/* Telefon på tvers (844×390, 667×375): den faste toppen tok over halve skjermen, og et trykk på «+ Ny avtale» traff
+   den. Under 500 px høyde ruller toppen med siden (fast pynt får dekke høyst 35 % av høyden). */
+@media (max-height: 500px) {
+  .top { position: static; }
+  html { scroll-padding-top: 0; }
 }
 
 @media (max-width: 520px) {

@@ -180,3 +180,14 @@ test("layout round 2: every direct child of #app keeps a 12-px side gutter on ph
   }
 });
 
+// Phone landscape (844×390, 667×375): the sticky header (title, date row, week strip) took 51–53 % of the screen,
+// and a tap on «+ Ny avtale» hit the header. Sticky chrome may cover at most 35 % of innerHeight: below 500 px of
+// height the header scrolls with the page, and the browser's own focus/scroll-into-view keeps clear of it.
+test("layout round 2: in phone landscape (height ≤ 500 px) the header is not sticky; scroll-padding keeps focus out from under it", () => {
+  assert.match(ruleIn("@media (max-height: 500px)", ".top"), /position:\s*static/);
+  const html = ruleIn(null, "html");
+  const pad = /scroll-padding-top:\s*(\d+)px/.exec(html);
+  assert.ok(pad && Number(pad[1]) >= 200, `html scroll-padding-top in «${html.trim()}»`);
+  assert.match(ruleIn("@media (max-height: 500px)", "html"), /scroll-padding-top:\s*0/);
+});
+
