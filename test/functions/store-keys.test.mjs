@@ -15,6 +15,7 @@ import * as bookings from "../../netlify/functions/bookings.mjs";
 import * as admin from "../../netlify/functions/admin.mjs";
 import * as bookingIcs from "../../netlify/functions/booking-ics.mjs";
 import * as retention from "../../netlify/functions/retention.mjs";
+import * as stats from "../../netlify/functions/stats.mjs";
 
 const PW = "fake-admin-password";
 const PHONE = "+47 912 34 567";
@@ -64,6 +65,11 @@ test("store keys: after every handler has run, every stored key has a deletion r
   const id = made.body.item.id;
   assert.equal((await call(admin, `/api/admin/items/${id}`, { method: "PATCH", json: { date: "2027-01-05", expect: made.body.item.updatedAt }, token, params: { id } })).status, 200);
   assert.equal((await call(admin, "/api/admin/cancel-phone", { method: "POST", json: { phone: PHONE }, token })).body.cancelled, 1);
+  // A page view from Instagram (visitor statistics) and the barber reading them
+  const view = await stats.handle(request("/api/hit", { method: "POST", body: JSON.stringify({ p: "/", r: "l.instagram.com" }),
+    headers: { "Content-Type": "text/plain", "User-Agent": "Mozilla/5.0 (iPhone) Safari/604.1", "X-Nf-Client-Connection-Ip": IP } }), ctx(IP), d);
+  assert.equal(view.status, 204);
+  assert.equal((await call(stats, "/api/stats", { token })).status, 200);
   assert.equal((await call(retention, "/.netlify/functions/retention", { method: "POST", json: {} })).status, 200);
 
   const problems = [];
@@ -84,4 +90,5 @@ test("store keys: after every handler has run, every stored key has a deletion r
   for (const prefix of ["rl/ip/", "rl/phone/", "rl/login/ip/", "m/2026-11", "m/2027-01", "push/subs", "calendar/feed", "rl/secret"]) {
     assert.ok(keys.some((k) => k.startsWith(prefix)), `${prefix} in ${keys.join(", ")}`);
   }
+  assert.deepEqual(d.blobs.keys("stats"), ["d/2026-11-12"]);
 });

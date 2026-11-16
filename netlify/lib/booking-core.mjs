@@ -63,11 +63,12 @@ export const mutateMonth = (store, ym, fn) =>
   mutateJSON(store, monthKey(ym), (data) => (data && Array.isArray(data.items) ? data : { items: [] }), fn);
 
 // Ventetiden før neste forsøk etter en kollisjon (ekte tid). Et objekt, så testene kan sette den til 0.
-export const retryDelay = { ms: (attempt) => 20 * 2 ** attempt + Math.random() * 20 };
+export const retryDelay = { ms: (attempt) => 20 * 2 ** Math.min(attempt, 5) + Math.random() * 20 };
 
 // Det samme for et vilkårlig JSON-dokument: init(data) gir dokumentet fn får (data = det lagrede, eller null).
-export async function mutateJSON(store, key, init, fn) {
-  for (let attempt = 0; attempt < 8; attempt++) {
+// attempts: hvor mange ganger det prøves ved kollisjon (8; tellere med mange samtidige skrivere bruker flere).
+export async function mutateJSON(store, key, init, fn, { attempts = 8 } = {}) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
     const cur = await store.getWithMetadata(key, { type: "json" });
     const doc = init(cur ? cur.data : null);
     const result = await fn(doc);
