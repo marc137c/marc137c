@@ -59,9 +59,9 @@
     const empty = posts.length === 0;
     grid.hidden = empty;
     if (lead) lead.hidden = empty;
-    // Færre enn 6 poster (eller ikke koblet til ennå): avslutt med et «Følg oss»-kort
+    // To kolonner: et «Følg oss»-kort fyller den tomme ruten når antallet poster er oddetall (og står alene uten poster)
     const html = posts.map(postCard);
-    if (posts.length < 6) html.push(followCard());
+    if (posts.length === 0 || posts.length % 2 === 1) html.push(followCard());
     grid.innerHTML = html.join("");
     grid.classList.toggle("social-feed--single", html.length === 1);
     grid.setAttribute("aria-busy", "false");

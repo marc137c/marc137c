@@ -299,6 +299,22 @@ test("F60: a post's aria-label is the caption's first 80 characters, whole, with
   assert.ok(raw.isWellFormed(), "the generated HTML has no lone surrogate");
 });
 
+// X3.5: the feed is a 2-column grid, so the tiles always fill whole rows: the follow card is added only to make an
+// odd number of posts even (or alone, when there are none)
+test("X3.5: 0 to 7 posts give 1 tile at 0 posts and an even number of tiles otherwise", async () => {
+  const expected = { 0: [0, 1], 1: [1, 2], 2: [2, 2], 3: [3, 4], 4: [4, 4], 5: [5, 6], 6: [6, 6], 7: [6, 6] };
+  for (let n = 0; n <= 7; n++) {
+    const site = await socialPage(feed(n));
+    const grid = site.$("social-feed");
+    const tiles = grid.children;
+    const follow = grid.querySelectorAll(".post--follow");
+    assert.deepEqual([tiles.length - follow.length, tiles.length], expected[n], `${n} posts`);
+    assert.ok(follow.length <= 1);
+    if (follow.length) assert.ok(tiles[tiles.length - 1] === follow[0], "the follow card comes last");
+    assert.equal(grid.classList.contains("social-feed--single"), n === 0, `${n} posts: single layout only with no posts`);
+  }
+});
+
 test("widgets: every string reviews.js, social-feed.js and i18n.js wrote in this file is well-formed Unicode", () => {
   const writes = SITES.reduce((all, s) => all.concat(s.html), []);
   assert.ok(writes.length > 20, `${writes.length} writes checked`);
