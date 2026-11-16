@@ -719,3 +719,34 @@ test("admin push panel: end to end, after a password change a device gets notifi
   assert.equal((await book()).status, 201);
   assert.deepEqual(push.deliveries.map((x) => x.device), [phone]);
 });
+
+// ---------- 11. Reset keeps this device logged in ----------
+// POST /api/admin/push/reset ends every other login (auth/epoch) and answers { ok, devices: 0, token }: the page
+// must keep that new token, or the barber who pressed the button is logged out too on the next request.
+test("admin push panel: end to end, after «Slå av varsler på alle andre enheter» this device stays logged in with the new token", async () => {
+  const PASSWORD = "fake-admin-password";
+  const push = fakePushService({ devices: [] });
+  const d = testDeps({ now: "2026-11-12T09:00:00Z", env: { ADMIN_PASSWORD: PASSWORD }, fetch: push.fetch });
+  const token = makeToken(PASSWORD, d.clock.now(), 60 * 24 * 3600e3);
+  const toServer = (call) => adminFn.handle(request(call.url || call.path, { method: call.method, headers: { Authorization: call.headers.Authorization }, json: call.body }), PRODUCTION, d).then(read);
+  // Another device is on, so the reset button shows
+  const other = makeDevice("fcm");
+  await toServer({ path: "/api/admin/push", method: "GET", headers: { Authorization: "Bearer " + token } });
+  assert.equal((await toServer({ path: "/api/admin/push/subscribe", method: "POST", headers: { Authorization: "Bearer " + token }, body: { subscription: other.subscription } })).status, 201);
+  d.clock.advance(1000);
+  const b = fakePushBrowser({ device: makeDevice("apple"), ios: true, push: false });
+  const page = await openSettings({ token, navigator: b.navigator, globals: b.globals, routes: {
+    "GET /api/admin/push": toServer, "POST /api/admin/push/reset": toServer, "GET /api/admin/items": toServer, "GET /api/admin/calendar": toServer,
+  } });
+  page.$("push-reset").click();
+  await page.flush();
+  assert.equal(msg(page), "Varsler er slått av på alle andre enheter.");
+  const kept = page.local.getItem("viggo-admin-token");
+  assert.ok(kept && kept !== token, "the new token from the reset answer is stored");
+  assert.equal((await toServer({ path: "/api/admin/items", method: "GET", headers: { Authorization: "Bearer " + token } })).status, 401, "the old token is ended");
+  page.$("settings-close").click();
+  page.$("next").click();
+  await page.flush();
+  assert.equal(page.$("login").hidden, true, "still logged in");
+  assert.equal(page.calls.at(-1).headers.Authorization, "Bearer " + kept);
+});

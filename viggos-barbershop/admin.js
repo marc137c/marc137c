@@ -42,6 +42,8 @@
   // ---------- Innlogging ----------
   // Safari i privat modus kan ikke lagre noe; da huskes innloggingen så lenge siden er åpen
   let memToken = null;
+  // Ligger innloggingen i localStorage («Hold meg innlogget»)? En ny billett for samme innlogging lagres samme sted.
+  const tokenRemembered = () => { try { return !!localStorage.getItem(KEY); } catch (e) { return false; } };
   const getToken = () => { if (memToken) return memToken; try { return localStorage.getItem(KEY) || sessionStorage.getItem(KEY); } catch (e) { return null; } };
   function setToken(t, remember) {
     memToken = t || null;
@@ -1028,7 +1030,10 @@
     const sub = pushState.sub;
     btn.disabled = true;
     pushMsg("Slår av varsler på de andre enhetene …", "info");
-    api("/api/admin/push/reset", { method: "POST", body: "{}" }).then(() => {
+    api("/api/admin/push/reset", { method: "POST", body: "{}" }).then((res) => {
+      // Serveren har avsluttet alle innlogginger og gitt denne enheten en ny billett: ta vare på den, ellers ble
+      // også Viggo logget ut ved neste henting
+      if (res && typeof res.token === "string" && res.token) setToken(res.token, tokenRemembered());
       if (!sub) {
         if (seq !== pushSeq) return;
         // Uten varsler her (av, blokkert eller ikke mulig i denne nettleseren): de samme knappene som før, uten
