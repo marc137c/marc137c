@@ -57,6 +57,13 @@
     </header>
 
     <main class="day">
+      <!-- Søk: en kunde ringer for å avlyse eller flytte. Finner timer fra i dag og tre måneder frem på telefonnummer
+           eller navn; et trykk åpner avtalen (admin.js). -->
+      <form class="find" id="find" role="search">
+        <input id="q" type="search" aria-label="Søk etter navn eller telefon" placeholder="Søk navn eller telefon" autocomplete="off">
+        <button class="chip" type="submit">Søk</button>
+      </form>
+      <ol class="hits" id="hits" aria-live="polite"></ol>
       <div class="day-head">
         <h2 id="day-title"></h2>
         <div class="day-actions">

@@ -33,6 +33,11 @@
     return iso(parse(out)) === out ? out : null;
   };
   const active = (i) => i.status !== "cancelled";
+  // Når en avtale ble bestilt (createdAt): «12.11. kl. 14:05»
+  const created = (s) => {
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? "" : `${d.getDate()}.${d.getMonth() + 1}. kl. ${hhmm(d.getHours() * 60 + d.getMinutes())}`;
+  };
 
   // ---------- Innlogging ----------
   // Safari i privat modus kan ikke lagre noe; da huskes innloggingen så lenge siden er åpen
@@ -298,7 +303,7 @@
       <span class="what">${esc(i.service || "Avtale")}${i.addons && i.addons.length ? ` + ${esc(i.addons.join(", "))}` : ""}</span>
       <span class="who">${esc(i.name || "Uten navn")}</span>
       ${i.note ? `<span class="note">${esc(i.note)}</span>` : ""}
-      ${i.source === "nettside" ? '<span class="tag">Bestilt på nett</span>' : ""}
+      ${i.source === "nettside" ? `<span class="tag">Bestilt på nett${i.createdAt && created(i.createdAt) ? " " + created(i.createdAt) : ""}</span>` : ""}
     </button>${tel ? `<a class="item-tel" href="tel:${esc(tel)}">${esc(i.phone)}</a>` : ""}</div>`;
   }
 
@@ -602,6 +607,52 @@
       if (fl.sheet === sheetSeq && dlg.open) $("edit-msg").textContent = errText(err);
       else alert(`Ble ikke avlyst (${fl.phone}): ${errText(err)}`);
     }).then(() => { btn.disabled = false; });
+  });
+
+  // ---------- Søk etter en kunde (X2.1) ----------
+  // En kunde ringer for å avlyse: søk på telefonnummer (minst 4 sifre, uansett mellomrom eller +47) eller en del av
+  // navnet, blant timene fra i dag og 92 dager frem. Et trykk på et treff åpner dagen og avtalen.
+  let findSeq = 0;
+  let hits = [];
+  function hitHtml(i, n) {
+    const off = i.status === "cancelled";
+    return `<li><button type="button" class="item hit${off ? " is-cancelled" : ""}" data-hit="${n}">
+      <span class="when">${esc(fmt(i.date, { weekday: "short", day: "numeric", month: "short" }))} kl. ${hhmm(i.start)}${off ? " · AVLYST" : ""}</span>
+      <span class="what">${esc(i.service || "Avtale")}</span>
+      <span class="who">${esc(i.name || "Uten navn")}${i.phone ? ` · ${esc(i.phone)}` : ""}</span>
+      ${i.createdAt && created(i.createdAt) ? `<span class="note">bestilt ${created(i.createdAt)}</span>` : ""}
+    </button></li>`;
+  }
+  const hitsMsg = (text) => { $("hits").innerHTML = text ? `<li class="empty">${esc(text)}</li>` : ""; };
+  $("find").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const q = String($("q").value || "").trim();
+    const seq = ++findSeq;
+    hits = [];
+    if (!q) return hitsMsg("");
+    const byName = /[a-zæøåäöü]/i.test(q), digits = phoneKey(q);
+    if (!byName && digits.length < 4) return hitsMsg("Skriv minst 4 sifre av telefonnummeret, eller en del av navnet.");
+    hitsMsg("Søker …");
+    const today = todayIso(), name = q.toLowerCase();
+    api(`/api/admin/items?from=${today}&to=${addDays(today, 92)}`).then((r) => {
+      if (seq !== findSeq) return;
+      hits = (r.items || []).filter((i) => i.type === "booking" && (byName ? String(i.name || "").toLowerCase().indexOf(name) >= 0 : phoneKey(i.phone).indexOf(digits) >= 0))
+        .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.start - b.start));
+      if (!hits.length) return hitsMsg("Ingen treff fra i dag og tre måneder frem.");
+      $("hits").innerHTML = hits.map(hitHtml).join("");
+    }).catch((err) => { if (seq === findSeq && err.status !== 401) hitsMsg(errText(err)); });
+  });
+  $("q").addEventListener("input", () => { if (!String($("q").value || "").trim()) { findSeq++; hits = []; hitsMsg(""); } });
+  $("hits").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-hit]");
+    const hit = b && hits[Number(b.dataset.hit)];
+    if (!hit) return;
+    state.day = hit.date;
+    render();
+    Promise.resolve(load()).then(() => {
+      const it = state.itemsDay === hit.date && state.items.filter((x) => x.id === hit.id)[0];
+      if (it && state.day === hit.date && !dlg.open) openEditor(it);
+    });
   });
 
   $("delete").addEventListener("click", () => {

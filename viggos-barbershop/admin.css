@@ -73,6 +73,14 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 .week button.is-active strong, .week button.is-active .n { color: var(--on-gold); }
 
 .day { max-width: 900px; margin: 0 auto; padding: 18px 16px 60px; }
+/* Søk etter en kunde (navn eller telefon) */
+.find { display: flex; align-items: center; margin: 0 0 12px; }
+.find input { flex: 1; min-width: 0; max-width: 320px; }
+.find .chip { margin-left: 8px; }
+.hits { list-style: none; margin: 0 0 18px; padding: 0; display: grid; grid-gap: 6px; gap: 6px; }
+.hits:empty { display: none; }
+.hit { font: inherit; color: inherit; }
+.hit > span { display: block; }
 .day-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; justify-content: space-between; }
 .day-head h2 { margin: 0; font-size: 1.35rem; }
 .day-actions { display: flex; gap: 8px; flex-wrap: wrap; }
