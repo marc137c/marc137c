@@ -265,8 +265,8 @@
   };
   const FOCUS = { service: () => select, day: firstOpenDay, time: firstFreeSlot };
   const nameOk = (v) => v.trim().length >= 2;
-  // Samme regler som serveren: navn minst 2 tegn, telefon 8–15 sifre uansett skrivemåte
-  const phoneOk = (v) => { const n = v.replace(/\D/g, "").length; return n >= 8 && n <= 15; };
+  // Samme regler som serveren: navn minst 2 tegn, telefon høyst 30 tegn (F25) med 8–15 sifre uansett skrivemåte
+  const phoneOk = (v) => { if (v.trim().length > 30) return false; const n = v.replace(/\D/g, "").length; return n >= 8 && n <= 15; };
 
   // Et løfte som gir opp etter ms millisekunder (AbortController finnes ikke i Safari før 12.1, så forespørselen
   // selv går videre). .late er svaret selv, i tilfelle det kommer etter at tiden er ute.

@@ -357,6 +357,20 @@ test("F24: a bad_service answer asks the customer to reload the page, at step 1"
   kept(site);
 });
 
+// F25: the server refuses a phone over 30 characters (bad_phone); the page never lets one through.
+test("F25: the phone field takes at most 30 characters, and a longer value is refused before anything is sent", async () => {
+  const site = await boot();
+  assert.equal(site.$("f-phone").getAttribute("maxlength"), "30");
+  await site.pick(Object.assign({}, FRIDAY, { phone: "+47 409 63 955 (jobb, ring etter kl. 16)" }));
+  assert.equal(site.$("f-phone").value.length, 30, "the browser cuts it at 30");
+  site.$("f-phone").removeAttribute("maxlength"); // a browser that ignores maxlength
+  site.type(site.$("f-phone"), "409 63 955                      x");
+  await site.book();
+  assert.equal(site.bookingPosts().length, 0, "nothing is sent");
+  assert.equal(site.message(), site.s().needPhone);
+  assert.ok(site.focused === site.$("f-phone"));
+});
+
 test("F73: a successful booking is stored once and nothing else is sent (no Netlify Forms copy)", async () => {
   const site = await boot();
   await site.pick(FRIDAY);
