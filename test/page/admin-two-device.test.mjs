@@ -110,3 +110,45 @@ test("two devices X1.3: a 404 on Slett says the same, and the stale card is gone
   assert.equal(page.$("editor").open, false);
   assert.doesNotMatch(page.$("timeline").innerHTML, /Kari/);
 });
+
+// Round 2: Slett carries the same precondition as Lagre (SPEC R3): ?expect=<updatedAt as this device saw it>.
+// A booking moved on the other device since is never deleted from a stale sheet.
+test("two devices X1.1: Slett sends expect=updatedAt; a 412 closes the sheet, reloads and says why, and deletes nothing", async () => {
+  const list = [kari()];
+  const page = await loadAdmin({ now: DAY + "T09:00", routes: {
+    "GET /api/admin/items": itemsRoute(() => list),
+    [`DELETE /api/admin/items/${encodeURIComponent(list[0].id)}`]: () => STALE_BODY,
+  } });
+  page.tap("timeline", `[data-id="${list[0].id}"] button.item-open`);
+  const before = gets(page);
+  page.$("delete").click();
+  await page.flush();
+  const del = page.calls.filter((c) => c.method === "DELETE");
+  assert.equal(del.length, 1);
+  assert.equal(del[0].url, `/api/admin/items/${encodeURIComponent(list[0].id)}?expect=${encodeURIComponent(U1)}`);
+  assert.deepEqual(page.alerts, ["Avtalen er endret på en annen enhet, så den ble ikke slettet. Listen oppdateres nå."]);
+  assert.equal(page.$("editor").open, false);
+  assert.ok(gets(page) > before, "the list is fetched again");
+});
+
+test("two devices X1.1: every mutating request sent from an existing booking's sheet carries expect", async () => {
+  const list = [kari()];
+  const page = await loadAdmin({ now: DAY + "T09:00", confirm: () => true, routes: {
+    "GET /api/admin/items": itemsRoute(() => list),
+    [`PATCH /api/admin/items/${encodeURIComponent(list[0].id)}`]: () => ({ ok: true, item: {} }),
+    [`DELETE /api/admin/items/${encodeURIComponent(list[0].id)}`]: () => ({ ok: true }),
+  } });
+  page.tap("timeline", `[data-id="${list[0].id}"] button.item-open`);
+  page.field("note").value = "ny";
+  page.submit();
+  await page.flush();
+  page.tap("timeline", `[data-id="${list[0].id}"] button.item-open`);
+  page.$("delete").click();
+  await page.flush();
+  const mutating = page.calls.filter((c) => c.method !== "GET" && c.path.indexOf("/api/admin/items/") === 0);
+  assert.deepEqual(mutating.map((c) => c.method), ["PATCH", "DELETE"]);
+  for (const c of mutating) {
+    const sent = c.method === "PATCH" ? c.body.expect : new URL(c.url, "https://x").searchParams.get("expect");
+    assert.equal(sent, U1, `${c.method} carries expect`);
+  }
+});

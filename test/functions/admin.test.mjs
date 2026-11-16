@@ -2,6 +2,8 @@
 // the store from deps.getStore (production or the preview store, F10). Nothing here uses process.env, the real
 // clock or the network.
 import { test } from "node:test";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { testDeps, request, read, quiet, PRODUCTION, PREVIEW } from "../helpers/deps.mjs";
 import { item, seedItems, storedItems, CUSTOMER_PHONE } from "../helpers/bookings.mjs";
@@ -231,4 +233,45 @@ test("admin edit: a body that is not a JSON object is 400, not a server error", 
     const created = await read(await handle(request("/api/admin/items", { method: "POST", headers: { ...auth(d), "Content-Type": "application/json" }, body }), PRODUCTION, d));
     assert.equal(created.status, 400, body);
   }
+});
+
+// ---------- Round 2: every mutating /api/admin/items/:id route carries the updatedAt precondition (SPEC R3) ----------
+// DELETE had none: a sheet left open on one device deleted a booking another device had just moved.
+const SRC = readFileSync(fileURLToPath(new URL("../../netlify/functions/admin.mjs", import.meta.url)), "utf8");
+const MUTATING = {
+  PATCH: (d, id, expect) => handle(request(`/api/admin/items/${id}`, { method: "PATCH", json: { note: "Fra den gamle fanen", expect }, headers: auth(d) }), { ...PRODUCTION, params: { id } }, d),
+  DELETE: (d, id, expect) => handle(request(`/api/admin/items/${id}?expect=${encodeURIComponent(expect)}`, { method: "DELETE", headers: auth(d) }), { ...PRODUCTION, params: { id } }, d),
+};
+
+test("admin: every mutating route on /api/admin/items/:id is in the stale-expect table", () => {
+  const methods = [...SRC.matchAll(/\bid && req\.method === "([A-Z]+)"/g)].map((m) => m[1]).sort();
+  assert.deepEqual(methods, Object.keys(MUTATING).sort());
+});
+
+for (const [method, call] of Object.entries(MUTATING)) {
+  test(`admin: ${method} with a stale expect is 412 'stale' and leaves the store unchanged`, async () => {
+    const d = testDeps({ now: NOW, env });
+    const [b] = seedItems(d.blobs, [item({ date: "2026-11-27", start: 600 })]);
+    const seenByA = b.updatedAt;
+    d.clock.advance(60e3);
+    const moved = await patch(d, b.id, { start: 900, note: "Flyttet av B", expect: seenByA });
+    assert.equal(moved.status, 200);
+    const before = JSON.stringify(storedItems(d.blobs));
+    const res = await read(await call(d, b.id, seenByA));
+    assert.deepEqual([res.status, res.body.code], [412, "stale"], JSON.stringify(res.body));
+    assert.equal(JSON.stringify(storedItems(d.blobs)), before);
+    // with the version B left, it goes through
+    assert.equal((await read(await call(d, b.id, moved.body.item.updatedAt))).status, 200);
+  });
+}
+
+test("admin: DELETE with the current expect deletes; without expect (an old tab) it still works; a too long expect is 400", async () => {
+  const d = testDeps({ now: NOW, env });
+  const [a, b] = seedItems(d.blobs, [item({ date: "2026-11-27", start: 600 }), item({ date: "2026-11-27", start: 660 })]);
+  const del = (id, q = "") => handle(request(`/api/admin/items/${id}${q}`, { method: "DELETE", headers: auth(d) }), { ...PRODUCTION, params: { id } }, d).then(read);
+  assert.equal((await del(a.id, "?expect=" + "y".repeat(41))).status, 400);
+  assert.equal((await del(a.id, `?expect=${encodeURIComponent(a.updatedAt)}`)).status, 200);
+  assert.equal((await del(b.id)).status, 200);
+  assert.deepEqual(storedItems(d.blobs), []);
+  assert.equal((await del(a.id, `?expect=${encodeURIComponent(a.updatedAt)}`)).status, 404, "already gone: 404 as before");
 });

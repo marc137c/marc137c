@@ -403,14 +403,18 @@ function sameExceptVersion(a, b) {
   return true;
 }
 
-export async function deleteItem(store, id) {
+// Sletter en avtale for godt. expect: updatedAt slik /admin så den; er den endret et annet sted siden (flyttet,
+// avlyst, nytt nummer), svarer det 412 «stale» og ingenting slettes (SPEC R3, som for PATCH). Uten expect (en
+// gammel fane) som før.
+export async function deleteItem(store, id, { expect } = {}) {
   const date = String(id).split("_")[0];
   if (!isDate(date)) return { error: "Fant ikke avtalen.", status: 404 };
   let removed = false; // et nytt forsøk etter tapt svar skal ikke gi «fant ikke»
   return mutateMonth(store, monthOf(date), (doc) => {
-    const before = doc.items.length;
+    const it = doc.items.find((i) => i.id === id);
+    if (!it) return removed ? { ok: true, noWrite: true } : { error: "Fant ikke avtalen.", status: 404 };
+    if (expect !== undefined && it.updatedAt !== expect) return STALE;
     doc.items = doc.items.filter((i) => i.id !== id);
-    if (doc.items.length === before) return removed ? { ok: true, noWrite: true } : { error: "Fant ikke avtalen.", status: 404 };
     removed = true;
     return { ok: true };
   });

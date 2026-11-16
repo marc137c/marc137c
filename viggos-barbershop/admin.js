@@ -526,6 +526,7 @@
   }
   // Avtalen er endret på en annen enhet siden arket ble åpnet (412 «stale», X1.1)
   const STALE_TEXT = "Avtalen er endret på en annen enhet, så endringen ble ikke lagret. Listen oppdateres nå.";
+  const STALE_DELETE = "Avtalen er endret på en annen enhet, så den ble ikke slettet. Listen oppdateres nå.";
   // Avtalen er flyttet til en annen måned (ny id) eller slettet på en annen enhet (404, X1.3)
   const GONE_SAVE = "Avtalen er flyttet eller slettet fra en annen enhet, så endringen ble ikke lagret. Listen oppdateres nå.";
   const GONE_DELETE = "Avtalen er flyttet eller slettet fra en annen enhet, så den ble ikke slettet her. Listen oppdateres nå.";
@@ -712,11 +713,14 @@
     if (!it) return;
     const what = it.type === "block" ? "blokkeringen" : `avtalen med ${it.name || "kunden"}${it.phone ? ` (${it.phone})` : ""}`;
     if (!confirm(`Slette ${what} ${fmt(it.date, { day: "numeric", month: "long" })} kl. ${hhmm(it.start)} for godt?\n\nTips: huk av «Avlyst» i stedet hvis du vil ha historikken.`)) return;
-    api(`/api/admin/items/${encodeURIComponent(it.id)}`, { method: "DELETE" }).then(() => {
+    // expect: avtalen slik denne enheten så den; er den endret et annet sted siden, svarer serveren 412 (R3)
+    const q = it.updatedAt ? `?expect=${encodeURIComponent(it.updatedAt)}` : "";
+    api(`/api/admin/items/${encodeURIComponent(it.id)}${q}`, { method: "DELETE" }).then(() => {
       dlg.close();
       return load();
     }).catch((err) => {
       if (err.status === 401) return;
+      if (err.status === 412) { alert(STALE_DELETE); dlg.close(); return load(); }
       if (err.status === 404) { alert(GONE_DELETE); dlg.close(); return load(); }
       $("edit-msg").textContent = errText(err);
     });

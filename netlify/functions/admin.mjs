@@ -4,7 +4,7 @@
 //   GET    /api/admin/items?from&to    alle avtaler og blokkeringer i perioden
 //   POST   /api/admin/items            ny avtale/blokkering   (?force=1 = lagre selv om det kolliderer)
 //   PATCH  /api/admin/items/:id        endre (flytte, ny tjeneste, avlyse …)
-//   DELETE /api/admin/items/:id        slette for godt
+//   DELETE /api/admin/items/:id        slette for godt (?expect=<updatedAt>: 412 «stale» hvis endret et annet sted)
 //   POST   /api/admin/cancel-phone     { phone } avlys alle kommende nettbestillinger fra dette nummeret, uansett
 //                                      skrivemåte (etter en flom av falske bestillinger, X2.4) → { ok, cancelled }
 //   GET    /api/admin/calendar         lenken til kalenderen på telefonen: { enabled, createdAt, links }, eller
@@ -223,7 +223,10 @@ export async function handle(req, context, deps) {
       return json({ error: "Testvarselet kom ikke fram. Prøv igjen om litt.", code: "push_failed" }, 502);
     }
     if (id && req.method === "DELETE") {
-      const r = await deleteItem(store, decodeURIComponent(id));
+      // ?expect=<updatedAt slik denne enheten så avtalen>: 412 «stale» hvis den er endret et annet sted siden (R3)
+      const expect = url.searchParams.get("expect");
+      if (expect !== null && expect.length > 40) return json({ error: "Ugyldig versjon." }, 400);
+      const r = await deleteItem(store, decodeURIComponent(id), expect === null ? {} : { expect });
       return r.error ? json(r, r.status) : json(r);
     }
     return json({ error: "Ukjent forespørsel." }, 404);
