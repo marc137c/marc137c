@@ -404,6 +404,8 @@ test("F57: with focus on a day, the 30-s refresh still redraws: a time someone e
 });
 
 // F49: every path that drops a chosen time or day says why, at that step, at once and again on 'Bestill time'.
+// Every row runs with no pending (uncertain) attempt: after an uncertain outcome the choice is kept instead, and the
+// retry decides (test/client/booking-pending.test.mjs, round 2).
 const SAT_1630 = { service: "Herreklipp", date: "2026-11-14", time: 990, name: FRIDAY.name, phone: FRIDAY.phone };
 const reject = (code, status = 400) => (s) => s.when((r) => r.url === "/api/bookings", { status, body: { code, error: code } }, 1);
 const DROPS = [

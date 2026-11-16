@@ -69,8 +69,19 @@
   const dayOpen = (d) => d >= today() && d <= lastDay() && !isClosed(d);
 
   const duration = () => DURATIONS[select.value] || SLOT_MIN;
-  const isBusy = (date, start, dur) =>
-    (busy[iso(date)] || []).some(([a, b]) => start < b && a < start + dur);
+  // Et forsøk med usikkert utfall (attempt.uncertain) kan være lagret: da er det opptatte tidsrommet akkurat der
+  // kundens egen time, ikke en annens. Mens det står, regnes det tidsrommet som ledig for kunden, og ingen
+  // bakgrunnshendelse (30-s oppdatering, tilbake til fanen, språkbytte, et sent svar) slipper valget eller
+  // overskriver beskjeden. Neste «Bestill time» sender samme requestId, og serveren avgjør: 201 (vår) eller 409 (runde 2).
+  const pendingOn = (date) => !!attempt && attempt.uncertain === true && !!date && attempt.date === iso(date) && attempt.service === select.value;
+  const isBusy = (date, start, dur) => {
+    const mine = pendingOn(date) ? [attempt.start, attempt.start + attempt.dur] : null;
+    let skipped = false;
+    return (busy[iso(date)] || []).some(([a, b]) => {
+      if (mine && !skipped && a === mine[0] && b === mine[1]) { skipped = true; return false; }
+      return start < b && a < start + dur;
+    });
+  };
 
   // Alle starttider en gitt dag (minutter etter midnatt) med status:
   // "free" = ledig, "taken" = noen har booket denne tiden, "short" = ledig, men valgt tjeneste rekker ikke før neste avtale/stenging
@@ -155,8 +166,9 @@
     }
     const slots = slotsFor(state.date);
     // En valgt tid som ikke er ledig lenger (tatt av en annen, passert, eller for kort for ny tjeneste) slippes, med
-    // beskjed om hvorfor ved steget (F49)
-    if (state.time !== null && !sending && !slots.some((x) => x.t === state.time && x.status === "free")) {
+    // beskjed om hvorfor ved steget (F49). Aldri et valg med et usikkert forsøk på vei (pendingOn): det avgjør serveren.
+    const pendingTime = pendingOn(state.date) && attempt.start === state.time;
+    if (state.time !== null && !sending && !pendingTime && !slots.some((x) => x.t === state.time && x.status === "free")) {
       const was = slots.filter((x) => x.t === state.time)[0];
       state.time = null;
       dropped.time = was && was.status === "short" ? (t) => t.tooShortPicked : (t) => t.timeGone;
@@ -198,8 +210,9 @@
     summaryEl.hidden = !ready;
   }
   const renderAll = () => {
-    // En valgt dag som er passert, stengt eller utenfor bestillingsvinduet mens siden sto åpen, slippes, med beskjed
-    if (state.date && !sending && !dayOpen(state.date)) {
+    // En valgt dag som er passert, stengt eller utenfor bestillingsvinduet mens siden sto åpen, slippes, med beskjed.
+    // Ikke en dag med et usikkert forsøk på vei som ikke er passert: et nytt forsøk får serverens svar (runde 2).
+    if (state.date && !sending && !dayOpen(state.date) && !(pendingOn(state.date) && state.date >= today())) {
       state.date = null;
       state.time = null;
       dropped.day = (t) => t.dayGone;
@@ -385,7 +398,7 @@
 
   // Samme bestilling sendt på nytt (etter et tapt svar, tidsavbrudd eller nettfeil) får samme requestId, så serveren
   // lagrer den bare én gang og svarer med timen som allerede er lagret. En endret bestilling får en ny (SPEC R1).
-  let attempt = null; // { sig, id }
+  let attempt = null; // { sig, id, date, start, dur, service, uncertain }
   let turns = 0;      // løpenummer for forsøkene
   function newRequestId() {
     let bytes = null;
@@ -411,6 +424,8 @@
   // kalenderen» er en vanlig lenke til serverens .ics for timen (ingen data:-URL: Chrome 60 stopper dem, og iOS 10 har
   // ikke download-attributtet).
   const bookedList = []; // { when(t), id }
+  const bookedIds = {};    // booking-id → true: hver bekreftet time står én gang
+  const confirmedReq = {}; // requestId → when(t) for timen serveren bekreftet for den
   function renderDone() {
     if (!doneEl) return;
     const s = I18N.s();
@@ -450,40 +465,76 @@
       name: name.value.trim(), phone: phone.value.trim(),
     };
     const sig = JSON.stringify([body.service, body.date, body.start, body.addons, body.name, body.phone]);
-    if (!attempt || attempt.sig !== sig) attempt = { sig, id: newRequestId() };
+    if (!attempt || attempt.sig !== sig) attempt = { sig, id: newRequestId(), date: body.date, start: body.start, dur: duration(), service: body.service };
     body.botField = bot ? bot.value : "";
     body.requestId = attempt.id;
     const turn = ++turns;
-    const current = () => turn === turns; // svar på et eldre forsøk overstyrer aldri et nyere
+    const current = () => turn === turns; // svar på et eldre forsøk overstyrer aldri beskjeden til et nyere
+    const mine = { requestId: body.requestId, service: svcValue, date: body.date };
+    // Skjemaet viser fortsatt akkurat dette forsøkets valg
+    const formShows = () => select.value === mine.service && !!state.date && iso(state.date) === mine.date && state.time === t0;
+    // Et sikkert svar (ja eller nei) på dette forsøket: det er ikke lenger usikkert
+    const settle = () => { if (attempt && attempt.id === mine.requestId) attempt.uncertain = false; };
     lock(true);
     setMsg("", (t) => t.sending);
     // Hver vei ut låser opp skjemaet først, så feilmeldingen kan flytte fokus og kunden kan rette eller prøve igjen
     const end = (fn) => { lock(false); fn(); };
     // Timen er lagret: si det med en gang, og hent oppdaterte ledige tider i bakgrunnen. Bekreftelsen viser det
     // serveren lagret (tjeneste, dag, tid), og står i #booking-done til siden lukkes.
-    const booked = (data) => {
+    // Hvert 2xx-svar er et faktum, uansett hvilket forsøk det hører til eller når det kommer: timen legges i
+    // #booking-done (én gang per booking-id), og forsøket er ikke lenger usikkert (runde 2).
+    const record = (data) => {
       const b = (data && data.booking) || {};
       const svc = typeof b.service === "string" ? b.service : svcValue;
       const day = fromIso(b.date) || d0;
       const start = typeof b.start === "number" ? b.start : t0;
       const when = (t) => t.summary(selectedServiceLabelFor(svc), dateLabel(day), t.time(start));
-      attempt = null;
-      bookedList.push({ when, id: typeof b.id === "string" ? b.id : "" });
-      renderDone();
+      const id = typeof b.id === "string" ? b.id : "";
+      if (!id || !bookedIds[id]) {
+        if (id) bookedIds[id] = true;
+        bookedList.push({ when, id });
+        renderDone();
+      }
+      confirmedReq[mine.requestId] = when;
+      if (attempt && attempt.id === mine.requestId) attempt = null;
+      return when;
+    };
+    const booked = (data) => {
+      const when = record(data);
       end(() => done((t) => t.booked(when(t))));
       refresh();
     };
+    // Et 2xx som kommer etter at forsøket ga opp (eller etter et nyere forsøk): alltid i #booking-done. Beskjeden og
+    // nullstillingen av skjemaet bare når ingen nyere bestilling er på vei og skjemaet fortsatt viser denne timen.
+    const lateBooked = (data) => {
+      const when = record(data);
+      if (!sending && formShows()) done((t) => t.booked(when(t)));
+      refresh();
+    };
     // Vi vet ikke om timen ble lagret (ingen svar, nettfeil, eller et svar vi ikke kan stole på). requestId beholdes,
-    // så et nytt forsøk med det samme blir samme bestilling hos serveren.
-    const uncertain = () => end(() => setMsg("err", (t) => t.uncertain));
-    const rejected = (what, textFn) => loadAvailability().then(() => end(() => {
+    // så et nytt forsøk med det samme blir samme bestilling hos serveren, og valget står til serveren har svart sikkert.
+    const uncertain = () => {
+      const when = confirmedReq[mine.requestId]; // et tidligere svar har allerede bekreftet den
+      if (when) return end(() => done((t) => t.booked(when(t))));
+      if (attempt && attempt.id === mine.requestId) attempt.uncertain = true;
+      end(() => setMsg("err", (t) => t.uncertain));
+    };
+    // Steget for beskjeden velges ut fra hvordan siden ser ut etter at ledige tider er hentet på nytt, ikke bare fra
+    // serverens kode: er dagen stengt nå (barberen blokkerte den), eller er det ingen ledig tid igjen den dagen, gjelder
+    // beskjeden dagen, med fokus på en åpen dag (runde 2).
+    const rejected = (what, textFn) => { settle(); return loadAvailability().then(() => end(() => {
+      if (what === "time" && state.date && !dayOpen(state.date)) { what = "day"; textFn = (t) => t.dayGone; }
+      else if (what === "time" && state.date && !bookable(state.date)) {
+        what = "day";
+        textFn = slotsFor(state.date).some(isShort) ? (t) => t.dayNoFit : (t) => t.dayFullNow;
+      }
       if (what === "day") state.date = null;
       state.time = null;
       renderAll();
       dropped[what] = textFn;
       if (what === "day") fail(textFn, "day", firstOpenDay());
       else fail(textFn, "time", firstFreeSlot());
-    }));
+    })); };
     const ok = (r) => r.status >= 200 && r.status < 300 && !!r.data && r.data.ok === true;
     const answer = (r) => {
       const status = r.status, data = r.data || {};
@@ -494,9 +545,10 @@
       if (data.code === "too_early" || data.code === "bad_time") return rejected("time", (t) => t.timeGone);
       if (data.code === "bad_date" || data.code === "closed") return rejected("day", (t) => t.dayGone);
       // For mange bestillinger (fra nummeret, nettet eller totalt): et nytt forsøk hjelper ikke, så be om en telefon
-      if (status === 429 || data.code === "rate_limited") return end(() => setMsg("err", (t) => t.rateLimited));
+      if (status === 429 || data.code === "rate_limited") { settle(); return end(() => setMsg("err", (t) => t.rateLimited)); }
       if (status >= 500 || status < 400) return uncertain();
       // 404: bookingsystemet finnes ikke her, så ingenting ble lagret. Andre 4xx: serveren sa nei, ingenting ble lagret.
+      settle();
       if (status === 404) return end(() => setMsg("err", (t) => t.notSaved));
       const e = ERR[data.code];
       end(() => (e ? fail(e[0], e[1], (e[2] || FOCUS[e[1]])()) : setMsg("err", (t) => t.notSaved)));
@@ -506,11 +558,13 @@
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify(body),
     }).then((res) => res.json().then((data) => ({ status: res.status, data }), () => ({ status: res.status, data: null }))), SEND_TIMEOUT);
-    sent.then((r) => { if (current()) return answer(r); }, () => {
-      if (!current()) return;
-      uncertain();
-      // Kommer svaret likevel senere og timen ble lagret, får kunden vite det
-      sent.late.then((r) => { if (current() && !sending && ok(r)) booked(r.data); }, () => {});
+    sent.then((r) => {
+      if (current()) return answer(r);
+      if (ok(r)) lateBooked(r.data);
+    }, () => {
+      if (current()) uncertain();
+      // Kommer svaret likevel senere og timen ble lagret, får kunden vite det, også etter et nyere forsøk
+      sent.late.then((r) => { if (ok(r)) lateBooked(r.data); }, () => {});
     }).catch(() => { if (current()) uncertain(); });
   });
 
