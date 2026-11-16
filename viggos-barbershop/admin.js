@@ -207,8 +207,21 @@
     return reached >= h[1];
   }
 
+  // «I dag» følger klokken (F12): står timeboken åpen over natten, flytter visningen seg fra i går til i dag neste
+  // gang den hentes (fanen kommer tilbake, tidtakeren, et trykk). En dag Viggo har valgt selv, blir stående.
+  let lastToday = todayIso();
+  function rollDay() {
+    const t = todayIso();
+    if (t === lastToday) return false;
+    const moved = state.day === lastToday;
+    if (moved) state.day = t;
+    lastToday = t;
+    return moved;
+  }
+
   let loadSeq = 0;
   function load() {
+    if (rollDay()) render();
     const seq = ++loadSeq, d = state.day, today = todayIso();
     $("sync").textContent = "Henter …";
     return Promise.all([
@@ -346,8 +359,11 @@
   $("timeline").addEventListener("keydown", (e) => {
     if ((e.key === "Enter" || e.key === " " || e.keyCode === 13 || e.keyCode === 32) && e.target.matches("div[data-id]")) { e.preventDefault(); e.target.click(); }
   });
-  $("add").addEventListener("click", () => openEditor(null, { type: "booking" }));
+  // Etter midnatt uten at noe er hentet ennå: ny avtale eller blokkering gjelder likevel den nye dagen
+  const freshDay = () => { if (rollDay()) { render(); load(); } };
+  $("add").addEventListener("click", () => { freshDay(); openEditor(null, { type: "booking" }); });
   $("block").addEventListener("click", () => {
+    freshDay();
     const h = hoursOn(state.day);
     openEditor(null, { type: "block", start: h ? h[0] : 600, dur: h ? h[1] - h[0] : 480 });
   });
