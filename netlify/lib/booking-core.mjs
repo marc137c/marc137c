@@ -322,6 +322,11 @@ export async function updateItem(store, id, changes, { force = false, now = new 
   if (error) return { error, status };
   next.id = `${next.date}_${idSuffix(currentId)}`;
   const suffix = idSuffix(currentId);
+  // mv: flyttingens tilfeldige merke på kopien i den nye måneden, til den gamle tiden er fjernet (runde 2). Kopien er
+  // første halvdel av en skriving i to dokumenter, og andre skrivere (f.eks. «Avlys alle fra nummeret») kan endre den
+  // i mellomtiden; angringen kjenner den igjen på merket, aldri på updatedAt, så det aldri blir to kopier.
+  const moveMark = randomBytes(6).toString("hex");
+  next.mv = moveMark;
   // Hver forutsetning sjekkes inne i skrivingen som bygger på den (vakt-regel SPEC R16): en annen enhets endring
   // mellom lesingen over og de to skrivingene under, skal gi 412, aldri bli borte eller gi to kopier (runde 2).
   // adopted: den nye måneden har allerede nøyaktig denne flyttingen (et tidligere forsøk fra oss, eller den samme
@@ -355,7 +360,6 @@ export async function updateItem(store, id, changes, { force = false, now = new 
   // movedOut: en kort logg i den gamle måneden over flyttinger ut av den (id, ny id, et tilfeldig merke, tid; ingen
   // kundedata, høyst et døgn og 20 stykker). Går svaret på vår egen fjerning tapt, prøver klienten skrivingen igjen og
   // finner avtalen borte; bare merket skiller det fra at en annen enhet slettet eller flyttet den i mellomtiden.
-  const moveMark = randomBytes(6).toString("hex");
   let removed;
   try {
     removed = await mutateMonth(store, fromMonth, (doc) => {
@@ -379,12 +383,7 @@ export async function updateItem(store, id, changes, { force = false, now = new 
   if (removed.conflict) {
     if (adopted) return STALE; // kopien er ikke vår: la den stå
     try {
-      const undone = await mutateMonth(store, toMonth, (doc) => {
-        const before = doc.items.length;
-        doc.items = doc.items.filter((o) => !(o.id === next.id && o.updatedAt === next.updatedAt));
-        return doc.items.length === before ? { ok: true, noWrite: true } : { ok: true };
-      });
-      if (undone.error) throw new Error(undone.error);
+      await undoCopy(store, { toMonth, fromMonth, copyId: next.id, mark: moveMark, originalId: currentId });
     } catch (err) {
       console.error("Flytting: kunne ikke ta tilbake kopien etter en samtidig endring:", err && err.name);
       return { error: MOVE_RACE_HALF, code: "move_conflict", status: 503 };
@@ -392,13 +391,61 @@ export async function updateItem(store, id, changes, { force = false, now = new 
     return STALE;
   }
   if (removed.error) return { error: MOVE_HALF_DONE, code: "move_half_done", status: 503 };
-  return { ok: true, item: added.item };
+  // Flyttingen er ferdig: ta bort merket (vårt, eller det på en kopi vi tok over). Går det ikke, står merket bare
+  // som et ufarlig felt; neste flytting av avtalen tar det bort.
+  const marks = [moveMark].concat(adopted && adopted.mv ? [adopted.mv] : []);
+  let item = added.item;
+  try {
+    const done = await mutateMonth(store, toMonth, (doc) => {
+      const o = doc.items.find((i) => i.id === next.id && marks.includes(i.mv));
+      if (!o) return { ok: true, noWrite: true };
+      delete o.mv;
+      item = o;
+      return { ok: true };
+    });
+    if (done.error) console.warn("Flytting: merket på kopien ble stående:", done.error);
+  } catch (err) {
+    console.warn("Flytting: merket på kopien ble stående:", err && err.name);
+  }
+  const { mv, ...shown } = item;
+  return { ok: true, item: shown };
 }
-// To avtaler er like bortsett fra versjonen (updatedAt) og varselmerket
+
+// Tar bort kopien en flytting la i den nye måneden (kjent på merket mark, uansett updatedAt). Har kopien fått en
+// status i mellomtiden (avlyst av «Avlys alle fra nummeret»), flyttes den først over på originalen, så avlysningen
+// står; feiler det, blir kopien liggende og kallet kaster (503 MOVE_RACE_HALF).
+async function undoCopy(store, { toMonth, fromMonth, copyId, mark, originalId }) {
+  let carried = false;
+  for (let round = 0; round < 3; round++) {
+    let carry = null;
+    const r = await mutateMonth(store, toMonth, (doc) => {
+      carry = null;
+      const copy = doc.items.find((o) => o.id === copyId && o.mv === mark);
+      if (!copy) return { ok: true, noWrite: true };
+      if (!active(copy) && !carried) { carry = copy; return { ok: true, noWrite: true }; }
+      doc.items = doc.items.filter((o) => o !== copy);
+      return { ok: true };
+    });
+    if (r.error) throw new Error(r.error);
+    if (!carry) return;
+    const c = await mutateMonth(store, fromMonth, (doc) => {
+      const o = doc.items.find((i) => i.id === originalId);
+      if (!o || !active(o)) return { ok: true, noWrite: true };
+      o.status = carry.status;
+      o.updatedAt = carry.updatedAt;
+      return { ok: true };
+    });
+    if (c.error) throw new Error(c.error);
+    carried = true;
+  }
+  throw new Error("kopien ble endret under angringen");
+}
+// To avtaler er like bortsett fra versjonen (updatedAt), varselmerket og flyttemerket
 function sameExceptVersion(a, b) {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
   keys.delete("updatedAt");
   keys.delete("notifiedAt");
+  keys.delete("mv");
   for (const k of keys) if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) return false;
   return true;
 }
@@ -443,11 +490,13 @@ export function monthsBetween(fromDate, toDate) {
 }
 
 // Avlyser (status «cancelled», ny updatedAt; aldri slettet) alle aktive avtaler match(item) godtar i disse
-// månedene. Teller bare det dette kallet avlyste, også når et svar gikk tapt og skrivingen ble prøvd igjen.
+// månedene. Teller bare det dette kallet avlyste, også når et svar gikk tapt og skrivingen ble prøvd igjen, og hver
+// avtale én gang: en avtale midt i en flytting til en annen måned (originalen og kopien med merket mv) har samme
+// id-hale i begge, og avlyses i begge, men telles som én (runde 2).
 // Svarer { ok, cancelled } eller { error, status: 503, cancelled } (det som rakk å bli avlyst; kall igjen).
 export async function cancelMatching(store, months, match, now = new Date()) {
   const stamp = now.toISOString();
-  let total = 0;
+  const done = new Set(); // id-halene dette kallet har avlyst
   for (const ym of months) {
     const attempted = new Set();
     let r;
@@ -461,17 +510,17 @@ export async function cancelMatching(store, months, match, now = new Date()) {
           attempted.add(i.id);
           changed = true;
         }
-        const cancelled = doc.items.filter((i) => attempted.has(i.id) && i.status === "cancelled" && i.updatedAt === stamp).length;
-        return changed ? { ok: true, cancelled } : { ok: true, noWrite: true, cancelled };
+        const ids = doc.items.filter((i) => attempted.has(i.id) && i.status === "cancelled" && i.updatedAt === stamp).map((i) => i.id);
+        return changed ? { ok: true, ids } : { ok: true, noWrite: true, ids };
       });
     } catch (err) {
       console.error("Avlysning: lagringen svarte ikke:", err && err.name);
       r = { error: true };
     }
-    if (r.error) return { error: "Fikk ikke avlyst alle. Prøv igjen om litt.", status: 503, cancelled: total };
-    total += r.cancelled;
+    if (r.error) return { error: "Fikk ikke avlyst alle. Prøv igjen om litt.", status: 503, cancelled: done.size };
+    for (const id of r.ids) done.add(idSuffix(id));
   }
-  return { ok: true, cancelled: total };
+  return { ok: true, cancelled: done.size };
 }
 
 // ---------- Admin-innlogging ----------

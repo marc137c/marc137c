@@ -387,3 +387,46 @@ test("fault matrix: an old tab's DELETE of a booking that was moved to another m
   assert.equal(r.body.code, "stale");
   assert.equal(storedItems(d.blobs).length, 1);
 });
+
+// Round 2, fix-up: a cross-month move racing «Avlys alle fra nummeret» (interleave-show.mjs, second scene). The
+// copy in December carries the move's mark (mv) until November's original is gone; the undo removes the copy by
+// that mark whatever its updatedAt, and cancel-phone counts each booking once by its id suffix.
+const cancelPhoneAs = (deps) => admin.handle(request("/api/admin/cancel-phone", { method: "POST", json: { phone: CUSTOMER_PHONE }, headers: auth(deps) }), PRODUCTION, deps).then(read);
+function moveWithCancelPhone(when) {
+  const { d, b } = moveSetup();
+  let byB = null, n = 0;
+  const depsA = { ...d, getStore: (o) => new Proxy(d.getStore(o), { get(tg, p) {
+    if (p === "setJSON") return async (key, val, opts) => {
+      if (when(key, n++) && !byB) { d.clock.advance(1000); byB = await cancelPhoneAs(d); d.clock.advance(1000); }
+      return tg.setJSON(key, val, opts);
+    };
+    const v = tg[p]; return typeof v === "function" ? v.bind(tg) : v;
+  } }) };
+  return { d, b, depsA, byB: () => byB };
+}
+test("fault matrix: cancel-phone between the December copy and the removal of the original: one cancelled copy, «1 avlyst», and the move answers 412", async (t) => {
+  quiet(t);
+  const { d, b, depsA, byB } = moveWithCancelPhone((key) => key === "m/2026-11"); // right before A removes November's original
+  const byA = await patchAs(depsA, b.id, { date: "2026-12-02", expect: b.updatedAt });
+  assert.equal(byA.status, 412, JSON.stringify(byA.body));
+  assert.deepEqual([byB().status, byB().body.cancelled], [200, 1]);
+  assert.deepEqual(storedItems(d.blobs).map((i) => `${i.id} ${i.status}`), [`${b.id} cancelled`]);
+});
+test("fault matrix: cancel-phone after the original is gone but before the move's mark is cleared cancels the December booking once; the mark never stays", async (t) => {
+  quiet(t);
+  const { d, b, depsA, byB } = moveWithCancelPhone((key, n) => key === "m/2026-12" && n === 2); // right before A clears mv
+  const byA = await patchAs(depsA, b.id, { date: "2026-12-02", expect: b.updatedAt });
+  assert.equal(byA.status, 200, JSON.stringify(byA.body));
+  assert.equal(byA.body.item.mv, undefined);
+  assert.deepEqual([byB().status, byB().body.cancelled], [200, 1]);
+  const stored = storedItems(d.blobs);
+  assert.deepEqual(stored.map((i) => `${i.id} ${i.status}`), [`2026-12-02_${suffix(b.id)} cancelled`]);
+  assert.ok(stored.every((i) => !("mv" in i)), JSON.stringify(stored));
+});
+test("fault matrix: an undisturbed cross-month move leaves no move mark on the booking", async (t) => {
+  quiet(t);
+  const { d, b } = moveSetup();
+  const r = await patchAs(d, b.id, { date: "2026-12-02", expect: b.updatedAt });
+  assert.equal(r.status, 200);
+  assert.ok(storedItems(d.blobs).every((i) => !("mv" in i)));
+});
