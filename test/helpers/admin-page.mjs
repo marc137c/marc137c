@@ -11,8 +11,15 @@
 //   await page.advance(ms) moves the page's fake clock: setTimeout callbacks that are due run (nothing waits in real
 //   time); page.timers() → how many timeouts are pending
 // routes: { "GET /api/admin/calendar": (call) => ({ status, body }) | body | Promise, … } (query ignored).
-// An unknown route answers 404. A route may throw to simulate a network failure.
+// An unknown route answers 404. A route may throw to simulate a network failure (netFail), never answer (hang),
+// or be answered later by the test (held). itemsRoute(list) answers GET /api/admin/items like the server.
 // globals: extra window properties (e.g. Notification and PushManager from fakePushBrowser below).
+// now: "2026-11-11T23:50" gives the page a fake Date (local time) that page.setNow(t) moves; storage: extra
+// localStorage entries at load.
+//   page.alerts → texts passed to alert(); page.wake() fires visibilitychange; page.tick() runs the setInterval
+//   callbacks; page.rendered(id) parses what admin.js wrote into #id; page.tap(id, selector) clicks an element in
+//   it (the event reaches #id's delegated listener); page.text(id) its visible text; page.submit("edit-form")
+//   submits a form; page.field(name) is an editor field (the same object admin.js reads).
 //
 //   const browser = fakePushBrowser({ permission: "default", answer: "granted", device: makeDevice("apple") });
 //   loadAdmin({ navigator: browser.navigator, globals: browser.globals })
@@ -25,6 +32,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
+import { parseDocument } from "./mini-dom.mjs";
 
 const SITE_DIR = fileURLToPath(new URL("../../viggos-barbershop/", import.meta.url));
 const HTML = readFileSync(SITE_DIR + "admin.html", "utf8");
@@ -95,10 +103,12 @@ class FakeElement {
   // <dialog> as in a browser that has it (compat.js replaces these with its shim in old browsers)
   showModal() { this.open = true; this.attrs.open = ""; }
   close() { if (!this.open) return; this.open = false; delete this.attrs.open; this.dispatch("close"); }
-  // form.elements: fields by name (only used when the editor opens)
+  // form.elements: fields by name (only used when the editor opens). The same object every time, so a test can
+  // type into page.$("edit-form").elements.note and admin.js reads it.
   get elements() {
     const doc = this.ownerDocument;
-    return new Proxy({}, { get: (o, name) => (typeof name === "string" ? (o[name] = o[name] || new FakeElement(doc, "input", "", "")) : undefined) });
+    if (!this._elements) this._elements = new Proxy({}, { get: (o, name) => (typeof name === "string" ? (o[name] = o[name] || new FakeElement(doc, "input", "", "")) : undefined) });
+    return this._elements;
   }
 }
 
@@ -138,10 +148,55 @@ const storage = (init = {}) => {
   return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), _map: m };
 };
 
-export async function loadAdmin({ routes = {}, token = "test-admin-token", navigator = {}, confirm = () => true, oldBrowser = false, execCommand, queryCommandSupported, globals = {}, search = "" } = {}) {
+// A Date whose «now» the test sets: new Date() and Date.now() give it; new Date(y, m, d, …) and new Date(string)
+// work as usual. Times without a zone ("2026-11-11T23:50") are local time, like admin.js's own dates.
+export function fakeDate(start) {
+  const Real = Date;
+  const clock = { ms: typeof start === "number" ? start : Real.parse(start) };
+  if (Number.isNaN(clock.ms)) throw new Error("fakeDate: bad start " + start);
+  class FakeDate extends Real {
+    constructor(...a) { if (a.length === 0) super(clock.ms); else super(...a); }
+    static now() { return clock.ms; }
+  }
+  return { Date: FakeDate, set: (t) => { clock.ms = typeof t === "number" ? t : Real.parse(t); }, now: () => clock.ms };
+}
+
+// Routes for the network cases (RC2): a route that never answers, one that fails the way browsers do when the
+// connection drops (Safari: «Load failed», Chrome: «Failed to fetch»), and one the test answers later:
+//   const h = held(); routes: { "POST /api/admin/items": h.route } … h.release({ status: 409, body }) / h.fail()
+export const hang = () => () => new Promise(() => {});
+export const netFail = (message = "Failed to fetch") => () => { throw new TypeError(message); };
+export function held() {
+  const waiting = [];
+  return {
+    route: (call) => new Promise((resolve, reject) => { waiting.push({ call, resolve, reject }); }),
+    get calls() { return waiting.map((w) => w.call); },
+    pending: () => waiting.length,
+    release(answer) { const w = waiting.shift(); if (!w) throw new Error("held: nothing is waiting"); w.resolve(answer); },
+    fail(message = "Load failed") { const w = waiting.shift(); if (!w) throw new Error("held: nothing is waiting"); w.reject(new TypeError(message)); },
+  };
+}
+
+// GET /api/admin/items as the server answers it: the items between ?from and ?to, sorted by date and start, with
+// the config. list may be an array the test changes later, or a function returning one.
+export const ADMIN_CONFIG = { hours: { 0: null, 1: [600, 1080], 2: [600, 1080], 3: [600, 1080], 4: [600, 1080], 5: [600, 1080], 6: [600, 1020] }, durations: { Herreklipp: 30, "Full service": 60 }, addons: ["Vask langt hår"] };
+export function itemsRoute(list, config = ADMIN_CONFIG) {
+  return (call) => {
+    const q = new URL(call.url, "https://viggos.test").searchParams;
+    const from = q.get("from"), to = q.get("to") || from;
+    const all = typeof list === "function" ? list() : list;
+    const items = all.filter((i) => i.date >= from && i.date <= to).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.start - b.start));
+    return { from, to, items: JSON.parse(JSON.stringify(items)), config };
+  };
+}
+
+export async function loadAdmin({ routes = {}, token = "test-admin-token", navigator = {}, confirm = () => true, oldBrowser = false, execCommand, queryCommandSupported, globals = {}, search = "", now, storage: stored = {} } = {}) {
   const doc = makeDocument();
   const calls = [];
   const confirms = [];
+  const alerts = [];
+  const intervals = [];
+  const clockDate = now === undefined ? null : fakeDate(now);
   if (execCommand) doc.execCommand = (cmd) => { doc.execCommandCalls.push(cmd); return execCommand(cmd, doc); };
   if (queryCommandSupported) doc.queryCommandSupported = queryCommandSupported;
   const all = {
@@ -159,7 +214,7 @@ export async function loadAdmin({ routes = {}, token = "test-admin-token", navig
       return { ok: res.status >= 200 && res.status < 300, status: res.status, json: () => Promise.resolve(JSON.parse(JSON.stringify(res.body))) };
     });
   };
-  const local = storage(token ? { "viggo-admin-token": token } : {});
+  const local = storage(Object.assign({}, stored, token ? { "viggo-admin-token": token } : {}));
   // A fake clock for setTimeout/clearTimeout: callbacks run only when the test calls advance(ms)
   const clock = { now: 0, seq: 0, pending: [] };
   const setTimeoutFake = (fn, ms) => { const id = ++clock.seq; clock.pending.push({ id, at: clock.now + Math.max(0, Number(ms) || 0), fn }); return id; };
@@ -168,7 +223,9 @@ export async function loadAdmin({ routes = {}, token = "test-admin-token", navig
     document: doc, navigator, fetch, localStorage: local, sessionStorage: storage(),
     setTimeout: setTimeoutFake, clearTimeout: clearTimeoutFake,
     confirm: (text) => { confirms.push(text); return confirm(text); },
-    setInterval: () => 0, clearInterval: () => {}, console,
+    alert: (text) => { alerts.push(String(text)); },
+    setInterval: (fn, ms) => { intervals.push({ fn, ms }); return intervals.length; }, clearInterval: () => {}, console,
+    ...(clockDate ? { Date: clockDate.Date } : {}),
     atob: (s) => Buffer.from(String(s), "base64").toString("latin1"),
     Event: class Event { constructor(type) { this.type = type; } },
     location: { pathname: "/admin", search, href: "https://viggos.test/admin" + search },
@@ -193,7 +250,27 @@ export async function loadAdmin({ routes = {}, token = "test-admin-token", navig
     await flush();
   };
   await flush();
-  return { doc, $: (id) => doc.byId.get(id), calls, confirms, missing: doc.missing, local, flush, advance, timers: () => clock.pending.length, context };
+  // The HTML admin.js wrote into an element, parsed (mini-dom), so a test can query it like a page
+  const rendered = (id) => parseDocument(`<div id="__root">${doc.byId.get(id).innerHTML}</div>`).getElementById("__root");
+  // A click on something admin.js drew inside #id (e.g. a card in #timeline): the event reaches #id's listener
+  // with that element as target, as event delegation in a browser would
+  const tap = (id, selector) => {
+    const el = rendered(id).querySelector(selector);
+    if (!el) throw new Error(`tap: nothing matches ${selector} in #${id}`);
+    doc.byId.get(id).dispatch("click", { target: el });
+    return el;
+  };
+  // The tab comes back to the front (visibilitychange), and the 30-s timer fires
+  const wake = () => { doc.hidden = false; (doc.listeners.visibilitychange || []).forEach((fn) => fn({ type: "visibilitychange" })); };
+  const tick = () => intervals.forEach((t) => t.fn());
+  // The visible text of what admin.js drew into #id, whitespace collapsed
+  const text = (id) => rendered(id).textContent.replace(/\s+/g, " ").trim();
+  return {
+    doc, $: (id) => doc.byId.get(id), calls, confirms, alerts, missing: doc.missing, local, flush, advance, timers: () => clock.pending.length, context,
+    rendered, tap, wake, tick, text, setNow: (t) => { if (!clockDate) throw new Error("loadAdmin: pass now to set the clock"); clockDate.set(t); },
+    submit: (id = "edit-form") => doc.byId.get(id).dispatch("submit", { submitter: doc.byId.get(id === "login-form" ? "pw" : "save") }),
+    field: (name) => doc.byId.get("edit-form").elements[name],
+  };
 }
 
 // A browser with service worker and Web Push (Chrome, Firefox, Safari 16+, iPhone Home Screen app on iOS 16.4+), or,
