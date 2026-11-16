@@ -2,7 +2,7 @@
 // og to kunder kan aldri få samme tid (konfliktsikker skriving i Netlify Blobs).
 // Hver ny bestilling gir et varsel på Viggos telefon/PC (Web Push, netlify/lib/push.mjs). Varselet sendes etter at
 // timen er lagret, og får aldri felle bestillingen eller holde igjen svaret mer enn BOOKING_PUSH_WAIT_MS.
-import { liveDeps, bookingStore, afterResponse } from "../lib/runtime.mjs";
+import { liveDeps, bookingStore, afterResponse, isRetiredDeploy, retiredResponse } from "../lib/runtime.mjs";
 import { validateCustomer, createItem } from "../lib/booking-core.mjs";
 import { takeBookingSlot, releaseBookingSlot } from "../lib/limits.mjs";
 import { notifyNewBooking, pushToDevices, bookingsPausedMessage, pushGen, BOOKING_PUSH_WAIT_MS } from "../lib/push.mjs";
@@ -11,6 +11,7 @@ const json = (body, status = 200) => Response.json(body, { status, headers: { "C
 
 // deps: se netlify/lib/runtime.mjs (testene sender inn falsk lagring, miljø, klokke og fetch)
 export async function handle(req, context, deps) {
+  if (isRetiredDeploy(context)) return retiredResponse(); // en gammel permalenke skriver aldri i timeboken (F10)
   if (req.method !== "POST") return json({ error: "Bruk POST." }, 405);
   // Bare JSON fra vår egen side. En annen nettside kan ikke sende JSON hit uten CORS-forhåndssjekk (som vi ikke
   // svarer på), så skjemaer og no-cors-kall fra fremmede sider kan ikke bestille i besøkendes navn (F2).

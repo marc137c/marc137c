@@ -24,6 +24,13 @@ export const liveDeps = () => ({
 // («bookings-preview»), så en testbestilling der aldri tar en ekte tid eller blander seg med ekte kunder.
 // Mangler context (eldre kall, tester), regnes det som ikke-produksjon: heller en tom timebok enn ekte data.
 export const isProduction = (context) => Boolean(context && context.deploy && context.deploy.context === "production");
+// En eldre produksjonsutrulling (F10/F2b): Netlify lar hver utrulling svare på sin egen permalenke
+// (<deploy-id>--<nettsted>.netlify.app) i opptil 30 dager, med koden og miljøverdiene (også ADMIN_PASSWORD) fra da den
+// ble laget, mens Netlify Blobs er felles for hele nettstedet. Den er context «production» med deploy.published
+// false. Den skal aldri skrive i eller vise den ekte timeboken: alle slike funksjoner svarer retiredResponse() før
+// de åpner en lagring (test/functions/deploy-context.test.mjs, docs/contracts/netlify.md).
+export const isRetiredDeploy = (context) => isProduction(context) && context.deploy.published === false;
+export const retiredResponse = () => Response.json({ error: "Bruk hovedsiden." }, { status: 410, headers: { "Cache-Control": "no-store" } });
 export const PRODUCTION_STORE = "bookings";
 export const PREVIEW_STORE = "bookings-preview";
 export const bookingStore = (deps, context) =>

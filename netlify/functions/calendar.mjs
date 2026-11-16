@@ -4,7 +4,7 @@
 //    admin-passordet ble byttet) gir alltid det samme 404-svaret, uten noe innhold fra timeboken, og leser ingen avtaler;
 //  - svaret mellomlagres aldri (Cache-Control: private, no-store, også for Netlifys CDN);
 //  - hemmeligheten skrives aldri til loggen.
-import { liveDeps, bookingStore } from "../lib/runtime.mjs";
+import { liveDeps, bookingStore, isRetiredDeploy, retiredResponse } from "../lib/runtime.mjs";
 import { readFeed, feedGen, tokenMatches, isTokenShaped, calendarFor } from "../lib/calendar.mjs";
 
 const PRIVATE = {
@@ -22,6 +22,7 @@ const notFound = () => text("Fant ikke kalenderen.\n", 404);
 
 // deps: se netlify/lib/runtime.mjs (testene sender inn falsk lagring og klokke)
 export async function handle(req, context, deps) {
+  if (isRetiredDeploy(context)) return retiredResponse(); // en gammel permalenke viser aldri timeboken (F10)
   if (req.method !== "GET" && req.method !== "HEAD") return text("Bruk GET.\n", 405, { Allow: "GET, HEAD" });
   const m = /^\/api\/calendar\/([^/]+?)(?:\.ics)?\/?$/.exec(new URL(req.url).pathname);
   const given = m ? m[1] : "";

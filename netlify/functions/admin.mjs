@@ -19,7 +19,7 @@
 //   POST   /api/admin/push/reset                        ingen enhet får varsler før de slås på igjen ({ devices: 0 })
 // Enhetene er knyttet til ADMIN_PASSWORD: bytter Viggo passordet, får ingen av de gamle enhetene flere varsler.
 // En enhet slått på med en kort innlogging («Hold meg innlogget» av) får varsler bare til den innloggingen går ut.
-import { liveDeps, bookingStore } from "../lib/runtime.mjs";
+import { liveDeps, bookingStore, isRetiredDeploy, retiredResponse } from "../lib/runtime.mjs";
 import {
   CONFIG, addDays, isDate, osloNow, readMonths, validateAdmin,
   createItem, updateItem, deleteItem, checkPassword, makeToken, readToken, makeDeviceMark, verifyDeviceMark,
@@ -49,6 +49,8 @@ const PUSH_POSTS = new Set(["/api/admin/push/subscribe", "/api/admin/push/unsubs
 
 // deps: se netlify/lib/runtime.mjs (testene sender inn falsk lagring, miljø og klokke)
 export async function handle(req, context, deps) {
+  // En gammel permalenke har det gamle passordet og den gamle koden: ingen sti der, heller ikke innloggingen (F10)
+  if (isRetiredDeploy(context)) return retiredResponse();
   const password = deps.env.ADMIN_PASSWORD;
   if (!password) return json({ error: "Admin er ikke satt opp ennå: legg inn ADMIN_PASSWORD i Netlify." }, 503);
   const url = new URL(req.url);

@@ -4,13 +4,14 @@
 // og dens auth-hemmelighet stemmer (renewSubscription i netlify/lib/push.mjs). Uten dette ville serveren sendt til
 // den gamle adressen, fått 410 og slettet enheten, og Viggo hadde ikke fått varsel om nye bestillinger før han åpnet
 // timeboken igjen. Svaret sier aldri noe om enhetene: 200 { ok: true } eller en feil.
-import { liveDeps, bookingStore } from "../lib/runtime.mjs";
+import { liveDeps, bookingStore, isRetiredDeploy, retiredResponse } from "../lib/runtime.mjs";
 import { parseSubscription, renewSubscription, pushGen } from "../lib/push.mjs";
 
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
 // deps: se netlify/lib/runtime.mjs (testene sender inn falsk lagring, miljø og klokke)
 export async function handle(req, context, deps) {
+  if (isRetiredDeploy(context)) return retiredResponse(); // en gammel permalenke skriver aldri i timeboken (F10)
   if (req.method !== "POST") return json({ error: "Bruk POST." }, 405);
   // Bare JSON fra vår egen side (service workeren er på samme nettsted)
   if (!/^application\/json\b/i.test(req.headers.get("content-type") || "")) return json({ error: "Bruk JSON.", code: "bad_content_type" }, 415);
