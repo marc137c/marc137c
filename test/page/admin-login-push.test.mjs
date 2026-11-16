@@ -126,3 +126,42 @@ test("login push: logging in hides it, and a slow lookup never shows it over the
   assert.equal(page.$("app").hidden, false);
   assert.equal(shown(page), false);
 });
+
+// Notify leftover (major): every subscription ends with its login (step 2). When that end has passed, the server
+// sends nothing any more (after one last notice without customer data), so the login page must not say they are
+// still on. The device remembers the end the server gave (localStorage), and says when they stopped.
+test("login push: after the login the notifications were turned on with has run out, the login page says they stopped", async () => {
+  const device = makeDevice("fcm");
+  const b = fakePushBrowser({ device, permission: "granted", subscribed: KEY_BYTES });
+  let expired = false;
+  const until = "2026-11-17T02:46:00";
+  const page = await loadAdmin({ now: "2026-11-16T14:46", navigator: b.navigator, globals: b.globals, routes: {
+    "GET /api/admin/items": () => (expired ? EXPIRED : { items: [], config: { hours: {}, durations: {}, addons: [] } }),
+    "GET /api/admin/push": () => (expired ? EXPIRED : { publicKey: SERVER_KEY, devices: 1 }),
+    "POST /api/admin/push/subscribe": () => ({ ok: true, devices: 1, until: new Date(until).toISOString() }),
+  } });
+  await page.flush();
+  assert.ok(page.calls.some((c) => c.path === "/api/admin/push/subscribe"), "the start-up sync gave the server the subscription");
+  // 13 hours later the 12-hour login has run out
+  page.setNow("2026-11-17T03:46");
+  expired = true;
+  page.wake();
+  await page.flush();
+  assert.ok(loginShown(page));
+  assert.ok(shown(page));
+  const text = page.$("login-push-msg").textContent;
+  assert.equal(text, "Varslene her stoppet da innloggingen gikk ut (kl. 02:46). Logg inn igjen for å få dem.");
+  assert.doesNotMatch(text, /fortsatt/);
+  assert.equal(page.$("login-push-off").hidden, false, "«Slå av varsler her» stays, as optional clean-up");
+});
+
+test("login push: before that end (the barber logged out and kept them), it still says they are on", async () => {
+  const device = makeDevice("fcm");
+  const b = fakePushBrowser({ device, permission: "granted", subscribed: KEY_BYTES });
+  const note = JSON.stringify({ endpoint: device.endpoint, until: "2026-11-17T02:46:00.000Z" });
+  const page = await loadAdmin({ now: "2026-11-16T14:46", token: null, storage: { "viggo-push": note }, navigator: b.navigator, globals: b.globals });
+  assert.equal(page.$("login-push-msg").textContent, ON_TEXT);
+  // A note about another (older) subscription says nothing about this one
+  const other = await loadAdmin({ now: "2026-12-30T14:46", token: null, storage: { "viggo-push": JSON.stringify({ endpoint: "https://fcm.googleapis.com/fcm/send/old", until: "2026-11-17T02:46:00.000Z" }) }, navigator: b.navigator, globals: b.globals });
+  assert.equal(other.$("login-push-msg").textContent, ON_TEXT);
+});

@@ -90,6 +90,26 @@
   // fanen ble lukket, eller Viggo logget ut uten å slå dem av): det står der, med «Slå av varsler her». Knappen
   // trenger ingen innlogging: nettleseren avslutter abonnementet, push-tjenesten svarer 410 neste gang, og serveren
   // sletter enheten.
+  // Det denne enheten husker om sine egne varsler (egen nøkkel i localStorage, alltid i try/catch):
+  // { endpoint, until } når serveren har tatt imot abonnementet (until: når innloggingen det ble slått på med, går
+  // ut), { endpoint, lost: true } når nettleseren eller push-tjenesten har mistet det. Fjernes når Viggo slår av
+  // varslene her. Slik kan innloggingssiden og timeboken si sannheten om varslene på denne enheten.
+  const NOTE_KEY = "viggo-push";
+  function getNote() {
+    try {
+      const v = JSON.parse(localStorage.getItem(NOTE_KEY) || "null");
+      return v && typeof v === "object" && typeof v.endpoint === "string" ? v : null;
+    } catch (e) { return null; }
+  }
+  const putNote = (v) => { try { localStorage.setItem(NOTE_KEY, JSON.stringify(v)); } catch (e) { /* privat modus */ } };
+  const clearNote = () => { try { localStorage.removeItem(NOTE_KEY); } catch (e) { /* privat modus */ } };
+  // Er tiden varslene her gjaldt til, ute? (bare for dette abonnementet)
+  function noteEnded(sub) {
+    const n = getNote();
+    const t = n && n.endpoint === sub.endpoint && n.until ? Date.parse(n.until) : NaN;
+    return isNaN(t) || t > Date.now() ? null : n.until;
+  }
+
   let loginPushSeq = 0;
   let loginPushSub = null;
   function loginPushMsg(text, kind) {
@@ -107,7 +127,12 @@
     return thisDeviceSubscription().then((sub) => {
       if (seq !== loginPushSeq || !sub || $("login").hidden) return;
       loginPushSub = sub;
-      loginPushMsg("Denne enheten har fortsatt varsler om nye bestillinger slått på.", "info");
+      // Innloggingen varslene ble slått på med, har gått ut: serveren sender ikke flere (bare ett siste varsel uten
+      // kundedata), så siden sier at de har stoppet. «Slå av varsler her» står likevel, for å rydde i nettleseren.
+      const ended = noteEnded(sub);
+      loginPushMsg(ended
+        ? `Varslene her stoppet da innloggingen gikk ut (${untilText(ended)}). Logg inn igjen for å få dem.`
+        : "Denne enheten har fortsatt varsler om nye bestillinger slått på.", "info");
       $("login-push-off").hidden = false;
       $("login-push-off").disabled = false;
       $("login-push").hidden = false;
@@ -125,6 +150,7 @@
       if (seq !== loginPushSeq) return;
       if (!ok) return loginPushMsg("Kunne ikke slå av varslene her. Slå av varsler for denne siden i nettleserens innstillinger.");
       loginPushSub = null;
+      clearNote();
       btn.hidden = true;
       loginPushMsg("Varsler om nye bestillinger er slått av på denne enheten.", "ok");
     });
@@ -864,7 +890,11 @@
     return true;
   }
   // JSON.stringify bruker PushSubscription.toJSON(): { endpoint, expirationTime, keys: { p256dh, auth } }
-  const saveSub = (sub) => api("/api/admin/push/subscribe", { method: "POST", body: JSON.stringify({ subscription: sub }) });
+  // Serveren har tatt imot abonnementet: enheten husker adressen og hvor lenge det gjelder (until)
+  const saveSub = (sub) => api("/api/admin/push/subscribe", { method: "POST", body: JSON.stringify({ subscription: sub }) }).then((res) => {
+    putNote(res && res.until ? { endpoint: sub.endpoint, until: res.until } : { endpoint: sub.endpoint });
+    return res;
+  });
   function swRegistration() {
     const c = sw();
     if (!c) return Promise.reject(new Error("Denne nettleseren kan ikke vise varsler."));
@@ -1008,6 +1038,7 @@
     sub.unsubscribe().catch(() => false).then((ok) => {
       if (!ok) throw Object.assign(new Error("Kunne ikke slå av varsler her. Prøv igjen."), { user: true });
       pushState.sub = null;
+      clearNote();
       return api("/api/admin/push/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint }) }).then((res) => {
         if (seq !== pushSeq) return;
         pushShow("off", res.devices);
@@ -1105,7 +1136,7 @@
       if (!sub) return done;
       const yes = confirm("Slå av varsler om nye bestillinger på denne enheten også?\n\nOK: varslene slås av her (lurt på en lånt eller delt telefon eller PC).\nAvbryt: du får fortsatt varsel om nye bestillinger her, også når du er logget ut.");
       if (!yes) return done; // innloggingssiden sier at varslene fortsatt er på, med «Slå av varsler her»
-      return turnOffHere(sub).then((stopped) => (stopped
+      return turnOffHere(sub).then((stopped) => { if (stopped) clearNote(); return stopped; }).then((stopped) => (stopped
         ? ["Du er logget ut, og varsler om nye bestillinger er slått av på denne enheten.", "ok"]
         : ["Du er logget ut, men varslene på denne enheten kunne ikke slås av nå. Slå av varsler for denne siden i nettleserens innstillinger.", ""]));
     }).catch(() => done).then((msg) => {
