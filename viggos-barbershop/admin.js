@@ -429,6 +429,7 @@
     E.cancelled.checked = v.status === "cancelled";
     $("edit-msg").textContent = "";
     syncType();
+    floodCheck(item);
     dlg.showModal();
     (item ? E.start : v.type === "block" ? E.dur : E.service).focus();
   }
@@ -560,10 +561,53 @@
   }
   f.addEventListener("submit", (e) => { e.preventDefault(); save(); });
 
+  // ---------- Mange falske nettbestillinger fra ett nummer (X2.4) ----------
+  // Et telefonnummer uansett skrivemåte, som phoneKey() på serveren: bare sifre, uten +47/0047 foran
+  const phoneKey = (p) => {
+    const d = String(p == null ? "" : p).replace(/\D/g, "");
+    if (d.length === 12 && d.indexOf("0047") === 0) return d.slice(4);
+    if (d.length === 10 && d.indexOf("47") === 0) return d.slice(2);
+    return d;
+  };
+  // Nettbestillingene fra dette nummeret fra i dag og 92 dager frem (det samme som POST /api/admin/cancel-phone avlyser)
+  let flood = null; // { sheet, phone, n }
+  function floodCheck(it) {
+    const btn = $("cancel-phone");
+    btn.hidden = true;
+    flood = null;
+    if (!it || it.type !== "booking" || it.source !== "nettside" || phoneKey(it.phone).length < 8) return;
+    const sheet = sheetSeq, key = phoneKey(it.phone), today = todayIso();
+    api(`/api/admin/items?from=${today}&to=${addDays(today, 92)}`).then((r) => {
+      if (sheet !== sheetSeq || !dlg.open) return;
+      const n = (r.items || []).filter((i) => i.type === "booking" && i.source === "nettside" && active(i) && i.date >= today && phoneKey(i.phone) === key).length;
+      if (n < 2) return;
+      flood = { sheet, phone: it.phone, n };
+      btn.textContent = `Avlys alle nettbestillinger fra ${it.phone} (${n})`;
+      btn.hidden = false;
+    }, () => {});
+  }
+  $("cancel-phone").addEventListener("click", () => {
+    const fl = flood;
+    const btn = $("cancel-phone");
+    if (!fl || fl.sheet !== sheetSeq || btn.disabled) return;
+    if (!confirm(`Avlyse alle ${fl.n} nettbestillingene fra ${fl.phone} fra i dag og fremover?\n\nDe blir merket «Avlyst», og tidene blir ledige igjen. Kundene får ingen beskjed.`)) return;
+    btn.disabled = true;
+    api("/api/admin/cancel-phone", { method: "POST", body: JSON.stringify({ phone: fl.phone }) }).then((r) => {
+      const n = Number(r.cancelled) || 0;
+      if (fl.sheet === sheetSeq && dlg.open) dlg.close();
+      alert(`${n} ${n === 1 ? "nettbestilling" : "nettbestillinger"} fra ${fl.phone} er avlyst. Kundene har ikke fått beskjed.`);
+      return load();
+    }).catch((err) => {
+      if (err.status === 401) return;
+      if (fl.sheet === sheetSeq && dlg.open) $("edit-msg").textContent = errText(err);
+      else alert(`Ble ikke avlyst (${fl.phone}): ${errText(err)}`);
+    }).then(() => { btn.disabled = false; });
+  });
+
   $("delete").addEventListener("click", () => {
     const it = state.editing;
     if (!it) return;
-    const what = it.type === "block" ? "blokkeringen" : `avtalen med ${it.name || "kunden"}`;
+    const what = it.type === "block" ? "blokkeringen" : `avtalen med ${it.name || "kunden"}${it.phone ? ` (${it.phone})` : ""}`;
     if (!confirm(`Slette ${what} ${fmt(it.date, { day: "numeric", month: "long" })} kl. ${hhmm(it.start)} for godt?\n\nTips: huk av «Avlyst» i stedet hvis du vil ha historikken.`)) return;
     api(`/api/admin/items/${encodeURIComponent(it.id)}`, { method: "DELETE" }).then(() => {
       dlg.close();

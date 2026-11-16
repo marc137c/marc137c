@@ -95,6 +95,8 @@
       </div>
       <label>Notat <textarea name="note" rows="2" placeholder="Valgfritt – f.eks. «lunsj» eller «ferie»"></textarea></label>
       <label class="check only-booking only-edit"><input type="checkbox" name="cancelled"> Avlyst (tiden blir ledig igjen)</label>
+      <!-- Vises for en nettbestilling når samme nummer har flere nettbestillinger fra i dag (en flom av falske) -->
+      <button class="btn btn-ghost only-booking only-edit cancel-phone" type="button" id="cancel-phone" hidden></button>
       <p class="msg" id="edit-msg" role="alert"></p>
       <div class="sheet-actions">
         <button class="btn btn-danger only-edit" type="button" id="delete">Slett</button>

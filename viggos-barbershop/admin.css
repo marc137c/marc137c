@@ -127,6 +127,7 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 .addons label { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: .92rem; }
 .addons input { width: 18px; min-height: 18px; height: 18px; accent-color: var(--gold); }
 .sheet-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cancel-phone { justify-self: start; white-space: normal; text-align: left; }
 
 /* Oppsett: kalender på telefonen og varsler på denne enheten */
 .sheet-body { display: grid; grid-gap: 14px; gap: 14px; padding: 22px; }
