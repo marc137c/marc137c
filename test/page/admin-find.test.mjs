@@ -87,3 +87,33 @@ test("find X2.1: a web booking's card says when it was booked", async () => {
   const page = await loadAdmin({ now: "2026-11-20T09:00", routes: { "GET /api/admin/items": itemsRoute(list) } });
   assert.match(page.text("timeline"), /Bestilt på nett 12\.11\. kl\. \d\d:05/);
 });
+
+// Round 2 (probe-find S1, S2): the query type came from a Latin-letter regex, so «Мария» and «محمد» were refused,
+// and +47 was stripped only from a whole number, so «+47 911 22» searched «4791122» and found nothing. Guard (SPEC
+// R25): a table of queries against stored data, for every script and every way to type part of a number.
+const intl = [
+  item("2026-11-28", 600, 30, { name: "Мария Иванова", phone: "455 66 777" }),
+  item("2026-11-28", 660, 30, { name: "محمد علي", phone: "466 77 888" }),
+  item("2026-11-28", 720, 30, { name: "Zoë Ærø", phone: "477 88 999" }),
+  item("2026-11-28", 780, 30, { name: "Kari Nordmann", phone: "911 22 333" }),
+];
+const QUERIES = [
+  ["Мария", "Мария Иванова"], ["иван", "Мария Иванова"], ["محمد", "محمد علي"], ["zoë", "Zoë Ærø"], ["ærø", "Zoë Ærø"],
+  ["+47 911 22", "Kari Nordmann"], ["0047 911 22", "Kari Nordmann"], ["+4791122", "Kari Nordmann"], ["911 22", "Kari Nordmann"],
+  ["+47 911 22 333", "Kari Nordmann"], ["91122333", "Kari Nordmann"], ["4791122333", "Kari Nordmann"], ["(911) 22-333", "Kari Nordmann"],
+];
+for (const [q, who] of QUERIES) {
+  test(`find round 2: '${q}' finds ${who}`, async () => {
+    const page = await loadAdmin({ now: TODAY + "T09:00", routes: { "GET /api/admin/items": itemsRoute(intl) } });
+    const hits = await find(page, q);
+    assert.equal(hits.length, 1, `${q}: ${page.rendered("hits").textContent}`);
+    assert.match(hits[0].textContent, new RegExp(who));
+  });
+}
+test("find round 2: fewer than 4 digits of a number still asks for more («+47 91», «0047 9»)", async () => {
+  const page = await loadAdmin({ now: TODAY + "T09:00", routes: { "GET /api/admin/items": itemsRoute(intl) } });
+  for (const q of ["+47 91", "0047 9", "911"]) {
+    await find(page, q);
+    assert.equal(page.rendered("hits").textContent.trim(), "Skriv minst 4 sifre av telefonnummeret, eller en del av navnet.", q);
+  }
+});

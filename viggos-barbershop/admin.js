@@ -734,7 +734,10 @@
     const seq = ++findSeq;
     hits = [];
     if (!q) return hitsMsg("");
-    const byName = /[a-zæøåäöü]/i.test(q), digits = phoneKey(q);
+    // Et nummer (bare sifre, mellomrom, +, (), punktum og bindestrek) søkes som telefon, alt annet som navn, på hvilket
+    // som helst skriftsystem. +47/0047 foran tas bort også fra en del av et nummer («+47 911 22»), før sifrene (runde 2).
+    const phoneLike = /^[\d\s+().-]+$/.test(q);
+    const byName = !phoneLike, digits = phoneKey(q.replace(/^\s*(?:\+|00)\s*47/, ""));
     if (!byName && digits.length < 4) return hitsMsg("Skriv minst 4 sifre av telefonnummeret, eller en del av navnet.");
     hitsMsg("Søker …");
     const today = todayIso(), name = q.toLowerCase();
