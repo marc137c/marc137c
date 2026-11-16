@@ -1,6 +1,7 @@
 // Bestillingskalender: velg tjeneste → dag → tid → navn og telefon.
-// Opptatte tider hentes fra /api/availability og vises som «Opptatt». Bestillingen lagres i
-// /api/bookings (tiden låses med en gang), og sendes i tillegg til Netlify Forms som e-postvarsel.
+// Opptatte tider hentes fra /api/availability og vises som «Opptatt». Bestillingen sendes som JSON til
+// /api/bookings, som låser tiden med en gang. Ingen kopi sendes noe annet sted (eierens beslutning D2).
+// Svarer ikke bookingsystemet, eller svarer det noe vi ikke kan stole på, får kunden beskjed om å ringe (D3).
 // Bruker HOURS fra script.js, så kalenderen alltid følger åpningstidene.
 (() => {
   const SLOT_MIN = 30;     // en ny time hvert 30. minutt
@@ -30,7 +31,6 @@
   const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const sameDay = (a, b) => a && b && a.getTime() === b.getTime();
   const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  const hhmm = (min) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
   const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 
   const state = { date: null, time: null, view: null };
@@ -243,22 +243,6 @@
   }
   const refresh = () => loadAvailability().then(() => { if (!state.view) initView(); renderAll(); });
 
-  // Skjemaet som tekst til Netlify Forms. Samme regler som FormData, men uten å kreve at FormData
-  // kan itereres (det kan den ikke i Safari før 11.1) eller at URLSearchParams finnes (Safari før 10.1).
-  const enc = (v) => { try { return encodeURIComponent(v); } catch (e) { return encodeURIComponent(String(v).replace(/[\uD800-\uDFFF]/g, "\uFFFD")); } };
-  const encodeForm = (f) => Array.prototype.slice.call(f.elements)
-    .filter((el) => el.name && !el.disabled && !/^(submit|button|reset|file)$/.test(el.type) &&
-      (!/^(checkbox|radio)$/.test(el.type) || el.checked))
-    .map((el) => (enc(el.name) + "=" + enc(el.value)).replace(/%20/g, "+"))
-    .join("&");
-
-  // E-postvarsel til barbershopen via Netlify Forms (skjemaet «booking»)
-  const notify = () => fetch("/", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: encodeForm(form),
-  });
-
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     const s = I18N.s();
@@ -273,11 +257,7 @@
     if (!nameOk(name.value)) return fail((t) => t.needName, name);
     if (!phoneOk(phone.value)) return fail((t) => t.needPhone, phone);
 
-    // Det barbershopen ser i e-posten: dato (ÅÅÅÅ-MM-DD), tid (24 t), tjeneste og tillegg på norsk
     const addons = Array.prototype.map.call(form.querySelectorAll(".addon-picks input:checked"), (c) => c.value);
-    $("f-dato").value = iso(state.date);
-    $("f-tid").value = hhmm(state.time);
-    $("f-tillegg").value = addons.join(", ");
 
     const btn = form.querySelector("button[type=submit]");
     btn.disabled = true;
@@ -302,12 +282,7 @@
       }),
     }).catch(() => null).then((res) => {
       if (res && res.ok) {
-        return res.json().catch(() => ({})).then((data) => {
-          // E-posten sier tydelig at timen allerede er lagret i timeboken
-          $("f-status").value = "BOOKET – lagret i timeboken" + (data.booking && data.booking.id ? ` (id ${data.booking.id})` : "");
-          notify().catch(() => {});
-          return loadAvailability();
-        }).then(() => { done((t) => t.booked(whenFor(t))); });
+        return loadAvailability().then(() => { done((t) => t.booked(whenFor(t))); });
       }
       if (res && res.status === 409) {
         // Noen andre rakk å ta tiden: vis oppdatert kalender
@@ -318,16 +293,13 @@
         });
       }
       if (res && res.status >= 400 && res.status < 500 && res.status !== 404) {
-        return res.json().catch(() => ({})).then((data) => { fail(ERR[data.code] || ((t) => t.sendFailed)); });
+        return res.json().catch(() => ({})).then((data) => { fail(ERR[data.code] || ((t) => t.notSaved)); });
       }
-      // Bookingsystemet svarer ikke: send som forespørsel på e-post i stedet
-      $("f-status").value = "FORESPØRSEL – IKKE lagret. Legg den inn i /admin og bekreft med kunden.";
-      return notify().then((r) => {
-        if (!r.ok) throw new Error(r.status);
-        done((t) => t.sent(whenFor(t)));
-      });
+      // 404: bookingsystemet finnes ikke her, så ingenting ble lagret. Ellers (ingen svar, nettfeil, serverfeil)
+      // vet vi ikke om timen ble lagret. Begge ganger: ring oss, og skjemaet beholder alt kunden har valgt og skrevet.
+      setMsg("err", (t) => (res && res.status === 404 ? t.notSaved : t.uncertain));
     }).catch(() => {
-      setMsg("err", (t) => t.sendFailed);
+      setMsg("err", (t) => t.uncertain);
     }).then(() => {
       btn.disabled = false;
     });

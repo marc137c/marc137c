@@ -146,11 +146,21 @@ test("config-sync: the README durations sentence names exactly the 60-min servic
   others.forEach((k) => assert.equal(CONFIG.durations[k], 30, `'alle andre 30 min' is true for ${k}`));
 });
 
+// The harness imports CONFIG instead of copying it (step 3a), so it cannot drift. This checks the values it
+// exports and that its fake server starts from them, and still checks literals if a copy ever comes back.
 const HARNESS = join(ROOT, "test", "client", "booking-harness.mjs");
 test("config-sync: the client booking harness uses CONFIG's hours and durations",
-  { skip: existsSync(HARNESS) ? false : "test/client/booking-harness.mjs does not exist on this branch" }, () => {
-    const h = declaredLiterals(readFileSync(HARNESS, "utf8"), "module");
-    assert.ok(h.HOURS && h.DURATIONS, "the harness declares literal HOURS and DURATIONS");
-    assert.deepEqual(h.HOURS, norm(CONFIG.hours), "harness HOURS");
-    assert.deepEqual(h.DURATIONS, norm(CONFIG.durations), "harness DURATIONS");
+  { skip: existsSync(HARNESS) ? false : "test/client/booking-harness.mjs does not exist on this branch" }, async () => {
+    const h = await import(new URL("./client/booking-harness.mjs", import.meta.url).href);
+    assert.deepEqual(norm(h.HOURS), norm(CONFIG.hours), "harness HOURS");
+    assert.deepEqual(norm(h.DURATIONS), norm(CONFIG.durations), "harness DURATIONS");
+    const server = new h.FakeServer(() => Date.parse("2026-11-12T09:00:00Z"));
+    assert.deepEqual(norm(server.config.durations), norm(CONFIG.durations), "fake server durations");
+    assert.deepEqual(norm(server.config.hours), norm(CONFIG.hours), "fake server hours");
+    assert.equal(server.config.slotMin, CONFIG.slotMin);
+    assert.equal(server.config.leadMin, CONFIG.leadMin);
+    assert.equal(server.config.maxDays, CONFIG.maxDays);
+    const lit = declaredLiterals(readFileSync(HARNESS, "utf8"), "module");
+    if (lit.HOURS) assert.deepEqual(lit.HOURS, norm(CONFIG.hours), "a literal HOURS in the harness");
+    if (lit.DURATIONS) assert.deepEqual(lit.DURATIONS, norm(CONFIG.durations), "a literal DURATIONS in the harness");
   });

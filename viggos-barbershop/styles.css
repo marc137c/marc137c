@@ -554,6 +554,8 @@ form.booking {
 .booking-after { text-align: center; margin-top: 26px; }
 .booking-after p { margin: 0 0 6px; color: var(--muted); }
 .booking-after a { font-weight: 700; }
+/* Uten JavaScript kan ingen bestille på nett: be om en telefon i stedet (index.html <noscript>) */
+.booking-noscript { margin: 0 0 18px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; font-weight: 600; }
 
 /* ---------- Google-anmeldelser ---------- */
 .rating-summary { display: inline-flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 8px 12px; margin-top: 16px; }

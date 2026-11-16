@@ -107,13 +107,9 @@
           <h2 data-i18n="book.title">Bestill time</h2>
         </header>
 
-        <form class="booking" id="booking-form" name="booking" method="POST" data-netlify="true" netlify-honeypot="bot-field" novalidate>
-          <input type="hidden" name="form-name" value="booking">
+        <noscript><p class="booking-noscript">Bestilling på nett krever JavaScript. Ring oss på <a href="tel:+4740963911">409 63 911</a>.</p></noscript>
+        <form class="booking" id="booking-form" method="POST" novalidate>
           <p class="hidden"><label>Ikke fyll ut: <input name="bot-field"></label></p>
-          <input type="hidden" name="dato" id="f-dato">
-          <input type="hidden" name="tid" id="f-tid">
-          <input type="hidden" name="tillegg" id="f-tillegg">
-          <input type="hidden" name="status" id="f-status">
 
           <div class="booking-col">
             <div class="step">

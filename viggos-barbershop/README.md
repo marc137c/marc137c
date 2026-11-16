@@ -4,7 +4,7 @@ Statisk nettside (HTML/CSS/JS, ingen avhengigheter). Åpne `index.html` i nettle
 
 ## Publisering på Netlify
 `netlify.toml` i roten av repoet peker Netlify til denne mappen (`publish = "viggos-barbershop"`).
-Bestillinger lagres i Netlify Blobs (lageret `bookings`) via Netlify Functions, og sendes i tillegg som e-postvarsel via Netlify Forms (skjemaet `booking`).
+Bestillinger lagres bare i Netlify Blobs (lageret `bookings`) via Netlify Functions. Ingen kopi sendes via Netlify Forms eller e-post.
 **Viktig:** Netlify-siden må bygges fra dette GitHub-repoet (Site configuration → Build & deploy → Link repository), ellers blir verken funksjonene eller timeboken publisert.
 
 ## Bedriftsinfo (bekreftet)
@@ -17,15 +17,15 @@ Bestillinger lagres i Netlify Blobs (lageret `bookings`) via Netlify Functions, 
 - **Priser og tjenester:** i `index.html` (prislisten og nedtrekkslisten i bestillingen) og engelsk tekst i `i18n.js`.
 - **Åpningstider:** `CONFIG.hours` i `netlify/lib/booking-core.mjs` styrer kalenderen og hvilke tider som kan bestilles (nettsiden henter dem derfra). Oppdater også `HOURS` i `script.js` (reserve når serveren ikke svarer), tabellen og `openingHoursSpecification` i `index.html` og engelsk tekst (`hours.wk`, `hours.sat`) i `i18n.js`.
 - **Varighet per tjeneste:** `CONFIG.durations` i `netlify/lib/booking-core.mjs` (Full service = 60 min, alle andre 30 min).
-- **Bookingvarsler:** i Netlify går du til **Forms → booking → Form notifications** og legger inn kurtivigan1@gmail.com, så kommer timeforespørslene på e-post.
+- **Bookingvarsler:** nye bestillinger ser du i timeboken (`/admin`), som varsel på telefonen og i kalenderen på telefonen (se Timebok for admin). Netlify Forms brukes ikke: slå av skjemagjenkjenning (Forms → Form detection) og slett de gamle «booking»-innsendingene i Netlify.
 
 ## Bestillingskalender
 `booking.js`: kunden velger tjeneste (og eventuelle tillegg), dag og tid, og skriver navn og telefon.
 - Kalenderen følger åpningstidene: søndager og passerte dager er stengt, tider deles i 30 minutter, i dag vises bare tider minst én time frem, og man kan bestille opptil 60 dager frem.
 - **Opptatte tider vises i rødt med «Opptatt»**, dager med noen bookinger får en gull prikk, og fullbookede dager blir røde. Tider der valgt tjeneste ikke rekker før neste avtale eller stengetid er grået ut.
 - Bestillingen lagres med en gang (`/api/bookings`). To kunder kan aldri få samme tid: den som kommer sist får beskjed om å velge en annen.
-- I tillegg sendes et e-postvarsel via Netlify Forms (feltene `tjeneste`, `tillegg`, `dato`, `tid`, `navn`, `telefon`, alltid på norsk).
-- **Bakoverkompatibelt:** svarer ikke bookingsystemet (f.eks. før funksjonene er publisert), virker kalenderen som før og sender en forespørsel via Netlify Forms.
+- Ingen kopi av bestillingen sendes noe annet sted (ikke Netlify Forms, ikke e-post).
+- **Svarer ikke bookingsystemet** (ingen svar, tidsavbrudd eller serverfeil), får kunden beskjed om at vi ikke vet om timen ble lagret, og om å ringe 409 63 911. Det kunden har valgt og skrevet blir stående i skjemaet.
 
 ## Timebok for admin (`/admin`)
 Gå til **/admin** (lenke «Admin» nederst på siden), skriv passordet og trykk Enter. «Hold meg innlogget» er på som standard, så du slipper å logge inn igjen på 60 dager, og nettleseren kan huske passordet.
