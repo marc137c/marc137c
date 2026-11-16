@@ -183,3 +183,82 @@ test("409 on a day that still has free times: «takenNow» at the time step, as 
   await site.advance(1000);
   oneMessageAt(site, "msg-time", site.s().takenNow);
 });
+
+// ---------- Fix-up round 2: the clock passes a rule between the uncertain attempt and the retry ----------
+// s2-too-early-retry.mjs: today 11:00 booked at 10:00:40, stored, reply lost; the retry at 10:01:23 (same requestId)
+// got 400 too_early because validation ran before the replay lookup, and the page said «Tiden du valgte er ikke ledig
+// lenger». The server (and this harness's FakeServer, which mirrors it) now answers the replay first; and the page
+// never turns a clock-rule «no» to an uncertain attempt's slot into a «gone» or «taken» text.
+const TODAY_11 = { service: "Herreklipp", date: "2026-11-12", time: 660, name: "Kari Nordmann", phone: "409 63 955" };
+test("pending: a stored same-day booking retried after the lead time has passed is confirmed (201 replay), and only one is stored", async () => {
+  const site = await boot({ now: "2026-11-12T10:00:40+01:00", setup: (s) => s.when((r) => r.url === "/api/bookings", (req, srv) => { srv.book(req); return { network: true }; }, 1) });
+  await site.pick(TODAY_11);
+  await site.book();
+  await site.advance(1000);
+  assert.equal(site.message(), site.s().uncertain);
+  await site.advance(42000); // 10:01:23: 11:00 is now inside the lead time
+  await site.book();
+  await site.advance(1000);
+  assert.equal(site.bookingPosts()[1].json.requestId, site.bookingPosts()[0].json.requestId);
+  assert.match(site.message(), /^Timen er booket: Herreklipp · torsdag 12\. november kl\. 11:00\./);
+  assert.equal(site.server.bookings().length, 1);
+  assert.equal(doneLines(site).length, 1);
+});
+for (const code of ["too_early", "bad_time", "bad_date", "closed"]) {
+  test(`pending: a ${code} answer to the retry of an uncertain attempt keeps it uncertain («ring oss»), never «gone»`, async () => {
+    const site = await boot({ setup: (s) => {
+      s.when((r) => r.url === "/api/bookings", (req, srv) => { srv.book(req); return { network: true }; }, 1);
+    } });
+    await site.pick(FRIDAY);
+    await site.book();
+    await site.advance(1000);
+    // an older server: validates the clock rules before it looks for the replay
+    site.server.when((r) => r.url === "/api/bookings", { status: 400, body: { error: code, code } }, 1);
+    await site.book();
+    await site.advance(1000);
+    const s = site.s();
+    for (const no of [s.timeGone, s.takenNow, s.dayGone]) assert.ok(!site.message().includes(no), site.message());
+    assert.equal(site.message(), s.uncertainStill);
+    assert.match(site.summary(), /fredag 13\. november kl\. 14:00/, "the choice is kept");
+    assert.equal(site.server.bookings().length, 1);
+  });
+}
+
+// ---------- Fix-up round 2: a customer edit between the uncertain outcome and the retry ----------
+// s3-edit-after-uncertain.mjs, s3b-service-change.mjs, s4-real-checks.mjs: the uncertainty belonged to the request,
+// so any edit made a new attempt without it, and the customer's own possibly-stored 14:00 became «someone else's».
+// Rule: the uncertainty belongs to the slot (requestId, date, start, dur) until a definite answer for that requestId.
+const EDITS = {
+  "the phone formatting": async (site) => { site.type(site.$("f-phone"), "40963955"); },
+  "a typo fixed in the name": async (site) => { site.type(site.$("f-name"), "Kari Nordman"); },
+  "an add-on ticked": async (site) => { site.click(site.qsa(".addon-picks input")[2]); await site.flush(); },
+  "the service changed to Barneklipp (also 30 min), then the 30-s refresh": async (site) => { site.choose(site.select, "Barneklipp"); await site.flush(); await site.poll(); },
+};
+for (const [label, edit] of Object.entries(EDITS)) {
+  test(`pending: after an uncertain outcome (stored), ${label}, then «Bestill time»: never «someone else» or «gone», one booking`, async () => {
+    const site = await boot({ setup: (s) => s.when((r) => r.url === "/api/bookings", (req, srv) => { srv.book(req); return { network: true }; }, 1) });
+    await site.pick(FRIDAY);
+    await site.book();
+    await site.advance(1000);
+    await edit(site);
+    const s = site.s();
+    assert.notEqual(site.message(), s.timeGone, "the edit does not drop the customer's own time");
+    assert.match(site.summary(), /kl\. 14:00/, "the time is kept");
+    await site.book();
+    await site.advance(1000);
+    for (const no of [s.timeGone, s.takenNow]) assert.ok(!site.message().includes(no), site.message());
+    const booked = /^Timen er booket/.test(site.message());
+    assert.ok(booked || site.message() === s.uncertainStill || site.message() === s.uncertain, site.message());
+    assert.equal(site.server.bookings().length, 1, "at most one booking for the customer");
+  });
+}
+test("pending: Full service uncertain at 14:00 keeps 13:30 and 14:30 busy (they overlap 14:00–15:00); only 14:00 itself stays the customer's", async () => {
+  const site = await boot({ setup: (s) => s.when((r) => r.url === "/api/bookings", (req, srv) => { srv.book(req); return { network: true }; }, 1) });
+  await site.pick({ ...FRIDAY, service: "Full service" });
+  await site.book();
+  await site.advance(1000);
+  await site.poll();
+  const at = (t) => site.slots().filter((x) => x.t === t || (x.t === null && x.text.indexOf(site.s().time(t)) === 0))[0];
+  assert.ok(site.slot(840), "14:00 is still the customer's choice");
+  for (const t of [810, 870]) assert.ok(site.slot(t) === null, `${t / 60} h: not offered as free (${JSON.stringify(at(t) && at(t).cls)})`);
+});

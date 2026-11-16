@@ -163,6 +163,8 @@
       sending: "Sender …",
       // Bestillingen: et svar vi ikke kan stole på er «uncertain», et sikkert nei er «notSaved» (eierens beslutning D3)
       uncertain: "Vi fikk ikke svar fra bookingsystemet, så vi vet ikke om timen ble lagret. Ring oss på 409 63 911 før du prøver igjen.",
+      // Et nei som kan gjelde kundens egen, kanskje lagrede time (et usikkert forsøk står fortsatt; runde 2)
+      uncertainStill: "Vi vet fortsatt ikke om den første bestillingen din ble lagret. Ring oss på 409 63 911, så sjekker vi det.",
       notSaved: "Timen ble ikke lagret. Ring oss på 409 63 911.",
       // Samme tekst for alle tre takene bak 429 (per nettverk, per nummer, alle nettbestillinger): ingen grunn som kan være feil
       rateLimited: "For mange bestillinger på nett akkurat nå. Ring oss på 409 63 911.",
@@ -223,6 +225,7 @@
       needPhone: "Please enter a valid phone number.",
       sending: "Sending …",
       uncertain: "We didn't get an answer from the booking system, so we don't know if your appointment was booked. Please call us on 409 63 911 before you try again.",
+      uncertainStill: "We still don't know whether your first booking was saved. Please call us on 409 63 911 and we'll check.",
       notSaved: "Your appointment was not booked. Please call us on 409 63 911.",
       rateLimited: "Too many online bookings right now. Please call us on 409 63 911.",
       taken: "Booked",

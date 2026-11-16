@@ -69,16 +69,30 @@
   const dayOpen = (d) => d >= today() && d <= lastDay() && !isClosed(d);
 
   const duration = () => DURATIONS[select.value] || SLOT_MIN;
-  // Et forsøk med usikkert utfall (attempt.uncertain) kan være lagret: da er det opptatte tidsrommet akkurat der
-  // kundens egen time, ikke en annens. Mens det står, regnes det tidsrommet som ledig for kunden, og ingen
-  // bakgrunnshendelse (30-s oppdatering, tilbake til fanen, språkbytte, et sent svar) slipper valget eller
-  // overskriver beskjeden. Neste «Bestill time» sender samme requestId, og serveren avgjør: 201 (vår) eller 409 (runde 2).
-  const pendingOn = (date) => !!attempt && attempt.uncertain === true && !!date && attempt.date === iso(date) && attempt.service === select.value;
+  // Et forsøk med usikkert utfall kan være lagret: da er det opptatte tidsrommet akkurat der kundens egen time, ikke en
+  // annens. Usikkerheten hører til tidsrommet (requestId, dato, start, varighet), ikke til forespørselen: den står til
+  // serveren har svart sikkert for den requestId-en (2xx, eller nei til akkurat den), aldri bare fordi kunden endret
+  // noe (tjeneste, navn, nummer, tillegg). Mens den står, er nettopp den starttiden den dagen ledig for kunden (uansett
+  // valgt tjeneste), tider som overlapper den er opptatt, og ingen bakgrunnshendelse (30-s oppdatering, tilbake til
+  // fanen, språkbytte, et sent svar) slipper valget. Et nei som overlapper tidsrommet, sier «vi vet fortsatt ikke»,
+  // aldri «noen andre» eller «ikke ledig lenger» (runde 2).
+  const unsettled = {}; // requestId → { date, start, dur }
+  const pendingOn = (date) => {
+    const day = date ? iso(date) : null;
+    return Object.keys(unsettled).map((k) => unsettled[k]).filter((u) => u.date === day);
+  };
+  const pendingAt = (date, start) => pendingOn(date).some((u) => u.start === start);
+  const overlapsPending = (date, start, dur, except) => Object.keys(unsettled).some((k) => {
+    const u = unsettled[k];
+    return k !== except && u.date === date && start < u.start + u.dur && u.start < start + dur;
+  });
   const isBusy = (date, start, dur) => {
-    const mine = pendingOn(date) ? [attempt.start, attempt.start + attempt.dur] : null;
-    let skipped = false;
+    const mine = pendingOn(date).filter((u) => u.start === start);
+    const used = [];
     return (busy[iso(date)] || []).some(([a, b]) => {
-      if (mine && !skipped && a === mine[0] && b === mine[1]) { skipped = true; return false; }
+      for (let i = 0; i < mine.length; i++) {
+        if (used.indexOf(i) < 0 && a === mine[i].start && b === mine[i].start + mine[i].dur) { used.push(i); return false; }
+      }
       return start < b && a < start + dur;
     });
   };
@@ -166,12 +180,14 @@
     }
     const slots = slotsFor(state.date);
     // En valgt tid som ikke er ledig lenger (tatt av en annen, passert, eller for kort for ny tjeneste) slippes, med
-    // beskjed om hvorfor ved steget (F49). Aldri et valg med et usikkert forsøk på vei (pendingOn): det avgjør serveren.
-    const pendingTime = pendingOn(state.date) && attempt.start === state.time;
+    // beskjed om hvorfor ved steget (F49). Aldri et valg med et usikkert forsøk på vei (pendingAt): det avgjør serveren.
+    // Overlapper valget et usikkert forsøk, kan grunnen være kundens egen time: si «vi vet fortsatt ikke», aldri «borte».
+    const pendingTime = pendingAt(state.date, state.time);
     if (state.time !== null && !sending && !pendingTime && !slots.some((x) => x.t === state.time && x.status === "free")) {
       const was = slots.filter((x) => x.t === state.time)[0];
+      const own = overlapsPending(iso(state.date), state.time, duration());
       state.time = null;
-      dropped.time = was && was.status === "short" ? (t) => t.tooShortPicked : (t) => t.timeGone;
+      dropped.time = own ? (t) => t.uncertainStill : was && was.status === "short" ? (t) => t.tooShortPicked : (t) => t.timeGone;
       setMsg("err", dropped.time, "time");
     }
     if (!slots.some(isFree)) {
@@ -212,10 +228,11 @@
   const renderAll = () => {
     // En valgt dag som er passert, stengt eller utenfor bestillingsvinduet mens siden sto åpen, slippes, med beskjed.
     // Ikke en dag med et usikkert forsøk på vei som ikke er passert: et nytt forsøk får serverens svar (runde 2).
-    if (state.date && !sending && !dayOpen(state.date) && !(pendingOn(state.date) && state.date >= today())) {
+    if (state.date && !sending && !dayOpen(state.date) && !(pendingOn(state.date).length && state.date >= today())) {
+      const own = pendingOn(state.date).length > 0;
       state.date = null;
       state.time = null;
-      dropped.day = (t) => t.dayGone;
+      dropped.day = own ? (t) => t.uncertainStill : (t) => t.dayGone;
       setMsg("err", dropped.day, "day");
     }
     renderCalendar(); renderSlots(); renderSummary(); renderMsg();
@@ -398,7 +415,7 @@
 
   // Samme bestilling sendt på nytt (etter et tapt svar, tidsavbrudd eller nettfeil) får samme requestId, så serveren
   // lagrer den bare én gang og svarer med timen som allerede er lagret. En endret bestilling får en ny (SPEC R1).
-  let attempt = null; // { sig, id, date, start, dur, service, uncertain }
+  let attempt = null; // { sig, id }
   let turns = 0;      // løpenummer for forsøkene
   function newRequestId() {
     let bytes = null;
@@ -465,16 +482,19 @@
       name: name.value.trim(), phone: phone.value.trim(),
     };
     const sig = JSON.stringify([body.service, body.date, body.start, body.addons, body.name, body.phone]);
-    if (!attempt || attempt.sig !== sig) attempt = { sig, id: newRequestId(), date: body.date, start: body.start, dur: duration(), service: body.service };
+    if (!attempt || attempt.sig !== sig) attempt = { sig, id: newRequestId() };
     body.botField = bot ? bot.value : "";
     body.requestId = attempt.id;
     const turn = ++turns;
     const current = () => turn === turns; // svar på et eldre forsøk overstyrer aldri beskjeden til et nyere
-    const mine = { requestId: body.requestId, service: svcValue, date: body.date };
+    const mine = { requestId: body.requestId, service: svcValue, date: body.date, start: body.start, dur: duration() };
     // Skjemaet viser fortsatt akkurat dette forsøkets valg
     const formShows = () => select.value === mine.service && !!state.date && iso(state.date) === mine.date && state.time === t0;
-    // Et sikkert svar (ja eller nei) på dette forsøket: det er ikke lenger usikkert
-    const settle = () => { if (attempt && attempt.id === mine.requestId) attempt.uncertain = false; };
+    // Et sikkert svar (ja eller nei) på dette forsøket: tidsrommet det kan ha lagret, er ikke lenger usikkert
+    const settle = () => { delete unsettled[mine.requestId]; };
+    // Prøvde dette forsøket et tidsrom som fortsatt er usikkert (det samme forsøket på nytt, eller et endret forsøk som
+    // overlapper det)? except: en requestId som ikke regnes med.
+    const doubt = (except) => overlapsPending(mine.date, mine.start, mine.dur, except);
     lock(true);
     setMsg("", (t) => t.sending);
     // Hver vei ut låser opp skjemaet først, så feilmeldingen kan flytte fokus og kunden kan rette eller prøve igjen
@@ -497,6 +517,14 @@
       }
       confirmedReq[mine.requestId] = when;
       if (attempt && attempt.id === mine.requestId) attempt = null;
+      // Det lagrede tidsrommet er nå sikkert; et usikkert forsøk som overlapper det, ble ikke lagret (serveren lagrer
+      // aldri to nettbestillinger over hverandre)
+      delete unsettled[mine.requestId];
+      const bDate = typeof b.date === "string" ? b.date : mine.date, bDur = typeof b.dur === "number" ? b.dur : mine.dur;
+      Object.keys(unsettled).forEach((k) => {
+        const u = unsettled[k];
+        if (u.date === bDate && start < u.start + u.dur && u.start < start + bDur) delete unsettled[k];
+      });
       return when;
     };
     const booked = (data) => {
@@ -516,9 +544,15 @@
     const uncertain = () => {
       const when = confirmedReq[mine.requestId]; // et tidligere svar har allerede bekreftet den
       if (when) return end(() => done((t) => t.booked(when(t))));
-      if (attempt && attempt.id === mine.requestId) attempt.uncertain = true;
+      unsettled[mine.requestId] = { date: mine.date, start: mine.start, dur: mine.dur };
       end(() => setMsg("err", (t) => t.uncertain));
     };
+    // Et nei som kan gjelde kundens egen, kanskje lagrede time: valget og usikkerheten står, og beskjeden sier at vi
+    // fortsatt ikke vet om den første ble lagret (ring oss), aldri «noen andre» eller «ikke ledig lenger»
+    const stillUnsure = () => loadAvailability().then(() => end(() => {
+      renderAll();
+      setMsg("err", (t) => t.uncertainStill);
+    }));
     // Steget for beskjeden velges ut fra hvordan siden ser ut etter at ledige tider er hentet på nytt, ikke bare fra
     // serverens kode: er dagen stengt nå (barberen blokkerte den), eller er det ingen ledig tid igjen den dagen, gjelder
     // beskjeden dagen, med fokus på en åpen dag (runde 2).
@@ -541,7 +575,16 @@
       if (ok(r)) return booked(r.data);
       // Noen andre rakk å ta tiden, eller serveren sier at tiden eller dagen ikke kan bestilles (dens klokke og regler
       // vinner): hent ledige tider på nytt, slipp valget og si hvorfor ved steget
-      if (status === 409 || data.code === "taken") return rejected("time", (t) => t.takenNow);
+      // En requestId brukt på en annen tid: kundens egen time finnes (flyttet), så aldri «noen andre»
+      if (data.code === "request_reused") { settle(); return stillUnsure(); }
+      // 409 på akkurat det usikre forsøket er et sikkert nei (serveren ser etter sin egen lagrede time før den sier
+      // «tatt»); 409 på et endret forsøk som overlapper et usikkert tidsrom, kan være kundens egen time
+      if (status === 409 || data.code === "taken") {
+        if (doubt(mine.requestId)) { settle(); return stillUnsure(); }
+        return rejected("time", (t) => t.takenNow);
+      }
+      // Klokkeregler: et nei til et usikkert tidsrom sier ingenting om det første forsøket (runde 2)
+      if (/^(too_early|bad_time|bad_date|closed)$/.test(data.code || "") && doubt()) return stillUnsure();
       if (data.code === "too_early" || data.code === "bad_time") return rejected("time", (t) => t.timeGone);
       if (data.code === "bad_date" || data.code === "closed") return rejected("day", (t) => t.dayGone);
       // For mange bestillinger (fra nummeret, nettet eller totalt): et nytt forsøk hjelper ikke, så be om en telefon
