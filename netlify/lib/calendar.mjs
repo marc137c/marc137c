@@ -229,3 +229,34 @@ export async function calendarFor(store, now = new Date()) {
   const { from, to } = feedRange(now);
   return buildCalendar(await readMonths(store, from, to), { now });
 }
+
+// ---------- Kundens egen time (GET /api/bookings/<id>.ics) ----------
+// Én avtale til kundens egen kalender: tjeneste, sted og hvem man ringer for å endre. Aldri navn eller telefon
+// (id-en er alt som trengs for å hente den), ingen alarm (kalenderappen bruker sin egen standard).
+export const SHOP_ADDRESS = "Violgata 22, 1776 Halden";
+export const SHOP_PHONE = "409 63 911";
+export const isCustomerVisible = (i) => !!i && i.source === "nettside" && isBookingInFeed(i);
+export function customerCalendar(i, { now = new Date() } = {}) {
+  const stamp = utcDateTime(i.updatedAt) || utcDateTime(i.createdAt) || utcDateTime(now);
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Viggo's Barbershop//Time//NO",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    ...VTIMEZONE,
+    "BEGIN:VEVENT",
+    `UID:${escapeText(`${i.id}@viggos-barbershop-kunde`)}`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART;TZID=${TZID}:${localDateTime(i.date, i.start)}`,
+    `DURATION:PT${i.dur}M`,
+    `SUMMARY:${escapeText(`${what(i)} – Viggo's Barbershop`)}`,
+    `LOCATION:${escapeText(SHOP_ADDRESS)}`,
+    `DESCRIPTION:${escapeText(`Ring ${SHOP_PHONE} for å endre eller avlyse.`)}`,
+    "STATUS:CONFIRMED",
+    "TRANSP:OPAQUE",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ];
+  return lines.map(foldLine).join("\r\n") + "\r\n";
+}

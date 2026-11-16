@@ -72,6 +72,7 @@ import { makeToken } from "../../netlify/lib/booking-core.mjs";
 import * as admin from "../../netlify/functions/admin.mjs";
 import * as calendar from "../../netlify/functions/calendar.mjs";
 import * as pushRenew from "../../netlify/functions/push-renew.mjs";
+import * as bookingIcs from "../../netlify/functions/booking-ics.mjs";
 
 const RETIRED = Object.freeze({ deploy: Object.freeze({ context: "production", id: "deploy-old", published: false }) });
 const PASSWORD = "fake-admin-password";
@@ -92,6 +93,7 @@ const RETIRED_CALLS = [
   ["POST /api/admin/cancel-phone with a valid token", (d) => admin.handle(request("/api/admin/cancel-phone", { method: "POST", json: { phone: CUSTOMER_PHONE }, headers: { Authorization: "Bearer " + makeToken(PASSWORD, d.clock.now()) } }), RETIRED, d)],
   ["GET /api/calendar/<token>.ics", (d) => calendar.handle(request(`/api/calendar/${FEED_TOKEN}.ics`), RETIRED, d)],
   ["POST /api/push/renew", (d) => pushRenew.handle(request("/api/push/renew", { method: "POST", json: {} }), RETIRED, d)],
+  ["GET /api/bookings/<id>.ics", (d) => bookingIcs.handle(request("/api/bookings/2026-11-20_abcdef0123.ics"), RETIRED, d)],
 ];
 for (const [label, call] of RETIRED_CALLS) {
   test(`retired deploy: ${label} answers 410 'Bruk hovedsiden.' and touches no store`, async () => {
