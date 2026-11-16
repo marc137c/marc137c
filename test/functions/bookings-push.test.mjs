@@ -205,3 +205,23 @@ test("booking push: without any device a booking makes no network call and no ke
   assert.equal(d.fetch.calls.length, 0);
   assert.equal(d.blobs.has("bookings", VAPID_KEY), false);
 });
+
+// Notification leftover (audit/notify still_open, «duplicate add-ons»): the validators kept every copy of an add-on,
+// so a crafted booking stored «Vask langt hår, Vask langt hår, …» and its push grew past the fixed PAD_SIZE length.
+test("booking push: repeated add-ons are stored once each, in the configured order, and the push keeps the fixed length", async () => {
+  const d = await site(["apple"]);
+  const addons = [...Array(150).fill("Vask langt hår"), "Styling", "Styling", "Vask langt hår"];
+  const res = await book(d, { ...BODY, addons });
+  assert.equal(res.status, 201);
+  assert.deepEqual(storedItems(d.blobs)[0].addons, ["Vask langt hår", "Styling"]);
+  assert.equal(d.push.deliveries.length, 1);
+  assert.equal(d.push.deliveries[0].payload.body, "Fredag 13. november kl. 10:00 · Herreklipp + Vask langt hår, Styling · Ola Nordmann");
+  assert.equal(d.push.deliveries[0].bytes.length, 1126, "header 86 + PAD_SIZE 1024 + tag 16, like every other booking");
+});
+
+test("booking push: an admin-made booking also keeps each add-on once", async () => {
+  const d = await site(["apple"]);
+  const res = await adminCall(d, "/api/admin/items", { json: { date: "2026-11-13", start: 600, dur: 30, service: "Herreklipp", addons: ["Styling", "Styling", "Vask kort hår"] } });
+  assert.equal(res.status, 201, JSON.stringify(res.body));
+  assert.deepEqual(storedItems(d.blobs)[0].addons, ["Vask kort hår", "Styling"]);
+});

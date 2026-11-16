@@ -108,6 +108,9 @@ const clean = (s, max) => String(s ?? "").replace(/[\u0000-\u001f\u007f]/g, " ")
 // Telefon: 8–15 sifre, uansett skrivemåte («409 63 911», «+47 409-63-911», «409.63.911»)
 const phoneOk = (p) => { const n = String(p ?? "").replace(/\D/g, "").length; return n >= 8 && n <= 15; };
 const fail = (code, error, status = 400) => ({ error, code, status });
+// Tilleggene som er valgt, hvert høyst én gang og i samme rekkefølge som i CONFIG (en bestilling med 150 kopier av
+// samme tillegg ble lagret slik, og varselet ble lengre enn alle andre)
+const pickAddons = (list) => (Array.isArray(list) ? CONFIG.addons.filter((a) => list.includes(a)) : []);
 
 // Gamle tjenestenavn → nye (godtas fortsatt, i tilfelle noen har den gamle siden åpen)
 const SERVICE_ALIASES = { "Herreklipp + skjeggtrim (maskin)": "Herreklipp + skjeggtrim" };
@@ -133,7 +136,7 @@ export function validateCustomer(input, now = new Date()) {
   const phone = clean(input.phone, 30);
   if (name.length < 2) return fail("bad_name", "Skriv inn navnet ditt.");
   if (!phoneOk(input.phone)) return fail("bad_phone", "Ugyldig telefonnummer.");
-  const addons = (Array.isArray(input.addons) ? input.addons : []).filter((a) => CONFIG.addons.includes(a));
+  const addons = pickAddons(input.addons);
   const value = { date: input.date, start, dur, service, addons, name, phone };
   // Idempotens-nøkkel fra siden (SPEC R1): samme requestId igjen er et nytt forsøk på den samme bestillingen.
   // Bare når siden sender en gyldig en, så en vanlig bestilling lagrer nøyaktig de samme feltene som før.
@@ -167,7 +170,7 @@ export function validateAdmin(input, { partial = false } = {}) {
   for (const [k, max] of [["service", 80], ["name", 80], ["phone", 30], ["note", 300]]) {
     if (input[k] !== undefined) out[k] = clean(input[k], max);
   }
-  if (input.addons !== undefined) out.addons = (Array.isArray(input.addons) ? input.addons : []).filter((a) => CONFIG.addons.includes(a));
+  if (input.addons !== undefined) out.addons = pickAddons(input.addons);
   if (input.status !== undefined) {
     if (!["confirmed", "cancelled"].includes(input.status)) return { error: "Ugyldig status.", status: 400 };
     out.status = input.status;
