@@ -826,15 +826,16 @@
     const day = iso(d) === todayIso() ? "" : iso(d) === addDays(todayIso(), 1) ? "i morgen " : fmt(iso(d), { day: "numeric", month: "long" }) + " ";
     return day + "kl. " + hhmm(d.getHours() * 60 + d.getMinutes());
   }
-  // devices: alle enhetene serveren sender til (med denne, når den er på). until: er Viggo logget inn uten «Hold meg
-  // innlogget», får enheten varsler bare til den innloggingen går ut, og det står her.
+  // devices: alle enhetene serveren sender til (med denne, når den er på). until: enheten får varsler bare til
+  // innloggingen den ble slått på med, går ut (12 timer, eller 60 dager med «Hold meg innlogget»), og det står her.
+  // Hver ny innlogging forlenger dem (pushSync gir serveren abonnementet på nytt).
   function pushShow(mode, devices, until) {
     const n = Number(devices) || 0;
     pushState.others = mode === "on" ? Math.max(0, n - 1) : n;
     pushButtons(mode);
     if (mode === "on") pushState.lost = false;
     const when = mode === "on" && until ? untilText(until) : "";
-    if (when) pushMsg("Varsler er på til innloggingen her går ut, " + when + ". Logger du inn med «Hold meg innlogget», får du dem hele tiden." + others(pushState.others), "ok");
+    if (when) pushMsg("Varsler er på til innloggingen her går ut, " + when + ". Når du logger inn på nytt, varer de like lenge som den nye innloggingen." + others(pushState.others), "ok");
     else if (mode === "on") pushMsg("Varsler er på. Du får et varsel her hver gang en kunde bestiller time." + others(pushState.others), "ok");
     else pushMsg((pushState.lost ? "Varslene må slås på igjen på denne enheten." : "Varsler er av på denne enheten.") + others(pushState.others), "info");
   }

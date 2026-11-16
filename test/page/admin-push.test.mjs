@@ -130,8 +130,26 @@ test("admin push panel: after a short login («Hold meg innlogget» off) the pan
   }) });
   page.$("push-on").click();
   await page.flush();
-  assert.equal(msg(page), `Varsler er på til innloggingen her går ut, ${today(until) ? "" : "i morgen "}kl. ${pad(until.getHours())}:${pad(until.getMinutes())}. Logger du inn med «Hold meg innlogget», får du dem hele tiden.`);
+  assert.equal(msg(page), `Varsler er på til innloggingen her går ut, ${today(until) ? "" : "i morgen "}kl. ${pad(until.getHours())}:${pad(until.getMinutes())}. Når du logger inn på nytt, varer de like lenge som den nye innloggingen.`);
   assert.deepEqual(buttons(page), ["push-test", "push-off"]);
+});
+
+// Since step 2 every login has an end, «Hold meg innlogget» too (60 days): nothing may promise notifications
+// 'hele tiden' (all the time), and a 60-day login shows its date
+test("admin push panel: a 60-day login shows the date notifications stop; no text promises them 'hele tiden'", async () => {
+  const until = new Date(Date.now() + 60 * 24 * 3600e3);
+  const b = fakePushBrowser({ device: makeDevice("wns") });
+  const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes({
+    "POST /api/admin/push/subscribe": () => ({ status: 201, body: { ok: true, devices: 1, until: until.toISOString() } }),
+  }) });
+  page.$("push-on").click();
+  await page.flush();
+  const month = new Intl.DateTimeFormat("nb-NO", { month: "long" }).format(until);
+  assert.match(msg(page), new RegExp(`^Varsler er på til innloggingen her går ut, ${until.getDate()}\\. ${month} kl\\. \\d\\d:\\d\\d\\. Når du logger inn på nytt`));
+  const { readFileSync } = await import("node:fs");
+  for (const f of ["admin.js", "admin.html", "README.md"]) {
+    assert.doesNotMatch(readFileSync(new URL("../../viggos-barbershop/" + f, import.meta.url), "utf8"), /hele tiden|fortsetter de til du slår dem av/, f);
+  }
 });
 
 test("admin push panel: refusing permission sends nothing; «blocked» offers only «Prøv igjen»", async () => {
