@@ -161,6 +161,8 @@
       fullDay: "Fullbooket",
       dayFull: "Alle tider er booket denne dagen. Velg en annen dag.",
       takenNow: "Beklager, noen rakk å booke den tiden akkurat nå. Velg en annen tid.",
+      timeGone: "Tiden du valgte er ikke ledig lenger. Velg en annen tid.",
+      dayGone: "Dagen du valgte kan ikke bestilles lenger. Velg en annen dag.",
       booked: (when) => `Timen er booket: ${when}. Velkommen! Må du endre eller avlyse, ring oss på 409 63 911.`,
       // Anmeldelser
       basedOn: (n) => `basert på ${n} anmeldelser på Google`,
@@ -205,6 +207,8 @@
       fullDay: "Fully booked",
       dayFull: "Every time is booked this day. Please choose another day.",
       takenNow: "Sorry, someone just booked that time. Please choose another time.",
+      timeGone: "The time you chose is no longer available. Please choose another time.",
+      dayGone: "The day you chose can no longer be booked. Please choose another day.",
       booked: (when) => `You're booked: ${when}. See you then! To change or cancel, call us on 409 63 911.`,
       // Reviews
       basedOn: (n) => `based on ${n} reviews on Google`,

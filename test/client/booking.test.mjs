@@ -178,7 +178,7 @@ test("F90: a booking with no answer says 'Sender …' for 20 s, then tells the c
   kept(site);
   reply.resolve();
   await site.advance(1000);
-  assert.match(site.message(), /^Timen er booket: Herreklipp · fredag 13. november kl. 14:00./, "the late 2xx is shown");
+  assert.match(site.message(), /^Timen er booket: Herreklipp · fredag 13\. november kl\. 14:00\./, "the late 2xx is shown");
   assert.equal(site.server.bookings().length, 1);
 });
 
@@ -266,6 +266,71 @@ test("F8: a 409 puts 'takenNow' in #msg-time with focus on a free time", async (
   oneMessageAt(site, "msg-time", site.s().takenNow);
   assert.ok(site.focused.classList.contains("slot") && !site.focused.disabled);
   assert.ok(!site.slot(FRIDAY.time), "14:00 is no longer offered");
+});
+
+// F19: the server's answer decides "now" and the booking rules; the device clock is only used before it answers.
+const TODAY = "2026-11-12";
+const offered = (site) => site.slots().filter((x) => x.t !== null && !x.disabled).map((x) => x.t);
+
+test("F19: with the server clock 90 s ahead of the device, 17:30 today is not offered (the server would say too_early)", async () => {
+  const site = await boot({ now: "2026-11-12T16:30:00+01:00", serverAheadMs: 90000 });
+  await site.pick({ service: "Herreklipp", date: TODAY });
+  assert.ok(!offered(site).includes(1050), "17:30 is not offered: " + offered(site));
+  assert.equal(site.slots().filter((x) => x.t === 1050).length, 0);
+});
+
+for (const [label, now, ahead, has1730] of [
+  ["10 min behind", "2026-11-12T16:25:00+01:00", 600000, false],
+  ["10 min ahead of", "2026-11-12T16:35:00+01:00", -600000, true],
+]) {
+  test(`F19: a device clock ${label} the server still offers exactly the server's times`, async () => {
+    const site = await boot({ now, serverAheadMs: ahead });
+    await site.pick({ service: "Herreklipp", date: TODAY });
+    assert.equal(offered(site).includes(1050), has1730, "17:30: " + offered(site));
+    assert.deepEqual(offered(site).filter((t) => t !== 1050), [], "nothing before 17:30");
+  });
+}
+
+test("F19: a 400 too_early drops the time, says why at step 3, reloads availability, and a second tap sends nothing", async () => {
+  const site = await boot({ now: "2026-11-12T16:00:00+01:00", setup: (s) => s.when((r) => r.url === "/api/bookings", { status: 400, body: { code: "too_early", error: "Tidspunktet er for tidlig." } }, 1) });
+  await site.pick({ service: "Herreklipp", date: TODAY, time: 1020, name: FRIDAY.name, phone: FRIDAY.phone });
+  const gets = site.server.requests.filter((r) => r.url === "/api/availability").length;
+  await site.book();
+  await site.advance(500);
+  assert.ok(site.server.requests.filter((r) => r.url === "/api/availability").length > gets, "availability is loaded again");
+  assert.equal(site.slots().filter((x) => /is-selected/.test(x.cls)).length, 0, "no time is selected");
+  assert.equal(site.summary(), "");
+  assert.deepEqual(site.visibleMessages().map((el) => el.id), ["msg-time"]);
+  assert.equal(site.message(), site.s().timeGone);
+  await site.book();
+  await site.advance(500);
+  assert.equal(site.bookingPosts().length, 1, "the rejected start is not sent again");
+  assert.equal(site.$("f-name").value, FRIDAY.name, "name and phone stay");
+});
+
+for (const code of ["bad_date", "closed"]) {
+  test(`F19: a 400 ${code} drops the day and says why at step 2`, async () => {
+    const site = await boot({ setup: (s) => s.when((r) => r.url === "/api/bookings", { status: 400, body: { code, error: code } }, 1) });
+    await site.pick(FRIDAY);
+    await site.book();
+    await site.advance(500);
+    assert.equal(site.summary(), "");
+    assert.equal(site.qsa("#cal-grid .is-selected").length, 0, "no day is selected");
+    assert.deepEqual(site.visibleMessages().map((el) => el.id), ["msg-day"]);
+    assert.equal(site.message(), site.s().dayGone);
+    assert.ok(site.focused.classList.contains("cal-day"));
+  });
+}
+
+test("F19: slotMin, leadMin and maxDays come from the server after a range check", async () => {
+  const site = await boot({ now: "2026-11-12T10:00:00+01:00", setup: (s) => { s.config.leadMin = 120; s.config.maxDays = 30; } });
+  await site.pick({ service: "Herreklipp", date: TODAY });
+  assert.equal(Math.min(...offered(site)), 720, "today from 12:00 (two hours ahead)");
+  assert.ok(!(await site.day("2026-12-12")).disabled, "day 30 (a Saturday) can be booked");
+  assert.ok((await site.day("2026-12-14")).disabled, "day 32 (a Monday) cannot");
+  const odd = await boot({ setup: (s) => { s.config.slotMin = 0; s.config.leadMin = -5; s.config.maxDays = "60"; } });
+  await odd.pick({ service: "Herreklipp", date: "2026-11-13" });
+  assert.deepEqual(offered(odd).slice(0, 3), [600, 630, 660], "out-of-range values are ignored");
 });
 
 test("F73: a successful booking is stored once and nothing else is sent (no Netlify Forms copy)", async () => {

@@ -2,11 +2,13 @@
 // Opptatte tider hentes fra /api/availability og vises som «Opptatt». Bestillingen sendes som JSON til
 // /api/bookings, som låser tiden med en gang. Ingen kopi sendes noe annet sted (eierens beslutning D2).
 // Svarer ikke bookingsystemet, eller svarer det noe vi ikke kan stole på, får kunden beskjed om å ringe (D3).
-// Bruker HOURS fra script.js, så kalenderen alltid følger åpningstidene.
+// Klokka, åpningstidene og bestillingsreglene kommer fra /api/availability, og serverens svar vinner over enhetens
+// klokke og verdiene under (F19). Bruker HOURS og osloNow fra script.js til serveren har svart.
 (() => {
-  const SLOT_MIN = 30;     // en ny time hvert 30. minutt
-  const LEAD_MIN = 60;     // i dag: tidligste time er minst én time frem i tid
-  const MAX_DAYS = 60;     // hvor langt frem man kan bestille
+  // Reserveverdier til serveren har svart (se useServer)
+  let SLOT_MIN = 30;       // en ny time hvert 30. minutt
+  let LEAD_MIN = 60;       // i dag: tidligste time er minst én time frem i tid
+  let MAX_DAYS = 60;       // hvor langt frem man kan bestille
   const SEND_TIMEOUT = 20000; // så lenge venter vi på svar på en bestilling før kunden får beskjed om å ringe
   const LOAD_TIMEOUT = 15000; // så lenge venter vi på ledige tider
   // Varighet per tjeneste (minutter). Overskrives av serveren hvis den svarer.
@@ -15,6 +17,7 @@
     "Knivbarbering": 30, "Skjegg & line-up": 30, "Barneklipp": 30,
   };
   let busy = {};           // { "ÅÅÅÅ-MM-DD": [[start, slutt], …] } – opptatte tidsrom
+  let clock = null;        // serverens klokke fra siste svar: { y, m, d, minutes, at }
   let online = false;      // true når bookingsystemet på serveren svarer
 
   const $ = (id) => document.getElementById(id);
@@ -36,18 +39,25 @@
   const sameDay = (a, b) => a && b && a.getTime() === b.getTime();
   const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+  const YMD = /^(\d{4})-(\d{2})-(\d{2})$/;
 
   const state = { date: null, time: null, view: null };
   let sending = false;     // en bestilling er på vei (se lock)
 
-  // «I dag» og klokka følger norsk tid (osloNow i script.js), ikke besøkerens tidssone
-  // Regnes ut høyst én gang i sekundet (kalenderen spør hundrevis av ganger per tegning)
-  let todayYmd = null, todayAt = 0;
-  const today = () => {
-    const now = Date.now();
-    if (!todayYmd || now - todayAt > 1000) { const o = osloNow(); todayYmd = [o.y, o.m - 1, o.d]; todayAt = now; }
-    return new Date(todayYmd[0], todayYmd[1], todayYmd[2]); // ny Date hver gang: kallerne endrer den
-  };
+  // «Nå» i norsk tid: serverens klokke (talt videre fra da svaret kom) når serveren har svart, ellers enhetens klokke
+  // (osloNow i script.js). Enhetsklokka kan gå feil; serveren avgjør hva som er for tidlig.
+  let devNow = null, devAt = 0;
+  function now() {
+    const t = Date.now();
+    if (clock) {
+      const min = clock.minutes + Math.floor(Math.max(0, t - clock.at) / 60000);
+      return { y: clock.y, m: clock.m, d: clock.d + Math.floor(min / 1440), minutes: min % 1440 };
+    }
+    // Høyst én gang i sekundet: kalenderen spør hundrevis av ganger per tegning
+    if (!devNow || t - devAt > 1000) { devNow = osloNow(); devAt = t; }
+    return devNow;
+  }
+  const today = () => { const n = now(); return new Date(n.y, n.m - 1, n.d); }; // ny Date hver gang: kallerne endrer den
   const lastDay = () => { const d = today(); d.setDate(d.getDate() + MAX_DAYS); return d; };
 
   const duration = () => DURATIONS[select.value] || SLOT_MIN;
@@ -62,7 +72,7 @@
     const dur = duration();
     let earliest = -1;
     if (date < today() || date > lastDay()) return [];
-    if (sameDay(date, today())) earliest = osloNow().minutes + LEAD_MIN;
+    if (sameDay(date, today())) earliest = now().minutes + LEAD_MIN;
     const out = [];
     for (let t = hours[0]; t + SLOT_MIN <= hours[1]; t += SLOT_MIN) {
       if (t < earliest) continue;
@@ -269,6 +279,20 @@
     return t;
   };
 
+  // Serverens svar vinner: klokke, åpningstider, varigheter og bestillingsregler (tall bare innenfor rimelige grenser)
+  function useServer(data) {
+    busy = data.busy && typeof data.busy === "object" ? data.busy : {};
+    if (data.durations) DURATIONS = data.durations;
+    // Åpningstidene kommer fra serveren, så kalenderen og bestillingsreglene alltid er like
+    if (data.hours) for (let d = 0; d < 7; d++) if (d in data.hours) HOURS[d] = data.hours[d];
+    const num = (v, lo, hi) => typeof v === "number" && v % 1 === 0 && v >= lo && v <= hi;
+    if (num(data.slotMin, 5, 240)) SLOT_MIN = data.slotMin;
+    if (num(data.leadMin, 0, 1440)) LEAD_MIN = data.leadMin;
+    if (num(data.maxDays, 0, 400)) MAX_DAYS = data.maxDays;
+    const m = YMD.exec(data.today || "");
+    if (m && num(data.nowMinutes, 0, 1439)) clock = { y: +m[1], m: +m[2], d: +m[3], minutes: data.nowMinutes, at: Date.now() };
+  }
+
   // Hent opptatte tider fra serveren. Et eldre svar som kommer etter et nyere, brukes ikke.
   let loads = 0, applied = 0;
   function loadAvailability() {
@@ -278,10 +302,7 @@
       .then((data) => {
         if (n < applied || !data || typeof data !== "object") return;
         applied = n;
-        busy = data.busy || {};
-        if (data.durations) DURATIONS = data.durations;
-        // Åpningstidene kommer fra serveren, så kalenderen og bestillingsreglene alltid er like
-        if (data.hours) for (let d = 0; d < 7; d++) if (d in data.hours) HOURS[d] = data.hours[d];
+        useServer(data);
         online = true;
       })
       .catch(() => {
@@ -364,18 +385,22 @@
     // Vi vet ikke om timen ble lagret (ingen svar, nettfeil, eller et svar vi ikke kan stole på). requestId beholdes,
     // så et nytt forsøk med det samme blir samme bestilling hos serveren.
     const uncertain = () => end(() => setMsg("err", (t) => t.uncertain));
+    const rejected = (what, textFn) => loadAvailability().then(() => end(() => {
+      if (what === "day") state.date = null;
+      state.time = null;
+      renderAll();
+      if (what === "day") fail(textFn, "day", firstOpenDay());
+      else fail(textFn, "time", firstFreeSlot());
+    }));
     const ok = (r) => r.status >= 200 && r.status < 300 && !!r.data && r.data.ok === true;
     const answer = (r) => {
       const status = r.status, data = r.data || {};
       if (ok(r)) return booked();
-      if (status === 409 || data.code === "taken") {
-        // Noen andre rakk å ta tiden: vis oppdatert kalender
-        return loadAvailability().then(() => end(() => {
-          state.time = null;
-          renderAll();
-          fail((t) => t.takenNow, "time", firstFreeSlot());
-        }));
-      }
+      // Noen andre rakk å ta tiden, eller serveren sier at tiden eller dagen ikke kan bestilles (dens klokke og regler
+      // vinner): hent ledige tider på nytt, slipp valget og si hvorfor ved steget
+      if (status === 409 || data.code === "taken") return rejected("time", (t) => t.takenNow);
+      if (data.code === "too_early" || data.code === "bad_time") return rejected("time", (t) => t.timeGone);
+      if (data.code === "bad_date" || data.code === "closed") return rejected("day", (t) => t.dayGone);
       // For mange bestillinger (fra nummeret, nettet eller totalt): et nytt forsøk hjelper ikke, så be om en telefon
       if (status === 429 || data.code === "rate_limited") return end(() => setMsg("err", (t) => t.rateLimited));
       if (status >= 500 || status < 400) return uncertain();
