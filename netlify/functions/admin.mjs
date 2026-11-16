@@ -228,7 +228,7 @@ export async function handle(req, context, deps) {
       // ?expect=<updatedAt slik denne enheten så avtalen>: 412 «stale» hvis den er endret et annet sted siden (R3)
       const expect = url.searchParams.get("expect");
       if (expect !== null && expect.length > 40) return json({ error: "Ugyldig versjon." }, 400);
-      const r = await deleteItem(store, decodeURIComponent(id), expect === null ? {} : { expect });
+      const r = await deleteItem(store, decodeURIComponent(id), expect === null ? { now: deps.now() } : { expect, now: deps.now() });
       return r.error ? json(r, r.status) : json(r);
     }
     return json({ error: "Ukjent forespørsel." }, 404);

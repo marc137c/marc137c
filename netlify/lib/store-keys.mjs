@@ -14,7 +14,7 @@ export const STATS_STORES = ["stats", "stats-preview"];
 
 // { stores, key (exact) | prefix, holds, deletion }. The most specific row wins: an exact key, then the longest prefix.
 export const KEY_RULES = Object.freeze([
-  { stores: BOOKING_STORES, prefix: "m/", holds: "one month of bookings and blocks: date, time, service, add-ons, name, phone, note (and movedOut: ids of moves out of the month in the last 24 h, no customer data)",
+  { stores: BOOKING_STORES, prefix: "m/", holds: "one month of bookings and blocks: date, time, service, add-ons, name, phone, note (and movedOut, deletedOut: ids of moves out of the month and of deletions in the last 24 h, no customer data)",
     deletion: `daily clean-up: every item ${RETENTION_DAYS} days after its date (cancelled ones too, and impossible dates); a month document left empty is deleted once the whole month is past that limit. The barber can delete an item at any time («Slett»).` },
   { stores: BOOKING_STORES, key: "rl/secret", holds: "32 random bytes behind the counter key names; no personal data",
     deletion: "kept for the life of the store; deleting it only resets every counter" },

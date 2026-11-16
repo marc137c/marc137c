@@ -406,16 +406,27 @@ function sameExceptVersion(a, b) {
 // Sletter en avtale for godt. expect: updatedAt slik /admin så den; er den endret et annet sted siden (flyttet,
 // avlyst, nytt nummer), svarer det 412 «stale» og ingenting slettes (SPEC R3, som for PATCH). Uten expect (en
 // gammel fane) som før.
-export async function deleteItem(store, id, { expect } = {}) {
+// deletedOut: en kort logg i månedsdokumentet over slettinger (id, et tilfeldig merke for kallet, tid; ingen
+// kundedata, høyst et døgn og 50 stykker), som movedOut for flyttinger. Går svaret på vår egen skriving tapt, kjøres
+// endringen på nytt og finner avtalen borte; bare merket skiller det fra at en annen enhet flyttet den ut (412) eller
+// slettet den (404) i mellomtiden. Vakt-regel (runde 2): et nytt forsøk kjenner igjen sitt eget tidligere forsøk bare
+// på et merke i dokumentet, aldri på et flagg i minnet, for et forsøk som satte flagget, kan ha mistet skrivingen.
+export async function deleteItem(store, id, { expect, now = new Date() } = {}) {
   const date = String(id).split("_")[0];
   if (!isDate(date)) return { error: "Fant ikke avtalen.", status: 404 };
-  let removed = false; // et nytt forsøk etter tapt svar skal ikke gi «fant ikke»
+  const mark = randomBytes(6).toString("hex");
   return mutateMonth(store, monthOf(date), (doc) => {
+    const log = Array.isArray(doc.deletedOut) ? doc.deletedOut : [];
     const it = doc.items.find((i) => i.id === id);
-    if (!it) return removed ? { ok: true, noWrite: true } : { error: "Fant ikke avtalen.", status: 404 };
+    if (!it) {
+      if (log.some((g) => g && g.id === id && g.m === mark)) return { ok: true, noWrite: true }; // vår egen sletting
+      if (Array.isArray(doc.movedOut) && doc.movedOut.some((m) => m && m.id === id)) return STALE; // flyttet ut: åpne på nytt
+      return { error: "Fant ikke avtalen.", status: 404 };
+    }
     if (expect !== undefined && it.updatedAt !== expect) return STALE;
     doc.items = doc.items.filter((i) => i.id !== id);
-    removed = true;
+    doc.deletedOut = log.filter((g) => g && Date.parse(g.at) > now.getTime() - 864e5)
+      .concat({ id, m: mark, at: now.toISOString() }).slice(-50);
     return { ok: true };
   });
 }

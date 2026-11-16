@@ -322,3 +322,68 @@ test("fault matrix: two moves at once (to 2 December and to 8 January) leave one
   const ics = await calendarFor(d.getStore({ name: "bookings", consistency: "strong" }), d.now());
   assert.equal((ics.match(/BEGIN:VEVENT/g) || []).length, 1);
 });
+
+// Round 2, fix-up: a DELETE racing a cross-month move (interleave-show.mjs, interleave-all.mjs). Device B moves the
+// booking out of November between device A's read of m/2026-11 and A's conditional write; A's write misses, the
+// re-run finds the booking gone and used to answer 200 «ok» because of a flag set by the attempt that never stored.
+// Now a delete recognises its own earlier attempt only by its tombstone in the month document (deletedOut).
+const MOVES_OUT = {
+  "a move to 2 December": { date: "2026-12-02" },
+  "a move to 8 January": { date: "2027-01-08" },
+  "a move to 2 December at 11:00": { date: "2026-12-02", start: 660 },
+};
+const deleteWith = (deps, id, expect) => admin.handle(request(`/api/admin/items/${id}${expect ? `?expect=${encodeURIComponent(expect)}` : ""}`, { method: "DELETE", headers: auth(deps) }), { ...PRODUCTION, params: { id } }, deps).then(read);
+for (const [tab, withExpect] of [["this device's DELETE (expect)", true], ["an old tab's DELETE (no expect)", false]]) {
+  test(`fault matrix: ${tab} racing a cross-month move never answers 2xx while the booking lives on`, async (t) => {
+    quiet(t);
+    for (const [label, patch] of Object.entries(MOVES_OUT)) {
+      for (let k = 0; k < 4; k++) {
+        const { d, b } = moveSetup();
+        let byB = null;
+        const depsA = hooked(d, async (n) => {
+          if (n !== k) return;
+          d.clock.advance(1000);
+          byB = await patchAs(d, b.id, { ...patch, expect: b.updatedAt });
+          d.clock.advance(1000);
+        });
+        const byA = await deleteWith(depsA, b.id, withExpect ? b.updatedAt : null);
+        if (!byB) continue;
+        const stored = storedItems(d.blobs).filter((i) => suffix(i.id) === suffix(b.id) && i.status === "confirmed");
+        const where = `B: ${label} before A's store call ${k}: A ${byA.status} ${JSON.stringify(byA.body)}, B ${byB.status}`;
+        if (byA.status >= 200 && byA.status < 300) assert.equal(stored.length, 0, `${where}: A said deleted, but ${stored.map((i) => i.id)} is active`);
+        else assert.equal(byA.status, 412, `${where}: the moved booking is reported as changed elsewhere`);
+        if (byB.status === 200) assert.equal(stored.length, 1, where);
+      }
+    }
+  });
+}
+
+test("fault matrix: a DELETE whose stored write lost its reply finds its own tombstone on the re-run (200), and a DELETE of a booking another device deleted answers 404", async (t) => {
+  quiet(t);
+  const { d, b } = moveSetup();
+  // stored, reply lost: the client's retry of the conditional PUT gets 412, and the re-run of the mutate function
+  // finds the booking gone; only the tombstone with this call's mark says that was this call
+  d.blobs.inject({ method: "PUT", key: "m/2026-11", fault: "lost-response" });
+  const first = await deleteWith(d, b.id, b.updatedAt);
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  d.blobs.clearFaults();
+  assert.deepEqual(storedItems(d.blobs), []);
+  // the month document keeps a short tombstone list: id, a random mark and the time; no customer data
+  const doc = d.blobs.json("bookings", "m/2026-11");
+  assert.ok(Array.isArray(doc.deletedOut) && doc.deletedOut.length === 1, JSON.stringify(doc));
+  assert.deepEqual(Object.keys(doc.deletedOut[0]).sort(), ["at", "id", "m"]);
+  // another device (or an old tab) deleting it again: 404, not «ok»
+  const other = await deleteWith(d, b.id);
+  assert.equal(other.status, 404);
+});
+
+test("fault matrix: an old tab's DELETE of a booking that was moved to another month answers 412 (open it again), not 404", async (t) => {
+  quiet(t);
+  const { d, b } = moveSetup();
+  const moved = await patchAs(d, b.id, { date: "2026-12-02", expect: b.updatedAt });
+  assert.equal(moved.status, 200);
+  const r = await deleteWith(d, b.id);
+  assert.equal(r.status, 412, JSON.stringify(r.body));
+  assert.equal(r.body.code, "stale");
+  assert.equal(storedItems(d.blobs).length, 1);
+});
