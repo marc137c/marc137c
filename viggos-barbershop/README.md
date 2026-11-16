@@ -96,8 +96,8 @@ Siden åpner alltid på norsk, også når nettleseren står på engelsk eller et
 - Bookingskjemaet sender alltid tjenestenavnet på norsk, så forespørslene i Netlify blir like uansett språk.
 
 ## Logo og profil
-Logoen er laget i kode slik at den er skarp på alle skjermer: «Viggo's» i skriveskrift (Google-fonten Great Vibes),
-«BARBERSHOP» i Cinzel, og ornamentlinjen med diamant som SVG (`--ornament` i `styles.css`). Fargene er dyp grønn og gull fra visittkortet.
+Logoen er laget i kode slik at den er skarp på alle skjermer: «Viggo's» i skriveskrift (Great Vibes),
+«BARBERSHOP» i Cinzel (begge ligger i `fonts/` på vår egen server, med lisensen i `fonts/OFL.txt`, så besøkende kontakter ikke Google Fonts), og ornamentlinjen med diamant som SVG (`--ornament` i `styles.css`). Fargene er dyp grønn og gull fra visittkortet.
 Bildene av gullskiltet og visittkortet ligger i `img/` (webp i to størrelser).
 
 ## Instagram-feed (oppdateres automatisk)

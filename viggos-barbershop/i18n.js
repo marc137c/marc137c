@@ -107,6 +107,8 @@
     "c.address": "Address",
     "c.map": "Get directions →",
     "c.maptitle": "Map: Violgata 22, 1776 Halden",
+    "c.mapload": "Show map (Google Maps)",
+    "c.mapnote": "The map loads from Google only when you tap.",
 
     // 8. Social media
     "soc.eyebrow": "Social media",

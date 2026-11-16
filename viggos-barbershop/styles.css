@@ -1,3 +1,10 @@
+/* Skriftene ligger på vår egen server (fonts/, SIL Open Font License, se fonts/OFL.txt), så ingen besøkende
+   kontakter Google Fonts (F47). woff2 først; Safari 10 på macOS 10.11 kan bare woff. */
+@font-face { font-family: "Cinzel"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/cinzel-latin-500-normal.woff2") format("woff2"), url("fonts/cinzel-latin-500-normal.woff") format("woff"); }
+@font-face { font-family: "Cinzel"; font-style: normal; font-weight: 600; font-display: swap; src: url("fonts/cinzel-latin-600-normal.woff2") format("woff2"), url("fonts/cinzel-latin-600-normal.woff") format("woff"); }
+@font-face { font-family: "Cinzel"; font-style: normal; font-weight: 700; font-display: swap; src: url("fonts/cinzel-latin-700-normal.woff2") format("woff2"), url("fonts/cinzel-latin-700-normal.woff") format("woff"); }
+@font-face { font-family: "Great Vibes"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/great-vibes-latin-400-normal.woff2") format("woff2"), url("fonts/great-vibes-latin-400-normal.woff") format("woff"); }
+
 :root {
   --bg: #0b0f0d;
   --bg-alt: #0e1914;
@@ -673,10 +680,20 @@ form.booking {
 .hours-grid { display: grid; grid-template-columns: 1fr 1.1fr; grid-gap: 48px; gap: 48px; align-items: stretch; }
 .address { color: var(--muted); line-height: 1.8; margin: 8px 0 0; }
 .address strong { color: var(--gold); font-family: var(--caps); letter-spacing: .1em; font-size: .85rem; }
+/* Kartet lastes fra Google først når besøkeren trykker «Vis kart» (F47): til da en rolig flate med knappen */
 .map {
+  position: relative; overflow: hidden;
   width: 100%; min-height: 340px; height: 100%; border: 1px solid var(--line); border-radius: 20px;
-  filter: var(--map-filter);
+  background: var(--surface);
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  padding: 24px; text-align: center;
 }
+.map-frame { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; filter: var(--map-filter); }
+.map-frame[hidden], .map-load[hidden], .map-note[hidden] { display: none; }
+.map-note { margin: 12px 0 0; max-width: 300px; font-size: .85rem; color: var(--muted); }
 
 /* ---------- Sosiale medier og footer ---------- */
 .btn-follow .handle { font-weight: 500; color: var(--muted); }

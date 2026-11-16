@@ -101,3 +101,20 @@ for (const [label, before] of [["with <dialog>", nativeDialogs], ["without <dial
     assert.equal(img.getAttribute("src"), items[4].getAttribute("data-full").replace(/\.webp$/, ".jpg"), "item 5's own picture");
   });
 }
+
+// ---------- F47: the map loads only after a click ----------
+test("F47: «Vis kart (Google Maps)» loads the map into the iframe and hands it the focus", async () => {
+  const site = await page();
+  const frame = site.qs("iframe");
+  assert.equal(frame.hasAttribute("src"), false);
+  click(site.$("map-load"));
+  assert.equal(frame.getAttribute("src"), frame.getAttribute("data-src"));
+  assert.equal(frame.hidden, false);
+  assert.ok(site.$("map-load").closest("[hidden]"), "the button is gone");
+  assert.ok(site.doc.activeElement === frame, "focus moves to the map, not to the top of the page");
+});
+
+test("F47: in English the button says so too", async () => {
+  const site = await page({ lang: "en" });
+  assert.equal(site.$("map-load").textContent, "Show map (Google Maps)");
+});

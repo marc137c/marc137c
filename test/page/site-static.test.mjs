@@ -1,7 +1,7 @@
 // Static checks of the public site's files (step 6). Each block names the finding it guards.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseDocument } from "../helpers/mini-dom.mjs";
 
@@ -59,4 +59,47 @@ test("F69: under 480 px the language toggle and the header icons get invisible :
   assert.match(blocks, /\.lang-toggle::after \{[^}]*content: "";[^}]*position: absolute;[^}]*top: -11px;[^}]*bottom: -11px;/);
   assert.match(blocks, /\.socials\.header-socials a \{[^}]*position: relative;/);
   assert.match(blocks, /\.socials\.header-socials a::after \{[^}]*content: "";[^}]*position: absolute;[^}]*top: -8px;[^}]*bottom: -8px;/);
+});
+
+// ---------- F47: no third-party request before the visitor asks for one ----------
+const siteFiles = () => readdirSync(SITE).filter((f) => /\.(html|css|js|webmanifest)$/.test(f));
+
+test("F47: no page, style or script loads Google Fonts", () => {
+  for (const f of siteFiles()) {
+    const src = read(f);
+    assert.ok(!/fonts\.googleapis\.com|fonts\.gstatic\.com/.test(src), `${f} references Google Fonts`);
+  }
+});
+
+test("F47: Cinzel 500/600/700 and Great Vibes 400 are self-hosted: woff2 then woff, swap, files and licence present", () => {
+  const css = read("styles.css");
+  const faces = Array.from(css.matchAll(/@font-face\s*\{([^}]*)\}/g), (m) => m[1]);
+  const got = faces.map((f) => /font-family:\s*"([^"]+)"/.exec(f)[1] + " " + /font-weight:\s*(\d+)/.exec(f)[1]).sort();
+  assert.deepEqual(got, ["Cinzel 500", "Cinzel 600", "Cinzel 700", "Great Vibes 400"]);
+  for (const f of faces) {
+    assert.match(f, /font-display:\s*swap/);
+    const urls = Array.from(f.matchAll(/url\("([^"]+)"\)\s*format\("([^"]+)"\)/g), (m) => [m[1], m[2]]);
+    assert.deepEqual(urls.map((u) => u[1]), ["woff2", "woff"], "woff2 first, woff for Safari 10 on macOS 10.11");
+    for (const [u] of urls) {
+      assert.ok(u.startsWith("fonts/"), u);
+      assert.ok(existsSync(SITE + u), `${u} exists`);
+    }
+  }
+  const ofl = read("fonts/OFL.txt");
+  assert.match(ofl, /SIL OPEN FONT LICENSE Version 1\.1/);
+  assert.match(ofl, /Cinzel/);
+  assert.match(ofl, /Great Vibes/);
+});
+
+test("F47: the map iframe has no src at load, keeps its address in data-src and sends no referrer", () => {
+  const doc = parseDocument(read("index.html"));
+  const frames = doc.querySelectorAll("iframe");
+  assert.equal(frames.length, 1);
+  const map = frames[0];
+  assert.equal(map.hasAttribute("src"), false, "nothing loads from Google until the visitor asks");
+  assert.match(map.getAttribute("data-src"), /^https:\/\/www\.google\.com\/maps\?q=Violgata\+22/);
+  assert.equal(map.getAttribute("referrerpolicy"), "no-referrer");
+  const btn = doc.getElementById("map-load");
+  assert.ok(btn && btn.localName === "button" && btn.getAttribute("type") === "button");
+  assert.equal(btn.textContent.trim(), "Vis kart (Google Maps)");
 });

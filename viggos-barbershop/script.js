@@ -186,6 +186,18 @@ document.getElementById("lightbox-close").addEventListener("click", () => lightb
 lightboxDlg.addEventListener("close", () => { lightboxImg.removeAttribute("src"); lightboxImg.alt = ""; });
 lightboxDlg.addEventListener("click", (e) => { if (e.target === lightboxDlg) lightboxDlg.close(); });
 
+// Kartet: ingenting hentes fra Google før besøkeren trykker «Vis kart» (F47). Uten henvisningsadresse.
+const mapBtn = document.getElementById("map-load");
+if (mapBtn) mapBtn.addEventListener("click", () => {
+  const frame = document.querySelector(".map-frame");
+  const note = document.getElementById("map-note");
+  frame.setAttribute("src", frame.getAttribute("data-src"));
+  frame.hidden = false;
+  mapBtn.hidden = true;
+  if (note) note.hidden = true;
+  frame.focus();
+});
+
 // Animasjon når seksjoner kommer til syne
 if ("IntersectionObserver" in window) {
   const targets = document.querySelectorAll(".section-head, .highlight, .price-list, .addons, .booking, .about, .gallery figure, .hours-grid > *");

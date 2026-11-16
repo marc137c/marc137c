@@ -46,9 +46,6 @@
     "priceRange": "kr 100–750"
   }
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Great+Vibes&display=swap">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body id="top">
@@ -326,9 +323,13 @@
             <a href="https://www.google.com/maps/search/?api=1&amp;query=Violgata%2022%2C%201776%20Halden" target="_blank" rel="noopener" data-i18n="c.map">Veibeskrivelse →</a>
           </p>
         </div>
-        <iframe class="map" title="Kart: Violgata 22, 1776 Halden" data-i18n-attr="title:c.maptitle"
-          src="https://www.google.com/maps?q=Violgata+22,+1776+Halden&amp;z=16&amp;output=embed"
-          loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+        <div class="map" id="map">
+          <iframe class="map-frame" title="Kart: Violgata 22, 1776 Halden" data-i18n-attr="title:c.maptitle" hidden
+            data-src="https://www.google.com/maps?q=Violgata+22,+1776+Halden&amp;z=16&amp;output=embed"
+            referrerpolicy="no-referrer"></iframe>
+          <button type="button" class="btn btn-ghost map-load" id="map-load" data-i18n="c.mapload">Vis kart (Google Maps)</button>
+          <p class="map-note" id="map-note" data-i18n="c.mapnote">Kartet hentes fra Google først når du trykker.</p>
+        </div>
       </div>
     </section>
   </main>
