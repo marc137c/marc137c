@@ -37,7 +37,6 @@
   // Feil som gjelder tjeneste, dag eller tid vises ved det steget (der fokuset havner), resten under knappen (F8)
   const boxes = { service: $("msg-service"), day: $("msg-day"), time: $("msg-time") };
 
-  const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const sameDay = (a, b) => a && b && a.getTime() === b.getTime();
   const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
@@ -460,8 +459,8 @@
     setMsg("", (t) => t.sending);
     // Hver vei ut låser opp skjemaet først, så feilmeldingen kan flytte fokus og kunden kan rette eller prøve igjen
     const end = (fn) => { lock(false); fn(); };
-    // Timen er lagret: si det med en gang, og hent oppdaterte ledige tider i bakgrunnen
-    // Bekreftelsen viser det serveren lagret (tjeneste, dag, tid), og står i #booking-done til siden lukkes
+    // Timen er lagret: si det med en gang, og hent oppdaterte ledige tider i bakgrunnen. Bekreftelsen viser det
+    // serveren lagret (tjeneste, dag, tid), og står i #booking-done til siden lukkes.
     const booked = (data) => {
       const b = (data && data.booking) || {};
       const svc = typeof b.service === "string" ? b.service : svcValue;
