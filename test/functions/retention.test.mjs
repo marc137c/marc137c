@@ -148,3 +148,15 @@ test("retention: a scheduled function declared in its own file, daily", () => {
   assert.deepEqual(retention.config, { schedule: "@daily" });
   assert.match(readFileSync(new URL("../../netlify/functions/retention.mjs", import.meta.url), "utf8"), /export const config = \{ schedule: "@daily" \}/);
 });
+
+// Netlify runs scheduled functions only on the published deploy. If its call ever came without deploy information,
+// the live store must still be cleaned: the rules are the same for every store, so this deletes only what is due.
+test("retention: a call without deploy information (the scheduler) cleans the live store too", async () => {
+  for (const ctx of [undefined, {}]) {
+    const { d, blobs } = site();
+    const res = await read(await retention.handle(request("/.netlify/functions/retention", { method: "POST", json: {} }), ctx, d));
+    assert.equal(res.status, 200);
+    assert.equal(blobs.has("bookings", "m/2026-11"), false, JSON.stringify(ctx));
+    assert.deepEqual(blobs.keys("stats"), ["d/2027-02-28"]);
+  }
+});

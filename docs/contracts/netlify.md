@@ -28,5 +28,5 @@ Each rule below is something the code assumes about Netlify. Each one names the 
 
 - **Docs:** https://docs.netlify.com/build/functions/scheduled-functions/
 - **Quote:** "Scheduled functions only run on their schedule for published deploys — Deploy Previews and branch deploys won't trigger them automatically."
-- **What the code does:** the schedule is declared in each function file (`export const config = { schedule: ... }`), never in `netlify.toml`. The only scheduled functions are `social-refresh.mjs` (hourly) and `retention.mjs` (the daily clean-up). `retention.mjs` still checks the context itself: it does nothing on a retired deploy, and outside production it cleans only the preview stores.
+- **What the code does:** the schedule is declared in each function file (`export const config = { schedule: ... }`), never in `netlify.toml`. The only scheduled functions are `social-refresh.mjs` (hourly) and `retention.mjs` (the daily clean-up). `retention.mjs` still checks the context itself: it does nothing on a retired deploy, cleans only the preview stores under another named context (such as `dev`), and treats a call without deploy information as the published deploy, since only that one runs on a schedule.
 - **Test:** `test/no-sms.test.mjs` (the list of scheduled functions, and no `schedule` in `netlify.toml`), `test/functions/retention.test.mjs`.

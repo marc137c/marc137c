@@ -5,8 +5,8 @@
 //  - de gamle innloggingstellerne auth/ip/* og auth/all (auth/epoch blir);
 //  - besøksstatistikk (d/ÅÅÅÅ-MM-DD) eldre enn STATS_KEEP_DAYS;
 //  - en Instagram-tilkobling som aldri ble fullført (oauth-state-*), etter et døgn.
-// På en gammel permalenke (isRetiredDeploy) gjør den ingenting. Utenfor produksjon rydder den bare
-// forhåndsvisningenes lagring. Feil i ett dokument stopper ikke resten; neste kjøring gjør det ferdig.
+// På en gammel permalenke (isRetiredDeploy) gjør den ingenting. Med en annen utrulling enn produksjon (f.eks.
+// netlify dev) rydder den bare forhåndsvisningenes lagring. Feil i ett dokument stopper ikke resten; neste kjøring gjør det ferdig.
 // Planen står i denne fila (Netlify: planlagte funksjoner kjører bare på den publiserte utrullingen).
 import { liveDeps, isProduction, isRetiredDeploy, retiredResponse } from "../lib/runtime.mjs";
 import { addDays, isDate, osloNow, mutateJSON, EPOCH_KEY } from "../lib/booking-core.mjs";
@@ -106,7 +106,9 @@ export async function handle(req, context, deps) {
   if (isRetiredDeploy(context)) return retiredResponse();
   const now = deps.now();
   const at = { today: osloNow(now).date, nowMs: now.getTime() };
-  const live = isProduction(context);
+  // Netlify kjører planlagte funksjoner bare på den publiserte utrullingen, så et kall uten utrullingsinfo regnes som
+  // det. Reglene er de samme for alle lagringer, så det sletter uansett bare det som skal bort.
+  const live = isProduction(context) || !(context && context.deploy && context.deploy.context);
   const tally = { deleted: 0, changed: 0, errors: 0 };
   const steps = [
     ...(live ? ["bookings"] : []).map((name) => () => cleanBookings(deps.getStore({ name, consistency: "strong" }), at, tally)),
