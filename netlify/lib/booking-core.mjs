@@ -62,6 +62,9 @@ const monthKey = (ym) => `m/${ym}`;
 export const mutateMonth = (store, ym, fn) =>
   mutateJSON(store, monthKey(ym), (data) => (data && Array.isArray(data.items) ? data : { items: [] }), fn);
 
+// Ventetiden før neste forsøk etter en kollisjon (ekte tid). Et objekt, så testene kan sette den til 0.
+export const retryDelay = { ms: (attempt) => 20 * 2 ** attempt + Math.random() * 20 };
+
 // Det samme for et vilkårlig JSON-dokument: init(data) gir dokumentet fn får (data = det lagrede, eller null).
 export async function mutateJSON(store, key, init, fn) {
   for (let attempt = 0; attempt < 8; attempt++) {
@@ -74,7 +77,7 @@ export async function mutateJSON(store, key, init, fn) {
     // og da skal kunden ikke få beskjed om at timen er booket.
     if (write.modified && write.etag) return result || { ok: true };
     if (write.modified) throw new Error("Netlify Blobs bekreftet ikke lagringen (mangler ETag)");
-    await new Promise((r) => setTimeout(r, 20 * 2 ** attempt + Math.random() * 20));
+    await new Promise((r) => setTimeout(r, retryDelay.ms(attempt)));
   }
   return { error: "Mange endringer samtidig. Prøv igjen.", status: 503 };
 }
@@ -104,7 +107,13 @@ export async function getAvailability(store, now = new Date()) {
 }
 
 // ---------- Validering ----------
-const clean = (s, max) => String(s ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, max);
+// Tekst slik den lagres: kontrolltegn blir mellomrom, et ensomt surrogat blir U+FFFD, og kuttet etter max
+// UTF-16-enheter deler aldri et tegn utenfor BMP (en emoji) i to.
+function clean(s, max) {
+  let t = String(s ?? "").toWellFormed().replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, max);
+  if (/[\ud800-\udbff]$/.test(t)) t = t.slice(0, -1);
+  return t.trim();
+}
 // Telefon: 8–15 sifre, uansett skrivemåte («409 63 911», «+47 409-63-911», «409.63.911»)
 const phoneOk = (p) => { const n = String(p ?? "").replace(/\D/g, "").length; return n >= 8 && n <= 15; };
 const fail = (code, error, status = 400) => ({ error, code, status });
@@ -135,7 +144,8 @@ export function validateCustomer(input, now = new Date()) {
   const name = clean(input.name, 80);
   const phone = clean(input.phone, 30);
   if (name.length < 2) return fail("bad_name", "Skriv inn navnet ditt.");
-  if (!phoneOk(input.phone)) return fail("bad_phone", "Ugyldig telefonnummer.");
+  // Sjekk det som lagres: et nummer over 30 tegn ble kuttet i stillhet, og sifrene etter tegn 30 forsvant (F25)
+  if (String(input.phone ?? "").trim().length > 30 || !phoneOk(phone)) return fail("bad_phone", "Ugyldig telefonnummer.");
   const addons = pickAddons(input.addons);
   const value = { date: input.date, start, dur, service, addons, name, phone };
   // Idempotens-nøkkel fra siden (SPEC R1): samme requestId igjen er et nytt forsøk på den samme bestillingen.
@@ -175,7 +185,12 @@ export function validateAdmin(input, { partial = false } = {}) {
     if (!["confirmed", "cancelled"].includes(input.status)) return { error: "Ugyldig status.", status: 400 };
     out.status = input.status;
   }
-  return { value: out };
+  // Idempotens-nøkkel for en ny avtale fra /admin, som for nettbestillinger (SPEC R1)
+  if (!partial && typeof input.requestId === "string" && REQUEST_ID_RE.test(input.requestId)) out.requestId = input.requestId;
+  // expect: avtalens updatedAt slik /admin så den. Er den endret et annet sted siden, svarer endringen 412 (SPEC R3).
+  // Den hører ikke til avtalen og lagres aldri.
+  if (input.expect !== undefined && (typeof input.expect !== "string" || input.expect.length > 40)) return { error: "Ugyldig versjon.", status: 400 };
+  return input.expect === undefined ? { value: out } : { value: out, expect: input.expect };
 }
 
 const newId = (date) => `${date}_${randomBytes(5).toString("hex")}`;
@@ -183,7 +198,8 @@ const newId = (date) => `${date}_${randomBytes(5).toString("hex")}`;
 // ---------- Opprett / endre / slett ----------
 export async function createItem(store, value, { source, force = false, now = new Date() } = {}) {
   const item = {
-    id: newId(value.date), type: value.type || "booking", status: "confirmed", source,
+    // status: det validerte (/admin kan legge inn en avlyst time); ellers «confirmed»
+    id: newId(value.date), type: value.type || "booking", status: value.status === "cancelled" ? "cancelled" : "confirmed", source,
     date: value.date, start: value.start, dur: value.dur,
     service: value.service || "", addons: value.addons || [], name: value.name || "", phone: value.phone || "", note: value.note || "",
     createdAt: now.toISOString(), updatedAt: now.toISOString(),
@@ -198,7 +214,7 @@ export async function createItem(store, value, { source, force = false, now = ne
       const same = doc.items.find((o) => o.requestId === item.requestId && active(o) && o.date === item.date && o.start === item.start);
       if (same) return { ok: true, item: same, replay: true, noWrite: true };
     }
-    const clash = doc.items.find((o) => active(o) && o.date === item.date && overlaps(item.start, item.dur, o.start, o.dur));
+    const clash = active(item) && doc.items.find((o) => active(o) && o.date === item.date && overlaps(item.start, item.dur, o.start, o.dur));
     if (clash && !force) return { error: "Tidspunktet er allerede booket.", code: "taken", status: 409 };
     doc.items.push(item);
     return { ok: true, item };
@@ -212,9 +228,25 @@ export async function findItem(store, id) {
   return doc?.items?.find((i) => i.id === id) || null;
 }
 
-export async function updateItem(store, id, changes, { force = false, now = new Date() } = {}) {
-  const current = await findItem(store, id);
+const idSuffix = (id) => { const s = String(id); return s.slice(s.indexOf("_") + 1); };
+// Hver endring står allerede i avtalen (et nytt forsøk etter et svar som gikk tapt)
+const hasChanges = (item, changes) => Object.keys(changes).every((k) => JSON.stringify(item[k]) === JSON.stringify(changes[k]));
+const STALE = { error: "Avtalen er endret på en annen enhet. Lukk og åpne den på nytt.", code: "stale", status: 412 };
+const MOVE_HALF_DONE = "Avtalen er lagt inn på den nye datoen, men den gamle tiden ble ikke fjernet. Trykk Lagre én gang til.";
+
+// Endrer en avtale. changes: feltene fra validateAdmin (partial). expect: updatedAt slik /admin så avtalen; er den
+// lagrede endret siden og endringen ikke allerede gjort, svarer det 412 «stale» (X1.1/X1.2). Uten expect (en gammel
+// fane) som før. Kollisjon sjekkes bare når tiden endres (dato, start, varighet, eller en avlyst time blir aktiv
+// igjen), så et nytt telefonnummer på en time under en blokkering ikke gir 409 (F32).
+// Flytting til en annen måned beholder id-ens tilfeldige del (`${dato}_${suffix}`): avtalen legges inn i den nye
+// måneden (og erstatter en med samme id, så et nytt forsøk aldri gir to), og fjernes så fra den gamle. Feiler
+// fjerningen, svarer det 503 MOVE_HALF_DONE, og «Lagre» én gang til gjør jobben ferdig (F17).
+export async function updateItem(store, id, changes, { force = false, now = new Date(), expect } = {}) {
+  let current = await findItem(store, id);
+  // Ble flyttingen lagret i et tidligere forsøk (svaret gikk tapt), ligger avtalen allerede på den nye datoen
+  if (!current && changes.date !== undefined && isDate(changes.date)) current = await findItem(store, `${changes.date}_${idSuffix(id)}`);
   if (!current) return { error: "Fant ikke avtalen.", status: 404 };
+  const currentId = current.id;
   const fromMonth = monthOf(current.date);
   const toMonth = monthOf(changes.date ?? current.date);
   const build = (base) => {
@@ -222,35 +254,64 @@ export async function updateItem(store, id, changes, { force = false, now = new 
     if (next.start + next.dur > 1440) return { error: "Avtalen går over midnatt.", status: 400 };
     return { next };
   };
+  const timeChanged = (base, next) => next.date !== base.date || next.start !== base.start || next.dur !== base.dur || (active(next) && !active(base));
   const clashIn = (doc, next, selfId) => active(next) && doc.items.find((o) =>
     o.id !== selfId && active(o) && o.date === next.date && overlaps(next.start, next.dur, o.start, o.dur));
   const CLASH = { error: "Det nye tidspunktet kolliderer med en annen avtale.", status: 409 };
+  // null: gå videre; ellers svaret (en gjentakelse som allerede er gjort, eller 412)
+  const versionCheck = (base) => {
+    if (expect === undefined || base.updatedAt === expect) return null;
+    return hasChanges(base, changes) ? { ok: true, item: base, noWrite: true } : STALE;
+  };
 
   if (fromMonth === toMonth) {
     return mutateMonth(store, fromMonth, (doc) => {
-      const idx = doc.items.findIndex((i) => i.id === id);
+      const idx = doc.items.findIndex((i) => i.id === currentId);
       if (idx < 0) return { error: "Fant ikke avtalen.", status: 404 };
-      const { next, error, status } = build(doc.items[idx]);
+      const base = doc.items[idx];
+      const seen = versionCheck(base);
+      if (seen) return seen;
+      const { next, error, status } = build(base);
       if (error) return { error, status };
-      if (clashIn(doc, next, id) && !force) return CLASH;
+      if (timeChanged(base, next) && clashIn(doc, next, currentId) && !force) return CLASH;
       doc.items[idx] = next;
       return { ok: true, item: next };
     });
   }
-  // Flytting til en annen måned: ny ID (ID-en viser hvilken måned avtalen ligger i).
-  // Legg inn i ny måned først, fjern så fra den gamle – da forsvinner avtalen aldri.
+  const seen = versionCheck(current);
+  if (seen) return seen;
   const { next, error, status } = build(current);
   if (error) return { error, status };
-  next.id = newId(next.date);
-  const added = await mutateMonth(store, toMonth, (doc) => {
-    if (doc.items.some((o) => o.id === next.id)) return { ok: true, item: next };
+  next.id = `${next.date}_${idSuffix(currentId)}`;
+  const addToNewMonth = () => mutateMonth(store, toMonth, (doc) => {
     if (clashIn(doc, next, next.id) && !force) return CLASH;
-    doc.items.push(next);
+    const same = doc.items.findIndex((o) => o.id === next.id);
+    if (same >= 0) doc.items[same] = next; else doc.items.push(next);
     return { ok: true, item: next };
   });
+  let added;
+  try {
+    added = await addToNewMonth();
+  } catch (err) {
+    // Usikkert om skrivingen ble lagret (svaret kom aldri): se etter. Ligger den der, fullfør flyttingen.
+    const there = await findItem(store, next.id).catch(() => null);
+    if (!there || there.updatedAt !== next.updatedAt) throw err;
+    added = { ok: true, item: there };
+  }
   if (added.error) return added;
-  await mutateMonth(store, fromMonth, (doc) => { doc.items = doc.items.filter((i) => i.id !== id); });
-  return added;
+  let removed;
+  try {
+    removed = await mutateMonth(store, fromMonth, (doc) => {
+      const before = doc.items.length;
+      doc.items = doc.items.filter((i) => i.id !== currentId);
+      return doc.items.length === before ? { ok: true, noWrite: true } : { ok: true };
+    });
+  } catch (err) {
+    console.error("Flytting: kunne ikke fjerne den gamle tiden:", err && err.name);
+    removed = { error: true };
+  }
+  if (removed.error) return { error: MOVE_HALF_DONE, code: "move_half_done", status: 503 };
+  return { ok: true, item: added.item };
 }
 
 export async function deleteItem(store, id) {
@@ -260,7 +321,7 @@ export async function deleteItem(store, id) {
   return mutateMonth(store, monthOf(date), (doc) => {
     const before = doc.items.length;
     doc.items = doc.items.filter((i) => i.id !== id);
-    if (doc.items.length === before) return removed ? { ok: true } : { error: "Fant ikke avtalen.", status: 404 };
+    if (doc.items.length === before) return removed ? { ok: true, noWrite: true } : { error: "Fant ikke avtalen.", status: 404 };
     removed = true;
     return { ok: true };
   });

@@ -173,3 +173,62 @@ test("admin login: the 60-day token only with remember === true, otherwise 12 ho
     assert.equal(r.body.expiresIn, ttl, JSON.stringify(remember));
   }
 });
+
+// ---------- Edits (F32, X1.1/X1.2) ----------
+const patch = (d, id, json) => handle(request(`/api/admin/items/${id}`, { method: "PATCH", headers: auth(d), json }), { ...PRODUCTION, params: { id } }, d).then(read);
+
+test("admin edit: a booking under a block can get a new phone (200), but moving it inside the block is still 409 (F32)", async () => {
+  const d = testDeps({ now: NOW, env });
+  const [b] = seedItems(d.blobs, [
+    item({ date: "2026-11-20", start: 600, dur: 30 }),
+    item({ date: "2026-11-20", start: 600, dur: 120, type: "block", name: "", phone: "", service: "" }),
+  ]);
+  const phone = await patch(d, b.id, { phone: "400 00 000" });
+  assert.equal(phone.status, 200, JSON.stringify(phone.body));
+  assert.equal(phone.body.item.phone, "400 00 000");
+  assert.equal((await patch(d, b.id, { note: "Kommer litt sent" })).status, 200);
+  assert.equal((await patch(d, b.id, { start: 630 })).status, 409);
+  assert.equal((await patch(d, b.id, { status: "cancelled" })).status, 200);
+  assert.equal((await patch(d, b.id, { status: "confirmed" })).status, 409, "reactivating it under the block is a time change");
+});
+
+for (const [label, change] of [["same month (a new note)", { note: "Fra A" }], ["cross month (a move to 2 Dec)", { date: "2026-12-02" }]]) {
+  test(`admin edit: a stale edit is 412 'stale' and the cancel made on the other device stays, ${label} (X1.1)`, async () => {
+    const d = testDeps({ now: NOW, env });
+    const [b] = seedItems(d.blobs, [item({ date: "2026-11-27", start: 600 })]);
+    const seenByA = b.updatedAt;
+    d.clock.advance(60e3);
+    const byB = await patch(d, b.id, { status: "cancelled", expect: seenByA });
+    assert.equal(byB.status, 200);
+    d.clock.advance(60e3);
+    const byA = await patch(d, b.id, { ...change, expect: seenByA });
+    assert.equal(byA.status, 412, JSON.stringify(byA.body));
+    assert.equal(byA.body.code, "stale");
+    assert.equal(byA.body.error, "Avtalen er endret på en annen enhet. Lukk og åpne den på nytt.");
+    const items = storedItems(d.blobs);
+    assert.deepEqual(items.map((i) => [i.id, i.status, i.note, i.date]), [[b.id, "cancelled", "", "2026-11-27"]]);
+    // With the current version it goes through
+    const fresh = await patch(d, b.id, { ...change, expect: byB.body.item.updatedAt });
+    assert.equal(fresh.status, 200, JSON.stringify(fresh.body));
+  });
+}
+
+test("admin edit: a PATCH without expect (an old admin tab) still works, and expect is never stored", async () => {
+  const d = testDeps({ now: NOW, env });
+  const [b] = seedItems(d.blobs, [item({ date: "2026-11-27", start: 600 })]);
+  assert.equal((await patch(d, b.id, { note: "Uten versjon" })).status, 200);
+  assert.equal((await patch(d, b.id, { note: "Med versjon", expect: storedItems(d.blobs)[0].updatedAt })).status, 200);
+  assert.equal("expect" in storedItems(d.blobs)[0], false);
+  assert.equal((await patch(d, b.id, { note: "x", expect: "y".repeat(41) })).status, 400);
+});
+
+test("admin edit: a body that is not a JSON object is 400, not a server error", async () => {
+  const d = testDeps({ now: NOW, env });
+  const [b] = seedItems(d.blobs, [item({ date: "2026-11-27" })]);
+  for (const body of ["{", "[]", "null", "5"]) {
+    const res = await read(await handle(request(`/api/admin/items/${b.id}`, { method: "PATCH", headers: { ...auth(d), "Content-Type": "application/json" }, body }), { ...PRODUCTION, params: { id: b.id } }, d));
+    assert.equal(res.status, 400, body);
+    const created = await read(await handle(request("/api/admin/items", { method: "POST", headers: { ...auth(d), "Content-Type": "application/json" }, body }), PRODUCTION, d));
+    assert.equal(created.status, 400, body);
+  }
+});

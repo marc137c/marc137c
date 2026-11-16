@@ -164,3 +164,11 @@ test("bookings: a requestId only replays the same time; a malformed one is ignor
   assert.equal(again.body.booking.start, 690);
   assert.equal(storedItems(d.blobs).length, 3);
 });
+
+test("bookings: a phone over 30 characters is 400 bad_phone and stores nothing (F25: it was cut and saved)", async () => {
+  const d = testDeps({ now: NOW });
+  const phone = "409 63 911" + " ".repeat(20) + "1"; // 31 characters, 9 digits
+  const res = await read(await handle(post({ ...BODY, phone }), PRODUCTION, d));
+  assert.deepEqual([res.status, res.body.code], [400, "bad_phone"]);
+  assert.equal(storedItems(d.blobs).length, 0);
+});

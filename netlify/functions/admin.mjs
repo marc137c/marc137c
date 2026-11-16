@@ -42,6 +42,15 @@ const pushUntil = (session) => (session.exp - session.iat <= SHORT_LOGIN ? new D
 const calendarInfo = (origin, feed, stale) => (feed
   ? { enabled: true, createdAt: feed.createdAt, links: feedLinks(origin, feed.token) }
   : stale ? { enabled: false, expired: true } : { enabled: false });
+// Brødteksten som et JSON-objekt (høyst 20 000 tegn), eller null
+async function readBody(req) {
+  const raw = await req.text();
+  if (raw.length > 20000) return null;
+  try {
+    const body = JSON.parse(raw);
+    return body && typeof body === "object" && !Array.isArray(body) ? body : null;
+  } catch { return null; }
+}
 const PUSH_POSTS = new Set(["/api/admin/push/subscribe", "/api/admin/push/unsubscribe", "/api/admin/push/test", "/api/admin/push/reset"]);
 
 // deps: se netlify/lib/runtime.mjs (testene sender inn falsk lagring, miljø og klokke)
@@ -118,16 +127,22 @@ export async function handle(req, context, deps) {
       return json({ from, to, today, items, config: { hours: CONFIG.hours, durations: CONFIG.durations, addons: CONFIG.addons } });
     }
     if (path === "/api/admin/items" && req.method === "POST") {
-      const v = validateAdmin(await req.json());
+      const body = await readBody(req);
+      if (!body) return json({ error: "Ugyldig forespørsel." }, 400);
+      const v = validateAdmin(body);
       if (v.error) return json({ error: v.error }, v.status);
+      // Med requestId er et nytt forsøk (svaret gikk tapt) den samme avtalen, aldri en kopi (SPEC R1)
       const r = await createItem(store, v.value, { source: "admin", force, now: deps.now() });
-      return r.error ? json(r, r.status) : json(r, 201);
+      return r.error ? json(r, r.status) : json({ ok: true, item: r.item }, 201);
     }
     if (id && req.method === "PATCH") {
-      const v = validateAdmin(await req.json(), { partial: true });
+      const body = await readBody(req);
+      if (!body) return json({ error: "Ugyldig forespørsel." }, 400);
+      const v = validateAdmin(body, { partial: true });
       if (v.error) return json({ error: v.error }, v.status);
-      const r = await updateItem(store, decodeURIComponent(id), v.value, { force, now: deps.now() });
-      return r.error ? json(r, r.status) : json(r);
+      // expect: updatedAt slik denne enheten så avtalen; 412 «stale» hvis den er endret et annet sted siden (X1.1)
+      const r = await updateItem(store, decodeURIComponent(id), v.value, { force, now: deps.now(), expect: v.expect });
+      return r.error ? json(r, r.status) : json({ ok: true, item: r.item });
     }
     if (path === "/api/admin/calendar" && req.method === "GET") {
       const { feed, stale } = await readFeedState(store, feedGen(password));
