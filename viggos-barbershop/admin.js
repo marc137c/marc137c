@@ -166,6 +166,19 @@
   };
   const state = { day: linkedDay() || todayIso(), items: [], week: [], config: null, editing: null };
   const hoursOn = (d) => { const h = state.config && state.config.hours; return h ? h[parse(d).getDay()] : null; };
+  // Eiervalg D4: en dag der aktive blokkeringer til sammen (inntil hverandre eller overlappende) dekker hele
+  // åpningstiden, er stengt. Samme regel som closedDays() på serveren og kundekalenderen (F91).
+  function fullyBlocked(d, list) {
+    const h = hoursOn(d);
+    if (!h) return false;
+    const spans = list.filter((x) => x.date === d && x.type === "block" && active(x)).sort((a, b) => a.start - b.start);
+    let reached = h[0];
+    for (let i = 0; i < spans.length; i++) {
+      if (spans[i].start > reached) break;
+      reached = Math.max(reached, spans[i].start + spans[i].dur);
+    }
+    return reached >= h[1];
+  }
 
   let loadSeq = 0;
   function load() {
@@ -201,10 +214,12 @@
     for (let i = 0; i < WEEK_DAYS; i++) {
       const d = addDays(today, i);
       const n = state.week.filter((x) => x.date === d && active(x) && x.type === "booking").length;
-      const closed = !hoursOn(d);
+      const closed = !hoursOn(d) || fullyBlocked(d, state.week);
+      const count = n ? `${n} ${n === 1 ? "time" : "timer"}` : "";
+      const label = closed ? (count ? count + " · stengt" : "stengt") : count || "&nbsp;";
       html.push(`<button type="button" data-day="${d}" class="${d === state.day ? "is-active" : ""}${closed ? " is-closed" : ""}">
         <span>${esc(fmt(d, { weekday: "short" }).replace(".", ""))}</span><strong>${parse(d).getDate()}</strong>
-        <span class="n">${n ? `${n} ${n === 1 ? "time" : "timer"}` : closed ? "stengt" : "&nbsp;"}</span></button>`);
+        <span class="n">${label}</span></button>`);
     }
     $("week").innerHTML = html.join("");
   }
@@ -239,9 +254,12 @@
     live.forEach((a) => live.forEach((b) => { if (a !== b && a.start < b.start + b.dur && b.start < a.start + a.dur) clashes.add(a.id); }));
 
     const bookings = live.filter((i) => i.type === "booking").length;
-    $("day-info").textContent = hours
-      ? `Åpent ${hhmm(hours[0])}–${hhmm(hours[1])} · ${bookings} ${bookings === 1 ? "avtale" : "avtaler"}${clashes.size ? " · ⚠ dobbeltbooking" : ""}`
-      : "Stengt denne dagen (du kan likevel legge inn avtaler).";
+    const avtaler = `${bookings} ${bookings === 1 ? "avtale" : "avtaler"}`;
+    $("day-info").textContent = hours && fullyBlocked(d, live)
+      ? "Stengt – blokkert hele dagen (du kan likevel legge inn avtaler)." + (bookings ? ` ${avtaler} ligger fortsatt inne.` : "")
+      : hours
+        ? `Åpent ${hhmm(hours[0])}–${hhmm(hours[1])} · ${avtaler}${clashes.size ? " · ⚠ dobbeltbooking" : ""}`
+        : "Stengt denne dagen (du kan likevel legge inn avtaler).";
 
     const rows = [];
     const shown = new Set();
