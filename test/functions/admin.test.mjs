@@ -296,3 +296,37 @@ test("admin: a 401 carries code expired, revoked or invalid", async () => {
   assert.deepEqual([r.status, r.body.code], [401, "invalid"]);
   assert.equal((await get(makeToken(PASSWORD, d.clock.now()))).status, 200);
 });
+
+// ---------- Fix-up round 2: a refused attempt creates no state (retention-load.mjs) ----------
+// Refused logins used to take a hit and give it back, leaving an empty counter document per client; 600 cheap
+// requests from 600 /64s left 600 documents for the 30-s daily clean-up. Abuse-suite rule: a refused request
+// (any 429) leaves zero new keys and writes nothing; a successful login leaves no document for its client.
+const writes = (d, from) => d.blobs.log.slice(from).filter((e) => e.method === "PUT" || e.method === "DELETE");
+test("admin login abuse: a refused attempt (429, the client cap) writes nothing and leaves zero new keys", async () => {
+  const d = testDeps({ now: NOW, env });
+  for (let i = 0; i < 10; i++) assert.equal((await tryLogin(d, "nope" + i, "203.0.113.20")).status, 401);
+  const keys = JSON.stringify(d.blobs.keys("bookings"));
+  const from = d.blobs.log.length;
+  for (let i = 0; i < 5; i++) assert.equal((await tryLogin(d, "nope", "203.0.113.20")).status, 429);
+  assert.deepEqual(writes(d, from), []);
+  assert.equal(JSON.stringify(d.blobs.keys("bookings")), keys);
+});
+test("admin login abuse: 600 wrong logins from 600 /64s leave only the counted attempts' documents, none empty", async () => {
+  const d = testDeps({ now: NOW, env });
+  const st = {};
+  for (let i = 0; i < 600; i++) {
+    const r = await tryLogin(d, "gjett" + i, `2001:db8:77:${i.toString(16)}::1`);
+    st[r.status] = (st[r.status] || 0) + 1;
+    if (i % 50 === 49) d.clock.advance(60e3);
+  }
+  assert.deepEqual(st, { 401: 100, 429: 500 });
+  const docs = d.blobs.keys("bookings").filter((k) => k.startsWith("rl/login/ip/"));
+  assert.equal(docs.length, 100, "one per counted attempt, none for a refused one");
+  assert.equal(docs.filter((k) => d.blobs.json("bookings", k).hits.length === 0).length, 0);
+});
+test("admin login abuse: a successful login gives its hit back by deleting its client's now-empty document", async () => {
+  const d = testDeps({ now: NOW, env });
+  assert.equal((await tryLogin(d, PASSWORD, "203.0.113.21")).status, 200);
+  assert.deepEqual(d.blobs.keys("bookings").filter((k) => k.startsWith("rl/login/ip/")), []);
+  assert.ok(d.blobs.has("bookings", "rl/login/all"), "the one global counter document stays");
+});

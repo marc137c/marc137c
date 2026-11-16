@@ -50,12 +50,26 @@ export async function peek(store, key, rules, { nowMs, token } = {}) {
 }
 
 // Tar tilbake treffet med denne id-en (et forsøk som likevel ikke ble noe av). Svarer { ok } eller { error, status }.
+// Blir en klients eller et nummers teller tom (ingen treff, intet pausevarsel), slettes dokumentet i stedet for å
+// lagres tomt (runde 2): ellers la hvert avviste forsøk igjen et dokument som den daglige oppryddingen måtte gå
+// gjennom. Sletting kan ikke være betinget i Netlify Blobs, så et treff skrevet i millisekundene mellom lesingen og
+// slettingen kan gå tapt; det gir høyst ett ekstra forsøk for den samme klienten eller det samme nummeret. De felles
+// tellerne (rl/all, rl/login/all) er ett dokument hver og slettes aldri her, så det felles taket er alltid eksakt.
+const isShared = (key) => key === ALL_KEY || key === LOGIN_ALL_KEY;
 export async function release(store, key, token) {
-  return mutateJSON(store, key, initHits, (doc) => {
+  let drop = false;
+  const r = await mutateJSON(store, key, initHits, (doc) => {
+    drop = false;
     if (!hasOwn(doc.hits, token)) return { ok: true, noWrite: true };
     doc.hits = doc.hits.filter((h) => !(h && h.id === token));
+    if (!isShared(key) && !doc.hits.some(validHit) && !Number.isFinite(doc.alertedAt)) {
+      drop = true;
+      return { ok: true, released: true, noWrite: true };
+    }
     return { ok: true, released: true };
   });
+  if (drop) await store.delete(key);
+  return r;
 }
 
 // Taket er nådd uten at noen har fått varsel innen alertMs: skriv alertedAt og svar tripped (bare én gang)

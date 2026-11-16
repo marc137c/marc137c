@@ -29,7 +29,7 @@ import {
   CONFIG, addDays, isDate, osloNow, readMonths, validateAdmin,
   createItem, updateItem, deleteItem, cancelMatching, monthsBetween, checkPassword, makeToken, checkSession, bumpEpoch, makeDeviceMark, verifyDeviceMark,
 } from "../lib/booking-core.mjs";
-import { take, release, newToken, counterKey, limiterSecret, clientKey, phoneKey, LOGIN_LIMITS, LOGIN_ALL_KEY } from "../lib/limits.mjs";
+import { take, peek, release, newToken, counterKey, limiterSecret, clientKey, phoneKey, LOGIN_LIMITS, LOGIN_ALL_KEY } from "../lib/limits.mjs";
 import { readFeedState, createFeed, feedLinks, feedGen } from "../lib/calendar.mjs";
 import {
   vapidKeys, readSubscriptions, parseSubscription, saveSubscription, removeSubscriptions, normalizeEndpoint,
@@ -83,6 +83,10 @@ export async function handle(req, context, deps) {
       const ipKey = counterKey(await limiterSecret(authStore), "login/ip", clientKey(ip));
       const checks = [[ipKey, LOGIN_LIMITS.ip]];
       if (!verifyDeviceMark(body.device, password, nowMs)) checks.push([LOGIN_ALL_KEY, LOGIN_LIMITS.all]);
+      // Først bare lesing (som takeBookingSlot): er en teller full, avvises forsøket uten at noe skrives, så et
+      // avvist forsøk aldri lager et dokument (runde 2: 600 avviste forsøk fra 600 /64 la igjen 600 tomme tellere)
+      const peeks = await Promise.all(checks.map(([key, rules]) => peek(authStore, key, rules, { nowMs })));
+      if (peeks.some((p) => p.full)) return json({ error: "For mange feil forsøk. Vent et kvarter og prøv igjen." }, 429);
       for (const [key, rules] of checks) {
         const r = await take(authStore, key, rules, { nowMs, token: attempt });
         if (r.error || !r.ok) {

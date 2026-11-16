@@ -48,9 +48,9 @@ function seedStore(blobs, store) {
   return { keep, keepCancelled };
 }
 
-function site({ listPageSize = 1000 } = {}) {
+function site({ listPageSize = 1000, retryDelayMs } = {}) {
   const clock = new FakeClock(NOW);
-  const blobs = new FakeBlobs({ clock, listPageSize });
+  const blobs = new FakeBlobs({ clock, listPageSize, ...(retryDelayMs !== undefined ? { retryDelayMs } : {}) });
   const d = testDeps({ blobs });
   const seeded = { bookings: seedStore(blobs, "bookings"), "bookings-preview": seedStore(blobs, "bookings-preview") };
   blobs.seed("stats", "d/2027-02-28", { views: 3, pages: { forside: 3 }, sources: { direkte: 3 } });
@@ -131,7 +131,9 @@ test("retention: outside production only the preview stores are cleaned", async 
 
 test("retention: a store error on one document stops nothing else, and the next run finishes the job", async (t) => {
   quiet(t);
-  const { d, blobs } = site();
+  // the client retries a 500 five times; with its real 5-s delay one failing document would use up the run's time
+  // budget (tested below), so here the retries are quick and the run has time for everything else
+  const { d, blobs } = site({ retryDelayMs: 100 });
   blobs.inject({ method: "PUT", store: "bookings", key: "m/2026-12", fault: "fail-before", status: 500, times: 6 });
   const first = await run(d);
   assert.equal(first.status, 500);
@@ -228,3 +230,55 @@ for (const [kind, seed, has, statedDays, keepDays] of [
     assert.ok(gone - end <= statedDays() * DAY, `deleted ${((gone - end) / DAY).toFixed(2)} days after the end of the date; stated ${statedDays()}`);
   });
 }
+
+// ---------- Fix-up round 2: a time budget (retention-load.mjs) ----------
+// Netlify stops a scheduled function after 30 s (docs/contracts/netlify.md). The clean-up walked every key one by
+// one, three Blobs calls per stale counter, bookings first: 600 refused logins from 600 /64s made it need 45 s, and
+// the statistics and Instagram steps never ran. Guard: with 5 000 stale counters at 25 ms per Blobs call (the
+// fake clock adds concurrent calls up, so this is the pessimistic case), one run stops cleanly inside the limit,
+// has done the bounded work (bookings, statistics, Instagram) first, says how much is left, and later runs finish.
+test("retention budget: 5 000 stale counters at 25 ms per call: the run stops cleanly within 30 s, bookings, statistics and Instagram done first, and later nights finish", async (t) => {
+  const out = quiet(t);
+  const clock = new FakeClock(NOW);
+  const blobs = new FakeBlobs({ clock, latencyMs: 25 });
+  const d = testDeps({ blobs });
+  const old = nowMs - 3 * DAY;
+  for (let i = 0; i < 5000; i++) blobs.seed("bookings", `rl/login/ip/${String(i).padStart(22, "x")}`, i % 2 ? { hits: [] } : { hits: [{ t: old, id: "a" + i }] });
+  blobs.seed("bookings", "rl/secret", { k: "s".repeat(43) });
+  blobs.seed("bookings", "m/2026-10", { items: [item({ date: "2026-10-05", name: "Gammel kunde" })] });
+  blobs.seed("stats", "d/2025-01-01", { views: 1, pages: { forside: 1 }, sources: { direkte: 1 } });
+  blobs.seed("social", "oauth-state-" + "c".repeat(48), { platform: "instagram", created_at: old });
+  const counters = () => blobs.keys("bookings").filter((k) => k.startsWith("rl/login/ip/")).length;
+  const t0 = clock.now();
+  const first = await run(d);
+  const took = clock.now() - t0;
+  assert.ok(took < 30e3, `the run took ${took / 1000} s on the virtual clock`);
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  assert.equal(blobs.has("bookings", "m/2026-10"), false, "the old booking (personal data) went first");
+  assert.equal(blobs.has("stats", "d/2025-01-01"), false, "the statistics step ran");
+  assert.equal(blobs.has("social", "oauth-state-" + "c".repeat(48)), false, "the Instagram step ran");
+  assert.ok(first.body.unfinished > 0 && counters() > 0, `stopped early: ${JSON.stringify(first.body)}, ${counters()} counters left`);
+  assert.ok(out.log.some((a) => /stoppet/i.test(String(a[0]))), "it says so in the log");
+  let nights = 1;
+  while (counters() > 0 && nights < 40) {
+    clock.advance(DAY);
+    const t1 = clock.now();
+    const r = await run(d);
+    assert.equal(r.status, 200);
+    assert.ok(clock.now() - t1 < 30e3);
+    nights++;
+  }
+  assert.equal(counters(), 0, `all stale counters gone after ${nights} nights`);
+  assert.ok(blobs.has("bookings", "rl/secret"));
+});
+
+test("retention budget: a stale counter costs two Blobs calls (read, delete), never a metadata read too", async () => {
+  const clock = new FakeClock(NOW);
+  const blobs = new FakeBlobs({ clock });
+  const d = testDeps({ blobs });
+  for (let i = 0; i < 20; i++) blobs.seed("bookings", `rl/ip/${String(i).padStart(22, "y")}`, { hits: [{ t: nowMs - 3 * DAY, id: "a" }] });
+  const from = blobs.log.length;
+  await run(d);
+  const onCounters = blobs.log.slice(from).filter((e) => e.store === "bookings" && e.key && e.key.startsWith("rl/ip/"));
+  assert.equal(onCounters.length, 40, JSON.stringify([...new Set(onCounters.map((e) => e.method))]));
+});
