@@ -116,3 +116,101 @@ test("R1: a new booking carries a requestId; Lagre again after a lost answer sen
   await page.flush();
   assert.notEqual(posts(page)[3].body.requestId, ids[2], "a new sheet is a new booking");
 });
+
+// ---------- Round 2: every request-sending control in #editor follows the same rules (SPEC R21) ----------
+// «Slett» never got the F27/F28 fixes «Lagre» got: a pending DELETE closed or wrote into the next sheet, a second
+// tap gave a false «slettet fra en annen enhet», and after an expired login the sheet said «trykk Lagre», which
+// deletes nothing. Table: Lagre, Slett and «Avlys alle nettbestillinger» × held → Lukk → open another sheet →
+// release ok / fail / 404 / 401. The other sheet is untouched, the control is locked while its request is pending,
+// a failure for a closed sheet is an alert naming the booking, and after a new login the interrupted action is named.
+const ali = item(DAY, 660, 30, { name: "Ali", phone: "400 00 001", source: "nettside", updatedAt: "2026-11-18T10:00:00.000Z" });
+const ali2 = item(DAY, 900, 30, { name: "Ali", phone: "400 00 001", source: "nettside" });
+const CONTROLS = {
+  "Lagre": { id: "save", route: `PATCH /api/admin/items/${encodeURIComponent(ali.id)}`, start: (page) => { page.field("note").value = "Ali-notat"; page.submit(); },
+    verb: "Ble ikke lagret", resume: "Du er logget inn igjen – trykk Lagre." },
+  "Slett": { id: "delete", route: `DELETE /api/admin/items/${encodeURIComponent(ali.id)}`, start: (page) => page.$("delete").click(),
+    verb: "Ble ikke slettet", resume: "Du er logget inn igjen – trykk Slett for å slette avtalen." },
+  "Avlys alle nettbestillinger": { id: "cancel-phone", route: "POST /api/admin/cancel-phone", start: (page) => page.$("cancel-phone").click(),
+    verb: "Ble ikke avlyst", resume: "Du er logget inn igjen – trykk «Avlys alle nettbestillinger» for å avlyse dem." },
+};
+const OUTCOMES = {
+  ok: (h) => h.release({ ok: true, item: {}, cancelled: 2 }),
+  fail: (h) => h.fail("Load failed"),
+  404: (h) => h.release({ status: 404, body: { error: "Fant ikke avtalen." } }),
+  401: (h) => h.release({ status: 401, body: { error: "Logg inn på nytt." } }),
+};
+async function sheetPage(ctl) {
+  const h = held();
+  const page = await loadAdmin({ now: DAY + "T09:00", confirm: () => true, routes: {
+    "GET /api/admin/items": itemsRoute([ali, ali2, nils]),
+    [ctl.route]: h.route,
+    [`PATCH /api/admin/items/${encodeURIComponent(nils.id)}`]: () => { throw new Error("Nils must not be changed"); },
+    "POST /api/admin/login": () => ({ token: "new", expiresIn: 43200000, device: "dev-mark" }),
+    "GET /api/admin/push": () => ({ publicKey: "x", devices: 0 }),
+  } });
+  page.tap("timeline", `[data-id="${ali.id}"] button.item-open`);
+  await page.flush();
+  return { page, h };
+}
+async function logInAgain(page) {
+  assert.equal(page.$("login").hidden, false, "the login page shows");
+  page.$("pw").value = "riktig";
+  page.submit("login-form");
+  await page.flush();
+}
+
+for (const [label, ctl] of Object.entries(CONTROLS)) {
+  for (const [outcome, release] of Object.entries(OUTCOMES)) {
+    test(`sheet requests: ${label} pending → Lukk → Nils's sheet → ${outcome}: Nils's sheet is untouched`, async () => {
+      const { page, h } = await sheetPage(ctl);
+      assert.equal(page.$(ctl.id).hidden, false, `${label} is shown`);
+      ctl.start(page);
+      await page.flush();
+      assert.equal(h.pending(), 1, `${label}'s request is on its way`);
+      assert.equal(page.$(ctl.id).disabled, true, `${label} is locked while its request is pending`);
+      page.$("cancel-edit").click();
+      page.tap("timeline", `[data-id="${nils.id}"] button.item-open`);
+      page.field("note").value = "Nils-notat";
+      release(h);
+      await page.flush();
+      if (outcome === "401") {
+        assert.equal(page.alerts.length, 1, JSON.stringify(page.alerts));
+        assert.match(page.alerts[0], new RegExp(`^${ctl.verb} \(.*(Ali|400 00 001).*\): innloggingen hadde gått ut`));
+        await logInAgain(page);
+      } else if (outcome === "fail") {
+        assert.equal(page.alerts.length, 1, JSON.stringify(page.alerts));
+        assert.match(page.alerts[0], new RegExp(`^${ctl.verb} \(.*(Ali|400 00 001).*\): Ingen forbindelse`));
+      }
+      nilsStillOpen(page);
+      if (outcome !== "401") assert.equal(page.$("edit-msg").textContent, "", "nothing written into Nils's sheet");
+    });
+  }
+  test(`sheet requests: ${label} gets 401 in its own sheet; after logging in the sheet names ${label}`, async () => {
+    const { page, h } = await sheetPage(ctl);
+    ctl.start(page);
+    await page.flush();
+    OUTCOMES[401](h);
+    await page.flush();
+    assert.deepEqual(page.alerts, []);
+    await logInAgain(page);
+    assert.equal(page.$("editor").open, true, "the sheet is back");
+    assert.equal(page.$("edit-msg").textContent, ctl.resume);
+    assert.equal(page.$(ctl.id).disabled, false, `${label} can be pressed again`);
+  });
+}
+
+test("sheet requests: Slett shows progress, and a second tap on the same booking while its DELETE is pending sends nothing", async () => {
+  const { page, h } = await sheetPage(CONTROLS.Slett);
+  page.$("delete").click();
+  await page.flush();
+  assert.equal(page.$("edit-msg").textContent, "Sletter …");
+  page.$("cancel-edit").click();
+  page.tap("timeline", `[data-id="${ali.id}"] button.item-open`);
+  page.$("delete").click();
+  await page.flush();
+  assert.equal(page.calls.filter((c) => c.method === "DELETE").length, 1, "one DELETE");
+  assert.equal(page.confirms.length, 1, "no second question");
+  h.release({ ok: true });
+  await page.flush();
+  assert.deepEqual(page.alerts, [], "no false «slettet fra en annen enhet»");
+});

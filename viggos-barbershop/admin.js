@@ -71,6 +71,14 @@
   // Gikk innloggingen ut mens en avtale var åpen for redigering, kommer arket tilbake (med det som var skrevet) når
   // Viggo har logget inn igjen (F28). Bare redigeringsarket: «Oppsett» har kalenderhemmeligheten og forblir lukket.
   let resumeEdit = false;
+  // Handlingen i arket som en utløpt innlogging (401) avbrøt, og det arket sier når det kommer tilbake (runde 2:
+  // «trykk Lagre» etter en avbrutt Slett slettet ingenting)
+  let resumeAction = null;
+  const RESUME_TEXT = {
+    save: "Du er logget inn igjen – trykk Lagre.",
+    delete: "Du er logget inn igjen – trykk Slett for å slette avtalen.",
+    "cancel-phone": "Du er logget inn igjen – trykk «Avlys alle nettbestillinger» for å avlyse dem.",
+  };
   function showLogin(message = "", kind = "") {
     if ($("editor").open) resumeEdit = true;
     closeDialogs();
@@ -204,7 +212,8 @@
         if (resumeEdit) {
           // dialog.close() tømmer ikke skjemaet, og state.editing er den samme: bare vis arket igjen
           resumeEdit = false;
-          $("edit-msg").textContent = "Du er logget inn igjen – trykk Lagre.";
+          $("edit-msg").textContent = RESUME_TEXT[resumeAction] || RESUME_TEXT.save;
+          resumeAction = null;
           $("editor").showModal();
         } else openPushIfAsked();
       }).catch((err) => {
@@ -467,7 +476,11 @@
 
   function openEditor(item, preset = {}) {
     sheetSeq++;
-    $("save").disabled = false; // en lagring fra et tidligere ark kan fortsatt være på vei
+    resumeAction = null;
+    // en lagring, sletting eller avlysning fra et tidligere ark kan fortsatt være på vei: knappene her er dette arkets
+    $("save").disabled = false;
+    $("delete").disabled = false;
+    $("cancel-phone").disabled = false;
     fillChoices();
     state.editing = item || null;
     const v = item || Object.assign({ type: "booking", date: state.day, start: firstFree(), dur: 30, service: "", addons: [], name: "", phone: "", note: "", status: "confirmed" }, preset);
@@ -531,6 +544,30 @@
   const GONE_SAVE = "Avtalen er flyttet eller slettet fra en annen enhet, så endringen ble ikke lagret. Listen oppdateres nå.";
   const GONE_DELETE = "Avtalen er flyttet eller slettet fra en annen enhet, så den ble ikke slettet her. Listen oppdateres nå.";
 
+  // Én forespørsel startet fra redigeringsarket: Lagre, Slett og «Avlys alle nettbestillinger» (F27, F28; runde 2,
+  // SPEC R21). Den hører til arket den ble startet i (sheet): knappen er låst mens den venter, svaret skrives bare i
+  // det arket, og er arket lukket eller et annet åpnet siden, kommer en feil som en alert som navngir avtalen (who).
+  // En 401 (innloggingen gikk ut) huskes som den avbrutte handlingen når arket kommer tilbake etter ny innlogging;
+  // ellers sies det fra med en gang.
+  function sheetCall(action, button, who, verb, sheet = sheetSeq) {
+    const own = () => sheetSeq === sheet;
+    const call = {
+      here: () => dlg.open && own(),
+      lock() { if (call.here()) $(button).disabled = true; },
+      unlock() { if (own()) $(button).disabled = false; },
+      error(err) {
+        if (err.status === 401) {
+          if (own() && resumeEdit) resumeAction = action;
+          else alert(`${verb} (${who}): innloggingen hadde gått ut. Logg inn og prøv igjen.`);
+          return;
+        }
+        if (call.here()) $("edit-msg").textContent = errText(err);
+        else alert(`${verb} (${who}): ${errText(err)}`);
+      },
+    };
+    return call;
+  }
+
   // Hver lagring holder fast det den gjelder fra trykket på Lagre (F27): målet (avtalen), det som sendes, og hvilket
   // ark det var (sheetSeq øker hver gang et ark åpnes). Et svar som kommer etter at arket er lukket og et annet er
   // åpnet, skriver aldri i det nye arket og lukker det aldri; en feil blir da et varsel som navngir avtalen.
@@ -573,12 +610,13 @@
         body.requestId = attempt.id;
       }
     }
-    // Det samme arket er fortsatt åpent
-    const here = () => dlg.open && sheetSeq === mine;
     const was = (k) => (body[k] != null ? body[k] : target ? target[k] : null);
     const who = was("name") || was("service") || (was("type") === "block" ? "Blokkering" : "avtale");
+    const call = sheetCall("save", "save", who, "Ble ikke lagret", mine);
+    // Det samme arket er fortsatt åpent
+    const here = call.here;
     const q = force ? "?force=1" : "";
-    if (here()) $("save").disabled = true;
+    call.lock();
     const sent = target
       ? api(`/api/admin/items/${encodeURIComponent(target.id)}${q}`, { method: "PATCH", body: JSON.stringify(body) })
       : api(`/api/admin/items${q}`, { method: "POST", body: JSON.stringify(body) });
@@ -588,7 +626,7 @@
       if (body.date && body.date !== state.day) state.day = body.date;
       return load();
     }).catch((err) => {
-      if (err.status === 401) return; // innloggingen vises (og arket kommer tilbake etterpå, F28)
+      if (err.status === 401) return call.error(err); // innloggingen vises (og arket kommer tilbake etterpå, F28)
       if ((err.status === 412 || err.status === 404) && target) {
         // Aldri «lagre likevel» her: da ville endringen fra den andre enheten blitt overskrevet
         alert(err.status === 412 ? STALE_TEXT : GONE_SAVE);
@@ -611,11 +649,8 @@
       if (err.status === 409 && !force) {
         if (confirm(`${who} ${hhmm(was("start"))}: ${err.message}\n\nVil du lagre likevel (dobbeltbooking)?`)) return save(true, { target, body, sheet: mine });
       }
-      if (here()) $("edit-msg").textContent = errText(err);
-      else alert(`Ble ikke lagret (${who}): ${errText(err)}`);
-    }).then(() => {
-      if (sheetSeq === mine) $("save").disabled = false;
-    });
+      call.error(err);
+    }).then(() => call.unlock());
   }
   f.addEventListener("submit", (e) => { e.preventDefault(); save(); });
 
@@ -649,17 +684,19 @@
     const btn = $("cancel-phone");
     if (!fl || fl.sheet !== sheetSeq || btn.disabled) return;
     if (!confirm(`Avlyse alle ${fl.n} nettbestillingene fra ${fl.phone} fra i dag og fremover?\n\nDe blir merket «Avlyst», og tidene blir ledige igjen. Kundene får ingen beskjed.`)) return;
-    btn.disabled = true;
+    const call = sheetCall("cancel-phone", "cancel-phone", fl.phone, "Ble ikke avlyst", fl.sheet);
+    call.lock();
+    const busy = "Avlyser …";
+    $("edit-msg").textContent = busy;
     api("/api/admin/cancel-phone", { method: "POST", body: JSON.stringify({ phone: fl.phone }) }).then((r) => {
       const n = Number(r.cancelled) || 0;
-      if (fl.sheet === sheetSeq && dlg.open) dlg.close();
+      if (call.here()) dlg.close();
       alert(`${n} ${n === 1 ? "nettbestilling" : "nettbestillinger"} fra ${fl.phone} er avlyst. Kundene har ikke fått beskjed.`);
       return load();
-    }).catch((err) => {
-      if (err.status === 401) return;
-      if (fl.sheet === sheetSeq && dlg.open) $("edit-msg").textContent = errText(err);
-      else alert(`Ble ikke avlyst (${fl.phone}): ${errText(err)}`);
-    }).then(() => { btn.disabled = false; });
+    }).catch((err) => call.error(err)).then(() => {
+      if (call.here() && $("edit-msg").textContent === busy) $("edit-msg").textContent = "";
+      call.unlock();
+    });
   });
 
   // ---------- Søk etter en kunde (X2.1) ----------
@@ -708,21 +745,37 @@
     });
   });
 
+  // Slettinger på vei (avtalens id): et nytt trykk på Slett for den samme avtalen mens den første venter, sender
+  // ingenting (ellers fikk det andre 404 og en falsk «slettet fra en annen enhet»)
+  const deleting = {};
+  const DELETING = "Sletter …";
   $("delete").addEventListener("click", () => {
     const it = state.editing;
-    if (!it) return;
+    if (!it || $("delete").disabled) return;
+    if (deleting[it.id]) { $("edit-msg").textContent = DELETING; return; }
     const what = it.type === "block" ? "blokkeringen" : `avtalen med ${it.name || "kunden"}${it.phone ? ` (${it.phone})` : ""}`;
     if (!confirm(`Slette ${what} ${fmt(it.date, { day: "numeric", month: "long" })} kl. ${hhmm(it.start)} for godt?\n\nTips: huk av «Avlyst» i stedet hvis du vil ha historikken.`)) return;
+    const who = `${it.type === "block" ? "blokkeringen" : it.name || "avtalen"} kl. ${hhmm(it.start)}`;
+    const call = sheetCall("delete", "delete", who, "Ble ikke slettet");
+    deleting[it.id] = true;
+    call.lock();
+    $("edit-msg").textContent = DELETING;
     // expect: avtalen slik denne enheten så den; er den endret et annet sted siden, svarer serveren 412 (R3)
     const q = it.updatedAt ? `?expect=${encodeURIComponent(it.updatedAt)}` : "";
     api(`/api/admin/items/${encodeURIComponent(it.id)}${q}`, { method: "DELETE" }).then(() => {
-      dlg.close();
+      if (call.here()) dlg.close();
       return load();
     }).catch((err) => {
-      if (err.status === 401) return;
-      if (err.status === 412) { alert(STALE_DELETE); dlg.close(); return load(); }
-      if (err.status === 404) { alert(GONE_DELETE); dlg.close(); return load(); }
-      $("edit-msg").textContent = errText(err);
+      if (err.status === 412 || err.status === 404) {
+        alert(err.status === 412 ? STALE_DELETE : GONE_DELETE);
+        if (call.here()) dlg.close();
+        return load();
+      }
+      call.error(err);
+    }).then(() => {
+      delete deleting[it.id];
+      if (call.here() && $("edit-msg").textContent === DELETING) $("edit-msg").textContent = "";
+      call.unlock();
     });
   });
 
@@ -1203,6 +1256,7 @@
       setToken(null);
       showLogin(msg[0], msg[1]);
       resumeEdit = false; // logget ut med vilje: ingen avtale skal dukke opp for neste som logger inn
+      resumeAction = null;
     });
   });
 
