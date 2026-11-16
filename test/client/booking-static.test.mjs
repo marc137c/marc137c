@@ -123,3 +123,37 @@ test("F8: index.html has a message box at steps 1-3, and a focused day or time i
   assert.match(css, /\.step-msg:empty \{ display: none; \}/);
   assert.match(css, /\.sr-only \{[^}]*clip: rect\(0, 0, 0, 0\)/);
 });
+
+// F70: a form field's border is a non-text element that must reach 3:1 against what is around it (WCAG 1.4.11).
+// The fields sit on --surface (the booking card) and are filled with --bg.
+const rootTokens = (css) => {
+  const m = /:root\s*\{([^}]*)\}/.exec(css);
+  assert.ok(m, "styles.css has a :root block");
+  const out = {};
+  for (const d of m[1].matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) out[d[1]] = d[2].trim();
+  return out;
+};
+function luminance(hex) {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  assert.ok(m, "a 6-digit hex colour: " + hex);
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16) / 255)
+    .map((c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+const contrast = (a, b) => { const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+
+test("F70: the contrast helper gives the known values", () => {
+  assert.equal(contrast("#000000", "#ffffff").toFixed(2), "21.00");
+  assert.equal(contrast("#2a3b31", "#12211a").toFixed(2), "1.41", "the old --line against --surface (the finding)");
+});
+
+test("F70: input and select borders use --field-line, at least 3:1 against --surface and --bg", () => {
+  const css = read("styles.css");
+  const t = rootTokens(css);
+  assert.equal(t["--field-line"], "#66796d");
+  assert.ok(contrast(t["--field-line"], t["--surface"]) >= 3, "against --surface: " + contrast(t["--field-line"], t["--surface"]).toFixed(2));
+  assert.ok(contrast(t["--field-line"], t["--bg"]) >= 3, "against --bg: " + contrast(t["--field-line"], t["--bg"]).toFixed(2));
+  const rule = /\ninput, select \{([^}]*)\}/.exec(css);
+  assert.ok(rule, "styles.css has the 'input, select' rule");
+  assert.match(rule[1], /border: 1px solid var\(--field-line\);/);
+});

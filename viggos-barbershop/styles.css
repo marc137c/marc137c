@@ -3,6 +3,7 @@
   --bg-alt: #0e1914;
   --surface: #12211a;
   --line: #2a3b31;
+  --field-line: #66796d; /* kanten på skjemafelt: minst 3:1 mot --surface og --bg (F70); --line er for skillelinjer */
   --text: #f2ece0;
   --muted: #b1ab9b;
   --gold: #cfa75e;
@@ -232,7 +233,7 @@ p { margin: 0 0 1em; }
 
 input, select {
   font: inherit; color: var(--text);
-  background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+  background: var(--bg); border: 1px solid var(--field-line); border-radius: 10px;
   padding: 12px 14px; width: 100%;
   color-scheme: inherit;
 }
