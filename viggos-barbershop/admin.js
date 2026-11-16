@@ -162,7 +162,10 @@
       // kundedata), så siden sier at de har stoppet. «Slå av varsler her» står likevel, for å rydde i nettleseren.
       // Siden sier «fortsatt slått på» bare når serverens oppføring for enheten kan være gjeldende ennå.
       const ended = noteEnded(sub);
-      const removed = logoutReason === "revoked" || logoutReason === "invalid";
+      // Grunnen huskes også i notatet (runde 2): 401-en fjernet billetten, så etter en omlasting finnes den bare der
+      const n = getNote();
+      const savedOff = !!n && !!n.off && n.endpoint === sub.endpoint;
+      const removed = logoutReason === "revoked" || logoutReason === "invalid" || savedOff;
       loginPushMsg(removed ? OFF_ELSEWHERE : ended
         ? `Varslene her stoppet da innloggingen gikk ut (${untilText(ended)}). Logg inn igjen for å få dem.`
         : "Denne enheten har fortsatt varsler om nye bestillinger slått på.", "info");
@@ -269,6 +272,13 @@
         if (res.status === 401) {
           // Hvorfor (expired, revoked, invalid): innloggingssiden sier ut fra det om varslene her kan være på fortsatt
           logoutReason = typeof data.code === "string" ? data.code : null;
+          // «revoked»/«invalid»: serveren har fjernet denne enheten. Det lagres i notatet (uten «until»), så
+          // innloggingssiden sier det samme etter en omlasting; neste vellykkede «Slå på varsler» (saveSub) skriver et
+          // nytt notat, og «Slå av varsler» med vilje fjerner det (runde 2)
+          if (logoutReason === "revoked" || logoutReason === "invalid") {
+            const n = getNote();
+            if (n && n.endpoint) putNote({ endpoint: n.endpoint, off: logoutReason });
+          }
           setToken(null);
           showLogin("Logg inn på nytt.", "info");
           throw Object.assign(new Error(data.error || "Logg inn"), { status: 401, code: logoutReason });

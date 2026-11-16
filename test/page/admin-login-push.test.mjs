@@ -187,3 +187,58 @@ test("login push: a 401 expired with no note keeps today's «fortsatt slått på
   const page = await loadAdmin({ navigator: b.navigator, globals: b.globals, routes: { "GET /api/admin/items": () => expired, "GET /api/admin/push": () => expired } });
   assert.equal(page.$("login-push-msg").textContent, ON_TEXT);
 });
+
+// Fix-up round 2 (probe R2-P1b, R2-INVALID-reload): the reason for the 401 lived only in memory, and the 401 had
+// already removed the token, so a reload (the Home Screen app reopened, same localStorage, same browser subscription)
+// said «fortsatt … slått på» again although the server had removed this device. Guard: what the login page says about
+// notifications comes from saved state or a server answer, never from memory alone, and every case runs twice: in the
+// tab that got the 401, and reloaded with the same localStorage and subscription.
+const reload = (page, b, now) => loadAdmin({ now, token: null, storage: Object.fromEntries(page.local._map), navigator: b.navigator, globals: b.globals });
+const STOPPED_AT = /^Varslene her stoppet da innloggingen gikk ut \(kl\. \d\d:46\)\. Logg inn igjen for å få dem\.$/;
+for (const [label, code, expected] of [
+  ["reset from another device", "revoked", OFF_ELSEWHERE],
+  ["a new password", "invalid", OFF_ELSEWHERE],
+  ["an expired login (before the note's end)", "expired", ON_TEXT],
+]) {
+  test(`login push (same tab and reloaded): after ${label} (401 ${code}) the text is the same both times`, async () => {
+    const device = makeDevice("fcm");
+    const b = fakePushBrowser({ device, permission: "granted", subscribed: KEY_BYTES });
+    const note = JSON.stringify({ endpoint: device.endpoint, until: "2027-01-15T02:46:00.000Z" });
+    const gone = { status: 401, body: { error: "Logg inn på nytt.", code } };
+    const page = await loadAdmin({ now: "2026-11-16T14:46", storage: { "viggo-push": note }, navigator: b.navigator, globals: b.globals, routes: { "GET /api/admin/items": () => gone, "GET /api/admin/push": () => gone } });
+    assert.ok(loginShown(page));
+    assert.equal(page.$("login-push-msg").textContent, expected, "in the tab that got the 401");
+    assert.equal(page.local.getItem("viggo-admin-token"), null, "the 401 removed the token");
+    const again = await reload(page, b, "2026-11-16T15:10");
+    assert.ok(loginShown(again));
+    assert.equal(again.$("login-push-msg").textContent, expected, "after a reload");
+    assert.equal(again.$("login-push-off").hidden, false);
+  });
+}
+test("login push (reloaded): an expired 12-h login says they stopped, also after a reload", async () => {
+  const device = makeDevice("fcm");
+  const b = fakePushBrowser({ device, permission: "granted", subscribed: KEY_BYTES });
+  const note = JSON.stringify({ endpoint: device.endpoint, until: "2026-11-17T02:46:00.000Z" });
+  const page = await loadAdmin({ now: "2026-11-17T09:00", token: null, storage: { "viggo-push": note }, navigator: b.navigator, globals: b.globals });
+  assert.match(page.$("login-push-msg").textContent, STOPPED_AT);
+  const again = await reload(page, b, "2026-11-17T09:30");
+  assert.equal(again.$("login-push-msg").textContent, page.$("login-push-msg").textContent);
+});
+test("login push (reloaded): logged out on purpose with notifications kept says they are still on, also after a reload", async () => {
+  const device = makeDevice("fcm");
+  const b = fakePushBrowser({ device, permission: "granted", subscribed: KEY_BYTES });
+  const note = JSON.stringify({ endpoint: device.endpoint, until: "2027-01-15T02:46:00.000Z" });
+  const page = await loadAdmin({ now: "2026-11-16T14:46", storage: { "viggo-push": note }, confirm: () => false, navigator: b.navigator, globals: b.globals });
+  page.$("logout").click();
+  await page.flush();
+  assert.ok(loginShown(page));
+  assert.equal(page.$("login-push-msg").textContent, ON_TEXT);
+  const again = await reload(page, b, "2026-11-16T15:10");
+  assert.equal(again.$("login-push-msg").textContent, ON_TEXT);
+});
+test("login push: a saved «off» reason (from an earlier 401 revoked) is shown at a fresh start with no 401", async () => {
+  const device = makeDevice("fcm");
+  const b = fakePushBrowser({ device, permission: "granted", subscribed: KEY_BYTES });
+  const page = await loadAdmin({ now: "2026-11-16T14:46", token: null, storage: { "viggo-push": JSON.stringify({ endpoint: device.endpoint, off: "revoked" }) }, navigator: b.navigator, globals: b.globals });
+  assert.equal(page.$("login-push-msg").textContent, OFF_ELSEWHERE, "the saved reason, with no 401 in this tab");
+});
