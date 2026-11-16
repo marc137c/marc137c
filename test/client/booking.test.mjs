@@ -371,6 +371,37 @@ test("F25: the phone field takes at most 30 characters, and a longer value is re
   assert.ok(site.focused === site.$("f-phone"));
 });
 
+// F57: redrawing the calendar (tab back, the 30-s refresh, a language switch) keeps keyboard focus where it was, and the
+// redraw happens even while focus is in the grid, so no stale 'Ledig' button stays on screen.
+const focusedTime = (site) => site.focused && site.focused.getAttribute && site.focused.getAttribute("data-time");
+test("F57: focus stays on the 10:00 slot over hide()/show(), poll() and I18N.set('en')", async () => {
+  const site = await boot();
+  await site.pick({ service: "Herreklipp", date: "2026-11-13", time: 600 });
+  assert.equal(focusedTime(site), "600", "the tapped slot has focus");
+  site.server.add({ date: "2026-11-13", start: 840, dur: 30 }); // something changes, so the slots are redrawn
+  await site.hide(); await site.show(); await site.advance(100);
+  assert.equal(focusedTime(site), "600", "after the tab comes back");
+  assert.ok(site.slots().some((x) => /is-taken/.test(x.cls) && /^14:00/.test(x.text)), "the redraw happened");
+  site.server.add({ date: "2026-11-13", start: 900, dur: 30 });
+  await site.poll();
+  assert.equal(focusedTime(site), "600", "after the 30-s refresh");
+  site.I18N.set("en"); await site.flush();
+  assert.equal(focusedTime(site), "600", "after switching to English");
+  assert.equal(site.slot(600).textContent, "10:00 AM");
+});
+
+test("F57: with focus on a day, the 30-s refresh still redraws: a time someone else took shows as taken", async () => {
+  const site = await boot();
+  await site.pick({ service: "Herreklipp", date: "2026-11-13" });
+  assert.equal(site.focused.getAttribute("data-date"), "2026-11-13");
+  assert.ok(site.slot(840), "14:00 is free");
+  site.server.add({ date: "2026-11-13", start: 840, dur: 30 });
+  await site.poll();
+  assert.ok(!site.slot(840), "14:00 is no longer offered");
+  assert.ok(site.slots().some((x) => /is-taken/.test(x.cls) && /^14:00/.test(x.text)));
+  assert.equal(site.focused.getAttribute("data-date"), "2026-11-13", "focus stays on the day");
+});
+
 test("F73: a successful booking is stored once and nothing else is sent (no Netlify Forms copy)", async () => {
   const site = await boot();
   await site.pick(FRIDAY);

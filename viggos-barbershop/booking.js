@@ -93,6 +93,11 @@
     return (fmtCache[key] || (fmtCache[key] = new Intl.DateTimeFormat(I18N.s().locale, opts))).format(d);
   };
 
+  // Kalenderen og tidene tegnes bare på nytt når innholdet faktisk er endret, så fokus og skjermleser blir i fred (F57)
+  let gridHtml = null, slotsHtml = null;
+  const setGrid = (h) => { if (h !== gridHtml) { grid.innerHTML = h; gridHtml = h; } };
+  const setSlots = (h) => { if (h !== slotsHtml) { slotsEl.innerHTML = h; slotsHtml = h; } };
+
   function renderCalendar() {
     const s = I18N.s();
     const view = state.view;
@@ -120,7 +125,7 @@
         (!HOURS[d.getDay()] ? `, ${s.closedDay.toLowerCase()}` : "") + (full ? `, ${s.fullDay.toLowerCase()}` : "");
       html.push(`<button type="button" class="${cls.join(" ")}" data-date="${iso(d)}" aria-label="${label}" aria-pressed="${sameDay(d, state.date)}"${ok ? "" : " disabled"}${full ? ` title="${s.fullDay}"` : ""}>${day}</button>`);
     }
-    grid.innerHTML = html.join("");
+    setGrid(html.join(""));
 
     const firstOfThisMonth = new Date(today().getFullYear(), today().getMonth(), 1);
     const firstOfLastMonth = new Date(lastDay().getFullYear(), lastDay().getMonth(), 1);
@@ -131,16 +136,16 @@
   function renderSlots() {
     const s = I18N.s();
     if (!state.date) {
-      slotsEl.innerHTML = `<p class="slots-empty">${s.pickDayFirst}</p>`;
+      setSlots(`<p class="slots-empty">${s.pickDayFirst}</p>`);
       return;
     }
     const slots = slotsFor(state.date);
     if (state.time !== null && !freeSlots(state.date).includes(state.time)) state.time = null;
     if (!slots.some((x) => x.status === "free")) {
-      slotsEl.innerHTML = `<p class="slots-empty">${slots.length ? s.dayFull : s.noSlots}</p>`;
+      setSlots(`<p class="slots-empty">${slots.length ? s.dayFull : s.noSlots}</p>`);
       return;
     }
-    slotsEl.innerHTML = slots.map(({ t, status }) => {
+    setSlots(slots.map(({ t, status }) => {
       if (status === "taken") {
         return `<button type="button" class="slot is-taken" disabled aria-label="${s.time(t)}, ${s.taken.toLowerCase()}"><span>${s.time(t)}</span><small>${s.taken}</small></button>`;
       }
@@ -149,7 +154,7 @@
       }
       const sel = t === state.time;
       return `<button type="button" class="slot${sel ? " is-selected" : ""}" data-time="${t}" aria-pressed="${sel}"><span>${s.time(t)}</span></button>`;
-    }).join("");
+    }).join(""));
   }
 
   function selectedServiceLabel() {
@@ -175,6 +180,20 @@
     if (state.date && (state.date < today() || state.date > lastDay())) { state.date = null; state.time = null; }
     renderCalendar(); renderSlots(); renderSummary(); renderMsg();
   };
+
+  // Tegner på nytt uten at tastaturfokuset i kalenderen eller tidene forsvinner: står fokus på en dag eller tid som
+  // tegnes på nytt, flyttes det til den samme (eller den valgte, eller den første ledige)
+  function renderKeepFocus() {
+    const a = document.activeElement;
+    const inGrid = !!a && grid.contains(a) && a !== grid;
+    const inSlots = !!a && slotsEl.contains(a) && a !== slotsEl;
+    const key = inGrid ? a.getAttribute("data-date") : inSlots ? a.getAttribute("data-time") : null;
+    renderAll();
+    if ((!inGrid && !inSlots) || document.activeElement === a) return;
+    const box = inGrid ? grid : slotsEl;
+    const same = key !== null ? box.querySelector(`[data-${inGrid ? "date" : "time"}="${key}"]:not([disabled])`) : null;
+    focusOn(same || box.querySelector(".is-selected") || box.querySelector("button:not([disabled])"));
+  }
 
   // Første synlige måned: den første med en ledig dag
   function initView() {
@@ -311,7 +330,12 @@
         online = false; // kalenderen virker fortsatt med det vi vet fra før
       });
   }
-  const refresh = () => loadAvailability().then(() => { if (!state.view) initView(); renderAll(); });
+  // Etter nye data fra serveren: tegn på nytt uten å miste fokus
+  function afterLoad() {
+    if (!state.view) initView();
+    renderKeepFocus();
+  }
+  const refresh = () => loadAvailability().then(afterLoad);
 
   // Samme bestilling sendt på nytt (etter et tapt svar, tidsavbrudd eller nettfeil) får samme requestId, så serveren
   // lagrer den bare én gang og svarer med timen som allerede er lagret. En endret bestilling får en ny (SPEC R1).
@@ -427,15 +451,8 @@
   initView();
   renderAll();
   refresh();
-  I18N.onChange(renderAll);
-  // Hold ledige tider oppdatert mens siden står åpen
-  // (ikke mens noen bruker kalenderen med tastaturet, så fokus ikke forsvinner)
-  setInterval(() => {
-    if (document.hidden) return;
-    loadAvailability().then(() => {
-      if (grid.contains(document.activeElement) || slotsEl.contains(document.activeElement)) return;
-      renderAll();
-    });
-  }, 30000);
+  I18N.onChange(renderKeepFocus);
+  // Hold ledige tider oppdatert mens siden står åpen (fokus i kalenderen beholdes, og utdaterte knapper tegnes på nytt)
+  setInterval(() => { if (!document.hidden) refresh(); }, 30000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
 })();
