@@ -22,7 +22,7 @@ Bestillinger lagres bare i Netlify Blobs (lageret `bookings`) via Netlify Functi
 ## Bestillingskalender
 `booking.js`: kunden velger tjeneste (og eventuelle tillegg), dag og tid, og skriver navn og telefon.
 - Kalenderen følger åpningstidene: søndager og passerte dager er stengt, tider deles i 30 minutter, i dag vises bare tider minst én time frem, og man kan bestille opptil 60 dager frem.
-- **Opptatte tider vises i rødt med «Opptatt»**, dager med noen bookinger får en gull prikk, og fullbookede dager blir røde. Tider der valgt tjeneste ikke rekker før neste avtale eller stengetid er grået ut og merket «For kort». En dag du har blokkert helt i timeboken, vises som stengt.
+- **Opptatte tider vises i rødt med «Opptatt»**, og fullbookede dager blir røde. Tider der valgt tjeneste ikke rekker før neste avtale eller stengetid er grået ut og merket «For kort». En dag du har blokkert helt i timeboken, vises som stengt.
 - Bestillingen lagres med en gang (`/api/bookings`). To kunder kan aldri få samme tid: den som kommer sist får beskjed om å velge en annen.
 - Etter hver bestilling står bekreftelsen over skjemaet så lenge siden er åpen, med lenken «Legg i kalenderen» (timen som kalenderfil).
 - Ingen kopi av bestillingen sendes noe annet sted (ikke Netlify Forms, ikke e-post).
@@ -128,10 +128,8 @@ Instagram-kontoen må være en **profesjonell konto** (Bedrift eller Innholdsska
 
 `<din-side>` må være den samme adressen som er registrert i steg 3, for eksempel `viggos-barbershop.netlify.app`.
 
-## Lyst og mørkt tema
-Sol/måne-knappen øverst i menyen bytter mellom mørkt tema (standard) og lyst tema, og valget huskes.
-Fargene for begge temaene står som variabler øverst i `styles.css` (`:root` og `:root[data-theme="light"]`).
-Den animerte bakgrunnen i toppen bytter farger mykt sammen med temaet.
+## Farger
+Siden har bare mørkt tema. Fargene står som variabler i `:root` øverst i `styles.css`.
 
 ## Gyllent partikkel-snøfall
 `gold-snow.js` legger et stille snøfall av gullstøv over hele siden. Det tar ikke imot klikk og ligger under menyen.
