@@ -487,6 +487,14 @@
     return id;
   }
 
+  // Aktive kundeavtaler som overlapper [start, end) den dagen (fra listen på skjermen, ellers hentet). null: ukjent.
+  function bookingsUnder(date, start, end) {
+    const pick = (list) => list.filter((i) => i.date === date && i.type === "booking" && active(i) && i.start < end && start < i.start + i.dur)
+      .sort((a, b) => a.start - b.start);
+    if (date === state.itemsDay) return Promise.resolve(pick(state.items));
+    return api(`/api/admin/items?from=${date}&to=${date}`).then((r) => pick(r.items || []), () => null);
+  }
+
   // ctx: { target, body, sheet } når en lagring prøves på nytt (409 → «lagre likevel»)
   function save(force = false, ctx) {
     const mine = ctx ? ctx.sheet : sheetSeq;
@@ -527,6 +535,19 @@
         alert(err.status === 412 ? STALE_TEXT : GONE_SAVE);
         if (here()) dlg.close();
         return load();
+      }
+      if (err.status === 409 && !force && was("type") === "block") {
+        // En blokkering over kunder (ferie, X2.3): si hvem, og at ingen av dem blir avlyst eller får beskjed
+        const start = was("start"), end = start + Number(was("dur"));
+        return bookingsUnder(was("date"), start, end).then((list) => {
+          const head = list && list.length
+            ? `${list.length === 1 ? "1 kunde har time her:" : `${list.length} kunder har time her:`}\n${list.map((i) => `${hhmm(i.start)} ${i.name || "Uten navn"} ${i.phone || ""}`.trim()).join("\n")}`
+            : "Det ligger allerede noe i dette tidsrommet.";
+          if (confirm(`${head}\n\nBlokkeringen avlyser dem ikke, og kundene får ingen beskjed. Ring dem og huk av «Avlyst». Lagre blokkeringen likevel?`)) return save(true, { target, body, sheet: mine });
+          const no = "Ikke lagret – tiden kan fortsatt bestilles på nett.";
+          if (here()) $("edit-msg").textContent = no;
+          else alert(`Blokkeringen ${hhmm(start)}: ${no}`);
+        });
       }
       if (err.status === 409 && !force) {
         if (confirm(`${who} ${hhmm(was("start"))}: ${err.message}\n\nVil du lagre likevel (dobbeltbooking)?`)) return save(true, { target, body, sheet: mine });
