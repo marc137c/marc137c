@@ -100,20 +100,25 @@ export class FakeServer {
     const service = own(SERVICE_ALIASES, b.service) ? SERVICE_ALIASES[b.service] : b.service;
     const dur = own(this.config.durations, service) ? this.config.durations[service] : undefined;
     if (!dur) return bad("bad_service");
+    // As the real server (bookings.mjs, findReplay; fix-up round 2): a replay of a stored, active booking with this
+    // requestId, date and start is answered before any rule that depends on the clock or the opening hours
+    const requestId = typeof b.requestId === "string" && REQUEST_ID.test(b.requestId) ? b.requestId : undefined;
+    const replay = requestId && this.active().find((i) => i.requestId === requestId && i.date === b.date && i.start === b.start);
     const { date: today, minutes } = this.oslo();
-    if (typeof b.date !== "string" || b.date < today || b.date > addDays(today, this.config.maxDays)) return bad("bad_date");
+    const clockRule = (code) => (replay ? this.created(replay) : bad(code));
+    if (typeof b.date !== "string" || b.date < today || b.date > addDays(today, this.config.maxDays)) return clockRule("bad_date");
     const h = this.config.hours[dow(b.date)];
-    if (!h) return bad("closed");
+    if (!h) return clockRule("closed");
     const start = b.start;
-    if (!Number.isInteger(start) || start % this.config.slotMin || start < h[0] || start + dur > h[1]) return bad("bad_time");
-    if (b.date === today && start < minutes + this.config.leadMin) return bad("too_early");
+    if (!Number.isInteger(start) || start % this.config.slotMin || start < h[0] || start + dur > h[1]) return clockRule("bad_time");
+    if (b.date === today && start < minutes + this.config.leadMin) return clockRule("too_early");
     if (String(b.name || "").trim().length < 2) return bad("bad_name");
     const phone = String(b.phone || "").trim();
     const digits = phone.replace(/\D/g, "").length;
     if (phone.length > 30 || digits < 8 || digits > 15) return bad("bad_phone");
-    const requestId = typeof b.requestId === "string" && REQUEST_ID.test(b.requestId) ? b.requestId : undefined;
-    const same = requestId && this.active().find((i) => i.requestId === requestId);
-    if (same) return this.created(same);
+    if (replay) return this.created(replay);
+    // the same requestId on an active booking at another time is reuse, never a second booking (SPEC R5)
+    if (requestId && this.active().some((i) => i.requestId === requestId)) return { status: 409, body: { error: "request_reused", code: "request_reused" } };
     if (this.active().some((i) => i.date === b.date && start < i.start + i.dur && i.start < start + dur)) return bad("taken", 409);
     const it = this.add({ date: b.date, start, dur, service, name: String(b.name).trim(), phone, addons: b.addons, requestId });
     return this.created(it);

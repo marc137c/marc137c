@@ -258,6 +258,19 @@ export async function createItem(store, value, { source, force = false, now = ne
   });
 }
 
+// Et nytt forsøk (replay) på en lagret nettbestilling: en aktiv avtale med samme requestId, dato og starttid, ellers
+// null. Vakt-regel (runde 2): et nytt forsøk på en lagret bestilling besvares med den lagrede (201) før noen regel
+// som avhenger av klokken eller av lagret tilstand (datovinduet, ledetiden, åpningstidene, takene). Ellers ble et nytt
+// forsøk etter at ledetiden hadde passert, besvart «for tidlig», og kunden bestilte en gang til.
+export async function findReplay(store, input) {
+  if (!input || typeof input.requestId !== "string" || !REQUEST_ID_RE.test(input.requestId) || !isDate(input.date)) return null;
+  const start = Number(input.start);
+  if (!Number.isInteger(start)) return null;
+  const doc = await store.get(monthKey(monthOf(input.date)), { type: "json" });
+  const items = doc && Array.isArray(doc.items) ? doc.items : [];
+  return items.find((o) => o && o.requestId === input.requestId && active(o) && o.date === input.date && o.start === start) || null;
+}
+
 export async function findItem(store, id) {
   const date = String(id).split("_")[0];
   if (!isDate(date)) return null;
