@@ -1,0 +1,12 @@
+{
+  "source": "The last published client: origin/main 31719ad, viggos-barbershop/index.html <option value> list and viggos-barbershop/booking.js DURATIONS. Unchanged at origin/main 1fb7739 (live since 2026-11-16) except the order of the options.",
+  "options": ["Full service", "Herreklipp", "Herreklipp + skjeggtrim", "Knivbarbering", "Skjegg & line-up", "Barneklipp"],
+  "durations": {
+    "Full service": 60,
+    "Herreklipp": 30,
+    "Herreklipp + skjeggtrim": 30,
+    "Knivbarbering": 30,
+    "Skjegg & line-up": 30,
+    "Barneklipp": 30
+  }
+}

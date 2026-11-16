@@ -92,6 +92,31 @@ export async function readMonths(store, fromDate, toDate) {
 }
 
 // ---------- Offentlig: ledighet ----------
+// Stengte dager (eierens beslutning D4, F7/F56): ingen automatiske helligdager, men en dag Viggo har blokkert helt
+// er stengt overalt. En dato er stengt når de aktive blokkeringene (type «block», ikke avlyst) til sammen dekker
+// åpningstiden den ukedagen. Bestillinger stenger aldri en dag, og søndag (ingen åpningstid) står aldri på lista.
+// Svarer datoene sortert. Tilfellene: test/fixtures/closed-days.mjs.
+export function closedDays(items) {
+  const blocks = new Map();
+  for (const i of items) {
+    if (!i || i.type !== "block" || !active(i) || !isDate(i.date) || !Number.isFinite(i.start) || !Number.isFinite(i.dur)) continue;
+    if (!blocks.has(i.date)) blocks.set(i.date, []);
+    blocks.get(i.date).push([i.start, i.start + i.dur]);
+  }
+  const out = [];
+  for (const [date, spans] of blocks) {
+    const hours = CONFIG.hours[dayOfWeek(date)];
+    if (!hours) continue;
+    let reached = hours[0]; // dekket fra åpning til hit
+    for (const [a, b] of spans.sort((x, y) => x[0] - y[0])) {
+      if (a > reached) break;
+      reached = Math.max(reached, b);
+    }
+    if (reached >= hours[1]) out.push(date);
+  }
+  return out.sort();
+}
+
 // Kundene ser bare opptatte tidsrom – aldri navn eller telefonnummer.
 export async function getAvailability(store, now = new Date()) {
   const { date: today, minutes } = osloNow(now);
@@ -99,10 +124,13 @@ export async function getAvailability(store, now = new Date()) {
   const items = await readMonths(store, today, last);
   const busy = {};
   for (const i of items.filter(active)) (busy[i.date] ||= []).push([i.start, i.start + i.dur]);
+  // De gamle navnene også, med den nye tjenestens varighet (F24)
+  const durations = { ...CONFIG.durations };
+  for (const [old, target] of Object.entries(SERVICE_ALIASES)) durations[old] = CONFIG.durations[target];
   return {
     today, nowMinutes: minutes, lastDate: last,
     hours: CONFIG.hours, slotMin: CONFIG.slotMin, leadMin: CONFIG.leadMin, maxDays: CONFIG.maxDays,
-    durations: CONFIG.durations, busy,
+    durations, busy, closed: closedDays(items),
   };
 }
 
@@ -121,8 +149,9 @@ const fail = (code, error, status = 400) => ({ error, code, status });
 // samme tillegg ble lagret slik, og varselet ble lengre enn alle andre)
 const pickAddons = (list) => (Array.isArray(list) ? CONFIG.addons.filter((a) => list.includes(a)) : []);
 
-// Gamle tjenestenavn → nye (godtas fortsatt, i tilfelle noen har den gamle siden åpen)
-const SERVICE_ALIASES = { "Herreklipp + skjeggtrim (maskin)": "Herreklipp + skjeggtrim" };
+// Gamle tjenestenavn → nye (godtas fortsatt, i tilfelle noen har den gamle siden åpen). /api/availability
+// publiserer dem med den nye tjenestens varighet, så en gammel side regner med samme lengde som serveren (F24).
+export const SERVICE_ALIASES = Object.freeze({ "Herreklipp + skjeggtrim (maskin)": "Herreklipp + skjeggtrim" });
 const alias = (s) => (Object.prototype.hasOwnProperty.call(SERVICE_ALIASES, s) ? SERVICE_ALIASES[s] : s);
 
 // Regler for kundebestillinger
