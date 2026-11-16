@@ -101,3 +101,25 @@ test("DEPLOY.md: every step is a checkbox, and the release, Netlify and domain s
     ["the owner's single final yes", /endelige ja/],
   ]) if (typeof re === "string") assert.ok(deploy.includes(re), what); else assert.match(deploy, re, what);
 });
+
+// Round 2 (SPEC R32): the README «Språk» section describes the tested behaviour, and every behaviour sentence there
+// names a test in test/page/site-i18n.test.mjs. Arriving with ?lang=en shows English for that link only; only the
+// toggle is remembered.
+test("docs round 2: README «Språk» says only the toggle is remembered, and each claim has its site-i18n test", () => {
+  const readme = read("viggos-barbershop/README.md");
+  const i = readme.indexOf("## Språk (norsk / English)");
+  assert.ok(i >= 0);
+  const section = readme.slice(i, readme.indexOf("\n## ", i + 5) >= 0 ? readme.indexOf("\n## ", i + 5) : undefined);
+  assert.doesNotMatch(section, /kommer via en lenke med `\?lang=en`; valget huskes/, "a ?lang=en link is not remembered");
+  assert.match(section, /Med en lenke med `\?lang=en` vises engelsk for den lenken; bare valget med bryteren huskes til neste besøk\./);
+  const tests = read("test/page/site-i18n.test.mjs");
+  for (const [claim, name] of [
+    ["åpner alltid på norsk", "a first visit with browser languages"],
+    ["valget med bryteren huskes", "choosing English with the toggle is remembered on the next visit"],
+    ["vises engelsk for den lenken", "arriving with ?lang=en shows English for that link only"],
+    ["skrives adressen om", "arriving with ?lang=en and toggling rewrites the address"],
+  ]) {
+    assert.ok(section.includes(claim), `README «Språk» says «${claim}»`);
+    assert.ok(tests.includes(name), `site-i18n.test.mjs has «${name}»`);
+  }
+});

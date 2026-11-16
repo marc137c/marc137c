@@ -1,5 +1,5 @@
 // Owner decision D5: Norwegian is the default for every visitor (en-US, sv-SE, no language at all). English shows
-// only when the visitor chooses it (the toggle or ?lang=en), and that choice is remembered (F13). Toggling after
+// only when the visitor chooses it (the toggle or ?lang=en); only the toggle's choice is remembered (F13, round 2). Toggling after
 // arriving with ?lang= rewrites the parameter, so a reload keeps what the visitor chose last (F52).
 // Runs the real i18n.js on the real index.html (test/helpers/site-page.mjs).
 import { test } from "node:test";
@@ -59,4 +59,16 @@ test("F52: a browser without history.replaceState still switches language", asyn
   const site = await loadSite({ search: "?lang=no", before: (ctx) => { ctx.history = {}; } });
   click(site.$("lang-toggle"));
   assert.equal(htmlLang(site), "en");
+});
+
+// ---------- Round 2: each behaviour sentence in the README «Språk» section has its test here (SPEC R32) ----------
+// The README said a visit through a ?lang=en link is remembered; only the toggle stores the choice (D5: English only
+// by the visitor's own choice). An English visitor who arrived with /?lang=en and then followed «← Til forsiden»
+// (href="/") got the Norwegian front page, as D5 intends, so the README is corrected, and this pins it.
+test("D5 round 2: arriving with ?lang=en shows English for that link only; the next visit without it is Norwegian", async () => {
+  const first = await loadSite({ search: "?lang=en", languages: ["nb-NO"] });
+  assert.equal(htmlLang(first), "en");
+  assert.equal(first.storage.getItem("lang"), null, "nothing is saved for a link");
+  const next = await loadSite({ languages: ["nb-NO"], storage: first.storage });
+  assert.equal(htmlLang(next), "no");
 });
