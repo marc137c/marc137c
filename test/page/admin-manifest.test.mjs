@@ -57,3 +57,10 @@ test("admin manifest: the service worker sits at the root, and Netlify serves th
   assert.match(block("/admin.webmanifest"), /Content-Type = "application\/manifest\+json/);
   assert.match(block("/admin-sw.js"), /Cache-Control = "no-cache"/);
 });
+
+// Round 2: current Chrome warns in the console when only the deprecated apple-mobile-web-app-capable is there.
+// Every Apple-only meta with a standard counterpart has it too (the Apple one stays for iOS).
+test("manifest round 2: mobile-web-app-capable sits next to apple-mobile-web-app-capable", () => {
+  const head = readFileSync(new URL("../../viggos-barbershop/admin.html", import.meta.url), "utf8");
+  assert.match(head, /<meta name="apple-mobile-web-app-capable" content="yes">\s*<meta name="mobile-web-app-capable" content="yes">/);
+});
