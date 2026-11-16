@@ -6,6 +6,7 @@ Statisk nettside (HTML/CSS/JS, ingen avhengigheter). Åpne `index.html` i nettle
 `netlify.toml` i roten av repoet peker Netlify til denne mappen (`publish = "viggos-barbershop"`).
 Bestillinger lagres bare i Netlify Blobs (lageret `bookings`) via Netlify Functions. Ingen kopi sendes via Netlify Forms eller e-post.
 **Viktig:** Netlify-siden må bygges fra dette GitHub-repoet (Site configuration → Build & deploy → Link repository), ellers blir verken funksjonene eller timeboken publisert.
+Adressen er **https://www.viggosbarbershop.no** (viggosbarbershop.no og den gamle netlify.app-adressen sender dit). Sjekklisten for hver publisering og for domenet står i `DEPLOY.md` i roten av repoet.
 
 ## Bedriftsinfo (bekreftet)
 - **Viggos Barbershop Kurti**, org.nr. 937 845 812, innehaver Vigan Kurti
@@ -78,11 +79,13 @@ Seksjonen «Hva kundene sier» viser snittkarakteren og opptil 4 anmeldelser med
 Før den er satt opp (og hvis `/api/reviews` ikke svarer innen 15 sekunder), vises eierens tre utvalgte Google-anmeldelser med «5,0 på Google» (`FEATURED` i `reviews.js`). Feiler Google i mer enn 3 døgn, slettes de lagrede anmeldelsene fra Google, og de tre utvalgte vises igjen.
 
 Oppsett (ca. 10 minutter):
-1. Gå til console.cloud.google.com, lag et prosjekt og slå på **Places API (New)**.
+1. Gå til console.cloud.google.com, lag et prosjekt, koble til en **betalingskonto** (Billing → Link a billing account; Google krever kort, men noen få oppslag i døgnet ligger innenfor gratiskvoten) og slå på **Places API (New)**.
 2. Lag en **API-nøkkel** (APIs & Services → Credentials) og begrens den til Places API (New).
 3. Legg den inn i **Netlify → Site configuration → Environment variables** som `GOOGLE_PLACES_API_KEY`.
 4. Valgfritt: `GOOGLE_PLACE_ID` – ellers finner siden «Viggos Barbershop» i Violgata 22 automatisk.
 5. Publiser på nytt. Google gir maks 5 anmeldelser per oppslag; siden viser de 4 første med tekst.
+
+Vises fortsatt bare de tre utvalgte anmeldelsene etter ca. 30 minutter? Se Netlify → Logs → Functions → `reviews`: «403 … BILLING_DISABLED» betyr at betalingskontoen mangler (steg 1); «Fant ikke Viggo's Barbershop i Violgata 22» betyr at du må sette `GOOGLE_PLACE_ID` (steg 4).
 
 ## Galleri
 Galleriet under «Om oss» viser bildene i `<div class="gallery">` i `index.html`. Slik legger du til et bilde:
