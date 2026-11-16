@@ -115,3 +115,49 @@ test("retired deploy: published: true and a production context without published
     assert.equal(d.blobs.json("bookings", "m/2026-11").items.length, 1);
   }
 });
+
+// ---------- Fix-up round 2: every function file, not a list of endpoints (retired-social-takeover.mjs) ----------
+// The F10 fix was applied to a list of endpoints, and social-connect.mjs, the one other function that guards a
+// site-wide write with an env secret frozen per deploy, was missed: a retired deploy with an old SOCIAL_ADMIN_KEY
+// wrote an OAuth state the live callback accepted. Guard: every file in netlify/functions/ exports
+// handle(req, context, deps), its default export is that handle with liveDeps(), and every route it serves answers
+// 410 on a retired deploy and opens no store, unless the file is in this commented exemption list.
+import { readdirSync, readFileSync } from "node:fs";
+const FUNCTIONS_DIR = new URL("../../netlify/functions/", import.meta.url);
+const EXEMPT = {
+  "availability.mjs": "read-only: busy intervals, no names or numbers; a retired deploy can only read",
+  "reviews.mjs": "read-only: Google reviews through the API key, no store",
+  "social.mjs": "read-only: the stored Instagram feed",
+  "social-refresh.mjs": "scheduled only, no path: Netlify runs schedules only on the published deploy (docs/contracts/netlify.md rule 4)",
+};
+// A route whose retired answer is not 410, with the reason; it still opens no store
+const RETIRED_ANSWER = { "POST /api/hit": [204, "the visitor beacon never shows an error; a retired deploy counts nothing"] };
+const sample = (p) => p.replace(":platform", "instagram").replace(":file", "2026-11-20_abcdef0123.ics").replace(":id", "2026-11-20_abcdef0123");
+const files = readdirSync(FUNCTIONS_DIR).filter((f) => f.endsWith(".mjs")).sort();
+
+test("retired deploy guard: the exemption list names only files that exist", () => {
+  for (const f of Object.keys(EXEMPT)) assert.ok(files.includes(f), f);
+});
+for (const file of files.filter((f) => !EXEMPT[f])) {
+  test(`retired deploy guard: every route of ${file} answers 410 and opens no store`, async () => {
+    const mod = await import(new URL(file, FUNCTIONS_DIR));
+    assert.equal(typeof mod.handle, "function", `${file} exports handle(req, context, deps)`);
+    assert.match(readFileSync(new URL(file, FUNCTIONS_DIR), "utf8"), /export default \(req, context\) => handle\(req, context, liveDeps\(\)\);/);
+    const paths = mod.config.path ? [].concat(mod.config.path) : ["/.netlify/functions/" + file.replace(/\.mjs$/, "")];
+    for (const p of paths) {
+      let answered = 0;
+      for (const method of ["GET", "POST"]) {
+        const d = testDeps({ now: NOW, env: { ADMIN_PASSWORD: PASSWORD, SOCIAL_ADMIN_KEY: "old-leaked-key" } });
+        const url = sample(p) + (p.startsWith("/api/connect/") ? "?key=old-leaked-key&state=" + "a".repeat(48) + "&code=X" : "");
+        const res = await read(await mod.handle(request(url, { method, ...(method === "POST" ? { json: {} } : {}) }), { ...RETIRED, params: { platform: "instagram", file: "2026-11-20_abcdef0123.ics", id: "2026-11-20_abcdef0123" } }, d));
+        // 410; or 405 for a method the route does not serve at all (nothing runs); or the documented answer above
+        const [status, why] = RETIRED_ANSWER[`${method} ${p}`] || [410];
+        assert.ok(res.status === status || res.status === 405, `${method} ${url}: ${res.status} ${JSON.stringify(res.body).slice(0, 120)}${why ? ` (${why})` : ""}`);
+        if (res.status !== 405) answered++;
+        assert.deepEqual(d.blobs.opened, [], `${method} ${url}: no store opened`);
+        assert.deepEqual(d.fetch.calls, [], `${method} ${url}: no outside call`);
+      }
+      assert.ok(answered > 0, `${p}: a method it serves answers on a retired deploy`);
+    }
+  });
+}

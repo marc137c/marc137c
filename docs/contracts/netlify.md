@@ -20,9 +20,9 @@ Each rule below is something the code assumes about Netlify. Each one names the 
 
 - **Docs:** https://docs.netlify.com/build/functions/api/#deploy (`context.deploy.context`, `context.deploy.published`)
 - **Rule (unquoted):** each deploy keeps its own code and env values and stays reachable at `https://<deploy-id>--<site>.netlify.app` until it is deleted (the audit noted up to 30 days). Its functions see `context.deploy.context === "production"` with `context.deploy.published === false`.
-- **What the code does:** `isRetiredDeploy(context)` in `netlify/lib/runtime.mjs` is `production && published === false`. Bookings, every `/api/admin/*` path (the login included), the calendar feed, the customer's `/api/bookings/<id>.ics`, `/api/push/renew` and the daily clean-up refuse there with 410 `{ error: "Bruk hovedsiden." }` before they open a store.
+- **What the code does:** `isRetiredDeploy(context)` in `netlify/lib/runtime.mjs` is `production && published === false`. Bookings, every `/api/admin/*` path (the login included), the calendar feed, the customer's `/api/bookings/<id>.ics`, `/api/push/renew`, the daily clean-up and the statistics panel refuse there with 410 `{ error: "Bruk hovedsiden." }` before they open a store, and `/api/connect/instagram` with a 410 page «Bruk hovedsiden» (fix-up round 2: its old `SOCIAL_ADMIN_KEY` could otherwise write an OAuth state the live callback accepted). The rule is checked per file: every file in `netlify/functions/` is tried, with a commented exemption list for read-only functions.
 - **Operations:** after each publish, delete the older deploys (Deploys → deploy → Options → Delete deploy).
-- **Test:** `test/functions/deploy-context.test.mjs` (410 and an empty Blobs log for each handler, while `published: true` or no `published` field behaves as before).
+- **Test:** `test/functions/deploy-context.test.mjs` (410 and an empty Blobs log for each handler, while `published: true` or no `published` field behaves as before; «retired deploy guard» for every function file), `test/functions/social-connect.test.mjs`.
 
 ## 4. Scheduled functions run only on the published deploy
 
