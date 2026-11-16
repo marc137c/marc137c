@@ -198,7 +198,11 @@
       $("sync").textContent = `Oppdatert ${hhmm(new Date().getHours() * 60 + new Date().getMinutes())}`;
     }).catch((err) => {
       if (seq !== loadSeq) return; // et nyere svar er på vei
-      if (err.status !== 401) $("sync").textContent = "Ingen forbindelse";
+      if (err.status === 401) return;
+      $("sync").textContent = "Ingen forbindelse";
+      // Dagen på skjermen er ikke hentet: si det, i stedet for «Henter …» som aldri blir ferdig. Tidtakeren og
+      // det å komme tilbake til fanen prøver igjen.
+      if (state.itemsDay !== state.day) $("timeline").innerHTML = '<li class="empty">Kunne ikke hente avtaler – prøver igjen …</li>';
     });
   }
 
@@ -214,7 +218,8 @@
     for (let i = 0; i < WEEK_DAYS; i++) {
       const d = addDays(today, i);
       const n = state.week.filter((x) => x.date === d && active(x) && x.type === "booking").length;
-      const closed = !hoursOn(d) || fullyBlocked(d, state.week);
+      // Før åpningstidene er hentet (uten nett fra start) vet vi ikke hvilke dager som er stengt (F29)
+      const closed = !!state.config && (!hoursOn(d) || fullyBlocked(d, state.week));
       const count = n ? `${n} ${n === 1 ? "time" : "timer"}` : "";
       const label = closed ? (count ? count + " · stengt" : "stengt") : count || "&nbsp;";
       html.push(`<button type="button" data-day="${d}" class="${d === state.day ? "is-active" : ""}${closed ? " is-closed" : ""}">
@@ -246,6 +251,13 @@
     $("day").value = d;
     const title = fmt(d, { weekday: "long", day: "numeric", month: "long" });
     $("day-title").textContent = d === todayIso() ? `I dag, ${title}` : title;
+    if (state.itemsDay !== d) {
+      // Dagens avtaler er ikke hentet ennå (eller nettet er borte): ingen oppsummering fra en annen dags liste, og
+      // ingenting vist som «ledig» før vi vet (F29). load() skriver «Kunne ikke hente …» hvis hentingen feiler.
+      $("day-info").textContent = "";
+      $("timeline").innerHTML = '<li class="empty">Henter avtaler …</li>';
+      return;
+    }
     const hours = hoursOn(d);
     // I starttidsrekkefølge (serveren sorterer, men et kort skal aldri havne feil om den ikke gjorde det)
     const items = state.items.filter((i) => i.date === d).sort((a, b) => a.start - b.start);
@@ -263,12 +275,7 @@
 
     const rows = [];
     const shown = new Set();
-    if (state.itemsDay !== d) {
-      // Dagens avtaler er ikke hentet ennå: ikke vis noe som «ledig» før vi vet
-      $("timeline").innerHTML = '<li class="empty">Henter avtaler …</li>';
-      return;
-    }
-    const row = (i) => `<li class="row"><time>${hhmm(i.start)}</time><div>${itemHtml(i, clashes.has(i.id))}</div></li>`;
+    const row =(i) => `<li class="row"><time>${hhmm(i.start)}</time><div>${itemHtml(i, clashes.has(i.id))}</div></li>`;
     if (hours) {
       // En kunde før åpningstid (f.eks. 09:30) står først, i rekkefølge, ikke nederst etter dagen (F31)
       live.filter((i) => i.start < hours[0]).forEach((i) => { shown.add(i.id); rows.push(row(i)); });
