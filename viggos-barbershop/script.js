@@ -121,9 +121,9 @@ function updateStatus() {
     tr.classList.toggle("today", tr.dataset.days.split(" ").includes(String(day)));
   });
 
-  el.className = "status closed"; // rød så lenge det er stengt; åpent nå = vanlig farge
-  if (today && minutes >= today[0] && minutes < today[1]) {
-    el.className = "status";
+  const openNow = !!(today && minutes >= today[0] && minutes < today[1]);
+  el.classList.toggle("closed", !openNow); // rød så lenge det er stengt; beholder "anim"-klassen
+  if (openNow) {
     el.textContent = s.hoursToday(s.time(today[0]), s.time(today[1]));
     return;
   }
