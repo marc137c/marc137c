@@ -186,6 +186,9 @@ export class Element extends Node {
   reset() { for (const el of this.elements) { delete el._value; delete el._checked; delete el._selIdx; } }
   get innerHTML() { return this.childNodes.map(serialize).join(""); }
   set innerHTML(html) {
+    // A test can watch every string a script writes: document.onInnerHTML = (element, html) => …
+    const doc = this.ownerDocument;
+    if (doc && typeof doc.onInnerHTML === "function") doc.onInnerHTML(this, String(html));
     for (const c of this.childNodes) c.parentNode = null;
     this.childNodes = [];
     parseInto(this, String(html), this.ownerDocument);
