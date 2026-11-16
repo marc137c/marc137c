@@ -175,11 +175,11 @@ for (const [label, ctl] of Object.entries(CONTROLS)) {
       await page.flush();
       if (outcome === "401") {
         assert.equal(page.alerts.length, 1, JSON.stringify(page.alerts));
-        assert.match(page.alerts[0], new RegExp(`^${ctl.verb} \(.*(Ali|400 00 001).*\): innloggingen hadde gått ut`));
+        assert.match(page.alerts[0], new RegExp(`^${ctl.verb} \\(.*(Ali|400 00 001).*\\): innloggingen hadde gått ut`));
         await logInAgain(page);
       } else if (outcome === "fail") {
         assert.equal(page.alerts.length, 1, JSON.stringify(page.alerts));
-        assert.match(page.alerts[0], new RegExp(`^${ctl.verb} \(.*(Ali|400 00 001).*\): Ingen forbindelse`));
+        assert.match(page.alerts[0], new RegExp(`^${ctl.verb} \\(.*(Ali|400 00 001).*\\): Ingen forbindelse`));
       }
       nilsStillOpen(page);
       if (outcome !== "401") assert.equal(page.$("edit-msg").textContent, "", "nothing written into Nils's sheet");

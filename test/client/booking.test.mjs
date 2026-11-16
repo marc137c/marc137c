@@ -81,7 +81,7 @@ test("NEW-429: the rate-limit text asks for a phone call and never says to try a
 // cap is full, was told their number had booked too much. Contract (SPEC R20): for each server code, the client
 // text names no cause that is false for one of the paths producing it. BOOKING_LIMITS is the list of causes; a new
 // cap must be added to CAUSE_WORDS here.
-const CAUSE_WORDS = { ip: /nettverk|network|enhet|device|adresse|address|IP/i, phone: /nummer|number/i, all: /alle kunder|everyone/i };
+const CAUSE_WORDS = { ip: /nettverk|network|enhet|device|adresse|address|\bIP\b/i, phone: /nummer|number/i, all: /alle kunder|everyone/i };
 test("contract: the rate_limited text names no cause that is false for one of the caps behind the code", async () => {
   const { BOOKING_LIMITS } = await import("../../netlify/lib/limits.mjs");
   const causes = Object.keys(BOOKING_LIMITS);
