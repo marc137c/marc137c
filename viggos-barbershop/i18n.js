@@ -170,6 +170,9 @@
       dayGone: "Dagen du valgte kan ikke bestilles lenger. Velg en annen dag.",
       reloadPage: "Siden er oppdatert. Last inn siden på nytt og prøv igjen.",
       booked: (when) => `Timen er booket: ${when}. Velkommen! Må du endre eller avlyse, ring oss på 409 63 911.`,
+      // Linjen som blir stående over skjemaet etter hver bestilling, med lenke til timen som kalenderfil
+      bookedLine: (when) => `Timen er booket: ${when}`,
+      addToCalendar: "Legg i kalenderen",
       // Anmeldelser
       basedOn: (n) => `basert på ${n} anmeldelser på Google`,
       ratingOf: (r) => `${r} av 5 stjerner`,
@@ -221,6 +224,8 @@
       dayGone: "The day you chose can no longer be booked. Please choose another day.",
       reloadPage: "This page has been updated. Please reload it and try again.",
       booked: (when) => `You're booked: ${when}. See you then! To change or cancel, call us on 409 63 911.`,
+      bookedLine: (when) => `You're booked: ${when}`,
+      addToCalendar: "Add to calendar",
       // Reviews
       basedOn: (n) => `based on ${n} reviews on Google`,
       ratingOf: (r) => `${r} out of 5 stars`,

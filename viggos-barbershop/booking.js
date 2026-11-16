@@ -33,6 +33,7 @@
   const slotsEl = $("slots");
   const summaryEl = $("booking-summary");
   const msg = $("form-msg");
+  const doneEl = $("booking-done");
   // Feil som gjelder tjeneste, dag eller tid vises ved det steget (der fokuset havner), resten under knappen (F8)
   const boxes = { service: $("msg-service"), day: $("msg-day"), time: $("msg-time") };
 
@@ -41,6 +42,8 @@
   const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
   const YMD = /^(\d{4})-(\d{2})-(\d{2})$/;
+  const fromIso = (s) => { const m = YMD.exec(s || ""); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; };
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
   const state = { date: null, time: null, view: null };
   let sending = false;     // en bestilling er på vei (se lock)
@@ -404,6 +407,19 @@
     Array.prototype.forEach.call(form.querySelectorAll(".addon-picks input"), (c) => { c.disabled = on; });
     form.setAttribute("aria-busy", on ? "true" : "false");
   }
+  // Bekreftelsene fra denne økten (NEW-confirm-volatile): én linje per time som er booket, over skjemaet. Ingen kvittering
+  // sendes noe annet sted, så dette er kundens eneste, og ingen melding, nytt valg eller ny tegning fjerner den. «Legg i
+  // kalenderen» er en vanlig lenke til serverens .ics for timen (ingen data:-URL: Chrome 60 stopper dem, og iOS 10 har
+  // ikke download-attributtet).
+  const bookedList = []; // { when(t), id }
+  function renderDone() {
+    if (!doneEl) return;
+    const s = I18N.s();
+    doneEl.innerHTML = bookedList.map((x) => {
+      const link = /^[A-Za-z0-9_-]{1,80}$/.test(x.id) ? ` <a href="/api/bookings/${x.id}.ics">${esc(s.addToCalendar)}</a>` : "";
+      return `<p class="booking-done-line">${esc(s.bookedLine(x.when(s)))}${link}</p>`;
+    }).join("");
+  }
   function done(textFn) {
     form.reset();
     select.classList.remove("picked");
@@ -429,7 +445,6 @@
     const addons = Array.prototype.map.call(form.querySelectorAll(".addon-picks input:checked"), (c) => c.value);
 
     const d0 = state.date, svcValue = select.value, t0 = state.time;
-    const whenFor = (t) => t.summary(selectedServiceLabelFor(svcValue), dateLabel(d0), t.time(t0));
     const bot = form.querySelector("[name=bot-field]");
     const body = {
       service: select.value, date: iso(state.date), start: state.time, addons,
@@ -446,9 +461,17 @@
     // Hver vei ut låser opp skjemaet først, så feilmeldingen kan flytte fokus og kunden kan rette eller prøve igjen
     const end = (fn) => { lock(false); fn(); };
     // Timen er lagret: si det med en gang, og hent oppdaterte ledige tider i bakgrunnen
-    const booked = () => {
+    // Bekreftelsen viser det serveren lagret (tjeneste, dag, tid), og står i #booking-done til siden lukkes
+    const booked = (data) => {
+      const b = (data && data.booking) || {};
+      const svc = typeof b.service === "string" ? b.service : svcValue;
+      const day = fromIso(b.date) || d0;
+      const start = typeof b.start === "number" ? b.start : t0;
+      const when = (t) => t.summary(selectedServiceLabelFor(svc), dateLabel(day), t.time(start));
       attempt = null;
-      end(() => done((t) => t.booked(whenFor(t))));
+      bookedList.push({ when, id: typeof b.id === "string" ? b.id : "" });
+      renderDone();
+      end(() => done((t) => t.booked(when(t))));
       refresh();
     };
     // Vi vet ikke om timen ble lagret (ingen svar, nettfeil, eller et svar vi ikke kan stole på). requestId beholdes,
@@ -465,7 +488,7 @@
     const ok = (r) => r.status >= 200 && r.status < 300 && !!r.data && r.data.ok === true;
     const answer = (r) => {
       const status = r.status, data = r.data || {};
-      if (ok(r)) return booked();
+      if (ok(r)) return booked(r.data);
       // Noen andre rakk å ta tiden, eller serveren sier at tiden eller dagen ikke kan bestilles (dens klokke og regler
       // vinner): hent ledige tider på nytt, slipp valget og si hvorfor ved steget
       if (status === 409 || data.code === "taken") return rejected("time", (t) => t.takenNow);
@@ -488,14 +511,14 @@
       if (!current()) return;
       uncertain();
       // Kommer svaret likevel senere og timen ble lagret, får kunden vite det
-      sent.late.then((r) => { if (current() && !sending && ok(r)) booked(); }, () => {});
+      sent.late.then((r) => { if (current() && !sending && ok(r)) booked(r.data); }, () => {});
     }).catch(() => { if (current()) uncertain(); });
   });
 
   initView();
   renderAll();
   refresh();
-  I18N.onChange(renderKeepFocus);
+  I18N.onChange(() => { renderKeepFocus(); renderDone(); });
   // Hold ledige tider oppdatert mens siden står åpen (fokus i kalenderen beholdes, og utdaterte knapper tegnes på nytt)
   setInterval(() => { if (!document.hidden) refresh(); }, 30000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });

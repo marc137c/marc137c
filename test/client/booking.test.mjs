@@ -4,7 +4,7 @@
 // customer is told to call 409 63 911, keeps what they typed, and is never told the time is confirmed.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { boot, later, FRIDAY, RATE_LIMITED } from "./booking-harness.mjs";
+import { boot, later, readSite, FRIDAY, RATE_LIMITED } from "./booking-harness.mjs";
 import * as CLOSED from "../fixtures/closed-days.mjs";
 
 const CALL = "409 63 911";
@@ -554,6 +554,52 @@ test("D4: the latest applied availability answer is window.bookingAvailability, 
   assert.equal(seen.length, 2, "a listener that throws does not stop the others or the page");
   assert.ok(seen[1] === site.ctx.bookingAvailability, "the newest answer");
   assert.ok(site.$("cal-grid").querySelectorAll(".cal-day").some((b) => !b.disabled), "the page still works");
+});
+
+// NEW-confirm-volatile: with no confirmation message sent anywhere, the on-page confirmation is the customer's only
+// record. It lives in its own element above the form, one line per booking made in this page session, and no later
+// tap, message or redraw clears it. 'Legg i kalenderen' is a plain link to the server's .ics for that booking.
+const doneLines = (site) => site.$("booking-done").querySelectorAll("p").map((p) => ({
+  text: p.textContent.replace(/\s+/g, " ").trim(), a: p.querySelector("a"),
+}));
+test("NEW-confirm-volatile: the confirmation stays after the next taps, with a link to the booking's .ics", async () => {
+  const site = await boot();
+  await site.pick(FRIDAY);
+  await site.book();
+  await site.advance(1000);
+  const id = site.server.bookings()[0].id;
+  site.choose(site.select, "Barneklipp"); await site.flush();      // now booking for a child
+  await site.pick({ date: "2026-11-16" });
+  assert.equal(site.message(), "", "the form message is gone");
+  let lines = doneLines(site);
+  assert.equal(lines.length, 1);
+  assert.match(lines[0].text, /^Timen er booket: Herreklipp · fredag 13\. november kl\. 14:00 Legg i kalenderen$/);
+  assert.equal(lines[0].a.getAttribute("href"), `/api/bookings/${id}.ics`);
+  assert.equal(lines[0].a.textContent, "Legg i kalenderen");
+  assert.equal(lines[0].a.getAttribute("download"), null, "no download attribute (iOS 10 has none)");
+  assert.equal(site.$("booking-done").getAttribute("role"), "status");
+  const ics = site.server.handle({ url: lines[0].a.getAttribute("href"), method: "GET" });
+  assert.equal(ics.status, 200, "the link is the server's GET /api/bookings/<id>.ics");
+
+  await site.pick({ time: 600, name: "Ola Nordmann", phone: FRIDAY.phone });
+  await site.book();
+  await site.advance(1000);
+  lines = doneLines(site);
+  assert.equal(lines.length, 2, "a second booking adds a line");
+  assert.match(lines[1].text, /^Timen er booket: Barneklipp · mandag 16\. november kl\. 10:00 /);
+  site.I18N.set("en"); await site.flush();
+  assert.match(doneLines(site)[0].text, /^You're booked: Men's haircut · Friday 13 November at 2:00 PM Add to calendar$/);
+  await site.poll();
+  await site.hide(); await site.show();
+  assert.equal(doneLines(site).length, 2, "redraws never clear it");
+});
+
+test("NEW-confirm-volatile: #booking-done sits above the form and starts empty", () => {
+  const html = readSite("index.html");
+  const done = html.indexOf('<div class="booking-done" id="booking-done" role="status"></div>');
+  assert.ok(done > 0, "index.html has the empty #booking-done");
+  assert.ok(done < html.indexOf('id="booking-form"'), "above the form");
+  assert.doesNotMatch(readSite("booking.js"), /data:text\/calendar/, "no data: URL (Chrome 60 blocks top-level data: navigation)");
 });
 
 test("F73: a successful booking is stored once and nothing else is sent (no Netlify Forms copy)", async () => {
