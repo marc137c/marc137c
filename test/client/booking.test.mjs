@@ -402,6 +402,50 @@ test("F57: with focus on a day, the 30-s refresh still redraws: a time someone e
   assert.equal(site.focused.getAttribute("data-date"), "2026-11-13", "focus stays on the day");
 });
 
+// F49: every path that drops a chosen time or day says why, at that step, at once and again on 'Bestill time'.
+const SAT_1630 = { service: "Herreklipp", date: "2026-11-14", time: 990, name: FRIDAY.name, phone: FRIDAY.phone };
+const reject = (code, status = 400) => (s) => s.when((r) => r.url === "/api/bookings", { status, body: { code, error: code } }, 1);
+const DROPS = [
+  { label: "a service change that no longer fits (Sat 16:30 + Full service)", pick: SAT_1630, act: async (site) => { site.choose(site.select, "Full service"); await site.flush(); }, box: "msg-time", key: "tooShortPicked" },
+  { label: "the 30-s refresh after someone else took the time", pick: FRIDAY, act: async (site) => { site.server.add({ date: FRIDAY.date, start: FRIDAY.time, dur: 30 }); await site.poll(); }, box: "msg-time", key: "timeGone" },
+  { label: "coming back to the tab after someone else took the time", pick: FRIDAY, act: async (site) => { site.server.add({ date: FRIDAY.date, start: FRIDAY.time, dur: 30 }); await site.hide(); await site.show(); }, box: "msg-time", key: "timeGone" },
+  { label: "a tap on another day where the chosen time is taken", pick: FRIDAY, setup: (s) => s.add({ date: "2026-11-16", start: 840, dur: 30 }), act: async (site) => { site.click(await site.day("2026-11-16")); await site.flush(); }, box: "msg-time", key: "timeGone" },
+  { label: "the server's booking window shrinking past the chosen day", pick: FRIDAY, act: async (site) => { site.server.config.maxDays = 0; await site.poll(); }, box: "msg-day", key: "dayGone" },
+  { label: "a 409 taken", pick: FRIDAY, setup: reject("taken", 409), act: (site) => site.book(), box: "msg-time", key: "takenNow" },
+  { label: "a 400 too_early", pick: FRIDAY, setup: reject("too_early"), act: (site) => site.book(), box: "msg-time", key: "timeGone" },
+  { label: "a 400 bad_time", pick: FRIDAY, setup: reject("bad_time"), act: (site) => site.book(), box: "msg-time", key: "timeGone" },
+  { label: "a 400 bad_date", pick: FRIDAY, setup: reject("bad_date"), act: (site) => site.book(), box: "msg-day", key: "dayGone" },
+  { label: "a 400 closed", pick: FRIDAY, setup: reject("closed"), act: (site) => site.book(), box: "msg-day", key: "dayGone" },
+];
+for (const d of DROPS) {
+  test(`F49: every path that clears the chosen time or day sets a visible reason: ${d.label}`, async () => {
+    const site = await boot({ setup: d.setup });
+    await site.pick(d.pick);
+    assert.notEqual(site.summary(), "", "a time is chosen");
+    await d.act(site);
+    await site.advance(500);
+    assert.equal(site.summary(), "", "the choice is dropped");
+    assert.equal(site.slots().filter((x) => /is-selected/.test(x.cls)).length, 0);
+    assert.deepEqual(site.visibleMessages().map((el) => el.id), [d.box], "one visible message, at the step");
+    assert.equal(site.message(), site.s()[d.key]);
+    const posts = site.bookingPosts().length;
+    await site.book();
+    await site.advance(500);
+    assert.equal(site.message(), site.s()[d.key], "'Bestill time' repeats the reason, not just 'choose a time'");
+    assert.equal(site.bookingPosts().length, posts, "nothing is sent");
+  });
+}
+
+test("F49: choosing again clears the reason", async () => {
+  const site = await boot();
+  await site.pick(SAT_1630);
+  site.choose(site.select, "Full service"); await site.flush();
+  assert.equal(site.message(), site.s().tooShortPicked);
+  site.click(site.slot(960)); await site.flush();
+  assert.equal(site.message(), "");
+  assert.match(site.summary(), /16:00/);
+});
+
 test("F73: a successful booking is stored once and nothing else is sent (no Netlify Forms copy)", async () => {
   const site = await boot();
   await site.pick(FRIDAY);

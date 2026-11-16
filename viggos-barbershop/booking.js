@@ -59,6 +59,8 @@
   }
   const today = () => { const n = now(); return new Date(n.y, n.m - 1, n.d); }; // ny Date hver gang: kallerne endrer den
   const lastDay = () => { const d = today(); d.setDate(d.getDate() + MAX_DAYS); return d; };
+  // Kan dagen bestilles i det hele tatt (åpen og innenfor bestillingsvinduet)?
+  const dayOpen = (d) => d >= today() && d <= lastDay() && !!HOURS[d.getDay()];
 
   const duration = () => DURATIONS[select.value] || SLOT_MIN;
   const isBusy = (date, start, dur) =>
@@ -140,7 +142,14 @@
       return;
     }
     const slots = slotsFor(state.date);
-    if (state.time !== null && !freeSlots(state.date).includes(state.time)) state.time = null;
+    // En valgt tid som ikke er ledig lenger (tatt av en annen, passert, eller for kort for ny tjeneste) slippes, med
+    // beskjed om hvorfor ved steget (F49)
+    if (state.time !== null && !sending && !slots.some((x) => x.t === state.time && x.status === "free")) {
+      const was = slots.filter((x) => x.t === state.time)[0];
+      state.time = null;
+      dropped.time = was && was.status === "short" ? (t) => t.tooShortPicked : (t) => t.timeGone;
+      setMsg("err", dropped.time, "time");
+    }
     if (!slots.some((x) => x.status === "free")) {
       setSlots(`<p class="slots-empty">${slots.length ? s.dayFull : s.noSlots}</p>`);
       return;
@@ -176,8 +185,13 @@
     summaryEl.hidden = !ready;
   }
   const renderAll = () => {
-    // En valgt dag som er blitt passert mens siden sto åpen, nullstilles
-    if (state.date && (state.date < today() || state.date > lastDay())) { state.date = null; state.time = null; }
+    // En valgt dag som er passert, stengt eller utenfor bestillingsvinduet mens siden sto åpen, slippes, med beskjed
+    if (state.date && !sending && !dayOpen(state.date)) {
+      state.date = null;
+      state.time = null;
+      dropped.day = (t) => t.dayGone;
+      setMsg("err", dropped.day, "day");
+    }
     renderCalendar(); renderSlots(); renderSummary(); renderMsg();
   };
 
@@ -257,7 +271,8 @@
     msg.className = "form-msg" + kind + (box ? " sr-only" : "");
     msg.textContent = text;
   }
-  function clearMsg() { lastMsg = null; renderMsg(); }
+  let dropped = { day: null, time: null }; // hvorfor en valgt dag/tid ble sluppet (gjentas ved «Bestill time»)
+  function clearMsg() { lastMsg = null; dropped = { day: null, time: null }; renderMsg(); }
   // Vis feilen og flytt fokus dit den gjelder. Meldingen ved steget rulles inn i bildet før fokus flyttes,
   // så telefonen ikke hopper til et felt langt oppe uten at kunden ser hvorfor.
   function fail(textFn, where, focusEl) {
@@ -365,6 +380,7 @@
     select.classList.remove("picked");
     state.date = null;
     state.time = null;
+    dropped = { day: null, time: null };
     lastMsg = { kind: "ok", textFn };
     renderAll();
   }
@@ -374,12 +390,10 @@
     if (sending) return;
     const name = $("f-name");
     const phone = $("f-phone");
+    renderAll(); // dager og tider som ikke kan bestilles lenger, slippes nå, med grunnen
     if (!select.value) return fail((t) => t.needService, "service", select);
-    if (!state.date) return fail((t) => t.needDay, "day", firstOpenDay());
-    if (state.time === null || !freeSlots(state.date).includes(state.time)) {
-      state.time = null; renderSlots(); renderSummary();
-      return fail((t) => t.needTime, "time", firstFreeSlot());
-    }
+    if (!state.date) return fail(dropped.day || ((t) => t.needDay), "day", firstOpenDay());
+    if (state.time === null) return fail(dropped.time || ((t) => t.needTime), "time", firstFreeSlot());
     if (!nameOk(name.value)) return fail((t) => t.needName, null, name);
     if (!phoneOk(phone.value)) return fail((t) => t.needPhone, null, phone);
 
@@ -415,6 +429,7 @@
       if (what === "day") state.date = null;
       state.time = null;
       renderAll();
+      dropped[what] = textFn;
       if (what === "day") fail(textFn, "day", firstOpenDay());
       else fail(textFn, "time", firstFreeSlot());
     }));
