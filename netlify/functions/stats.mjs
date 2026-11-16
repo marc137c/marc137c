@@ -5,7 +5,7 @@
 //                  forhåndsvisninger, grener, gamle permalenker og kall fra andre nettsteder telles ikke.
 //                  Ett dokument per dag (d/ÅÅÅÅ-MM-DD), konfliktsikkert; slettes etter STATS_KEEP_DAYS (retention.mjs).
 // GET  /api/stats – siste 30 dager, bare for innlogget barber (samme billett som /admin, også auth/epoch).
-import { liveDeps, bookingStore, isProduction, isRetiredDeploy, retiredResponse } from "../lib/runtime.mjs";
+import { liveDeps, bookingStore, isProduction, isRetiredDeploy, retiredResponse, jsonObject } from "../lib/runtime.mjs";
 import { osloNow, addDays, mutateJSON, readSession } from "../lib/booking-core.mjs";
 
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -69,8 +69,7 @@ export async function handle(req, context, deps) {
     if (!counted || !ua || BOT.test(ua)) return noContent();
     const raw = await readCapped(req, MAX_HIT_BYTES);
     if (raw === null) return json({ error: "For stor forespørsel." }, 413);
-    let body = {};
-    try { body = JSON.parse(raw) || {}; } catch { /* en melding vi ikke kan lese, teller som forsiden */ }
+    const body = jsonObject(raw) || {}; // en melding vi ikke kan lese (eller som ikke er et objekt), teller som forsiden
     const page = /personvern/.test(String(body.p || "")) ? "personvern" : "forside";
     const source = sourceOf(body.r);
     try {

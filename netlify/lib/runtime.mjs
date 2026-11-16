@@ -31,6 +31,17 @@ export const isProduction = (context) => Boolean(context && context.deploy && co
 // de åpner en lagring (test/functions/deploy-context.test.mjs, docs/contracts/netlify.md).
 export const isRetiredDeploy = (context) => isProduction(context) && context.deploy.published === false;
 export const retiredResponse = () => Response.json({ error: "Bruk hovedsiden." }, { status: 410, headers: { "Cache-Control": "no-store" } });
+// Brødteksten som et vanlig JSON-objekt, eller null (vakt-regel SPEC R14). JSON.parse alene slipper gjennom null,
+// tall, tekst, true og lister, og en handler som leser body.x på null, kaster (runde 2: POST /api/bookings med «null»
+// ga plattformens krasj-500). Hver handler bruker denne rett etter å ha lest teksten. empty: hva en tom tekst er,
+// for ruter der brødteksten er valgfri (ellers null).
+export function jsonObject(raw, { empty = null } = {}) {
+  if (raw === "" || raw === undefined || raw === null) return empty;
+  let value;
+  try { value = JSON.parse(raw); } catch { return null; }
+  return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+}
+
 export const PRODUCTION_STORE = "bookings";
 export const PREVIEW_STORE = "bookings-preview";
 export const bookingStore = (deps, context) =>

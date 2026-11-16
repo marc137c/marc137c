@@ -24,7 +24,7 @@
 // Enhetene er knyttet til ADMIN_PASSWORD: bytter Viggo passordet, får ingen av de gamle enhetene flere varsler.
 // En enhet får varsler bare til innloggingen den ble slått på med, går ut (12 timer, eller 60 dager med «Hold meg
 // innlogget»); da får den ett siste varsel uten kundedata.
-import { liveDeps, bookingStore, isRetiredDeploy, retiredResponse } from "../lib/runtime.mjs";
+import { liveDeps, bookingStore, isRetiredDeploy, retiredResponse, jsonObject } from "../lib/runtime.mjs";
 import {
   CONFIG, addDays, isDate, osloNow, readMonths, validateAdmin,
   createItem, updateItem, deleteItem, cancelMatching, monthsBetween, checkPassword, makeToken, readSession, bumpEpoch, makeDeviceMark, verifyDeviceMark,
@@ -48,15 +48,13 @@ const pushUntil = (session) => new Date(session.exp);
 const calendarInfo = (origin, feed, stale) => (feed
   ? { enabled: true, createdAt: feed.createdAt, links: feedLinks(origin, feed.token) }
   : stale ? { enabled: false, expired: true } : { enabled: false });
-// Brødteksten som et JSON-objekt (høyst 20 000 tegn), eller null
-async function readBody(req) {
+// Brødteksten som et JSON-objekt (høyst 20 000 tegn), eller null (SPEC R14). optional: en tom tekst er {}.
+async function readBody(req, { optional = false } = {}) {
   const raw = await req.text();
   if (raw.length > 20000) return null;
-  try {
-    const body = JSON.parse(raw);
-    return body && typeof body === "object" && !Array.isArray(body) ? body : null;
-  } catch { return null; }
+  return jsonObject(raw, { empty: optional ? {} : null });
 }
+const BAD_BODY = () => json({ error: "Ugyldig forespørsel." }, 400);
 const PUSH_POSTS = new Set(["/api/admin/push/subscribe", "/api/admin/push/unsubscribe", "/api/admin/push/test", "/api/admin/push/reset"]);
 
 // deps: se netlify/lib/runtime.mjs (testene sender inn falsk lagring, miljø og klokke)
@@ -71,8 +69,8 @@ export async function handle(req, context, deps) {
 
   if (path === "/api/admin/login") {
     if (req.method !== "POST") return json({ error: "Bruk POST." }, 405);
-    let body = {};
-    try { body = (await req.json()) || {}; } catch {}
+    const body = await readBody(req, { optional: true });
+    if (!body) return BAD_BODY(); // før telleren: en forespørsel uten passord prøver ingen gjetning
     // Sperre mot gjetting (F4, F5): hvert forsøk tar en plass i telleren FØR passordet sjekkes, konfliktsikkert,
     // så parallelle forsøk aldri får sjekket flere enn taket: høyst 10 per klient (IPv6 per /64) og 100 totalt per
     // 15 minutter. En enhet med et gyldig enhetsmerke (fra en tidligere innlogging her) slipper det felles taket.
@@ -166,9 +164,9 @@ export async function handle(req, context, deps) {
       return json(calendarInfo(url.origin, feed, stale));
     }
     if (path === "/api/admin/calendar" && req.method === "POST") {
-      let body = {};
-      try { body = await req.json(); } catch {}
-      const r = await createFeed(store, { replace: body && body.replace === true, now: deps.now(), gen: feedGen(password) });
+      const body = await readBody(req, { optional: true });
+      if (!body) return BAD_BODY();
+      const r = await createFeed(store, { replace: body.replace === true, now: deps.now(), gen: feedGen(password) });
       if (r.error) return json({ error: r.error }, r.status);
       return json(calendarInfo(url.origin, r.feed), r.created ? 201 : 200);
     }
@@ -190,8 +188,8 @@ export async function handle(req, context, deps) {
     if (PUSH_POSTS.has(path) && req.method === "POST") {
       const raw = await req.text();
       if (raw.length > 4000) return json({ error: "For stor forespørsel." }, 413);
-      let body = {};
-      try { body = JSON.parse(raw) || {}; } catch {}
+      const body = jsonObject(raw, { empty: {} });
+      if (!body) return BAD_BODY();
       const gen = pushGen(password);
       if (path === "/api/admin/push/reset") {
         // Ingen enhet får varsler, og alle innlogginger laget før nå slutter å virke (auth/epoch). Den som trykket,

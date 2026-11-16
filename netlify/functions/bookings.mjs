@@ -2,7 +2,7 @@
 // og to kunder kan aldri få samme tid (konfliktsikker skriving i Netlify Blobs).
 // Hver ny bestilling gir et varsel på Viggos telefon/PC (Web Push, netlify/lib/push.mjs). Varselet sendes etter at
 // timen er lagret, og får aldri felle bestillingen eller holde igjen svaret mer enn BOOKING_PUSH_WAIT_MS.
-import { liveDeps, bookingStore, afterResponse, isRetiredDeploy, retiredResponse } from "../lib/runtime.mjs";
+import { liveDeps, bookingStore, afterResponse, isRetiredDeploy, retiredResponse, jsonObject } from "../lib/runtime.mjs";
 import { validateCustomer, createItem } from "../lib/booking-core.mjs";
 import { takeBookingSlot, releaseBookingSlot } from "../lib/limits.mjs";
 import { notifyNewBooking, pushToDevices, bookingsPausedMessage, pushGen, BOOKING_PUSH_WAIT_MS } from "../lib/push.mjs";
@@ -20,8 +20,8 @@ export async function handle(req, context, deps) {
   if (site && site !== "same-origin") return json({ error: "Ikke tillatt.", code: "cross_site" }, 403);
   const raw = await req.text();
   if (raw.length > 4000) return json({ error: "For stor forespørsel." }, 413);
-  let input;
-  try { input = JSON.parse(raw); } catch { return json({ error: "Ugyldig JSON." }, 400); }
+  const input = jsonObject(raw); // bare et JSON-objekt; null, tall, tekst og lister er 400, aldri en krasj (SPEC R14)
+  if (!input) return json({ error: "Ugyldig forespørsel.", code: "bad_request" }, 400);
   if (input.botField) return json({ ok: true }); // honningkrukke mot spam-roboter (samme felt som Netlify Forms)
 
   const v = validateCustomer(input, deps.now());
