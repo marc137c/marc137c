@@ -280,11 +280,12 @@ export async function loadAdmin({ stats = false, routes = {}, token = "test-admi
 
 // A browser with service worker and Web Push (Chrome, Firefox, Safari 16+, iPhone Home Screen app on iOS 16.4+), or,
 // with ios: true and push: false, iPhone Safari outside the Home Screen (service worker, but no PushManager and no
-// Notification). iosVersion: the «OS 17_4» part of the iPhone's user agent. device: a fake-push.mjs makeDevice() whose endpoint and keys the subscription gets.
+// Notification). iosVersion: the «OS 17_4» part of the iPhone's user agent. userAgent, platform: replace them (an iPad in
+// desktop mode sends a Mac user agent with platform «MacIntel»). device: a fake-push.mjs makeDevice() whose endpoint and keys the subscription gets.
 // subscribed: the browser already has a subscription made with this applicationServerKey (bytes) at load.
 // As in Chrome, Firefox and Safari, pushManager.subscribe() asks for permission itself when it is «default» (the
 // barber answers `answer`), and rejects with NotAllowedError unless it ends up «granted».
-export function fakePushBrowser({ permission = "default", answer = "granted", device, subscribed, push = true, ios = false, iosVersion = "17_4", standalone = false, unsubscribeOk = true, registered = Boolean(subscribed), subscribeHangs = false, permissionsApi = false } = {}) {
+export function fakePushBrowser({ permission = "default", answer = "granted", device, subscribed, push = true, ios = false, iosVersion = "17_4", standalone = false, unsubscribeOk = true, registered = Boolean(subscribed), subscribeHangs = false, permissionsApi = false, userAgent, platform } = {}) {
   const log = { registered: [], subscribes: [], permissionAsks: 0, unsubscribed: [], getRegistration: [] };
   const listeners = {};
   const makeSub = (appKey) => ({
@@ -331,9 +332,10 @@ export function fakePushBrowser({ permission = "default", answer = "granted", de
     serviceWorker,
     userAgent: ios ? `Mozilla/5.0 (iPhone; CPU iPhone OS ${iosVersion} like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/${iosVersion.replace("_", ".")} Mobile/15E148 Safari/604.1`
       : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
-    platform: ios ? "iPhone" : "Win32",
+    platform: platform || (ios ? "iPhone" : "Win32"),
     maxTouchPoints: ios ? 5 : 0,
   };
+  if (userAgent) navigator.userAgent = userAgent; // e.g. an iPad in desktop mode (a Mac user agent, platform MacIntel)
   if (ios) navigator.standalone = standalone;
   // navigator.permissions (Chrome, Firefox, Safari 16+): its «notifications» status says when the barber changes it
   const status = { state: permission === "default" ? "prompt" : permission, onchange: null };
