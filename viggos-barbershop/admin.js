@@ -214,6 +214,7 @@
         setDevice(data.device);
         $("pw").value = "";
         showApp();
+        if (pendingDay) { state.day = pendingDay; pendingDay = null; } // et varsel trykket mens innloggingen sto fremme
         load();
         pushSync();
         if (resumeEdit) {
@@ -1300,12 +1301,20 @@
     } catch (e) { /* nettleseren kjenner ikke «notifications» her */ }
   }
 
-  // Trykk på et varsel mens timeboken er åpen: admin-sw.js sier hvilken dag som skal vises
+  // Trykk på et varsel mens timeboken er åpen: admin-sw.js sier hvilken dag som skal vises (open-day) eller at
+  // Oppsett skal åpnes (open-push). Står fanen på innloggingssiden, huskes det til Viggo har logget inn, som når
+  // varselet åpner et nytt vindu med /admin?dag=… eller ?varsler=1 (runde 2, SPEC R23).
+  let pendingDay = null;
+  const loggedIn = () => !!getToken() && !$("app").hidden;
   if (sw() && sw().addEventListener) {
     sw().addEventListener("message", (e) => {
       const d = e.data;
-      if (d && d.type === "open-day" && typeof d.date === "string" && toIso(d.date) === d.date && getToken()) go(d.date);
-      if (d && d.type === "open-push" && getToken() && !$("app").hidden) openSettings(true);
+      if (d && d.type === "open-day" && typeof d.date === "string" && toIso(d.date) === d.date) {
+        if (loggedIn()) go(d.date); else pendingDay = d.date;
+      }
+      if (d && d.type === "open-push") {
+        if (loggedIn()) openSettings(true); else pushAsked = true;
+      }
     });
   }
 

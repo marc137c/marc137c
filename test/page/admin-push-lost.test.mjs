@@ -150,3 +150,32 @@ test("lost 1: the reminder tapped while an edit sheet is open never closes the s
   assert.equal(page.$("settings").open, false);
   assert.equal(visible(page, "push-lost"), true);
 });
+
+// Round 2 (probes P2, P3): a notification's intent reaches the page by a URL (a new window: survives a login) or by a
+// message to an open tab, which was acted on only when the tab was logged in, and otherwise dropped. Guard (SPEC
+// R23): for each service-worker message type, the same end state after login whether the tab was logged in, on the
+// login page, or not open at all.
+const MESSAGES = {
+  "open-day": { msg: { type: "open-day", date: "2026-11-27" }, search: "?dag=2026-11-27", end: (page) => assert.equal(page.$("day").value, "2026-11-27") },
+  "open-push": { msg: { type: "open-push" }, search: "?varsler=1", end: (page) => { assert.equal(page.$("settings").open, true); assert.equal(visible(page, "push-on"), true); } },
+};
+for (const [type, m] of Object.entries(MESSAGES)) {
+  for (const tab of ["logged in", "on the login page", "not open"]) {
+    test(`sw message ${type}: tab ${tab} → the same end state after login`, async () => {
+      const b = fakePushBrowser({ device: makeDevice("fcm"), permission: "granted", registered: true });
+      const server = pushServer();
+      const page = await loadAdmin({
+        now: "2026-11-19T09:00", token: tab === "logged in" ? "test-admin-token" : null, search: tab === "not open" ? m.search : "",
+        navigator: b.navigator, globals: b.globals, routes: { ...server.routes, "POST /api/admin/login": () => ({ token: "new" }) },
+      });
+      if (tab !== "not open") { b.emit(m.msg); await page.flush(); }
+      if (tab !== "logged in") {
+        assert.equal(page.$("login").hidden, false);
+        page.$("pw").value = "riktig";
+        page.submit("login-form");
+        await page.flush();
+      }
+      m.end(page);
+    });
+  }
+}
