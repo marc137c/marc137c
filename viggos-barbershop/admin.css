@@ -174,6 +174,15 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
   .top-row .sync, .top-row a.link { min-width: 0; }
 }
 
+/* 320–359 px (Chrome og Samsung på små telefoner, Galaxy Fold-forsiden): datofeltet beholder plass til hele datoen
+   («17.11.2026» og kalenderikonet); de runde knappene, mellomrommene og «I dag» gir plass i stedet */
+@media (max-width: 359px) {
+  .day-nav { gap: 6px; }
+  .day-nav .icon { width: 38px; }
+  .day-nav input { min-width: 7.6em; }
+  .day-nav .chip { padding: 0 10px; }
+}
+
 /* Telefon på tvers (844×390, 667×375): den faste toppen tok over halve skjermen, og et trykk på «+ Ny avtale» traff
    den. Under 500 px høyde ruller toppen med siden (fast pynt får dekke høyst 35 % av høyden). */
 @media (max-height: 500px) {
@@ -201,6 +210,7 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
   .top-row > * + * { margin-left: 10px; }
   @media (max-width: 430px) { .top-row > * + * { margin-left: 6px; } }
   .day-nav > * + * { margin-left: 8px; }
+  @media (max-width: 359px) { .day-nav > * + * { margin-left: 6px; } }
   .week > * + * { margin-left: 6px; }
   .day-head > * { margin: 6px 0; }
   .day-actions > * + * { margin-left: 8px; }

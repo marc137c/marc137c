@@ -191,3 +191,19 @@ test("layout round 2: in phone landscape (height ≤ 500 px) the header is not s
   assert.match(ruleIn("@media (max-height: 500px)", "html"), /scroll-padding-top:\s*0/);
 });
 
+// 320–340 px in Chrome/Samsung: min-width: 0 let the date field shrink to about 112 px, cutting the year
+// («17.11.20»). A form control keeps its own text width at 320 px: the field keeps 7.6em (the whole date and the
+// calendar icon) and the round buttons, the gaps and «I dag» give way instead.
+test("layout round 2: at 359 px and below the date field keeps room for the whole date, and the row still fits 320 px", () => {
+  const q = "@media (max-width: 359px)";
+  const input = ruleIn(q, ".day-nav input");
+  const em = /min-width:\s*([\d.]+)em/.exec(input);
+  assert.ok(em && Number(em[1]) >= 7.5, input);
+  const icon = px(ruleIn(q, ".day-nav .icon"), "width");
+  const gap = px(ruleIn(q, ".day-nav"), "gap");
+  const chipPad = /padding:\s*0\s+(\d+)px/.exec(ruleIn(q, ".day-nav .chip"));
+  assert.ok(chipPad, "the «I dag» chip's side padding");
+  // 320 - 2 × 16 px padding; «I dag» at 16 px ≈ 40 px of text; the field at 16 px
+  const used = 2 * icon + Number(em[1]) * 16 + (40 + 2 * Number(chipPad[1])) + 3 * gap;
+  assert.ok(used <= 288, `the row needs ${used} px of 288`);
+});
