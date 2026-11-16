@@ -20,7 +20,7 @@ Each rule below is something the code assumes about Netlify. Each one names the 
 
 - **Docs:** https://docs.netlify.com/build/functions/api/#deploy (`context.deploy.context`, `context.deploy.published`)
 - **Rule (unquoted):** each deploy keeps its own code and env values and stays reachable at `https://<deploy-id>--<site>.netlify.app` until it is deleted (the audit noted up to 30 days). Its functions see `context.deploy.context === "production"` with `context.deploy.published === false`.
-- **What the code does:** `isRetiredDeploy(context)` in `netlify/lib/runtime.mjs` is `production && published === false`. Bookings, every `/api/admin/*` path (the login included), the calendar feed, the customer's `/api/bookings/<id>.ics` and `/api/push/renew` refuse there with 410 `{ error: "Bruk hovedsiden." }` before they open a store.
+- **What the code does:** `isRetiredDeploy(context)` in `netlify/lib/runtime.mjs` is `production && published === false`. Bookings, every `/api/admin/*` path (the login included), the calendar feed, the customer's `/api/bookings/<id>.ics`, `/api/push/renew` and the daily clean-up refuse there with 410 `{ error: "Bruk hovedsiden." }` before they open a store.
 - **Operations:** after each publish, delete the older deploys (Deploys → deploy → Options → Delete deploy).
 - **Test:** `test/functions/deploy-context.test.mjs` (410 and an empty Blobs log for each handler, while `published: true` or no `published` field behaves as before).
 
@@ -28,5 +28,5 @@ Each rule below is something the code assumes about Netlify. Each one names the 
 
 - **Docs:** https://docs.netlify.com/build/functions/scheduled-functions/
 - **Quote:** "Scheduled functions only run on their schedule for published deploys — Deploy Previews and branch deploys won't trigger them automatically."
-- **What the code does:** the schedule is declared in each function file (`export const config = { schedule: ... }`), never in `netlify.toml`. The only scheduled function is `social-refresh.mjs` (hourly).
-- **Test:** `test/no-sms.test.mjs` (the list of scheduled functions, and no `schedule` in `netlify.toml`).
+- **What the code does:** the schedule is declared in each function file (`export const config = { schedule: ... }`), never in `netlify.toml`. The only scheduled functions are `social-refresh.mjs` (hourly) and `retention.mjs` (the daily clean-up). `retention.mjs` still checks the context itself: it does nothing on a retired deploy, and outside production it cleans only the preview stores.
+- **Test:** `test/no-sms.test.mjs` (the list of scheduled functions, and no `schedule` in `netlify.toml`), `test/functions/retention.test.mjs`.

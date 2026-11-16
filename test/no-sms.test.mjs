@@ -5,7 +5,8 @@
 //      exception, because it has to name what it forbids. Other files may point at this guard by its exact path
 //      (test/no-sms.test.mjs, as docs/SPEC.md does), and that path is the only form of the word they may use.
 //      «påminnelse» on its own is allowed (a calendar alarm may use the word); «SMS-påminnelse» is caught.
-//   2. the only scheduled function is the Instagram refresh;
+//   2. the only scheduled functions are the hourly Instagram refresh and the daily clean-up (retention.mjs, which
+//      only deletes); there is no reminder run;
 //   3. no code path calls Sveve, or anything else outside Netlify Blobs, even with the old Sveve variables still
 //      set in Netlify: a booking's whole life (book, see availability, move, cancel, delete) fetches nothing else,
 //      and the replies and the stored booking carry no SMS state.
@@ -85,10 +86,12 @@ test("no SMS: no file or folder is named after SMS, Sveve or reminders", () => {
   }
 });
 
-test("no SMS: the only scheduled function is the hourly Instagram refresh", () => {
+test("no SMS: the only scheduled functions are the hourly Instagram refresh and the daily clean-up; no reminder run", () => {
   const dir = join(ROOT, "netlify", "functions");
   const scheduled = readdirSync(dir).filter((f) => /\bschedule\s*:/.test(readFileSync(join(dir, f), "utf8")));
-  assert.deepEqual(scheduled, ["social-refresh.mjs"]);
+  assert.deepEqual(scheduled, ["retention.mjs", "social-refresh.mjs"]);
+  // The clean-up only deletes: it fetches nothing and notifies nobody
+  assert.doesNotMatch(readFileSync(join(dir, "retention.mjs"), "utf8"), /fetch\(|pushToDevices|notify/);
   assert.doesNotMatch(readFileSync(join(ROOT, "netlify.toml"), "utf8"), /schedule/i);
 });
 
