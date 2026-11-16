@@ -26,8 +26,8 @@
 import { ECDH, createECDH, createHash, createPrivateKey, generateKeyPairSync, hkdfSync, createCipheriv, randomBytes, sign, timingSafeEqual } from "node:crypto";
 import { isDate, mutateJSON, passwordGen } from "./booking-core.mjs";
 
-// Hvilket admin-passord en enhet hører til: de første 16 tegnene av SHA-256("viggos-push:" + passordet) i
-// base64url. Uten passord (admin ikke satt opp) null: da sendes ingenting.
+// Hvilket admin-passord en enhet hører til: passwordGen(passordet, «push») i booking-core.mjs (16 tegn fra den
+// langsomme hovednøkkelen, F34). Uten passord (admin ikke satt opp) null: da sendes ingenting.
 export const pushGen = (password) => passwordGen(password, "push");
 
 export const VAPID_KEY = "push/vapid";

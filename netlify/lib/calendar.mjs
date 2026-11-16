@@ -5,7 +5,8 @@
 // Kalenderapper kan ikke sende innlogging, så adressen bærer en lang, tilfeldig hemmelighet (256 bit).
 // Den ligger i timebokens egen lagring (nøkkel FEED_KEY, så forhåndsvisninger har sin egen, F10) og kan
 // lages på nytt fra /admin: da slutter den gamle adressen å virke med en gang. Den slutter også å virke når
-// admin-passordet byttes (feedGen), så et passordbytte stenger alt: innlogging, varsler og kalenderlenken.
+// admin-passordet byttes og nettstedet er publisert på nytt (feedGen; et nytt passord gjelder først etter en ny
+// utrulling), så et passordbytte stenger alt: innlogging, varsler og kalenderlenken.
 //
 // Strømmen:
 //  - hver aktive avtale (type «booking», ikke avlyst) fra FEED_PAST_DAYS dager tilbake til FEED_FUTURE_DAYS

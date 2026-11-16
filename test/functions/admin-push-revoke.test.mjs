@@ -3,7 +3,8 @@
 //   1. after ADMIN_PASSWORD changes, no device subscribed before gets a push (also one subscribed with a stolen
 //      12-hour token), the device count is 0, and the old devices are removed from the store, logging nothing personal;
 //   2. «Slå av varsler på alle andre enheter» (POST /api/admin/push/reset) leaves 0 devices and the next booking
-//      sends nothing; a device turned on again afterwards is notified as before;
+//      sends nothing; a device turned on again afterwards is notified as before (the reset also ends every login
+//      made before it and gives the caller a fresh token: test/lib/auth-keys.test.mjs);
 //   3. reset requires the admin token: without it (or with a token for an old password) it is 401 and nothing changes.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -103,12 +104,13 @@ test("push revoke: reset leaves 0 devices and the next booking sends nothing; a 
   const reset = await call(d, "/api/admin/push/reset");
   assert.equal(reset.status, 200);
   assert.equal(reset.headers["cache-control"], "no-store");
-  assert.deepEqual(reset.body, { ok: true, devices: 0 });
+  assert.deepEqual({ ...reset.body, token: typeof reset.body.token }, { ok: true, devices: 0, token: "string" }, "and a fresh token (F34: other logins end)");
   assert.equal((await info(d)).body.devices, 0);
   assert.deepEqual(storedEndpoints(d), []);
   assert.equal((await book(d)).status, 201);
   assert.equal(d.push.deliveries.length, 0, "nobody is notified after a reset");
-  assert.deepEqual((await call(d, "/api/admin/push/reset")).body, { ok: true, devices: 0 }, "resetting again is fine");
+  const again = (await call(d, "/api/admin/push/reset")).body;
+  assert.deepEqual([again.ok, again.devices], [true, 0], "resetting again is fine");
   // This device turns itself on again (the page re-subscribes after a reset)
   assert.equal((await subscribe(d, phone)).body.devices, 1);
   assert.equal((await book(d)).status, 201);

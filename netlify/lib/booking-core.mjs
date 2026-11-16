@@ -1,7 +1,7 @@
 // Kjernen i bookingsystemet: regler, lagring og konfliktsikre skrivinger.
 // Alle klokkeslett er minutter etter midnatt, norsk tid (Europe/Oslo). Datoer er "ÅÅÅÅ-MM-DD".
 // Lagring: Netlify Blobs, ett dokument per måned (nøkkel "m/ÅÅÅÅ-MM") med alle avtaler og blokkeringer.
-import { randomBytes, createHmac, createHash, timingSafeEqual } from "node:crypto";
+import { randomBytes, createHmac, createHash, timingSafeEqual, scryptSync } from "node:crypto";
 
 // ---------- Konfigurasjon (hold i sync med HOURS i viggos-barbershop/script.js) ----------
 export const CONFIG = {
@@ -264,17 +264,34 @@ export async function deleteItem(store, id) {
 }
 
 // ---------- Admin-innlogging ----------
-// Passordet settes i Netlify som ADMIN_PASSWORD. Innloggingen gir en signert billett (12 timer, eller 60 dager med «Hold meg innlogget»);
-// bytter du passord, blir alle gamle billetter ugyldige.
+// Passordet settes i Netlify som ADMIN_PASSWORD. Et nytt passord gjelder først etter en ny utrulling (Netlify bruker
+// miljøverdiene fra da utrullingen ble laget, docs/contracts/netlify.md); da blir alle gamle billetter, varsler på
+// enhetene og kalenderlenken ugyldige. Innloggingen gir en signert billett (12 timer, eller 60 dager med «Hold meg innlogget»).
+//
+// Nøkler (F34): ingenting serveren gir ut eller lagrer, er en rask hash av passordet. Alt kommer fra én langsom
+// hovednøkkel, scrypt(passord, «viggos-admin-token-v1», N=16384, r=8, p=1), regnet ut én gang per passord per
+// instans, med en egen HMAC-undernøkkel per formål: «token» (billetter), «device» (enhetsmerket) og «gen:<formål>».
 const b64url = (buf) => Buffer.from(buf).toString("base64url");
-const signingKey = (password) => createHash("sha256").update("viggos-admin:" + password).digest();
+const MASTER_SALT = "viggos-admin-token-v1";
+const masterCache = new Map();
+export function masterKey(password) {
+  const pw = String(password);
+  let key = masterCache.get(pw);
+  if (!key) {
+    key = scryptSync(pw, MASTER_SALT, 32, { N: 16384, r: 8, p: 1 });
+    if (masterCache.size >= 4) masterCache.clear(); // et passordbytte gir en ny instans uansett; dette er bare et tak
+    masterCache.set(pw, key);
+  }
+  return key;
+}
+export const subkey = (password, purpose) => createHmac("sha256", masterKey(password)).update(purpose).digest();
 
 // Et kort merke for «dette passordet» til ting som skal slutte å virke når passordet byttes, slik billettene gjør:
 // varsler på enhetene (purpose «push») og kalenderlenken («calendar»). De første 16 tegnene av
-// SHA-256(«viggos-<purpose>:» + passordet) i base64url. Uten passord null.
+// HMAC(hovednøkkelen, «gen:<purpose>») i base64url. Uten passord null.
 export function passwordGen(password, purpose) {
   if (!password || !/^[a-z]+$/.test(String(purpose))) return null;
-  return createHash("sha256").update(`viggos-${purpose}:` + password).digest("base64url").slice(0, 16);
+  return createHmac("sha256", masterKey(password)).update("gen:" + purpose).digest("base64url").slice(0, 16);
 }
 
 export function checkPassword(given, password) {
@@ -283,29 +300,50 @@ export function checkPassword(given, password) {
   const b = createHash("sha256").update(password).digest();
   return timingSafeEqual(a, b);
 }
-// Billetten: { exp, iat } (utløper, laget; millisekunder) signert med passordet
-export function makeToken(password, now = Date.now(), ttlMs = 12 * 60 * 60 * 1000) {
+// Billetten: { exp, iat } (utløper, laget; millisekunder), signert med undernøkkelen «token»
+const signWith = (password, purpose, payload) => b64url(createHmac("sha256", subkey(password, purpose)).update(payload).digest());
+function makeSigned(password, purpose, now, ttlMs) {
   const payload = b64url(JSON.stringify({ exp: now + ttlMs, iat: now }));
-  const sig = b64url(createHmac("sha256", signingKey(password)).update(payload).digest());
-  return `${payload}.${sig}`;
+  return `${payload}.${signWith(password, purpose, payload)}`;
 }
-// Innholdet i en gyldig billett ({ exp, iat }; iat mangler i billetter laget før det ble lagt til), ellers null
-export function readToken(token, password, now = Date.now()) {
+function readSigned(token, password, purpose, now) {
   if (!password || typeof token !== "string" || !token.includes(".")) return null;
   const [payload, sig] = token.split(".");
-  const expected = b64url(createHmac("sha256", signingKey(password)).update(payload).digest());
-  const a = Buffer.from(sig || ""), b = Buffer.from(expected);
+  const a = Buffer.from(sig || ""), b = Buffer.from(signWith(password, purpose, payload));
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
   let data;
   try { data = JSON.parse(Buffer.from(payload, "base64url").toString()); } catch { return null; }
-  if (!data || !Number.isFinite(data.exp) || !(data.exp > now)) return null;
-  return { exp: data.exp, iat: Number.isFinite(data.iat) ? data.iat : undefined };
+  if (!data || !Number.isFinite(data.exp) || !Number.isFinite(data.iat) || !(data.exp > now)) return null;
+  return { exp: data.exp, iat: data.iat };
 }
+export const makeToken = (password, now = Date.now(), ttlMs = 12 * 60 * 60 * 1000) => makeSigned(password, "token", now, ttlMs);
+// Innholdet { exp, iat } i en gyldig, ikke utløpt billett for dette passordet, ellers null. Sjekker ikke auth/epoch:
+// det gjør readSession, som handlerne bruker.
+export const readToken = (token, password, now = Date.now()) => readSigned(token, password, "token", now);
 export const verifyToken = (token, password, now = Date.now()) => readToken(token, password, now) !== null;
+
+// «Logg ut alle» (F34): doc auth/epoch { t } i timebokens lagring. En billett laget før t godtas ikke. POST
+// /api/admin/push/reset flytter t til nå (og gir den som trykket en ny billett).
+export const EPOCH_KEY = "auth/epoch";
+export async function readEpoch(store) {
+  const doc = await store.get(EPOCH_KEY, { type: "json" });
+  return doc && Number.isFinite(doc.t) ? doc.t : 0;
+}
+export const bumpEpoch = (store, nowMs) => mutateJSON(store, EPOCH_KEY, (d) => (d && typeof d === "object" && !Array.isArray(d) ? d : {}), (doc) => {
+  doc.t = Math.max(Number.isFinite(doc.t) ? doc.t : 0, nowMs);
+  return { ok: true, t: doc.t };
+});
+// Innloggingen bak billetten: { exp, iat } når billetten er gyldig og ikke laget før auth/epoch, ellers null
+export async function readSession(store, token, password, nowMs) {
+  const session = readToken(token, password, nowMs);
+  if (!session) return null;
+  return session.iat >= await readEpoch(store) ? session : null;
+}
 
 // Enhetsmerket (F5): en innlogging med riktig passord gir enheten et merke som varer i et år. Med det slipper
 // innloggingen det felles taket mot gjetting (rl/login/all), så en som gjetter fra mange adresser ikke stenger
-// Viggo ute. Taket per klient gjelder fortsatt, og passordet må fortsatt være riktig.
+// Viggo ute. Taket per klient gjelder fortsatt, og passordet må fortsatt være riktig. Egen undernøkkel («device»),
+// så et merke aldri er en billett eller omvendt.
 export const DEVICE_MARK_MS = 365 * 24 * 60 * 60 * 1000;
-export const makeDeviceMark = (password, now = Date.now()) => makeToken(password + "|device", now, DEVICE_MARK_MS);
-export const verifyDeviceMark = (mark, password, now = Date.now()) => !!password && verifyToken(mark, password + "|device", now);
+export const makeDeviceMark = (password, now = Date.now()) => makeSigned(password, "device", now, DEVICE_MARK_MS);
+export const verifyDeviceMark = (mark, password, now = Date.now()) => readSigned(mark, password, "device", now) !== null;

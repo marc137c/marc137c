@@ -16,13 +16,14 @@
 
 //   POST   /api/admin/push/unsubscribe { endpoint }     denne enheten får ikke flere varsler
 //   POST   /api/admin/push/test        { endpoint }     send et testvarsel til denne enheten (bare en lagret enhet)
-//   POST   /api/admin/push/reset                        ingen enhet får varsler før de slås på igjen ({ devices: 0 })
+//   POST   /api/admin/push/reset                        ingen enhet får varsler før de slås på igjen, og alle andre
+//                                                       innlogginger slutter å virke ({ ok, devices: 0, token }: ny billett)
 // Enhetene er knyttet til ADMIN_PASSWORD: bytter Viggo passordet, får ingen av de gamle enhetene flere varsler.
 // En enhet slått på med en kort innlogging («Hold meg innlogget» av) får varsler bare til den innloggingen går ut.
 import { liveDeps, bookingStore, isRetiredDeploy, retiredResponse } from "../lib/runtime.mjs";
 import {
   CONFIG, addDays, isDate, osloNow, readMonths, validateAdmin,
-  createItem, updateItem, deleteItem, checkPassword, makeToken, readToken, makeDeviceMark, verifyDeviceMark,
+  createItem, updateItem, deleteItem, checkPassword, makeToken, readSession, bumpEpoch, makeDeviceMark, verifyDeviceMark,
 } from "../lib/booking-core.mjs";
 import { take, release, newToken, counterKey, limiterSecret, clientKey, LOGIN_LIMITS, LOGIN_ALL_KEY } from "../lib/limits.mjs";
 import { readFeedState, createFeed, feedLinks, feedGen } from "../lib/calendar.mjs";
@@ -35,12 +36,8 @@ const json = (body, status = 200) => Response.json(body, { status, headers: { "C
 const DAY = 24 * 60 * 60 * 1000;
 const SHORT_LOGIN = DAY / 2; // «Hold meg innlogget» av
 // En enhet slått på med en kort innlogging får varsler bare til den går ut (en lånt PC der innloggingen bare gikk ut,
-// eller fanen ble lukket, skal ikke vise kundenavn i ukevis). Billetter uten iat (laget før den kom med) regnes
-// som korte når de har høyst 12 timer igjen.
-const pushUntil = (session, nowMs) => {
-  const life = session.iat === undefined ? session.exp - nowMs : session.exp - session.iat;
-  return life <= SHORT_LOGIN ? new Date(session.exp) : null;
-};
+// eller fanen ble lukket, skal ikke vise kundenavn i ukevis).
+const pushUntil = (session) => (session.exp - session.iat <= SHORT_LOGIN ? new Date(session.exp) : null);
 // Det /admin får vite om kalenderlenken. Hemmeligheten står bare inne i lenkene.
 const calendarInfo = (origin, feed, stale) => (feed
   ? { enabled: true, createdAt: feed.createdAt, links: feedLinks(origin, feed.token) }
@@ -97,10 +94,16 @@ export async function handle(req, context, deps) {
   }
 
   const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-  const session = readToken(token, password, nowMs);
+  const store = bookingStore(deps, context);
+  let session;
+  try {
+    session = await readSession(store, token, password, nowMs); // også: ikke laget før auth/epoch (F34)
+  } catch (err) {
+    console.error("Admin: kunne ikke lese innloggingen:", err && err.name);
+    return json({ error: "Noe gikk galt på serveren." }, 503);
+  }
   if (!session) return json({ error: "Logg inn på nytt." }, 401);
 
-  const store = bookingStore(deps, context);
   const id = context?.params?.id || path.match(/^\/api\/admin\/items\/([^/]+)$/)?.[1];
   const force = url.searchParams.get("force") === "1";
 
@@ -150,14 +153,18 @@ export async function handle(req, context, deps) {
       try { body = JSON.parse(raw) || {}; } catch {}
       const gen = pushGen(password);
       if (path === "/api/admin/push/reset") {
+        // Ingen enhet får varsler, og alle innlogginger laget før nå slutter å virke (auth/epoch). Den som trykket,
+        // får en ny billett som varer like lenge som den gamle ville gjort.
         const r = await clearSubscriptions(store);
         if (r.error) return json({ error: r.error }, r.status);
-        return json({ ok: true, devices: 0 });
+        const e = await bumpEpoch(store, nowMs);
+        if (e.error) return json({ error: e.error }, e.status);
+        return json({ ok: true, devices: 0, token: makeToken(password, nowMs, session.exp - nowMs) });
       }
       if (path === "/api/admin/push/subscribe") {
         const v = parseSubscription(body.subscription);
         if (v.error) return json({ error: v.error, code: v.code }, 400);
-        const r = await saveSubscription(store, v.value, { now: deps.now(), gen, until: pushUntil(session, nowMs) });
+        const r = await saveSubscription(store, v.value, { now: deps.now(), gen, until: pushUntil(session) });
         // 410 «gone»: push-tjenesten har sagt at dette abonnementet er borte, så nettleseren må lage et nytt
         if (r.error) return json(r.code ? { error: r.error, code: r.code } : { error: r.error }, r.status);
         return json(r.until ? { ok: true, devices: r.devices, until: r.until } : { ok: true, devices: r.devices }, r.created ? 201 : 200);

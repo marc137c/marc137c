@@ -8,7 +8,7 @@
 //   3. every login on the device renews it (pushSync sends the subscription again with the new token): a new short
 //      login moves the end, a long login removes it;
 //   4. the subscribe answer says until when (the token's expiry) for a short login, and nothing for a long one;
-//   5. tokens made before they carried iat count as short when at most 12 hours are left;
+//   5. tokens made before F34 (no iat, signed with the old fast key) are refused;
 //   6. nothing personal is logged when an expired device is removed.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -127,21 +127,20 @@ test("push expiry: every login renews it; a new short login moves the end, a lon
   assert.equal(short.body.until, new Date(d.clock.now() + SHORT).toISOString());
 });
 
-// Tokens issued before this change carried only { exp }
+// Tokens issued before F34 carried only { exp } and were signed with SHA-256("viggos-admin:" + password)
 function oldToken(password, exp) {
   const payload = Buffer.from(JSON.stringify({ exp })).toString("base64url");
   const key = createHash("sha256").update("viggos-admin:" + password).digest();
   return `${payload}.${createHmac("sha256", key).update(payload).digest("base64url")}`;
 }
 
-test("push expiry: an old token without iat counts as short when it has at most 12 hours left", async () => {
-  const a = makeDevice("fcm"), b = makeDevice("apple");
-  const d = setup([a, b]);
+test("push expiry: an old token (no iat, the old fast key) is refused, so it can never subscribe a device", async () => {
+  const a = makeDevice("fcm");
+  const d = setup([a]);
   const soon = oldToken(PASSWORD, d.clock.now() + 3 * HOUR);
-  const far = oldToken(PASSWORD, d.clock.now() + 40 * DAY);
-  assert.deepEqual(readToken(soon, PASSWORD, d.clock.now()), { exp: d.clock.now() + 3 * HOUR, iat: undefined });
-  assert.equal((await subscribe(d, a, soon)).body.until, new Date(d.clock.now() + 3 * HOUR).toISOString());
-  assert.equal((await subscribe(d, b, far)).body.until, undefined);
+  assert.equal(readToken(soon, PASSWORD, d.clock.now()), null);
+  assert.equal((await subscribe(d, a, soon)).status, 401);
+  assert.deepEqual(stored(d), []);
 });
 
 test("push expiry: readToken gives { exp, iat } only for a valid, unexpired token of this password", () => {
