@@ -138,8 +138,10 @@ export async function getAvailability(store, now = new Date()) {
 // ---------- Validering ----------
 // Tekst slik den lagres: kontrolltegn blir mellomrom, et ensomt surrogat blir U+FFFD, og kuttet etter max
 // UTF-16-enheter deler aldri et tegn utenfor BMP (en emoji) i to.
+// (Uten String.prototype.toWellFormed, som først kom i Node 20: funksjonene skal virke på alle Node-versjoner Netlify kjører.)
+const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g;
 function clean(s, max) {
-  let t = String(s ?? "").toWellFormed().replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, max);
+  let t = String(s ?? "").replace(LONE_SURROGATE, "�").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, max);
   if (/[\ud800-\udbff]$/.test(t)) t = t.slice(0, -1);
   return t.trim();
 }
