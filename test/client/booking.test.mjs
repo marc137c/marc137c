@@ -73,7 +73,27 @@ test("NEW-429: the rate-limit text asks for a phone call and never says to try a
     assert.equal(site.bookingPosts().length, 1, "the page does not retry by itself");
   }
   const s = (await boot()).s();
-  assert.equal(s.rateLimited, "For mange bestillinger fra dette nummeret akkurat nå. Ring oss på 409 63 911.");
+  assert.equal(s.rateLimited, "For mange bestillinger på nett akkurat nå. Ring oss på 409 63 911.");
+});
+
+// Round 2 (p4-429-text.mjs): the same 429 rate_limited comes from three caps (per client, per phone, all web
+// bookings), so the text may not blame «dette nummeret»: a household on one IPv4, or a new customer when the global
+// cap is full, was told their number had booked too much. Contract (SPEC R20): for each server code, the client
+// text names no cause that is false for one of the paths producing it. BOOKING_LIMITS is the list of causes; a new
+// cap must be added to CAUSE_WORDS here.
+const CAUSE_WORDS = { ip: /nettverk|network|enhet|device|adresse|address|IP/i, phone: /nummer|number/i, all: /alle kunder|everyone/i };
+test("contract: the rate_limited text names no cause that is false for one of the caps behind the code", async () => {
+  const { BOOKING_LIMITS } = await import("../../netlify/lib/limits.mjs");
+  const causes = Object.keys(BOOKING_LIMITS);
+  assert.deepEqual(causes.filter((k) => !CAUSE_WORDS[k]), [], "every cap has its cause words here");
+  for (const lang of [null, "en"]) {
+    const site = await boot({ lang });
+    const text = site.s().rateLimited;
+    for (const k of causes) {
+      if (causes.length > 1) assert.doesNotMatch(text, CAUSE_WORDS[k], `${lang || "no"}: «${text}» blames ${k}, but rate_limited also comes from ${causes.filter((x) => x !== k).join(", ")}`);
+    }
+    assert.ok(text.includes("409 63 911"));
+  }
 });
 
 test("F1: a booking the server stored but whose reply was lost: the retry sends the same requestId and ends booked, stored once", async () => {

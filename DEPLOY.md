@@ -68,7 +68,7 @@ Koden bygger standardvalgene under. Eieren svarer én gang, i det endelige ja-et
 - [ ] Tomme seksjoner (Instagram uten innlegg, Google uten anmeldelser med tekst) skjules.
 - [ ] Kilden står som ren tekst «Google Maps», og kartet lastes først når kunden trykker «Vis kart».
 - [ ] Facebook-lenken er i dag en delingslenke; bekreft profiladressen hvis den skal byttes.
-- [ ] Kundetekstene: «Vi fikk ikke svar fra bookingsystemet, så vi vet ikke om timen ble lagret. Ring oss på 409 63 911 før du prøver igjen.», «Timen ble ikke lagret. Ring oss på 409 63 911.» og «For mange bestillinger fra dette nummeret akkurat nå. Ring oss på 409 63 911.» (den siste vises også når grensen per nettverk eller for hele siden slår inn).
+- [ ] Kundetekstene: «Vi fikk ikke svar fra bookingsystemet, så vi vet ikke om timen ble lagret. Ring oss på 409 63 911 før du prøver igjen.», «Timen ble ikke lagret. Ring oss på 409 63 911.» og «For mange bestillinger på nett akkurat nå. Ring oss på 409 63 911.» (den siste vises for alle tre grensene: per nettverk, per nummer og for hele siden, så den nevner ingen av dem).
 - [ ] Besøksstatistikken (uten personopplysninger) beholdes i 400 dager.
 - [ ] Google-anmeldelser mellomlagres i 12 timer og vises høyst 3 døgn etter siste vellykkede henting (se `docs/contracts/google-places.md`, regel 5).
 - [ ] Personvernsiden: teksten i `viggos-barbershop/personvern.html` godkjennes. Skriftene ligger nå på egen server, så Google nevnes ikke lenger for skrifter. Bekreft om misbrukstellerne (nøkkel-hash, slettes etter 24 timer) skal ha eget behandlingsgrunnlag på siden (for eksempel berettiget interesse, artikkel 6 nr. 1 bokstav f); i dag står bare bestillingens grunnlag (bokstav b).
