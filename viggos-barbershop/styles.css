@@ -100,7 +100,7 @@ p { margin: 0 0 1em; }
 .brand-script {
   font: 400 2rem/1 var(--script);
   background: var(--logo-grad); -webkit-background-clip: text; background-clip: text; color: transparent;
-  padding: 0 .15em; /* plass til swashene */
+  padding: 0 .35em; margin: 0 -.2em; /* plass til swashene (iPhone tegner V-en lenger ut); margin holder bredden lik */
 }
 .brand-caps { font: 600 .58rem var(--caps); letter-spacing: .42em; color: var(--logo-gold); margin: -2px 0 0 .42em; }
 .nav-menu { display: flex; align-items: center; gap: 28px; }
@@ -179,6 +179,8 @@ p { margin: 0 0 1em; }
 .hero .btn-ghost { background: rgba(var(--bg-rgb), .4); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 .status { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); font-size: .95rem; margin: 0; }
 .status::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--gold); }
+.status.closed { color: var(--err); }
+.status.closed::before { background: var(--err); }
 
 .anim { animation: anim-in .9s cubic-bezier(.2, .7, .2, 1) both; animation-delay: var(--d, 0s); }
 @keyframes anim-in { from { opacity: 0; transform: translateY(18px); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
@@ -276,6 +278,7 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
   .svc-link h3 { grid-column: 1; grid-row: 1; }
   .svc-link .price { grid-column: 2; grid-row: 1; }
   .svc-link p { grid-column: 1 / -1; grid-row: 2; }
+  .svc-link .svc-dur { grid-column: 1 / -1; grid-row: 3; justify-self: start; }
   .svc-badge { left: 10px; }
   .dots, .svc-arrow { display: none; }
 }
@@ -290,7 +293,7 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 .logo-script {
   display: block;
   font: 400 4.6rem/1 var(--script); font-size: clamp(4.6rem, 15vw, 9.5rem);
-  padding: 0 .2em .05em; /* swashene på V og g */
+  padding: 0 .45em .1em; /* hele V-en og g-en, også når iPhone bruker en annen skrift */
   background: var(--logo-grad); background-size: 200% auto;
   -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(var(--logo-shadow));
@@ -454,6 +457,8 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 /* ---------- Tjenester: «Mest populær» og tillegg ---------- */
 .svc-featured .svc-link { background: var(--surface); border-color: rgba(207, 167, 94, .45); box-shadow: 0 10px 30px rgba(var(--shadow), .18); }
 .svc-featured .svc-link { padding-top: 30px; }
+/* Varighet på hver tjeneste */
+.svc-dur { display: inline-block; margin-top: 8px; padding: 2px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: .75rem; line-height: 1.5; letter-spacing: .04em; color: var(--gold); }
 .svc-badge {
   position: absolute; top: 9px; left: 20px; padding: 3px 10px; border-radius: 999px;
   background: var(--gold-fill); color: var(--on-gold);

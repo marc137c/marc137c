@@ -121,7 +121,9 @@ function updateStatus() {
     tr.classList.toggle("today", tr.dataset.days.split(" ").includes(String(day)));
   });
 
+  el.className = "status closed"; // rød så lenge det er stengt; åpent nå = vanlig farge
   if (today && minutes >= today[0] && minutes < today[1]) {
+    el.className = "status";
     el.textContent = s.hoursToday(s.time(today[0]), s.time(today[1]));
     return;
   }
@@ -177,3 +179,14 @@ if ("IntersectionObserver" in window) {
 }
 
 document.getElementById("year").textContent = new Date().getFullYear();
+
+// Besøksteller uten informasjonskapsler: bare dato, side og hvilket nettsted besøket kom fra
+// (f.eks. instagram.com). Ingen IP-adresse eller ID lagres, og ingenting lagres på besøkerens enhet.
+(() => {
+  try {
+    const x = new XMLHttpRequest();
+    x.open("POST", "/api/hit", true);
+    x.setRequestHeader("Content-Type", "text/plain");
+    x.send(JSON.stringify({ p: location.pathname, r: document.referrer ? (document.referrer.split("/")[2] || "") : "" }));
+  } catch (e) { /* telleren er ikke viktig for siden */ }
+})();

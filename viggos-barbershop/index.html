@@ -11,7 +11,7 @@
     try { if (location.hash && history.replaceState) history.replaceState(null, "", location.pathname + location.search); if ("scrollRestoration" in history) history.scrollRestoration = "manual"; } catch (e) {}
   </script>
   <meta property="og:title" content="Viggo's Barbershop">
-  <meta property="og:description" content="Din stil. Vårt håndverk. Barber i Violgata 22, Halden.">
+  <meta property="og:description" content="Velkommen til Viggo's Barbershop – barber i Violgata 22, Halden.">
   <meta property="og:locale" content="nb_NO">
   <meta property="og:type" content="website">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b4d3b'/%3E%3Ctext x='32' y='44' font-family='Georgia,serif' font-size='36' font-weight='700' text-anchor='middle' fill='%23f2cc1d'%3EV%3C/text%3E%3C/svg%3E">
@@ -88,7 +88,7 @@
           <span class="logo-caps anim" style="--d:.35s">Barbershop</span>
         </h1>
         <span class="ornament anim" style="--d:.45s" aria-hidden="true"></span>
-        <p class="tagline anim" style="--d:.55s" data-i18n="hero.tag">Din stil. <em>Vårt håndverk.</em></p>
+        <p class="tagline anim" style="--d:.55s" data-i18n="hero.tag">Velkommen til <em>Viggo's Barbershop</em></p>
         <p class="lead anim" style="--d:.65s" data-i18n="hero.lead">Klassisk barberhåndverk med moderne presisjon. Kom innom for klassisk saksklipp, fade, skjeggtrim eller en varm håndklebarbering, og gå ut som en bedre versjon av deg selv.</p>
         <div class="hero-cta anim" style="--d:.75s">
           <a class="btn" href="#bestill" data-i18n="cta.book">Bestill time</a>
@@ -104,9 +104,7 @@
     <section class="section section-alt" id="bestill">
       <div class="container">
         <header class="section-head">
-          <p class="eyebrow" data-i18n="book.eyebrow">Timebestilling</p>
           <h2 data-i18n="book.title">Bestill time</h2>
-          <p class="section-lead" data-i18n="book.lead">Velg tjeneste, dag og tid som passer deg.</p>
         </header>
 
         <form class="booking" id="booking-form" name="booking" method="POST" data-netlify="true" netlify-honeypot="bot-field" novalidate>
@@ -121,12 +119,12 @@
             <div class="step">
               <label class="step-label" for="f-service"><span class="step-no">1</span><span data-i18n="book.s1">Velg tjeneste</span></label>
               <select name="tjeneste" id="f-service" required>
-                <option value="" data-i18n="f.choose">Velg tjeneste</option>
+                <option value="" data-i18n="f.choose">– Velg –</option>
                 <option value="Full service" data-i18n="s.full">Full service</option>
                 <option value="Herreklipp" data-i18n="s.cut">Herreklipp</option>
-                <option value="Herreklipp + skjeggtrim" data-i18n="s.combo">Herreklipp + skjeggtrim</option>
                 <option value="Knivbarbering" data-i18n="s.shave">Knivbarbering</option>
                 <option value="Skjegg &amp; line-up" data-i18n="s.beard">Skjegg &amp; line-up</option>
+                <option value="Herreklipp + skjeggtrim" data-i18n="s.combo">Herreklipp + skjeggtrim</option>
                 <option value="Barneklipp" data-i18n="s.kids">Barneklipp</option>
               </select>
               <fieldset class="addon-picks">
@@ -230,12 +228,12 @@
         </header>
 
         <ul class="price-list">
-          <li class="svc-featured"><a class="svc-link" href="#bestill" data-service="Full service"><div><span class="svc-badge" data-i18n="svc.popular">Mest populær</span><h3 data-i18n="s.full">Full service</h3><p data-i18n="s.full.d">Klipp, barbering, vask og styling. Hele pakken.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="750">fra 750,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
-          <li><a class="svc-link" href="#bestill" data-service="Herreklipp"><div><h3 data-i18n="s.cut">Herreklipp</h3><p data-i18n="s.cut.d">Klipp med saks og/eller maskin.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="350">fra 350,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
-          <li><a class="svc-link" href="#bestill" data-service="Herreklipp + skjeggtrim"><div><h3 data-i18n="s.combo">Herreklipp + skjeggtrim</h3><p data-i18n="s.combo.d">Samme lengde, uten linjer/fade.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="500">fra 500,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
-          <li><a class="svc-link" href="#bestill" data-service="Knivbarbering"><div><h3 data-i18n="s.shave">Knivbarbering</h3><p data-i18n="s.shave.d">Tradisjonell barbering med kniv, varme og kalde håndklær og utvalgte ansiktsprodukter.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="350">fra 350,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
-          <li><a class="svc-link" href="#bestill" data-service="Skjegg &amp; line-up"><div><h3 data-i18n="s.beard">Skjegg &amp; line-up</h3><p data-i18n="s.beard.d">Forming, trim og skarpe linjer.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="350">fra 350,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
-          <li><a class="svc-link" href="#bestill" data-service="Barneklipp"><div><h3 data-i18n="s.kids">Barneklipp</h3><p data-i18n="s.kids.d">For gutter til og med 12 år. Fra 13 år gjelder vanlig pris.</p></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="300">fra 300,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+          <li class="svc-featured"><a class="svc-link" href="#bestill" data-service="Full service"><div><span class="svc-badge" data-i18n="svc.popular">Mest populær</span><h3 data-i18n="s.full">Full service</h3><p data-i18n="s.full.d">Klipp, barbering, vask og styling. Hele pakken.</p><span class="svc-dur" data-i18n="dur.60">1 time</span></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="750">fra 750,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+          <li><a class="svc-link" href="#bestill" data-service="Herreklipp"><div><h3 data-i18n="s.cut">Herreklipp</h3><p data-i18n="s.cut.d">Klipp med saks og/eller maskin.</p><span class="svc-dur" data-i18n="dur.30">30 min</span></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="350">fra 350,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+          <li><a class="svc-link" href="#bestill" data-service="Knivbarbering"><div><h3 data-i18n="s.shave">Knivbarbering</h3><p data-i18n="s.shave.d">Tradisjonell barbering med kniv, varme og kalde håndklær og utvalgte ansiktsprodukter.</p><span class="svc-dur" data-i18n="dur.30">30 min</span></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="350">fra 350,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+          <li><a class="svc-link" href="#bestill" data-service="Skjegg &amp; line-up"><div><h3 data-i18n="s.beard">Skjegg &amp; line-up</h3><p data-i18n="s.beard.d">Forming, trim og skarpe linjer.</p><span class="svc-dur" data-i18n="dur.30">30 min</span></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="350">fra 350,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+          <li><a class="svc-link" href="#bestill" data-service="Herreklipp + skjeggtrim"><div><h3 data-i18n="s.combo">Herreklipp + skjeggtrim</h3><p data-i18n="s.combo.d">Hårklipp og skjeggtrim med maskin (samme lengde på hele skjegget uten forming og linjer).</p><span class="svc-dur" data-i18n="dur.30">30 min</span></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="500">fra 500,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
+          <li><a class="svc-link" href="#bestill" data-service="Barneklipp"><div><h3 data-i18n="s.kids">Barneklipp</h3><p data-i18n="s.kids.d">For gutter til og med 12 år. Fra 13 år gjelder vanlig pris.</p><span class="svc-dur" data-i18n="dur.30">30 min</span></div><span class="dots" aria-hidden="true"></span><span class="price" data-price="300">fra 300,-</span><span class="svc-arrow" aria-hidden="true">→</span></a></li>
         </ul>
 
         <div class="addons">
