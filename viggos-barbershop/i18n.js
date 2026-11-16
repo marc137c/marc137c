@@ -16,7 +16,7 @@
     "cta.prices": "See prices",
 
     // 1. Hero
-    "hero.tag": "Your style. <em>Our craft.</em>",
+    "hero.tag": "Welcome to <em>Viggo's Barbershop</em>",
     "hero.lead": "Classic barbering with modern precision. Come in for a classic scissor cut, fade, a beard trim or a hot towel shave, and leave a better version of yourself.",
 
     // 2. Services and prices
@@ -29,7 +29,9 @@
     "s.cut": "Men's haircut",
     "s.cut.d": "Cut with scissors and/or clippers.",
     "s.combo": "Men's haircut + beard trim",
-    "s.combo.d": "Same length, no lines or fade.",
+    "s.combo.d": "Haircut and clipper beard trim (same length on the whole beard, no shaping or lines).",
+    "dur.30": "30 min",
+    "dur.60": "1 hour",
     "s.shave": "Straight razor shave",
     "s.shave.d": "Traditional straight razor shave with hot and cold towels and selected face products.",
     "s.beard": "Beard &amp; line-up",
@@ -42,9 +44,7 @@
     "a.styling": "Styling",
 
     // 3. Booking calendar
-    "book.eyebrow": "Booking",
     "book.title": "Book an appointment",
-    "book.lead": "Choose your service, day and time.",
     "book.s1": "Choose a service",
     "book.s2": "Choose a day",
     "book.s3": "Choose a time",
@@ -53,7 +53,7 @@
     "book.call": "Prefer to call?",
     "cal.prev": "Previous month",
     "cal.next": "Next month",
-    "f.choose": "Choose a service",
+    "f.choose": "– Choose –",
     "f.name": "Name",
     "f.phone": "Phone",
     "f.submit": "Book appointment",
