@@ -92,6 +92,9 @@
     loginPushHide();
     $("login").hidden = true;
     $("app").hidden = false;
+    // Paneler i #app som tegnes av andre skript (admin-stats.js) får beskjed med en gang (runde 2, SPEC R29)
+    const shown = Array.isArray(window.adminShownListeners) ? window.adminShownListeners.slice() : [];
+    shown.forEach((fn) => { try { fn(); } catch (e) { /* en feil i et panel stopper ikke timeboken */ } });
   }
 
   // Innloggingssiden på en enhet som fortsatt har varsler om nye bestillinger slått på (innloggingen har gått ut,

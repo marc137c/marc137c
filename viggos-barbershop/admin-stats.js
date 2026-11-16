@@ -58,4 +58,7 @@
   setTimeout(load, 1200);
   setInterval(load, 60000);
   document.addEventListener("visibilitychange", load);
+  // Panelet tegnes på samme hendelse som viser timeboken: admin.js kaller hver funksjon i window.adminShownListeners
+  // når #app vises (også rett etter en ny innlogging), ikke først ved neste tikk på tidtakeren (runde 2)
+  (window.adminShownListeners = window.adminShownListeners || []).push(load);
 })();

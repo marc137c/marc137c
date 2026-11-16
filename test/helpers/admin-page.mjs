@@ -38,6 +38,7 @@ const SITE_DIR = fileURLToPath(new URL("../../viggos-barbershop/", import.meta.u
 const HTML = readFileSync(SITE_DIR + "admin.html", "utf8");
 const ADMIN_JS = readFileSync(SITE_DIR + "admin.js", "utf8");
 const COMPAT_JS = readFileSync(SITE_DIR + "compat.js", "utf8");
+const STATS_JS = readFileSync(SITE_DIR + "admin-stats.js", "utf8");
 
 class ClassList {
   constructor() { this.set = new Set(); }
@@ -190,7 +191,7 @@ export function itemsRoute(list, config = ADMIN_CONFIG) {
   };
 }
 
-export async function loadAdmin({ routes = {}, token = "test-admin-token", navigator = {}, confirm = () => true, oldBrowser = false, execCommand, queryCommandSupported, globals = {}, search = "", now, storage: stored = {} } = {}) {
+export async function loadAdmin({ stats = false, routes = {}, token = "test-admin-token", navigator = {}, confirm = () => true, oldBrowser = false, execCommand, queryCommandSupported, globals = {}, search = "", now, storage: stored = {} } = {}) {
   const doc = makeDocument();
   const calls = [];
   const confirms = [];
@@ -237,6 +238,8 @@ export async function loadAdmin({ routes = {}, token = "test-admin-token", navig
   vm.createContext(context);
   if (oldBrowser) vm.runInContext(COMPAT_JS, context, { filename: "compat.js" });
   vm.runInContext(ADMIN_JS, context, { filename: "admin.js" });
+  // stats: also admin-stats.js, after admin.js as in admin.html (off by default: its timers would count in timers())
+  if (stats) vm.runInContext(STATS_JS, context, { filename: "admin-stats.js" });
   const flush = async () => { for (let i = 0; i < 10; i++) await new Promise((r) => setImmediate(r)); };
   const advance = async (ms) => {
     const until = clock.now + ms;

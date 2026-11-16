@@ -29,6 +29,7 @@ function run({ answer, token = "tok" }) {
     fetch: (url, opts) => { calls.push({ url, auth: opts && opts.headers && opts.headers.Authorization }); return answer(); },
     Promise, console,
   };
+  ctx.window = ctx; // as in a browser
   vm.createContext(ctx);
   vm.runInContext(SRC, ctx, { filename: "admin-stats.js" });
   const flush = async () => { for (let i = 0; i < 10; i++) await new Promise((r) => setImmediate(r)); };
@@ -70,4 +71,31 @@ test("stats panel: no token, or a 401, draws nothing", async () => {
   const denied = run({ answer: () => Promise.resolve({ ok: false, status: 401, json: () => Promise.resolve({}) }) });
   await denied.advance(1200);
   assert.equal(denied.app.children.length, 0);
+});
+
+// ---------- Round 2: with the real admin.html + admin.js in the page harness ----------
+// The panel only appeared up to 60 s after a fresh login: load() returned early while #app was hidden, and nothing
+// told admin-stats.js that the app was shown. Guard (SPEC R29): every panel inside #app renders on the same event
+// that shows #app; the harness logs in fresh (no stored token) and asserts the panel within 1.5 s.
+import { loadAdmin } from "../helpers/admin-page.mjs";
+const panel = (page) => page.$("app").children.filter((c) => c.className === "stats-panel")[0] || null;
+test("stats panel: shown within 1.5 s after a fresh login (no stored token)", async () => {
+  const page = await loadAdmin({ stats: true, token: null, now: "2026-11-16T09:00", routes: {
+    "POST /api/admin/login": () => ({ token: "new", expiresIn: 43200000, device: "dev" }),
+    "GET /api/stats": () => STATS,
+  } });
+  await page.advance(5000); // the page's own first try finds the login page and does nothing
+  assert.equal(panel(page), null);
+  page.$("pw").value = "riktig";
+  page.submit("login-form");
+  await page.flush();
+  await page.advance(1500);
+  assert.ok(panel(page), "the panel is there");
+  assert.match(panel(page).innerHTML, /<strong>7<\/strong><span>i dag<\/span>/);
+  assert.equal(page.calls.filter((c) => c.path === "/api/stats")[0].headers.Authorization, "Bearer new");
+});
+test("stats panel: still shown after a reload with a remembered login", async () => {
+  const page = await loadAdmin({ stats: true, now: "2026-11-16T09:00", routes: { "GET /api/stats": () => STATS } });
+  await page.advance(1500);
+  assert.ok(panel(page));
 });
