@@ -23,7 +23,8 @@ const memStorage = () => {
   return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) };
 };
 
-export async function loadSite({ scripts = [], routes = {}, lang = null, now = "2026-11-16T12:00:00+01:00", languages = ["nb-NO", "nb", "no"] } = {}) {
+export async function loadSite({ scripts = [], routes = {}, lang = null, now = "2026-11-16T12:00:00+01:00", languages = ["nb-NO", "nb", "no"],
+  search = "", storage = null, page = "index.html", before = null } = {}) {
   const clock = { ms: Date.parse(now) };
   const timers = [];
   let seq = 0;
@@ -49,10 +50,12 @@ export async function loadSite({ scripts = [], routes = {}, lang = null, now = "
     static now() { return clock.ms; }
   }
 
-  const doc = parseDocument(readSite("index.html"));
+  const doc = parseDocument(readSite(page));
   const html = [];
   doc.onInnerHTML = (el, s) => html.push({ id: el.getAttribute("id") || el.localName, html: s });
   const requests = [];
+  const replaced = [];
+  const location = { search, pathname: "/" + (page === "index.html" ? "" : page), hash: "", href: "https://www.viggosbarbershop.no/" + (page === "index.html" ? "" : page) + search };
   const fetch = (url, init = {}) => {
     requests.push({ url: String(url), init, at: clock.ms });
     const ans = routes[String(url).split("?")[0]];
@@ -73,9 +76,17 @@ export async function loadSite({ scripts = [], routes = {}, lang = null, now = "
   const ctx = {
     document: doc,
     navigator: { languages, language: languages[0] || "", userAgent: "mini-dom" },
-    location: { search: "", pathname: "/", hash: "", href: "https://www.viggosbarbershop.no/" },
-    history: { replaceState() {} },
-    localStorage: memStorage(),
+    location,
+    history: {
+      state: null,
+      // Like a browser: the address changes (so a test can "reload" with site.location.search), nothing loads
+      replaceState(state, title, url) {
+        replaced.push(String(url));
+        const u = new URL(String(url), location.href);
+        Object.assign(location, { pathname: u.pathname, search: u.search, hash: u.hash, href: u.href });
+      },
+    },
+    localStorage: storage || memStorage(),
     sessionStorage: memStorage(),
     Date: FakeDate,
     setTimeout: (fn, ms) => addTimer(fn, ms, 0),
@@ -90,6 +101,7 @@ export async function loadSite({ scripts = [], routes = {}, lang = null, now = "
   };
   ctx.window = ctx;
   ctx.self = ctx;
+  if (before) before(ctx);
   vm.createContext(ctx);
   for (const f of ["i18n.js", ...scripts]) vm.runInContext(readSite(f), ctx, { filename: f });
   await flush();
@@ -97,7 +109,8 @@ export async function loadSite({ scripts = [], routes = {}, lang = null, now = "
 
   const $ = (id) => doc.getElementById(id);
   return {
-    doc, ctx, html, requests, clock, advance, flush, $,
+    doc, ctx, html, requests, replaced, location, clock, advance, flush, $,
+    storage: ctx.localStorage,
     I18N: ctx.I18N,
     s: () => ctx.I18N.s(),
     qs: (sel) => doc.querySelector(sel),

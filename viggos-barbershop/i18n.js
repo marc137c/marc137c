@@ -249,13 +249,21 @@
     set(v) { try { localStorage.setItem("lang", v); } catch (e) { /* privat modus */ } },
   };
 
+  // Norsk for alle (eierens beslutning D5), også for nettlesere på engelsk eller svensk. Engelsk bare når
+  // besøkeren har valgt det: ?lang=en i adressen, eller bryteren (valget huskes).
   function detect() {
-    const param = /[?&]lang=(en|no)(?:&|$)/.exec(location.search);
+    const param = /[?&]lang=(en|no)(?=&|$)/.exec(location.search);
     if (param) return param[1];
-    const saved = store.get();
-    if (saved === "en" || saved === "no") return saved;
-    const langs = navigator.languages || [navigator.language || ""];
-    return langs.some((l) => /^(nb|nn|no)\b/i.test(l)) ? "no" : "en";
+    return store.get() === "en" ? "en" : "no";
+  }
+
+  // Kom besøkeren med ?lang=… og bytter språk, skrives parameteren om, så «last inn på nytt» gir det nye valget
+  function rewriteParam(lang) {
+    try {
+      if (/[?&]lang=(en|no)(?=&|$)/.test(location.search) && history.replaceState) {
+        history.replaceState(history.state, "", location.pathname + location.search.replace(/([?&]lang=)(en|no)(?=&|$)/, "$1" + lang) + location.hash);
+      }
+    } catch (e) { /* adressen er ikke viktig nok til å stoppe språkbyttet */ }
   }
 
   function apply(lang) {
@@ -293,7 +301,7 @@
     lang: "no",
     s: () => STRINGS[I18N.lang],
     onChange: (fn) => listeners.push(fn),
-    set(lang) { store.set(lang); apply(lang); },
+    set(lang) { store.set(lang); apply(lang); rewriteParam(lang); },
   };
   window.I18N = I18N;
 

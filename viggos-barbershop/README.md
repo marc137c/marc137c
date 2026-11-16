@@ -88,7 +88,7 @@ Portrettet i «Om oss» er `img/viggo-portrett-600` og `-1000` (webp og jpg).
 
 ## Språk (norsk / English)
 Siden finnes på norsk og engelsk. Bryteren **English / Norsk** øverst i menyen bytter språk på hele siden, og valget huskes.
-Besøkende med nettleser på norsk får norsk, alle andre får engelsk. Lenke direkte til en versjon med `?lang=en` eller `?lang=no`.
+Siden åpner alltid på norsk, også når nettleseren står på engelsk eller et annet språk. Engelsk vises bare når besøkeren velger det med bryteren eller kommer via en lenke med `?lang=en`; valget huskes til neste besøk. Bytter besøkeren språk etter å ha kommet med `?lang=…`, skrives adressen om, så «last inn på nytt» gir det nye valget.
 
 - Norsk tekst står i `index.html`. Engelsk tekst står i `EN` i `i18n.js` (samme nøkkel som `data-i18n` i HTML-en).
 - Endrer du en tekst på norsk, oppdater den engelske også.
