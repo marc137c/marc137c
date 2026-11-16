@@ -128,6 +128,42 @@ test("F51: one review is 'anmeldelse' / 'review', two are plural, in the strings
   assert.equal(text(two.$("rating-summary").querySelector(".rating-count")), "basert på 2 anmeldelser på Google Maps");
 });
 
+// F76: Places policy: each review links to itself on Google Maps (googleMapsUri), and the page says how the
+// reviews shown were picked and ordered.
+const NOTE_NO = "Et utvalg av anmeldelsene med tekst, i den rekkefølgen Google Maps viser dem (mest relevante først).";
+const NOTE_EN = "A selection of the reviews with text, in the order Google Maps shows them (most relevant first).";
+test("F76: every Google card links to the review on Google Maps, and one line says how the reviews are picked and ordered", async () => {
+  const site = await reviewsPage(REVIEWS.many);
+  const shown = [1, 3, 4, 5];
+  cards(site).forEach((c, i) => {
+    const a = c.querySelectorAll("a.review-more");
+    assert.equal(a.length, 1);
+    assert.equal(a[0].getAttribute("href"), `https://www.google.com/maps/reviews/data=fixture-review-${shown[i]}`);
+    assert.equal(a[0].getAttribute("target"), "_blank");
+    assert.equal(a[0].getAttribute("rel"), "noopener");
+    assert.equal(text(a[0]), "Les hele på Google");
+  });
+  const notes = site.qsa("#reviews .reviews-note");
+  assert.equal(notes.length, 1);
+  assert.equal(text(notes[0]), NOTE_NO);
+  assert.equal(notes[0].querySelector("[translate=no]").textContent, "Google Maps");
+  await site.setLang("en");
+  assert.deepEqual(site.qsa("#reviews a.review-more").map(text), ["Read on Google", "Read on Google", "Read on Google", "Read on Google"]);
+  assert.equal(text(site.qs("#reviews .reviews-note")), NOTE_EN);
+
+  // A link that is not https is left out, the card stays
+  const rtl = await reviewsPage(REVIEWS.rtl);
+  assert.equal(cards(rtl).length, 2);
+  assert.equal(cards(rtl)[0].querySelectorAll("a.review-more").length, 1);
+  assert.equal(cards(rtl)[1].querySelectorAll("a.review-more").length, 0);
+
+  // The owner's FEATURED reviews are picked by the owner: no Google ordering note and no extra links
+  const featured = await reviewsPage(REVIEWS.unconfigured);
+  assert.equal(featured.qsa("#reviews .reviews-note").length, 0);
+  assert.equal(featured.qsa("#reviews a.review-more").length, 0);
+  assertFeatured(featured);
+});
+
 test("widgets: every string reviews.js, social-feed.js and i18n.js wrote in this file is well-formed Unicode", () => {
   const writes = SITES.reduce((all, s) => all.concat(s.html), []);
   assert.ok(writes.length > 20, `${writes.length} writes checked`);

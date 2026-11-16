@@ -179,6 +179,8 @@
       ratingOf: (r) => `${r} av 5 stjerner`,
       heroRating: (r, n) => `${r} på Google Maps · ${n} ${n === 1 ? "anmeldelse" : "anmeldelser"}`,
       reviewsFallback: "Les hva kundene våre sier om oss på Google.",
+      readOnGoogle: "Les hele på Google",
+      reviewsNote: "Et utvalg av anmeldelsene med tekst, i den rekkefølgen Google Maps viser dem (mest relevante først).",
       onGoogle: "på Google",
       googleReview: "Google-anmeldelse",
       // Instagram
@@ -232,6 +234,8 @@
       ratingOf: (r) => `${r} out of 5 stars`,
       heroRating: (r, n) => `${r} on Google Maps · ${n} ${n === 1 ? "review" : "reviews"}`,
       reviewsFallback: "Read what our customers say about us on Google.",
+      readOnGoogle: "Read on Google",
+      reviewsNote: "A selection of the reviews with text, in the order Google Maps shows them (most relevant first).",
       onGoogle: "on Google",
       googleReview: "Google review",
       // Instagram

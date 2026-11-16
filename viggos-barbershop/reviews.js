@@ -63,9 +63,12 @@
     const avatar = safeUrl(r.photo)
       ? `<img class="review-avatar" src="${esc(r.photo)}" alt="" width="40" height="40" loading="lazy" referrerpolicy="no-referrer">`
       : `<span class="review-avatar review-avatar--initial" aria-hidden="true">${esc((r.author || "?").charAt(0).toUpperCase())}</span>`;
+    // Lenken til akkurat denne anmeldelsen på Google Maps (Googles krav; teksten kan også være kuttet her)
+    const more = safeUrl(r.mapsUri);
     return `<figure class="review">
       <div class="review-top">${stars(r.rating)}${attr}</div>
       <blockquote>${esc(r.text)}</blockquote>
+      ${more ? `<a class="review-more" href="${esc(more)}" target="_blank" rel="noopener">${esc(I18N.s().readOnGoogle)}</a>` : ""}
       <figcaption>${avatar}<span><strong>${author}</strong><small>${esc(ago(r))}</small></span></figcaption>
     </figure>`;
   }
@@ -102,7 +105,8 @@
     }
 
     if (withText.length) {
-      list.innerHTML = withText.map((x) => card(x, GM)).join("");
+      // Googles krav: en linje om hvordan anmeldelsene er valgt ut og sortert
+      list.innerHTML = withText.map((x) => card(x, GM)).join("") + `<p class="reviews-note">${brand(s.reviewsNote)}</p>`;
       list.classList.remove("reviews--single");
     } else {
       // Ikke koblet til Google ennå (eller ingen tekst-anmeldelser): pen henvisning til Google

@@ -612,6 +612,8 @@ form.booking {
 .review figcaption small { color: var(--muted); font-size: .8rem; }
 .review-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex: none; }
 .review-avatar--initial { display: flex; align-items: center; justify-content: center; background: var(--gold-fill); color: var(--on-gold); font-weight: 700; }
+.review-more { align-self: flex-start; color: var(--gold); font-size: .85rem; }
+.reviews-note { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: .85rem; text-align: center; }
 .review--cta { align-items: center; text-align: center; padding: 32px; }
 .review--cta .g-logo { width: 36px; height: 36px; }
 .review--cta p { margin: 0; color: var(--muted); }
