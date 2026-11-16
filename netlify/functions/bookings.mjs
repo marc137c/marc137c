@@ -4,7 +4,7 @@
 // timen er lagret, og får aldri felle bestillingen eller holde igjen svaret mer enn BOOKING_PUSH_WAIT_MS.
 import { liveDeps, bookingStore, afterResponse, isRetiredDeploy, retiredResponse, jsonObject } from "../lib/runtime.mjs";
 import { validateCustomer, createItem } from "../lib/booking-core.mjs";
-import { takeBookingSlot, releaseBookingSlot } from "../lib/limits.mjs";
+import { takeBookingSlot, releaseBookingSlot, forgetToken } from "../lib/limits.mjs";
 import { announceBooking, pushToDevices, bookingsPausedMessage, pushGen, BOOKING_PUSH_WAIT_MS } from "../lib/push.mjs";
 
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -45,8 +45,10 @@ export async function handle(req, context, deps) {
     const r = await createItem(store, { ...v.value, type: "booking" }, { source: "nettside", now: deps.now() });
     if (r.error) {
       // Ble ingenting lagret (tiden var tatt), koster forsøket verken nummeret eller det felles taket noe.
-      // Klientens treff blir stående, så én klient fortsatt ikke kan prøve uten grense.
+      // Klientens treff blir stående, så én klient fortsatt ikke kan prøve uten grense, og får en ny id: et nytt,
+      // likt forsøk (samme requestId) telles da som et nytt forsøk, ikke som «allerede telt» (runde 2).
       await releaseBookingSlot(store, slot, ["phone", "all"]);
+      if (r.code === "taken" || r.code === "request_reused") await forgetToken(store, slot, "ip");
       return json({ error: r.error, code: r.code }, r.status);
     }
     // Bare enheter slått på med dagens admin-passord får varselet (bytter Viggo passordet, stopper alle gamle).

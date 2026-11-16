@@ -415,3 +415,20 @@ test("rate limit: an honest replay (the same body twice) is still 201, 201 with 
   assert.equal(hits(d, await keyOf(d, "phone", "40000000")), 1);
   assert.equal(hits(d, ALL_KEY), 1);
 });
+
+// Fix-up round 2 (taken-slot-same-reqid.mjs): with one fixed requestId, a taken slot could be retried without limit
+// (300 x 409, never 429), each try writing rl/all twice: the kept IP hit carried the requestId-derived token, so every
+// identical try was «already counted». Rule: only a request whose earlier attempt may have stored a booking is exempt
+// from counting; a taken slot re-keys the kept hit, so the next identical try counts as a new attempt.
+test("rate limit: 300 identical requests (same body and requestId) on a taken slot from one address stop at the client cap, with rl/all writes bounded", async () => {
+  const d = testDeps({ now: NOW });
+  seedItems(d.blobs, [item({ date: "2026-11-13", start: 600, name: "Tatt" })]);
+  const b = { ...body({ date: "2026-11-13", start: 600 }, "40000001"), requestId: RID };
+  const from0 = d.blobs.log.length;
+  const rs = [];
+  for (let i = 0; i < 300; i++) rs.push(await read(await handle(post(b), from("198.51.100.66"), d)));
+  assert.deepEqual(statuses(rs), { 409: 5, 429: 295 });
+  const allWrites = d.blobs.log.slice(from0).filter((e) => e.key === ALL_KEY && (e.method === "PUT" || e.method === "DELETE")).length;
+  assert.ok(allWrites <= 10, `${allWrites} writes to rl/all`);
+  assert.equal(hits(d, await keyOf(d, "ip", "198.51.100.66")), 5, "five counted attempts, each with its own id");
+});

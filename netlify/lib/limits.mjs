@@ -228,6 +228,24 @@ export async function releaseBookingSlot(store, slot, kinds) {
   const took = Array.isArray(slot.took) ? slot.took : [];
   await releaseKeys(store, kinds.filter((k) => took.includes(k)).map((k) => slot.keys[k]).filter(Boolean), slot.token);
 }
+// Et forsøk som ikke lagret noe (tiden var tatt, eller requestId var brukt på en annen tid), men som skal telle for
+// klienten: treffet blir stående, men med en ny, tilfeldig id (runde 2). Ellers var tokenet fra requestId «allerede
+// telt» i et døgn, og det samme forsøket kunne gjentas uten grense (300 x 409, aldri 429), med to skrivinger i rl/all
+// hver gang. Bare et forsøk som kan ha lagret en bestilling, er unntatt fra å telles på nytt. Feiler aldri.
+export async function forgetToken(store, slot, kind) {
+  if (!slot || !slot.keys || !slot.keys[kind]) return;
+  try {
+    const r = await mutateJSON(store, slot.keys[kind], initHits, (doc) => {
+      const hit = doc.hits.find((h) => h && h.id === slot.token);
+      if (!hit) return { ok: true, noWrite: true };
+      hit.id = newToken();
+      return { ok: true };
+    });
+    if (r.error) console.warn("Teller: kunne ikke gi treffet en ny id:", r.error);
+  } catch (err) {
+    console.warn("Teller: kunne ikke gi treffet en ny id:", err && err.name);
+  }
+}
 async function releaseKeys(store, keys, token) {
   for (const key of keys) {
     try {
