@@ -242,9 +242,14 @@ export async function createItem(store, value, { source, force = false, now = ne
     if (doc.items.some((o) => o.id === item.id)) return { ok: true, item };
     // … også når forsøket kom i et nytt kall (siden prøvde igjen med samme requestId, F1): svar med den lagrede
     // bestillingen i stedet for «tatt». Bare for den samme tiden, og bare mens den ikke er avlyst.
+    // Samme requestId på en aktiv avtale med en annen tid er aldri et nytt forsøk (siden lager en ny requestId for hver
+    // endring), men gjenbruk: avvis det i stedet for å lagre en avtale til (runde 2, SPEC R5).
     if (item.requestId) {
       const same = doc.items.find((o) => o.requestId === item.requestId && active(o) && o.date === item.date && o.start === item.start);
       if (same) return { ok: true, item: same, replay: true, noWrite: true };
+      if (doc.items.some((o) => o.requestId === item.requestId && active(o))) {
+        return { error: "Denne forespørselen er allerede brukt. Last siden på nytt.", code: "request_reused", status: 409 };
+      }
     }
     const clash = active(item) && doc.items.find((o) => active(o) && o.date === item.date && overlaps(item.start, item.dur, o.start, o.dur));
     if (clash && !force) return { error: "Tidspunktet er allerede booket.", code: "taken", status: 409 };

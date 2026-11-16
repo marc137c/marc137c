@@ -346,3 +346,72 @@ test("rate limit: no key in any store holds the customer's phone number or IP ad
   assert.match(counterKey(secret, "phone", "98765432"), /^rl\/phone\/[A-Za-z0-9_-]{22}$/);
   assert.equal(d.blobs.json("bookings", "rl/secret").k, secret);
 });
+
+// ---------- Round 2: a client-chosen requestId is only a replay of the request it was made for ----------
+// Guard rule (SPEC R5): an idempotency key from the client counts as a replay only when the server's fingerprint
+// of the request (requestId + date + start + phone) matches. Reused with another fingerprint it is a new, counted
+// attempt. Test rule: for every per-client cap, an adversarial loop varies each client-controlled field one at a
+// time while the others stay fixed, and at most 5 bookings per hour are ever stored from one client.
+const RID = "AAAAAAAAAAAA";
+const webItems = (d) => storedItems(d.blobs).filter((x) => x.source === "nettside");
+
+test("rate limit: one requestId reused for 100 different slots from one client stops at the client cap (5 counted, then 429)", async () => {
+  const d = testDeps({ now: NOW });
+  const slots = allSlots();
+  const out = [];
+  for (let i = 0; i < 100; i++) {
+    out.push(await read(await handle(post({ ...body(slots.next().value, "40000000"), requestId: RID }), from("198.51.100.9"), d)));
+  }
+  // The first is stored; a reuse in the same month is refused (409 request_reused), and every attempt is counted
+  assert.deepEqual(statuses(out), { 201: 1, 409: 4, 429: 95 });
+  assert.ok(out.filter((r) => r.status === 409).every((r) => r.body.code === "request_reused"), JSON.stringify(out.map((r) => r.body.code)));
+  assert.equal(webItems(d).length, 1);
+  assert.equal(hits(d, await keyOf(d, "ip", "198.51.100.9")), 5);
+});
+
+test("rate limit: adversarial loop - varying one client-controlled field at a time never stores more than 5 per hour from one client", async () => {
+  // Each variant: what changes from one request to the next. The slot always changes (a new booking needs one).
+  const variants = {
+    "same requestId, same phone/name/service": (i) => ({ requestId: RID }),
+    "same requestId, new phone each time": (i) => ({ requestId: RID, phone: mobile(i) }),
+    "same requestId, new service each time": (i) => ({ requestId: RID, service: i % 2 ? "Herreklipp" : "Barneklipp" }),
+    "same requestId, new name each time": (i) => ({ requestId: RID, name: "Flom " + i }),
+    "new requestId each time": (i) => ({ requestId: "rq_flood_" + String(i).padStart(4, "0") }),
+    "no requestId": () => ({}),
+  };
+  for (const [label, vary] of Object.entries(variants)) {
+    const d = testDeps({ now: NOW });
+    const slots = allSlots();
+    const out = [];
+    for (let i = 0; i < 30; i++) {
+      out.push(await read(await handle(post({ ...body(slots.next().value, "40000000"), ...vary(i) }), from("198.51.100.9"), d)));
+    }
+    assert.ok(webItems(d).length <= 5, `${label}: ${webItems(d).length} stored`);
+    assert.ok((statuses(out)[201] || 0) <= 5, `${label}: ${JSON.stringify(statuses(out))}`);
+  }
+});
+
+test("rate limit: the same requestId on a taken slot after a stored booking leaves that booking's phone and global hits in place", async () => {
+  const d = testDeps({ now: NOW });
+  seedItems(d.blobs, [item({ date: "2026-11-13", start: 660, name: "Tatt" })]);
+  const first = await read(await handle(post({ ...body({ date: "2026-11-13", start: 600 }, "40000000"), requestId: RID }), from("198.51.100.9"), d));
+  assert.equal(first.status, 201);
+  const phoneKeyOf = await keyOf(d, "phone", "40000000");
+  assert.deepEqual([hits(d, phoneKeyOf), hits(d, ALL_KEY)], [1, 1]);
+  const taken = await read(await handle(post({ ...body({ date: "2026-11-13", start: 660 }, "40000000"), requestId: RID }), from("198.51.100.9"), d));
+  assert.equal(taken.status, 409);
+  assert.deepEqual([hits(d, phoneKeyOf), hits(d, ALL_KEY)], [1, 1], "the stored booking still counts");
+});
+
+test("rate limit: an honest replay (the same body twice) is still 201, 201 with one booking and one hit", async () => {
+  const d = testDeps({ now: NOW });
+  const b = { ...body({ date: "2026-11-13", start: 600 }, "40000000"), requestId: RID };
+  const a1 = await read(await handle(post(b), from("198.51.100.9"), d));
+  const a2 = await read(await handle(post(b), from("198.51.100.9"), d));
+  assert.deepEqual([a1.status, a2.status], [201, 201]);
+  assert.equal(a2.body.booking.id, a1.body.booking.id);
+  assert.equal(webItems(d).length, 1);
+  assert.equal(hits(d, await keyOf(d, "ip", "198.51.100.9")), 1);
+  assert.equal(hits(d, await keyOf(d, "phone", "40000000")), 1);
+  assert.equal(hits(d, ALL_KEY), 1);
+});

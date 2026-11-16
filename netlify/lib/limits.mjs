@@ -163,42 +163,56 @@ export const ALERT_MS = DAY; // Viggo får høyst ett varsel per døgn om at net
 const ORDER = ["ip", "phone", "all"];
 
 // Nøklene til de tre tellerne for denne klienten og dette nummeret
-export async function bookingKeys(store, { ip, phone }) {
-  const secret = await limiterSecret(store);
+export function bookingKeys(secret, { ip, phone }) {
   return { ip: counterKey(secret, "ip", clientKey(ip)), phone: counterKey(secret, "phone", phoneKey(phone)), all: ALL_KEY };
+}
+
+// Tokenet et forsøk telles med. Uten requestId et nytt for hvert forsøk. Med requestId (SPEC R1, F1) det samme for
+// et nytt forsøk på den samme bestillingen, og bare da: tokenet er en nøkkel-hash av requestId sammen med dato,
+// starttid og telefonnummer, regnet ut av serveren. En klient som bruker samme requestId på en annen tid eller et
+// annet nummer, får et annet token og telles som et nytt forsøk (runde 2: én requestId åpnet ellers alle takene).
+export function bookingToken(secret, { requestId, date, start, phone }) {
+  if (!requestId) return newToken();
+  return createHmac("sha256", secret).update(`req:${requestId}|${date}|${start}|${phoneKey(phone)}`).digest("base64url").slice(0, 22);
 }
 
 // Teller én nettbestilling for klienten, telefonnummeret og totalen. Alle tre leses først, og er én full, avvises
 // forsøket uten at noe skrives. Så tas plassene i rekkefølgen ip → phone → all med samme token; avviser en senere
-// teller, gis de tidligere tilbake. token: bestillingens requestId (et nytt forsøk telles ikke to ganger) eller et
-// nytt. Svarer { ok: true, keys, token }, { ok: false, limited: "ip" | "phone" | "all", tripped } (tripped: det
-// felles taket avviste for første gang i ALERT_MS, si fra til Viggo) eller { ok: false, error, status }.
-export async function takeBookingSlot(store, { ip, phone, token = newToken() }, nowMs) {
-  const keys = await bookingKeys(store, { ip, phone });
+// teller, gis de tidligere tilbake. token: se bookingToken (et nytt forsøk på samme bestilling telles ikke to ganger).
+// Svarer { ok: true, keys, token, took } (took: tellerne dette kallet selv skrev i), { ok: false, limited: "ip" |
+// "phone" | "all", tripped } (tripped: det felles taket avviste for første gang i ALERT_MS, si fra til Viggo) eller
+// { ok: false, error, status }.
+export async function takeBookingSlot(store, { ip, phone, requestId, date, start }, nowMs) {
+  const secret = await limiterSecret(store);
+  const keys = bookingKeys(secret, { ip, phone });
+  const token = bookingToken(secret, { requestId, date, start, phone });
   const peeks = await Promise.all(ORDER.map((k) => peek(store, keys[k], BOOKING_LIMITS[k], { nowMs, token })));
   const fullAt = ORDER.find((k, i) => peeks[i].full);
   if (fullAt) {
     const tripped = peeks[2].full ? (await trip(store, ALL_KEY, BOOKING_LIMITS.all, nowMs, ALERT_MS)).tripped === true : false;
     return { ok: false, limited: fullAt, tripped };
   }
-  const taken = [];
+  const took = [];
   for (const k of ORDER) {
     const r = await take(store, keys[k], BOOKING_LIMITS[k], { nowMs, token, alertMs: k === "all" ? ALERT_MS : 0 });
     if (r.error || !r.ok) {
-      await releaseKeys(store, taken, token);
+      await releaseKeys(store, took.map((t) => keys[t]), token);
       if (r.error) return { ok: false, limited: k, error: r.error, status: r.status };
       return { ok: false, limited: k, tripped: r.tripped === true };
     }
-    if (!r.own) taken.push(keys[k]);
+    if (!r.own) took.push(k);
   }
-  return { ok: true, keys, token };
+  return { ok: true, keys, token, took };
 }
 
 // Gir tilbake plassene en bestilling tok (slot fra takeBookingSlot) i tellerne kinds, f.eks. ["phone", "all"] når
-// tiden var tatt. Feiler aldri: går det ikke, blir treffet stående til det går ut av vinduet.
+// tiden var tatt. Bare treff dette kallet selv skrev (slot.took): et treff som allerede sto der med samme token,
+// hører til et tidligere forsøk som kan ha blitt lagret, og blir stående. Feiler aldri: går det ikke, blir treffet
+// stående til det går ut av vinduet.
 export async function releaseBookingSlot(store, slot, kinds) {
   if (!slot || !slot.keys) return;
-  await releaseKeys(store, kinds.map((k) => slot.keys[k]).filter(Boolean), slot.token);
+  const took = Array.isArray(slot.took) ? slot.took : [];
+  await releaseKeys(store, kinds.filter((k) => took.includes(k)).map((k) => slot.keys[k]).filter(Boolean), slot.token);
 }
 async function releaseKeys(store, keys, token) {
   for (const key of keys) {

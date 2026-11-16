@@ -30,8 +30,9 @@ export async function handle(req, context, deps) {
     const store = bookingStore(deps, context); // forhåndsvisninger har sin egen timebok (F10)
     // Tak mot flom (F2): per klient (IP eller IPv6 /64), per telefonnummer og totalt, telt konfliktsikkert før timen lagres
     const ip = (context && context.ip) || req.headers.get("x-nf-client-connection-ip") || "ukjent";
-    // Med requestId er tokenet det samme i et nytt forsøk, så forsøket ikke telles to ganger (F1)
-    const slot = await takeBookingSlot(store, { ip, phone: v.value.phone, ...(v.value.requestId ? { token: v.value.requestId } : {}) }, deps.now().getTime());
+    // Med requestId er tokenet det samme i et nytt forsøk på samme bestilling, så det ikke telles to ganger (F1), men
+    // bundet til tid og nummer: samme requestId på en annen bestilling telles som et nytt forsøk (limits.mjs bookingToken)
+    const slot = await takeBookingSlot(store, { ip, ...v.value }, deps.now().getTime());
     if (!slot.ok) {
       // Første gang det felles taket avviser i døgnet: ett varsel til Viggo (uten kundedata), så han vet hvorfor
       if (slot.tripped) {

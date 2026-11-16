@@ -157,12 +157,12 @@ test("bookings: a requestId only replays the same time; a malformed one is ignor
   assert.equal((await handle(post({ ...BODY, requestId: "bad id" }), PRODUCTION, d)).status, 201);
   assert.equal((await handle(post({ ...BODY, requestId: "bad id" }), PRODUCTION, d)).status, 409);
   assert.deepEqual(Object.keys(storedItems(d.blobs)[0]).sort(), STORED_FIELDS);
-  // the same requestId for another time is not a replay of the first booking
+  // the same requestId for another time is not a replay of the first booking: the page makes a new requestId for
+  // every change, so a reuse is refused (409 request_reused) and stores nothing (round 2, SPEC R5)
   assert.equal((await handle(post({ ...BODY, start: 660, requestId: RID }), PRODUCTION, d)).status, 201);
   const again = await read(await handle(post({ ...BODY, start: 690, requestId: RID }), PRODUCTION, d));
-  assert.equal(again.status, 201);
-  assert.equal(again.body.booking.start, 690);
-  assert.equal(storedItems(d.blobs).length, 3);
+  assert.deepEqual([again.status, again.body.code], [409, "request_reused"]);
+  assert.equal(storedItems(d.blobs).length, 2);
 });
 
 test("bookings: a phone over 30 characters is 400 bad_phone and stores nothing (F25: it was cut and saved)", async () => {
