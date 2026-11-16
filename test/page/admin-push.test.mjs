@@ -625,6 +625,7 @@ test("admin push panel: end to end, a reset from the phone leaves only the phone
 // ---------- 10. Blocked, then allowed in the settings ----------
 const BLOCKED_TEXT = "Varsler er blokkert for denne siden. Tillat varsler i nettleserens innstillinger (på iPhone: Innstillinger → Varslinger → Timebok), og trykk Prøv igjen.";
 const STILL_BLOCKED_TEXT = "Fortsatt blokkert. Åpne nettleserens innstillinger for denne siden (på iPhone: Innstillinger → Varslinger → Timebok), velg Tillat for varsler, og kom tilbake hit.";
+const CHECKING_TEXT = "Sjekker …";
 const showPage = (page) => (page.doc.listeners.visibilitychange || []).forEach((fn) => fn({ type: "visibilitychange" }));
 
 test("admin push panel: blocked → «Prøv igjen»; after allowing notifications in the settings it offers «Slå på varsler»", async () => {
@@ -632,19 +633,28 @@ test("admin push panel: blocked → «Prøv igjen»; after allowing notification
   const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes() });
   assert.equal(msg(page), BLOCKED_TEXT);
   assert.deepEqual(buttons(page), ["push-retry"]);
-  page.$("push-retry").click();
-  await page.flush();
+  // Every tap gives a visible answer at once: «Sjekker …» with the button greyed out, then the result
+  const tap = async () => {
+    page.$("push-retry").click();
+    assert.equal(msg(page), CHECKING_TEXT, "the tap shows at once that it is checking");
+    assert.equal(page.$("push-retry").disabled, true, "and greys out the button meanwhile");
+    await page.flush();
+    assert.equal(msg(page), CHECKING_TEXT, "the answer comes a moment later, not in the same instant");
+    await page.advance(400);
+  };
+  await tap();
   assert.equal(msg(page), STILL_BLOCKED_TEXT, "still blocked: the tap gets a visibly different answer");
   assert.notEqual(STILL_BLOCKED_TEXT, BLOCKED_TEXT);
   assert.deepEqual(buttons(page), ["push-retry"]);
-  page.$("push-retry").click();
-  await page.flush();
-  assert.equal(msg(page), STILL_BLOCKED_TEXT, "and again on the next tap");
+  assert.equal(page.$("push-retry").disabled, false);
+  await tap();
+  assert.equal(msg(page), STILL_BLOCKED_TEXT, "the second tap also went through «Sjekker …» before the answer");
+  await tap();
+  assert.equal(msg(page), STILL_BLOCKED_TEXT, "and the third");
   assert.deepEqual(pushRequests(page).filter((r) => r.startsWith("POST")), [], "nothing is subscribed while blocked");
   assert.deepEqual(b.log.registered, [], "and no service worker is registered");
   b.setPermission("granted");
-  page.$("push-retry").click();
-  await page.flush();
+  await tap();
   assert.deepEqual(buttons(page), ["push-on"]);
   assert.equal(msg(page), "Varsler er av på denne enheten.");
   assert.equal(page.$("push-on").disabled, false);
@@ -655,8 +665,8 @@ test("admin push panel: «Prøv igjen» while blocked keeps the device count and
   const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes({ "GET /api/admin/push": () => ({ ...INFO, devices: 1 }) }) });
   assert.equal(msg(page), BLOCKED_TEXT + " 1 annen enhet får varsler.");
   page.$("push-retry").click();
-  assert.equal(msg(page), STILL_BLOCKED_TEXT, "the answer shows at once, in the tap");
-  await page.flush();
+  assert.equal(msg(page), CHECKING_TEXT, "the tap shows at once that it is checking");
+  await page.advance(400);
   assert.equal(msg(page), STILL_BLOCKED_TEXT + " 1 annen enhet får varsler.");
   assert.equal(page.$("push-reset").hidden, false);
   // Coming back from the settings still blocked (no tap) shows the usual text again

@@ -1118,7 +1118,20 @@
 
   // Har Viggo tillatt varsler i innstillingene, viser «Prøv igjen» (og det å komme tilbake til siden, eller at
   // nettleseren melder at tillatelsen er endret) panelet på nytt, så han slipper å lukke og åpne «Oppsett».
-  $("push-retry").addEventListener("click", () => pushLoad(true));
+  // Hvert trykk svarer synlig, også når svaret er det samme som sist («Fortsatt blokkert»): først «Sjekker …» med
+  // knappen grået ut, så svaret et øyeblikk etter (en tekst som byttes til den samme, ser ut som ingenting skjedde)
+  const RETRY_SHOW_MS = 400;
+  $("push-retry").addEventListener("click", () => {
+    const btn = $("push-retry");
+    if (btn.disabled) return;
+    const seq = pushSeq;
+    btn.disabled = true;
+    pushMsg("Sjekker …", "info");
+    setTimeout(() => {
+      if (seq === pushSeq && settings.open) pushLoad(true);
+      else btn.disabled = false;
+    }, RETRY_SHOW_MS);
+  });
   const pushRefresh = () => { if (settings.open && getToken() && !pushBusy()) pushLoad(); };
   document.addEventListener("visibilitychange", () => { if (!document.hidden) pushRefresh(); });
   if (pushSupported() && navigator.permissions && typeof navigator.permissions.query === "function") {
