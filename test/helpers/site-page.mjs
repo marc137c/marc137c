@@ -8,7 +8,8 @@
 //   innerHTML ({ id, html }), so a test can check what was generated, not only what the parser made of it.
 //   site.setLang("en") switches the language like the toggle does.
 //   More options: search ("?lang=en"), storage (share site.storage to "reload"), page ("personvern.html"),
-//   before(ctx) (change the window before any script runs: PointerEvent, HTMLDialogElement, saved values …).
+//   before(ctx) (change the window before any script runs: PointerEvent, HTMLDialogElement, saved values …),
+//   inline (also run the page's inline <script> blocks), i18n (default: only on index.html).
 //   site.replaced lists history.replaceState URLs, site.beacons the visit counter's XHRs, site.fire(type) runs
 //   window listeners.
 import vm from "node:vm";
@@ -28,7 +29,7 @@ const memStorage = () => {
 };
 
 export async function loadSite({ scripts = [], routes = {}, lang = null, now = "2026-11-16T12:00:00+01:00", languages = ["nb-NO", "nb", "no"],
-  search = "", storage = null, page = "index.html", before = null } = {}) {
+  search = "", storage = null, page = "index.html", before = null, i18n = page === "index.html", inline = false } = {}) {
   const clock = { ms: Date.parse(now) };
   const timers = [];
   let seq = 0;
@@ -121,7 +122,12 @@ export async function loadSite({ scripts = [], routes = {}, lang = null, now = "
   ctx.self = ctx;
   if (before) before(ctx);
   vm.createContext(ctx);
-  for (const f of ["i18n.js", ...scripts]) vm.runInContext(readSite(f), ctx, { filename: f });
+  // inline: the page's own <script> blocks (not JSON-LD) run first, in order
+  if (inline) {
+    Array.from(doc.querySelectorAll("script")).filter((el) => !el.hasAttribute("src") && !/json/.test(el.getAttribute("type") || ""))
+      .forEach((el, i) => vm.runInContext(el.textContent, ctx, { filename: page + " inline script " + (i + 1) }));
+  }
+  for (const f of [...(i18n ? ["i18n.js"] : []), ...scripts]) vm.runInContext(readSite(f), ctx, { filename: f });
   await flush();
   if (lang) { ctx.I18N.set(lang); await flush(); }
 

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="nb">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Personvern – Viggo's Barbershop</title>
+  <meta name="description" content="Hvilke opplysninger Viggo's Barbershop i Halden behandler når du bruker nettsiden og bestiller time, hvem som hjelper oss, og hvor lenge de lagres.">
+  <meta name="theme-color" content="#0b0f0d">
+  <link rel="icon" href="/favicon.ico" sizes="48x48">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <!-- Bare bekreftede fakta (eierens beslutning D6). Hver flyt som nevnes her, finnes i koden, og
+       test/page/privacy.test.mjs sjekker at sidene og koden stemmer overens. Alle adresser starter med /. -->
+  <style>
+    html { background: #0b0f0d; }
+    body { margin: 0; background: #0b0f0d; color: #f2ece0; font: 17px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 24px 16px 56px; }
+    .top { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between; -webkit-box-align: baseline; -webkit-align-items: baseline; align-items: baseline; border-bottom: 1px solid #2a3b31; padding-bottom: 14px; margin-bottom: 28px; }
+    .brand { font-family: Georgia, "Times New Roman", serif; font-size: 1.3rem; color: #cfa75e; text-decoration: none; margin-right: 16px; }
+    h1 { font-family: Georgia, "Times New Roman", serif; font-size: 2rem; line-height: 1.2; margin: 0 0 12px; }
+    h2 { font-family: Georgia, "Times New Roman", serif; font-size: 1.3rem; color: #cfa75e; margin: 36px 0 10px; }
+    p, li { color: #d6cbbd; }
+    p { margin: 0 0 12px; }
+    ul { margin: 0 0 12px; padding-left: 22px; }
+    li { margin: 0 0 8px; }
+    strong { color: #f2ece0; }
+    a { color: #cfa75e; overflow-wrap: break-word; word-wrap: break-word; }
+    a:hover, a:focus { color: #e3c381; }
+    .lead { font-size: 1.05rem; }
+    .small { font-size: .88rem; color: #b1ab9b; }
+    address { font-style: normal; color: #d6cbbd; margin: 0 0 12px; }
+    .foot { margin-top: 44px; padding-top: 16px; border-top: 1px solid #2a3b31; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="brand" href="/">Viggo's Barbershop</a>
+      <a href="/">← Til forsiden</a>
+    </header>
+
+    <main>
+      <h1>Personvern</h1>
+      <p class="lead">Her står hvilke opplysninger Viggo's Barbershop behandler når du bruker nettsiden og bestiller time, hvorfor, hvem som hjelper oss med det, og hvor lenge opplysningene lagres.</p>
+      <p class="small">Sist oppdatert 16. november 2026.</p>
+
+      <h2>Behandlingsansvarlig</h2>
+      <address>
+        <strong>Viggos Barbershop Kurti</strong> (org.nr. 937 845 812), innehaver Vigan Kurti<br>
+        Violgata 22, 1776 Halden<br>
+        Telefon <a href="tel:+4740963911">409 63 911</a> · e-post <a href="mailto:kurtivigan1@gmail.com">kurtivigan1@gmail.com</a>
+      </address>
+
+      <h2>Når du bestiller time</h2>
+      <p>Vi lagrer det du fyller ut: <strong>navn</strong>, <strong>telefonnummer</strong>, valgt <strong>tjeneste</strong> og eventuelle <strong>tillegg</strong>, <strong>dato</strong> og <strong>klokkeslett</strong> for timen, og når bestillingen ble gjort.</p>
+      <p>Formålet er å gi deg timen du ber om. Barberen ser bestillingen i den passordbeskyttede timeboken, kan ringe deg hvis noe må endres, og får beskjed om nye bestillinger på telefonen og i kalenderen sin (se under).</p>
+      <p>Behandlingsgrunnlaget er at opplysningene trengs for å gi deg timen du ber om (personvernforordningen artikkel 6 nr. 1 bokstav b).</p>
+      <p>Du må oppgi navn og telefonnummer for å bestille på nett. Vil du ikke det, kan du ringe oss på <a href="tel:+4740963911">409 63 911</a>. Vi sender deg ingen meldinger; bekreftelsen står på nettsiden når timen er lagret.</p>
+
+      <h2>Hvem som får opplysningene</h2>
+      <ul>
+        <li><strong>Netlify</strong> (Netlify, Inc., USA) drifter nettsiden, serverfunksjonene og lagringen (Netlify Blobs) der bestillingene ligger, som vår databehandler. Bestillingen lagres bare der, ikke i e-post eller i en skjematjeneste. Se <a href="https://www.netlify.com/privacy/" rel="noopener">Netlifys personvernerklæring</a>.</li>
+        <li><strong>Varsel til barberen:</strong> når du bestiller, får barberen et varsel («Ny time») med navn, tjeneste og tid, men ikke telefonnummeret. Varselet krypteres på serveren vår og fraktes til telefonen eller PC-en hans av push-tjenesten til nettleseren hans: Apple, Google, Mozilla eller Microsoft. Tjenesten kan ikke lese innholdet.</li>
+        <li><strong>Kalenderen på barberens telefon:</strong> har barberen koblet timeboken til kalenderen på telefonen, henter kalendertjenesten hans (Apples iCloud eller Google Kalender) navn, telefonnummer, tjeneste og tid for timene.</li>
+      </ul>
+      <p>Ingen andre får opplysningene om bestillingen din.</p>
+
+      <h2>Vern mot misbruk</h2>
+      <p>For å stoppe falske og automatiske bestillinger teller serveren forsøk per IP-adresse, per telefonnummer og per innlogging i timeboken. Tellerne lagrer bare tidspunkter, under en kode laget av adressen eller nummeret med en hemmelig nøkkel, aldri selve adressen eller nummeret. De slettes 24 timer etter siste forsøk.</p>
+      <p>Som for alle nettsteder mottar vertskapet (Netlify) IP-adressen din når nettleseren henter siden. Vi lagrer den ikke.</p>
+
+      <h2>Hvor lenge opplysningene lagres</h2>
+      <ul>
+        <li>En time slettes automatisk 90 dager etter timedatoen, også en avlyst time. Oppryddingen kjører hver dag.</li>
+        <li>Barberen kan slette en time før det, for eksempel hvis du ber om det.</li>
+        <li>Misbrukstellerne slettes 24 timer etter siste forsøk.</li>
+        <li>Besøksstatistikken (uten personopplysninger, se under) slettes etter 400 dager.</li>
+      </ul>
+
+      <h2>Besøksstatistikk uten informasjonskapsler</h2>
+      <p>For hver dag (norsk tid) teller vi hvor mange ganger forsiden og denne siden er vist, og hvor besøkene kom fra, i grove grupper: Instagram, Facebook, Google, TikTok, direkte eller annet. Det er alt.</p>
+      <p>Vi bruker ingen informasjonskapsler og lagrer ingen IP-adresse, ingen ID, ingen opplysninger om nettleseren din og ikke adressen du kom fra. Ingenting lagres på enheten din for å telle deg. Roboter og forhåndsvisninger telles ikke, bare besøk på den publiserte nettsiden. Tallene lagres hos Netlify (serverfunksjoner og Netlify Blobs) og slettes etter 400 dager.</p>
+
+      <h2>Innhold fra andre nettsteder</h2>
+      <ul>
+        <li><strong>Skrifter:</strong> skriftene ligger på vår egen server. Nettsiden henter ingenting fra Google Fonts.</li>
+        <li><strong>Kart:</strong> kartet under «Åpningstider» hentes fra Google Maps først når du trykker «Vis kart». Da kobler nettleseren din seg til Google, som får IP-adressen din og vanlig nettleserinformasjon etter Googles egne vilkår. Siden sender ikke med hvilken side du kom fra. «Veibeskrivelse» og adressen nederst på siden er vanlige lenker til Google Maps.</li>
+        <li><strong>Google-anmeldelser:</strong> anmeldelsene hentes fra Google av serveren vår, ikke av nettleseren din. Når seksjonen viser anmeldelser hentet fra Google, henter nettleseren din anmeldernes profilbilder fra Googles servere.</li>
+        <li><strong>Instagram:</strong> når seksjonen «Følg oss» viser innlegg fra Instagram, henter nettleseren din bildene fra Instagrams servere (Meta).</li>
+        <li>Lenkene til Instagram, TikTok og Facebook åpner de nettstedene først når du trykker på dem.</li>
+      </ul>
+
+      <h2>På enheten din</h2>
+      <p>Velger du engelsk på forsiden, husker nettleseren valget (lagret lokalt som «lang»). Det er ikke en informasjonskapsel og sendes ikke til oss. Ellers lagrer nettsiden ingenting på enheten din.</p>
+
+      <h2>Dine rettigheter</h2>
+      <p>Du kan be om innsyn i opplysningene vi har om deg, og be om retting eller sletting av dem. Du kan også be om at behandlingen begrenses, og om å få opplysningene utlevert. Ta kontakt på telefon <a href="tel:+4740963911">409 63 911</a> eller e-post <a href="mailto:kurtivigan1@gmail.com">kurtivigan1@gmail.com</a>.</p>
+      <p>Mener du at vi behandler opplysningene dine i strid med regelverket, kan du klage til Datatilsynet: <a href="https://www.datatilsynet.no/" rel="noopener">datatilsynet.no</a>.</p>
+    </main>
+
+    <footer class="foot small">
+      <p>Viggos Barbershop Kurti · Violgata 22, 1776 Halden · <a href="tel:+4740963911">409 63 911</a> · <a href="/">Forsiden</a> · <a href="/#bestill">Bestill time</a></p>
+    </footer>
+  </div>
+
+  <script>
+    // Besøksteller uten informasjonskapsler (se «Besøksstatistikk» over): bare side og hvilket nettsted besøket kom fra
+    (function () {
+      try {
+        var x = new XMLHttpRequest();
+        x.open("POST", "/api/hit", true);
+        x.setRequestHeader("Content-Type", "text/plain");
+        x.send(JSON.stringify({ p: location.pathname, r: document.referrer ? (document.referrer.split("/")[2] || "") : "" }));
+      } catch (e) { /* telleren er ikke viktig for siden */ }
+    })();
+  </script>
+</body>
+</html>

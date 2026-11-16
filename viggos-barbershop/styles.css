@@ -579,6 +579,9 @@ form.booking {
 .booking-done:empty { display: none; }
 .booking-done-line { margin: 0 0 8px; padding: 12px 14px; border: 1px solid rgba(111, 207, 142, .45); border-radius: 10px; color: var(--text); font-weight: 600; }
 .booking-done-line a { margin-left: 6px; color: var(--gold); text-decoration: underline; white-space: nowrap; }
+/* Personvern-linjen rett under «Bestill time» (D6) */
+.booking-privacy { margin: 10px 0 0; font-size: .85rem; line-height: 1.5; color: var(--muted); text-align: center; }
+.booking-privacy a { color: var(--gold); }
 .booking-after { text-align: center; margin-top: 26px; }
 .booking-after p { margin: 0 0 6px; color: var(--muted); }
 .booking-after a { font-weight: 700; }

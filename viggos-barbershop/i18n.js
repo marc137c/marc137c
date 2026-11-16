@@ -51,6 +51,7 @@
     "book.s4": "Your details",
     "book.addons": "Add-ons (optional)",
     "book.call": "Prefer to call?",
+    "book.privacy": "We only use your name and phone number for your appointment. Read more in our <a href=\"/personvern.html\" hreflang=\"nb\">privacy notice</a> (in Norwegian).",
     "cal.prev": "Previous month",
     "cal.next": "Next month",
     "f.choose": "– Choose –",
@@ -119,6 +120,7 @@
     // 9. Footer
     "foot.tel": "Tel",
     "totop": "Back to top ↑",
+    "foot.privacy": "Privacy",
     "foot.org": "Org. no.",
   };
 
