@@ -33,7 +33,7 @@
       "<div><strong>" + d.totals.month + "</strong><span>siste 30 dager</span></div></div>" +
       '<div class="sp-chart" aria-hidden="true">' + bars + "</div>" +
       (src ? '<p class="sp-sub">Kom fra (30 dager):</p><ul class="sp-src">' + src + "</ul>" : '<p class="sp-sub">Ingen besøk registrert ennå.</p>') +
-      '<p class="sp-note">Sidevisninger på forsiden. Telles uten informasjonskapsler og uten IP-adresser; roboter telles ikke.</p>';
+      '<p class="sp-note">Sidevisninger på forsiden og personvernsiden. Telles uten informasjonskapsler og uten IP-adresser; roboter telles ikke.</p>';
   }
   // Svarer ikke serveren innen WAIT_MS (dårlig nett), gis forsøket opp; neste tidtaker-tikk prøver igjen. Mens ett
   // forsøk venter, startes ikke et nytt (ellers hopet de seg opp bak tidtakeren).

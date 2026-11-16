@@ -12,7 +12,8 @@ const json = (body, status = 200) => Response.json(body, { status, headers: { "C
 const noContent = () => new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
 const BOT = /bot|crawl|spider|slurp|preview|headless|lighthouse|facebookexternalhit|whatsapp|telegram|discord|curl|wget|python|node-fetch|axios|go-http/i;
 export const SOURCES = ["instagram", "facebook", "google", "tiktok", "direkte", "annet"];
-const PAGES = ["forside", "personvern"];
+// Sidene som teller (panelet i /admin nevner hver av dem, test/page/admin-stats.test.mjs)
+export const PAGES = ["forside", "personvern"];
 export const MAX_HIT_BYTES = 1024;
 
 function sourceOf(host) {

@@ -99,3 +99,17 @@ test("stats panel: still shown after a reload with a remembered login", async ()
   await page.advance(1500);
   assert.ok(panel(page));
 });
+
+// The note says what is counted. Guard (SPEC R29): it is tested against the same list the server counts
+// (stats.mjs PAGES), so a page that starts sending the beacon cannot be left out of the text again.
+test("stats panel: the note names every page stats.mjs counts", async () => {
+  const { PAGES } = await import("../../netlify/functions/stats.mjs");
+  const NAMES = { forside: "forsiden", personvern: "personvernsiden" };
+  const page = run({ answer: () => Promise.resolve({ ok: true, json: () => Promise.resolve(STATS) }) });
+  await page.advance(1200);
+  const note = /<p class="sp-note">([^<]*)<\/p>/.exec(page.app.children[0].innerHTML)[1];
+  for (const p of PAGES) {
+    assert.ok(NAMES[p], `a Norwegian name for the counted page «${p}»`);
+    assert.ok(note.includes(NAMES[p]), `the note «${note}» names ${NAMES[p]}`);
+  }
+});
