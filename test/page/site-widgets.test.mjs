@@ -164,6 +164,25 @@ test("F76: every Google card links to the review on Google Maps, and one line sa
   assertFeatured(featured);
 });
 
+// F79, owner default (docs/SPEC.md): the hero badge shows whenever Google reports at least 5 reviews, whatever the
+// score; a low score is never hidden. The section summary always shows Google's numbers.
+test("F79: the hero badge needs at least 5 reviews and never hides a low score; the summary always shows", async () => {
+  const cases = [
+    ["1 review at 1.0", REVIEWS.oneStar, false],
+    ["3 reviews at 4.7", REVIEWS.few, false],
+    ["4 reviews", Object.assign({}, REVIEWS.few, { count: 4 }), false],
+    ["5 reviews", Object.assign({}, REVIEWS.few, { count: 5 }), true],
+    ["41 reviews at 4.7", REVIEWS.many, true],
+    ["7 reviews at 2.1", REVIEWS.low, true],
+  ];
+  for (const [name, body, shown] of cases) {
+    const site = await reviewsPage(body);
+    assert.equal(site.$("hero-rating").hidden, !shown, name);
+    assert.equal(site.$("rating-summary").hidden, false, name + ": summary");
+    if (shown) assert.match(text(site.$("hero-rating")), new RegExp(`^${String(body.rating.toFixed(1)).replace(".", ",")} på Google Maps · ${body.count} anmeldelser$`), name);
+  }
+});
+
 test("widgets: every string reviews.js, social-feed.js and i18n.js wrote in this file is well-formed Unicode", () => {
   const writes = SITES.reduce((all, s) => all.concat(s.html), []);
   assert.ok(writes.length > 20, `${writes.length} writes checked`);

@@ -7,6 +7,7 @@
   const link = document.getElementById("reviews-link");
   const heroRating = document.getElementById("hero-rating"); // stjernene øverst på siden
   const MAX_CARDS = 4;
+  const HERO_MIN = 5; // eierens standardvalg (docs/SPEC.md): stjernene i toppen fra 5 anmeldelser, uansett snitt
   let data = null;
 
   // Ekte Google-anmeldelser som eieren valgte (lest 14.11.2026 fra delte lenker på Google Maps).
@@ -98,7 +99,11 @@
       const r = data.rating.toFixed(1).replace(".", I18N.lang === "en" ? "." : ",");
       summary.innerHTML = `<strong class="rating-num">${r}</strong>${stars(data.rating, "stars-lg")}<span class="rating-count">${brand(s.basedOn(data.count))}</span>`;
       summary.hidden = false;
-      if (heroRating) { heroRating.innerHTML = `${stars(data.rating)}<span>${brand(s.heroRating(r, data.count))}</span>`; heroRating.hidden = false; }
+      // Stjernene øverst bare med minst HERO_MIN anmeldelser, men uansett snitt: et lavt snitt skjules aldri
+      if (heroRating) {
+        if (data.count >= HERO_MIN) { heroRating.innerHTML = `${stars(data.rating)}<span>${brand(s.heroRating(r, data.count))}</span>`; heroRating.hidden = false; }
+        else heroRating.hidden = true;
+      }
     } else {
       summary.hidden = true;
       if (heroRating) heroRating.hidden = true;

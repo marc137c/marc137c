@@ -47,7 +47,7 @@ This page holds the owner's decisions in force (D) and the rules the November 20
 The owner answers these once, in the final yes before going live. Until then the plan builds the default.
 
 - **Per-phone booking cap:** 6 per 24 h.
-- **Hero rating badge:** shown whenever Google reports at least 5 reviews, whatever the score. A low score is never hidden.
+- **Hero rating badge:** shown whenever Google reports at least 5 reviews, whatever the score. A low score is never hidden. Built in step 5 (`HERO_MIN` in `viggos-barbershop/reviews.js`, `test/page/site-widgets.test.mjs`).
 - **Empty sections:** an empty Instagram or Google reviews section is hidden.
 - **Map:** the attribution is plain text, 'Google Maps', and the map loads only after a click.
 - **Site address:** canonical, og:url and the JSON-LD url are `https://www.viggosbarbershop.no/`.
