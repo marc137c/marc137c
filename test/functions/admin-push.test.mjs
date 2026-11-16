@@ -214,3 +214,28 @@ test("admin push: other methods are unknown requests", async () => {
   }
   assert.equal(d.blobs.has("bookings", VAPID_KEY), false);
 });
+
+// Notification leftover (audit/notify still_open, «gone devices»): when the browser has lost this device's
+// subscription (pushsubscriptionchange without oldSubscription, a failed renew), the server still lists the old
+// endpoint, and Oppsett counted it as «1 annen enhet». GET /api/admin/push?endpoint=<the endpoint this device noted>
+// says whether that endpoint is still a device here (thisDevice), so /admin can count only the others and remove
+// its own dead entry with POST /api/admin/push/unsubscribe.
+test("admin push: GET ?endpoint= says whether that endpoint is still a device here, and unsubscribing a dead one drops the count", async () => {
+  const phone = makeDevice("apple"), pc = makeDevice("mozilla");
+  const d = setup({ devices: [phone, pc] });
+  await info(d);
+  await subscribe(d, phone);
+  await subscribe(d, pc);
+  const ask = (endpoint) => call(d, `/api/admin/push?endpoint=${encodeURIComponent(endpoint)}`, { method: "GET" }).then((r) => r.body);
+  assert.deepEqual(Object.keys((await info(d)).body).sort(), ["devices", "publicKey"], "no flag without ?endpoint=");
+  assert.equal((await ask(phone.endpoint)).thisDevice, true);
+  assert.equal((await ask(makeDevice("fcm").endpoint)).thisDevice, false, "an endpoint that was never stored");
+  assert.equal((await ask("https://evil.test/x")).thisDevice, false);
+  assert.equal((await ask("")).thisDevice, false);
+  // The phone's browser lost its subscription; /admin removes the noted endpoint, and only the PC is left
+  const res = await call(d, "/api/admin/push/unsubscribe", { json: { endpoint: phone.endpoint } });
+  assert.deepEqual([res.status, res.body], [200, { ok: true, devices: 1 }]);
+  const after = await ask(phone.endpoint);
+  assert.deepEqual([after.devices, after.thisDevice], [1, false]);
+  assert.equal(JSON.stringify(after).includes(pc.endpoint), false, "never another device's address");
+});

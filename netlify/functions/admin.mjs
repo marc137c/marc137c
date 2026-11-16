@@ -11,7 +11,8 @@
 //                                      { enabled: false, expired: true } når passordet er byttet siden den ble laget
 //   POST   /api/admin/calendar         lag lenken { replace: false } (beholder en som finnes) eller lag en ny
 //                                      { replace: true } (den gamle slutter å virke med en gang)
-//   GET    /api/admin/push             varsler på enhetene: { publicKey, devices } (nøkkelparet lages første gang)
+//   GET    /api/admin/push             varsler på enhetene: { publicKey, devices } (nøkkelparet lages første gang);
+//                                      med ?endpoint=<adresse> også thisDevice: er den adressen en enhet her
 //   POST   /api/admin/push/subscribe   { subscription } denne enheten får varsel om nye bestillinger (410 «gone»
 //                                      hvis push-tjenesten har sagt at abonnementet er borte: lag et nytt). Bare til
 //                                      innloggingen går ut: svaret har { until }
@@ -175,7 +176,16 @@ export async function handle(req, context, deps) {
       // Bare den offentlige nøkkelen går til nettleseren; den private blir på serveren
       const keys = await vapidKeys(store, { now: deps.now() });
       if (keys.error) return json({ error: keys.error }, keys.status);
-      return json({ publicKey: keys.publicKey, devices: (await readSubscriptions(store, { gen: pushGen(password), now: deps.now() })).length });
+      const subs = await readSubscriptions(store, { gen: pushGen(password), now: deps.now() });
+      const out = { publicKey: keys.publicKey, devices: subs.length };
+      // ?endpoint=<adressen denne enheten husker>: er den fortsatt en enhet her? Så kan /admin telle bare de andre,
+      // og fjerne sin egen døde adresse når nettleseren har mistet abonnementet. Aldri andre enheters adresser.
+      const asked = url.searchParams.get("endpoint");
+      if (asked !== null) {
+        const mine = normalizeEndpoint(asked);
+        out.thisDevice = !!mine && subs.some((s) => s.endpoint === mine);
+      }
+      return json(out);
     }
     if (PUSH_POSTS.has(path) && req.method === "POST") {
       const raw = await req.text();
