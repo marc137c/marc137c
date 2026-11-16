@@ -214,3 +214,62 @@ test("sheet requests: Slett shows progress, and a second tap on the same booking
   await page.flush();
   assert.deepEqual(page.alerts, [], "no false «slettet fra en annen enhet»");
 });
+
+// ---------- Fix-up round 2: held → Lukk → reopen the SAME booking (probe R2-D6, R2-D7) ----------
+// The F27 fix tied a request's result to the sheet it was started in, not to the booking: a sheet reopened for the
+// same booking counted as unrelated. A pending Slett showed nothing there (Slett enabled), its success made load()
+// say «Avtalen er endret et annet sted», and its failure left «Sletter …» standing. Guard: this column for Lagre,
+// Slett and «Avlys alle» × ok / fail / 404 / 401; «et annet sted» and «annen enhet» never appear for a booking this
+// device has a write pending or just finished for (a 404 or 412 is the server saying another device did it).
+const BLAME = /et annet sted|annen enhet/;
+async function sameSheetPage(ctl) {
+  const h = held();
+  const list = [ali, ali2, nils].map((x) => JSON.parse(JSON.stringify(x)));
+  const page = await loadAdmin({ now: DAY + "T09:00", confirm: () => true, routes: {
+    "GET /api/admin/items": itemsRoute(() => list),
+    [ctl.route]: h.route,
+    "POST /api/admin/login": () => ({ token: "new", expiresIn: 43200000, device: "dev-mark" }),
+    "GET /api/admin/push": () => ({ publicKey: "x", devices: 0 }),
+  } });
+  page.tap("timeline", `[data-id="${ali.id}"] button.item-open`);
+  await page.flush();
+  return { page, h, list };
+}
+const SERVER_DID = {
+  "Lagre": (list) => { list[0].note = "Ali-notat"; list[0].updatedAt = "2026-11-19T08:01:00.000Z"; return { ok: true, item: list[0] }; },
+  "Slett": (list) => { list.splice(0, 1); return { ok: true }; },
+  "Avlys alle nettbestillinger": (list) => { for (const x of list.slice(0, 2)) { x.status = "cancelled"; x.updatedAt = "2026-11-19T08:01:00.000Z"; } return { ok: true, cancelled: 2 }; },
+};
+for (const [label, ctl] of Object.entries(CONTROLS)) {
+  for (const outcome of ["ok", "fail", "404", "401"]) {
+    test(`sheet requests: ${label} pending → Lukk → the same booking reopened → ${outcome}: no false «et annet sted», and the reopened sheet is told`, async () => {
+      const { page, h, list } = await sameSheetPage(ctl);
+      ctl.start(page);
+      await page.flush();
+      assert.equal(h.pending(), 1);
+      page.$("cancel-edit").click();
+      page.tap("timeline", `[data-id="${ali.id}"] button.item-open`);
+      await page.flush();
+      assert.equal(page.$("editor").open, true, "Ali's sheet is open again");
+      if (label === "Slett") {
+        assert.equal(page.$("edit-msg").textContent, "Sletter …", "the reopened sheet says the delete is on its way");
+        assert.equal(page.$("delete").disabled, true, "and Slett is locked there");
+      }
+      if (outcome === "ok") h.release(SERVER_DID[label](list));
+      else OUTCOMES[outcome](h);
+      await page.flush();
+      if (outcome === "401") await logInAgain(page);
+      await page.flush();
+      const said = [page.$("edit-msg").textContent].concat(page.alerts).join(" | ");
+      if (outcome !== "404") assert.doesNotMatch(said, BLAME, said);
+      if (label === "Slett") {
+        assert.notEqual(page.$("edit-msg").textContent, "Sletter …", "«Sletter …» never outlives the DELETE");
+        if (outcome === "ok") assert.ok(!page.$("editor").open || page.$("edit-msg").textContent === "Avtalen er slettet.", "the deleted booking's sheet closes");
+        if (outcome === "fail") {
+          assert.match(said, /Ingen forbindelse/);
+          if (page.$("editor").open) assert.equal(page.$("delete").disabled, false, "Slett can be tried again");
+        }
+      }
+    });
+  }
+}

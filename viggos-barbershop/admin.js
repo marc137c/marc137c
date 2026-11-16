@@ -339,9 +339,12 @@
       state.config = day.config;
       render();
       // Arket står åpent (fanen kom tilbake), og avtalen er endret eller borte på serveren siden det ble åpnet (X1.2)
+      // Ikke for en endring denne enheten selv gjorde (ownChange; runde 2): da sier arket det, eller lukkes (slettet)
       if (dlg.open && state.editing && state.editing.date === d) {
-        const fresh = day.items.filter((i) => i.id === state.editing.id)[0];
-        if (!fresh || fresh.updatedAt !== state.editing.updatedAt) $("edit-msg").textContent = "Avtalen er endret et annet sted – lukk og åpne den på nytt.";
+        const ed = state.editing;
+        const fresh = day.items.filter((i) => i.id === ed.id)[0];
+        if (!fresh && ownWrites[ed.id] && ownWrites[ed.id].deleted) dlg.close();
+        else if (!fresh || fresh.updatedAt !== ed.updatedAt) $("edit-msg").textContent = ownChange(ed, fresh) ? OWN_CHANGE : "Avtalen er endret et annet sted – lukk og åpne den på nytt.";
       }
       $("sync").textContent = `Oppdatert ${hhmm(new Date().getHours() * 60 + new Date().getMinutes())}`;
     }).catch((err) => {
@@ -525,6 +528,11 @@
     E.note.value = v.note || "";
     E.cancelled.checked = v.status === "cancelled";
     $("edit-msg").textContent = "";
+    // En sletting av denne avtalen er fortsatt på vei (fra et ark som ble lukket): si det, og lås Slett (runde 2)
+    if (item && deleting[item.id]) {
+      $("delete").disabled = true;
+      $("edit-msg").textContent = DELETING;
+    }
     syncType();
     floodCheck(item);
     dlg.showModal();
@@ -567,6 +575,18 @@
   // Avtalen er endret på en annen enhet siden arket ble åpnet (412 «stale», X1.1)
   const STALE_TEXT = "Avtalen er endret på en annen enhet, så endringen ble ikke lagret. Listen oppdateres nå.";
   const STALE_DELETE = "Avtalen er endret på en annen enhet, så den ble ikke slettet. Listen oppdateres nå.";
+  // Det denne enheten selv har skrevet per avtale-id (runde 2): { deleted } etter Slett, { updatedAt, moved } etter
+  // Lagre; og numrene «Avlys alle» avlyste. load() skylder da aldri på «et annet sted» for det enheten gjorde selv.
+  const ownWrites = {};
+  const cancelledHere = {}; // de siste 8 sifrene i et nummer → true
+  const last8 = (phone) => String(phone || "").replace(/\D/g, "").slice(-8);
+  const OWN_CHANGE = "Avtalen er endret fra denne enheten – lukk og åpne den på nytt for å se endringen.";
+  function ownChange(ed, fresh) {
+    const w = ownWrites[ed.id];
+    if (w && fresh && w.updatedAt && fresh.updatedAt === w.updatedAt) return true;
+    if (w && !fresh && w.moved) return true;
+    return !!fresh && fresh.status === "cancelled" && !!cancelledHere[last8(fresh.phone)];
+  }
   // Avtalen er flyttet til en annen måned (ny id) eller slettet på en annen enhet (404, X1.3)
   const GONE_SAVE = "Avtalen er flyttet eller slettet fra en annen enhet, så endringen ble ikke lagret. Listen oppdateres nå.";
   const GONE_DELETE = "Avtalen er flyttet eller slettet fra en annen enhet, så den ble ikke slettet her. Listen oppdateres nå.";
@@ -576,12 +596,15 @@
   // det arket, og er arket lukket eller et annet åpnet siden, kommer en feil som en alert som navngir avtalen (who).
   // En 401 (innloggingen gikk ut) huskes som den avbrutte handlingen når arket kommer tilbake etter ny innlogging;
   // ellers sies det fra med en gang.
-  function sheetCall(action, button, who, verb, sheet = sheetSeq) {
+  // id (runde 2): avtalen forespørselen gjelder. Et ark som er åpnet på nytt for den samme avtalen, regnes som dens
+  // ark: svaret og feilen skrives der, og knappen låses opp der.
+  function sheetCall(action, button, who, verb, sheet = sheetSeq, id = null) {
     const own = () => sheetSeq === sheet;
+    const sameItem = () => !!id && dlg.open && !!state.editing && state.editing.id === id;
     const call = {
-      here: () => dlg.open && own(),
+      here: () => dlg.open && (own() || sameItem()),
       lock() { if (call.here()) $(button).disabled = true; },
-      unlock() { if (own()) $(button).disabled = false; },
+      unlock() { if (own() || sameItem()) $(button).disabled = false; },
       error(err) {
         if (err.status === 401) {
           if (own() && resumeEdit) resumeAction = action;
@@ -647,7 +670,9 @@
     const sent = target
       ? api(`/api/admin/items/${encodeURIComponent(target.id)}${q}`, { method: "PATCH", body: JSON.stringify(body) })
       : api(`/api/admin/items${q}`, { method: "POST", body: JSON.stringify(body) });
-    return sent.then(() => {
+    return sent.then((r) => {
+      const saved = r && r.item;
+      if (target && saved) ownWrites[target.id] = { updatedAt: saved.updatedAt, moved: !!saved.id && saved.id !== target.id };
       if (sheetSeq !== mine) return load(); // et annet ark er åpnet siden: la det være i fred
       if (dlg.open) dlg.close();
       if (body.date && body.date !== state.day) state.day = body.date;
@@ -717,6 +742,7 @@
     $("edit-msg").textContent = busy;
     api("/api/admin/cancel-phone", { method: "POST", body: JSON.stringify({ phone: fl.phone }) }).then((r) => {
       const n = Number(r.cancelled) || 0;
+      cancelledHere[last8(fl.phone)] = true;
       if (call.here()) dlg.close();
       alert(`${n} ${n === 1 ? "nettbestilling" : "nettbestillinger"} fra ${fl.phone} er avlyst. Kundene har ikke fått beskjed.`);
       return load();
@@ -786,14 +812,15 @@
     const what = it.type === "block" ? "blokkeringen" : `avtalen med ${it.name || "kunden"}${it.phone ? ` (${it.phone})` : ""}`;
     if (!confirm(`Slette ${what} ${fmt(it.date, { day: "numeric", month: "long" })} kl. ${hhmm(it.start)} for godt?\n\nTips: huk av «Avlyst» i stedet hvis du vil ha historikken.`)) return;
     const who = `${it.type === "block" ? "blokkeringen" : it.name || "avtalen"} kl. ${hhmm(it.start)}`;
-    const call = sheetCall("delete", "delete", who, "Ble ikke slettet");
+    const call = sheetCall("delete", "delete", who, "Ble ikke slettet", sheetSeq, it.id);
     deleting[it.id] = true;
     call.lock();
     $("edit-msg").textContent = DELETING;
     // expect: avtalen slik denne enheten så den; er den endret et annet sted siden, svarer serveren 412 (R3)
     const q = it.updatedAt ? `?expect=${encodeURIComponent(it.updatedAt)}` : "";
     api(`/api/admin/items/${encodeURIComponent(it.id)}${q}`, { method: "DELETE" }).then(() => {
-      if (call.here()) dlg.close();
+      ownWrites[it.id] = { deleted: true };
+      if (call.here()) dlg.close(); // også et ark som er åpnet på nytt for den samme avtalen
       return load();
     }).catch((err) => {
       if (err.status === 412 || err.status === 404) {
@@ -804,7 +831,8 @@
       call.error(err);
     }).then(() => {
       delete deleting[it.id];
-      if (call.here() && $("edit-msg").textContent === DELETING) $("edit-msg").textContent = "";
+      // aldri «Sletter …» etter svaret: ikke i dette arket, et ark åpnet på nytt for avtalen, eller et lukket ark
+      if ((call.here() || !dlg.open) && $("edit-msg").textContent === DELETING) $("edit-msg").textContent = "";
       call.unlock();
     });
   });
