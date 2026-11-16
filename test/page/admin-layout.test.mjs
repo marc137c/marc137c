@@ -148,3 +148,35 @@ test("layout F92: «I dag» never wraps and keeps its width; the date field may 
   assert.match(chip, /flex:\s*0 0 auto/);
   assert.match(ruleIn(null, ".day-nav input"), /min-width:\s*0/);
 });
+
+// ---------- Round 2: layout guards from the device run (SPEC R27) ----------
+// The CSS value of a horizontal side from a margin/padding shorthand: «24px 16px 40px» → "16px", «0 auto» → "auto"
+function side(body, prop) {
+  const m = new RegExp(`(^|;|\\s)${prop}\\s*:\\s*([^;]+)`).exec(body);
+  if (!m) return null;
+  const v = m[2].trim().split(/\s+/);
+  return v.length === 1 ? v[0] : v[1];
+}
+// Every direct child block of #app (in admin.html, plus the stats panel admin-stats.js appends) keeps at least
+// 12 px on each side from 320 to 768 px: a card (side borders) through its own margin, a full-width bar through
+// its padding. A card centred with margin auto gets it only from a min-width of its max-width + 24 px.
+test("layout round 2: every direct child of #app keeps a 12-px side gutter on phones and tablets", () => {
+  const app = between(HTML.replace(/\r\n/g, "\n"), '<div class="app" id="app" hidden>', '\n  </div>\n');
+  const classes = [...app.matchAll(/\n    <(?:header|main|section|div|nav)\s+class="([^" ]+)/g)].map((m) => m[1]);
+  const statsJs = readFileSync(new URL("admin-stats.js", SITE), "utf8");
+  assert.match(statsJs, /className = "stats-panel"/);
+  assert.match(statsJs, /app\.appendChild\(section\)/);
+  classes.push("stats-panel");
+  assert.deepEqual(classes, ["top", "day", "stats-panel"]);
+  for (const c of classes) {
+    const body = ruleIn(null, "." + c);
+    const card = /(^|;|\s)border(-left|-right)?\s*:/.test(body);
+    const v = card ? side(body, "margin") : side(body, "padding");
+    assert.ok(v && /^\d+px$/.test(v) && parseInt(v, 10) >= 12, `.${c}: ${card ? "margin" : "padding"} side is ${v} in «${body.trim()}»`);
+    // and where it is centred with auto, only from a width that still leaves 12 px
+    const maxW = /max-width:\s*(\d+)px/.exec(body);
+    const autoAt = [...CSS.matchAll(/@media \(min-width:\s*(\d+)px\)\s*\{\s*\.([\w-]+)\s*\{([^}]*)\}/g)].filter((m) => m[2] === c && /margin:[^;]*auto/.test(m[3]));
+    for (const m of autoAt) assert.ok(maxW && Number(m[1]) >= Number(maxW[1]) + 24, `.${c} is centred from ${m[1]} px, but max-width is ${maxW && maxW[1]} px`);
+  }
+});
+
