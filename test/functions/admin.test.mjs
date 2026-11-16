@@ -275,3 +275,24 @@ test("admin: DELETE with the current expect deletes; without expect (an old tab)
   assert.deepEqual(storedItems(d.blobs), []);
   assert.equal((await del(a.id, `?expect=${encodeURIComponent(a.updatedAt)}`)).status, 404, "already gone: 404 as before");
 });
+
+// Round 2: a 401 says why, so /admin's login page can tell the truth about this device's notifications.
+// expired: the token's own time ran out; revoked: made before auth/epoch («Slå av varsler på alle andre enheter»);
+// invalid: not a token of this password (a new ADMIN_PASSWORD, or garbage).
+test("admin: a 401 carries code expired, revoked or invalid", async () => {
+  const d = testDeps({ now: NOW, env });
+  const get = (token) => handle(request("/api/admin/items", { headers: { Authorization: "Bearer " + token } }), PRODUCTION, d).then(read);
+  const short = makeToken(PASSWORD, d.clock.now(), 3600e3);
+  const old = makeToken(PASSWORD, d.clock.now());
+  d.clock.advance(2 * 3600e3);
+  let r = await get(short);
+  assert.deepEqual([r.status, r.body.code], [401, "expired"]);
+  d.blobs.seed("bookings", "auth/epoch", { t: d.clock.now() });
+  r = await get(old);
+  assert.deepEqual([r.status, r.body.code], [401, "revoked"]);
+  r = await get(makeToken("another-password", d.clock.now()));
+  assert.deepEqual([r.status, r.body.code], [401, "invalid"]);
+  r = await get("garbage");
+  assert.deepEqual([r.status, r.body.code], [401, "invalid"]);
+  assert.equal((await get(makeToken(PASSWORD, d.clock.now()))).status, 200);
+});

@@ -27,7 +27,7 @@
 import { liveDeps, bookingStore, isRetiredDeploy, retiredResponse, jsonObject } from "../lib/runtime.mjs";
 import {
   CONFIG, addDays, isDate, osloNow, readMonths, validateAdmin,
-  createItem, updateItem, deleteItem, cancelMatching, monthsBetween, checkPassword, makeToken, readSession, bumpEpoch, makeDeviceMark, verifyDeviceMark,
+  createItem, updateItem, deleteItem, cancelMatching, monthsBetween, checkPassword, makeToken, checkSession, bumpEpoch, makeDeviceMark, verifyDeviceMark,
 } from "../lib/booking-core.mjs";
 import { take, release, newToken, counterKey, limiterSecret, clientKey, phoneKey, LOGIN_LIMITS, LOGIN_ALL_KEY } from "../lib/limits.mjs";
 import { readFeedState, createFeed, feedLinks, feedGen } from "../lib/calendar.mjs";
@@ -108,14 +108,16 @@ export async function handle(req, context, deps) {
 
   const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   const store = bookingStore(deps, context);
-  let session;
+  let checked;
   try {
-    session = await readSession(store, token, password, nowMs); // også: ikke laget før auth/epoch (F34)
+    checked = await checkSession(store, token, password, nowMs); // også: ikke laget før auth/epoch (F34)
   } catch (err) {
     console.error("Admin: kunne ikke lese innloggingen:", err && err.name);
     return json({ error: "Noe gikk galt på serveren." }, 503);
   }
-  if (!session) return json({ error: "Logg inn på nytt." }, 401);
+  // code: expired, revoked eller invalid, så /admin vet om varslene på enheten kan være på fortsatt (runde 2)
+  if (!checked.session) return json({ error: "Logg inn på nytt.", code: checked.code }, 401);
+  const session = checked.session;
 
   const id = context?.params?.id || path.match(/^\/api\/admin\/items\/([^/]+)$/)?.[1];
   const force = url.searchParams.get("force") === "1";

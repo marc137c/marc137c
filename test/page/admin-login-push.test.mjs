@@ -165,3 +165,25 @@ test("login push: before that end (the barber logged out and kept them), it stil
   const other = await loadAdmin({ now: "2026-12-30T14:46", token: null, storage: { "viggo-push": JSON.stringify({ endpoint: "https://fcm.googleapis.com/fcm/send/old", until: "2026-11-17T02:46:00.000Z" }) }, navigator: b.navigator, globals: b.globals });
   assert.equal(other.$("login-push-msg").textContent, ON_TEXT);
 });
+
+// Round 2 (probe P1): after «Slå av varsler på alle andre enheter» on another device (or a new password), the server
+// has removed this device, but the login page said «fortsatt … slått på». The 401 now says why (code), and only a
+// device whose server record can still be current says «fortsatt».
+const OFF_ELSEWHERE = "Varslene her er slått av (logget ut fra en annen enhet eller nytt passord). Logg inn igjen for å få dem.";
+for (const [label, code] of [["reset from another device", "revoked"], ["a new password", "invalid"]]) {
+  test(`login push: after ${label} (401 ${code}) the login page says notifications here are off, and keeps «Slå av varsler her»`, async () => {
+    const b = fakePushBrowser({ device: makeDevice("fcm"), permission: "granted", subscribed: KEY_BYTES });
+    const gone = { status: 401, body: { error: "Logg inn på nytt.", code } };
+    const page = await loadAdmin({ navigator: b.navigator, globals: b.globals, routes: { "GET /api/admin/items": () => gone, "GET /api/admin/push": () => gone } });
+    assert.ok(loginShown(page));
+    assert.ok(shown(page));
+    assert.equal(page.$("login-push-msg").textContent, OFF_ELSEWHERE);
+    assert.equal(page.$("login-push-off").hidden, false, "cleanup in the browser is still offered");
+  });
+}
+test("login push: a 401 expired with no note keeps today's «fortsatt slått på» text", async () => {
+  const b = fakePushBrowser({ device: makeDevice("fcm"), permission: "granted", subscribed: KEY_BYTES });
+  const expired = { status: 401, body: { error: "Logg inn på nytt.", code: "expired" } };
+  const page = await loadAdmin({ navigator: b.navigator, globals: b.globals, routes: { "GET /api/admin/items": () => expired, "GET /api/admin/push": () => expired } });
+  assert.equal(page.$("login-push-msg").textContent, ON_TEXT);
+});

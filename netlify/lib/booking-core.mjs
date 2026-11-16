@@ -506,14 +506,14 @@ function makeSigned(password, purpose, now, ttlMs) {
   const payload = b64url(JSON.stringify({ exp: now + ttlMs, iat: now }));
   return `${payload}.${signWith(password, purpose, payload)}`;
 }
-function readSigned(token, password, purpose, now) {
+function readSigned(token, password, purpose, now, { anyTime = false } = {}) {
   if (!password || typeof token !== "string" || !token.includes(".")) return null;
   const [payload, sig] = token.split(".");
   const a = Buffer.from(sig || ""), b = Buffer.from(signWith(password, purpose, payload));
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
   let data;
   try { data = JSON.parse(Buffer.from(payload, "base64url").toString()); } catch { return null; }
-  if (!data || !Number.isFinite(data.exp) || !Number.isFinite(data.iat) || !(data.exp > now)) return null;
+  if (!data || !Number.isFinite(data.exp) || !Number.isFinite(data.iat) || !(anyTime || data.exp > now)) return null;
   return { exp: data.exp, iat: data.iat };
 }
 export const makeToken = (password, now = Date.now(), ttlMs = 12 * 60 * 60 * 1000) => makeSigned(password, "token", now, ttlMs);
@@ -533,11 +533,21 @@ export const bumpEpoch = (store, nowMs) => mutateJSON(store, EPOCH_KEY, (d) => (
   doc.t = Math.max(Number.isFinite(doc.t) ? doc.t : 0, nowMs);
   return { ok: true, t: doc.t };
 });
-// Innloggingen bak billetten: { exp, iat } når billetten er gyldig og ikke laget før auth/epoch, ellers null
+// Innloggingen bak billetten: { session: { exp, iat } } når billetten er gyldig og ikke laget før auth/epoch, ellers
+// { code } som sier hvorfor (runde 2: /admin kan da si sannheten om varslene på enheten):
+//   expired  billetten er dette passordets, men tiden dens er ute
+//   revoked  laget før auth/epoch («Slå av varsler på alle andre enheter» på en annen enhet)
+//   invalid  ikke en billett for dette passordet (et nytt ADMIN_PASSWORD, eller noe som ikke er en billett)
+export async function checkSession(store, token, password, nowMs) {
+  const claims = readSigned(token, password, "token", nowMs, { anyTime: true });
+  if (!claims) return { code: "invalid" };
+  if (!(claims.exp > nowMs)) return { code: "expired" };
+  if (claims.iat < await readEpoch(store)) return { code: "revoked" };
+  return { session: claims };
+}
+// Det samme, bare innloggingen eller null
 export async function readSession(store, token, password, nowMs) {
-  const session = readToken(token, password, nowMs);
-  if (!session) return null;
-  return session.iat >= await readEpoch(store) ? session : null;
+  return (await checkSession(store, token, password, nowMs)).session || null;
 }
 
 // Enhetsmerket (F5): en innlogging med riktig passord gir enheten et merke som varer i et år. Med det slipper

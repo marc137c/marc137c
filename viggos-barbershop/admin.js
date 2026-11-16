@@ -136,6 +136,10 @@
 
   let loginPushSeq = 0;
   let loginPushSub = null;
+  // Grunnen serveren ga for siste 401 (null: ingen 401, f.eks. fanen ble lukket). «revoked» (logget ut fra en annen
+  // enhet, som også slo av varslene der) og «invalid» (nytt passord): serveren sender ikke lenger hit (runde 2).
+  let logoutReason = null;
+  const OFF_ELSEWHERE = "Varslene her er slått av (logget ut fra en annen enhet eller nytt passord). Logg inn igjen for å få dem.";
   function loginPushMsg(text, kind) {
     $("login-push-msg").textContent = text;
     $("login-push-msg").className = "msg" + (kind ? " " + kind : "");
@@ -153,8 +157,10 @@
       loginPushSub = sub;
       // Innloggingen varslene ble slått på med, har gått ut: serveren sender ikke flere (bare ett siste varsel uten
       // kundedata), så siden sier at de har stoppet. «Slå av varsler her» står likevel, for å rydde i nettleseren.
+      // Siden sier «fortsatt slått på» bare når serverens oppføring for enheten kan være gjeldende ennå.
       const ended = noteEnded(sub);
-      loginPushMsg(ended
+      const removed = logoutReason === "revoked" || logoutReason === "invalid";
+      loginPushMsg(removed ? OFF_ELSEWHERE : ended
         ? `Varslene her stoppet da innloggingen gikk ut (${untilText(ended)}). Logg inn igjen for å få dem.`
         : "Denne enheten har fortsatt varsler om nye bestillinger slått på.", "info");
       $("login-push-off").hidden = false;
@@ -204,6 +210,7 @@
         const res = r.res, data = r.data || {};
         if (!res.ok) throw Object.assign(new Error(data.error || (res.status === 404 ? "Timeboken er ikke publisert ennå." : "Kunne ikke logge inn.")), { user: true });
         setToken(data.token, $("remember").checked);
+        logoutReason = null;
         setDevice(data.device);
         $("pw").value = "";
         showApp();
@@ -255,7 +262,13 @@
       .then((r) => r, () => { throw Object.assign(new Error(write ? NO_NET + CHECK_SAVED : NO_NET), { user: true, network: true }); })
       .then((r) => {
         const res = r.res, data = r.data || {};
-        if (res.status === 401) { setToken(null); showLogin("Logg inn på nytt.", "info"); throw Object.assign(new Error(data.error || "Logg inn"), { status: 401 }); }
+        if (res.status === 401) {
+          // Hvorfor (expired, revoked, invalid): innloggingssiden sier ut fra det om varslene her kan være på fortsatt
+          logoutReason = typeof data.code === "string" ? data.code : null;
+          setToken(null);
+          showLogin("Logg inn på nytt.", "info");
+          throw Object.assign(new Error(data.error || "Logg inn"), { status: 401, code: logoutReason });
+        }
         if (!res.ok) throw Object.assign(new Error(httpText(res.status, data, write)), { status: res.status, code: data.code });
         return data;
       });
@@ -1254,6 +1267,7 @@
     }).catch(() => done).then((msg) => {
       btn.disabled = false;
       setToken(null);
+      logoutReason = null; // logget ut her: varslene er som Viggo nettopp valgte
       showLogin(msg[0], msg[1]);
       resumeEdit = false; // logget ut med vilje: ingen avtale skal dukke opp for neste som logger inn
       resumeAction = null;
