@@ -102,7 +102,7 @@
     const seq = loginPushSeq;
     btn.disabled = true;
     const stop = Promise.resolve().then(() => sub.unsubscribe()).then((ok) => ok === true, () => false);
-    withinTime(stop, LOGOUT_WAIT_MS, "").catch(() => false).then((ok) => {
+    withTimeout(stop, LOGOUT_WAIT_MS, "").catch(() => false).then((ok) => {
       btn.disabled = false;
       if (seq !== loginPushSeq) return;
       if (!ok) return loginPushMsg("Kunne ikke slå av varslene her. Slå av varsler for denne siden i nettleserens innstillinger.");
@@ -126,19 +126,22 @@
     const btn = e.submitter || $("login-form").querySelector("button[type=submit]");
     btn.disabled = true;
     loginMsg("");
-    fetch("/api/admin/login", {
+    withTimeout(fetch("/api/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password: $("pw").value, remember: $("remember").checked }),
-    }).then((res) => res.json().catch(() => ({})).then((data) => {
-      if (!res.ok) throw new Error(data.error || (res.status === 404 ? "Timeboken er ikke publisert ennå." : "Kunne ikke logge inn."));
-      setToken(data.token, $("remember").checked);
-      $("pw").value = "";
-      showApp();
-      load();
-      pushSync();
-    })).catch((err) => {
-      loginMsg(err.message);
+    }).then((res) => res.json().catch(() => ({})).then((data) => ({ res, data }))), API_WAIT_MS, "")
+      .then((r) => r, () => { throw Object.assign(new Error("Ingen forbindelse – prøv igjen."), { user: true, network: true }); })
+      .then((r) => {
+        const res = r.res, data = r.data || {};
+        if (!res.ok) throw Object.assign(new Error(data.error || (res.status === 404 ? "Timeboken er ikke publisert ennå." : "Kunne ikke logge inn.")), { user: true });
+        setToken(data.token, $("remember").checked);
+        $("pw").value = "";
+        showApp();
+        load();
+        pushSync();
+      }).catch((err) => {
+      loginMsg(errText(err));
       $("pw").select();
     }).then(() => {
       btn.disabled = false;
@@ -147,15 +150,39 @@
 
   // «Logg ut» står sammen med varslene lenger ned: får enheten varsler, spør den først om de skal slås av også.
 
+  // Ingen forbindelse (nettet er borte, eller ikke noe svar innen API_WAIT_MS): en norsk tekst i stedet for
+  // nettleserens egen («Load failed», «Failed to fetch»), med user: true så Oppsett viser den som den er (F30).
+  // En endring av avtaler kan likevel ha kommet fram, så da står det at siden bør oppdateres.
+  const API_WAIT_MS = 15000;
+  const NO_NET = "Ingen forbindelse – sjekk nettet og prøv igjen.";
+  const CHECK_SAVED = " Oppdater siden for å se om endringen ble lagret.";
+  const isWrite = (path, opts) => (opts.method || "GET") !== "GET" && /^\/api\/admin\/(items|cancel-phone)/.test(path);
+  // Svar med feilkode: serverens egen tekst, eller (en HTML-side fra plattformen, 502/504) en norsk tekst. Ved 5xx
+  // på en endring vet vi ikke om den ble lagret, med mindre serveren sier nøyaktig hva som skjedde (code).
+  function httpText(status, data, write) {
+    const said = data && typeof data.error === "string" ? data.error : "";
+    if (status < 500) return said || "Noe gikk galt.";
+    if (said && data.code) return said;
+    return (said || `Ingen forbindelse med serveren (feil ${status}) – prøv igjen.`) + (write ? CHECK_SAVED : "");
+  }
+  // Den eneste teksten en feil vises med: en kjent feil (svar fra serveren, eller laget her med user: true) viser
+  // sin melding; alt annet (en uventet feil i nettleseren) får en norsk tekst, aldri nettleserens engelske
+  function errText(err) {
+    return err && (err.status || err.user) ? err.message : "Noe gikk galt. Prøv igjen.";
+  }
   function api(path, opts = {}) {
-    return fetch(path, Object.assign({}, opts, {
+    const write = isWrite(path, opts);
+    return withTimeout(fetch(path, Object.assign({}, opts, {
       headers: Object.assign({ "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` }, opts.headers || {}),
       cache: "no-store",
-    })).then((res) => res.json().catch(() => ({})).then((data) => {
-      if (res.status === 401) { setToken(null); showLogin("Logg inn på nytt.", "info"); throw Object.assign(new Error(data.error || "Logg inn"), { status: 401 }); }
-      if (!res.ok) throw Object.assign(new Error(data.error || "Noe gikk galt."), { status: res.status });
-      return data;
-    }));
+    })).then((res) => res.json().catch(() => ({})).then((data) => ({ res, data }))), API_WAIT_MS, "")
+      .then((r) => r, () => { throw Object.assign(new Error(write ? NO_NET + CHECK_SAVED : NO_NET), { user: true, network: true }); })
+      .then((r) => {
+        const res = r.res, data = r.data || {};
+        if (res.status === 401) { setToken(null); showLogin("Logg inn på nytt.", "info"); throw Object.assign(new Error(data.error || "Logg inn"), { status: 401 }); }
+        if (!res.ok) throw Object.assign(new Error(httpText(res.status, data, write)), { status: res.status, code: data.code });
+        return data;
+      });
   }
 
   // ---------- Data ----------
@@ -412,7 +439,7 @@
       if (err.status === 409 && !force) {
         if (confirm(`${err.message}\n\nVil du lagre likevel (dobbeltbooking)?`)) return save(true);
       }
-      if (err.status !== 401) $("edit-msg").textContent = err.message;
+      if (err.status !== 401) $("edit-msg").textContent = errText(err);
     }).then(() => {
       $("save").disabled = false;
     });
@@ -427,7 +454,7 @@
     api(`/api/admin/items/${encodeURIComponent(it.id)}`, { method: "DELETE" }).then(() => {
       dlg.close();
       return load();
-    }).catch((err) => { if (err.status !== 401) $("edit-msg").textContent = err.message; });
+    }).catch((err) => { if (err.status !== 401) $("edit-msg").textContent = errText(err); });
   });
 
   // ---------- Oppsett: kalender på telefonen ----------
@@ -561,7 +588,7 @@
   // beskjed etter SUBSCRIBE_WAIT_MS, i stedet for å henge på «Slår på …».
   const SUBSCRIBE_WAIT_MS = 20000;
   const NO_CONTACT = "Fikk ikke kontakt med varseltjenesten. Sjekk nettet og prøv igjen.";
-  function withinTime(promise, ms, message) {
+  function withTimeout(promise, ms, message) {
     let timer;
     const late = new Promise((resolve, reject) => {
       timer = setTimeout(() => reject(Object.assign(new Error(message), { user: true, timeout: true })), ms);
@@ -705,7 +732,7 @@
         pushShow("on", res.devices, res.until);
       }, () => {});
     }, () => {});
-    withinTime(subscribing, SUBSCRIBE_WAIT_MS, NO_CONTACT).catch((err) => {
+    withTimeout(subscribing, SUBSCRIBE_WAIT_MS, NO_CONTACT).catch((err) => {
       if (err && err.timeout) { timedOut = true; throw err; }
       const answer = permission();
       if (answer === "granted") throw err;
@@ -829,7 +856,7 @@
     const c = sw();
     if (!pushSupported() || permission() !== "granted" || !c.getRegistration) return Promise.resolve(null);
     const look = c.getRegistration(SW_SCOPE).then((reg) => (reg ? reg.pushManager.getSubscription() : null));
-    return withinTime(look, LOOKUP_WAIT_MS, "").catch(() => null);
+    return withTimeout(look, LOOKUP_WAIT_MS, "").catch(() => null);
   }
   // Slår av i nettleseren og på serveren samtidig, og venter høyst LOGOUT_WAIT_MS. Svarer om minst én av dem lyktes
   // (da kommer det ikke flere varsler hit: push-tjenesten svarer 410 for et avsluttet abonnement, og serveren
@@ -839,7 +866,7 @@
     const browser = Promise.resolve().then(() => sub.unsubscribe()).then((ok) => { browserOk = ok === true; }, () => {});
     const server = api("/api/admin/push/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint: sub.endpoint }) })
       .then(() => { serverOk = true; }, () => {});
-    return withinTime(Promise.all([browser, server]), LOGOUT_WAIT_MS, "").catch(() => {}).then(() => browserOk || serverOk);
+    return withTimeout(Promise.all([browser, server]), LOGOUT_WAIT_MS, "").catch(() => {}).then(() => browserOk || serverOk);
   }
   $("logout").addEventListener("click", () => {
     const btn = $("logout");

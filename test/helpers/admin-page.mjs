@@ -211,7 +211,9 @@ export async function loadAdmin({ routes = {}, token = "test-admin-token", navig
     const route = all[`${method} ${path}`];
     return Promise.resolve().then(() => (route ? route(call) : { status: 404, body: { error: "Ukjent forespørsel." } })).then((r) => {
       const res = r && typeof r === "object" && "status" in r && "body" in r ? r : { status: 200, body: r };
-      return { ok: res.status >= 200 && res.status < 300, status: res.status, json: () => Promise.resolve(JSON.parse(JSON.stringify(res.body))) };
+      // A string body is a page that is not JSON (e.g. the platform's HTML error page): json() rejects, as in a browser
+      const json = typeof res.body === "string" ? () => Promise.reject(new SyntaxError("Unexpected token '<'")) : () => Promise.resolve(JSON.parse(JSON.stringify(res.body)));
+      return { ok: res.status >= 200 && res.status < 300, status: res.status, json };
     });
   };
   const local = storage(Object.assign({}, stored, token ? { "viggo-admin-token": token } : {}));
