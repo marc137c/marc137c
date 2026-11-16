@@ -16,7 +16,7 @@ import { testDeps, request, read, quiet, PRODUCTION } from "../helpers/deps.mjs"
 import { FakeBlobs } from "../helpers/fake-blobs.mjs";
 import { FakeClock } from "../helpers/clock.mjs";
 import { item } from "../helpers/bookings.mjs";
-import { RETENTION_DAYS, STATS_KEEP_DAYS } from "../../netlify/lib/store-keys.mjs";
+import { RETENTION_DAYS, STATS_KEEP_DAYS, COUNTER_MAX_AGE_MS } from "../../netlify/lib/store-keys.mjs";
 import * as retention from "../../netlify/functions/retention.mjs";
 
 const NOW = "2027-03-01T03:00:00Z";
@@ -160,3 +160,71 @@ test("retention: a call without deploy information (the scheduler) cleans the li
     assert.deepEqual(blobs.keys("stats"), ["d/2027-02-28"]);
   }
 });
+
+// ---------- Round 2: the worst-case lifetime is what the pages state (SPEC R30) ----------
+// The clean-up runs once per schedule interval (config.schedule), so a thing lives up to its threshold PLUS one
+// interval: a counter whose last hit came just after a run was still stored 47 h later, while personvern.html said
+// «24 timer». The stated periods (personvern.html, SPEC, DEPLOY) are these worst cases; this test seeds each kind
+// just after a run, runs the clean-up on its schedule, and requires it gone within the stated period.
+const RUN_EVERY_MS = { "@hourly": 3600e3, "@daily": DAY }[retention.config.schedule];
+const STATED = {
+  counterHours: (COUNTER_MAX_AGE_MS + RUN_EVERY_MS) / 3600e3,
+  bookingDays: RETENTION_DAYS + RUN_EVERY_MS / DAY,
+  statsDays: STATS_KEEP_DAYS + RUN_EVERY_MS / DAY,
+};
+// The end of an Oslo date (midnight Oslo at the start of the next day), in ms
+const endOfOsloDay = (date) => {
+  const next = new Date(Date.parse(date + "T00:00:00Z") + DAY).toISOString().slice(0, 10);
+  for (const off of [1, 2]) { const t = Date.parse(`${next}T00:00:00Z`) - off * 3600e3; if (osloDate(t) === next && osloDate(t - 1) !== next) return t; }
+  throw new Error("no Oslo midnight");
+};
+const osloDate = (t) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Oslo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(t));
+// Runs the clean-up at every scheduled time from startMs until gone() or limitMs; returns the time it went
+async function runUntilGone(clock, d, gone, limitMs) {
+  for (let t = clock.now(); t <= limitMs; t += RUN_EVERY_MS) {
+    clock.set(t);
+    assert.equal((await run(d)).status, 200);
+    if (gone()) return t;
+  }
+  return null;
+}
+
+test("retention round 2: the schedule is one the stated periods are derived from", () => {
+  assert.ok(RUN_EVERY_MS, `config.schedule ${retention.config.schedule}`);
+  assert.deepEqual(STATED, { counterHours: 48, bookingDays: 91, statsDays: 401 });
+});
+
+test("retention round 2: a counter hit just after a run is gone within the stated worst case (48 h), not before 24 h", async (t) => {
+  quiet(t);
+  const runAt = Date.parse("2027-03-01T00:00:00Z"); // @daily runs at midnight UTC
+  const clock = new FakeClock(new Date(runAt).toISOString());
+  const blobs = new FakeBlobs({ clock });
+  const d = testDeps({ blobs });
+  const hit = runAt + 60e3;
+  blobs.seed("bookings", "rl/ip/xxxxxxxxxxxxxxxxxxxxxx", { hits: [{ t: hit, id: "a" }] });
+  clock.advance(RUN_EVERY_MS);
+  const gone = await runUntilGone(clock, d, () => !blobs.has("bookings", "rl/ip/xxxxxxxxxxxxxxxxxxxxxx"), runAt + 10 * DAY);
+  assert.ok(gone, "deleted at all");
+  assert.ok(gone - hit > COUNTER_MAX_AGE_MS, "not before the threshold");
+  assert.ok(gone - hit <= STATED.counterHours * 3600e3, `deleted ${(gone - hit) / 3600e3} h after the last hit`);
+});
+
+for (const [kind, seed, has, statedDays, keepDays] of [
+  ["a booking", (blobs, date) => blobs.seed("bookings", `m/${date.slice(0, 7)}`, { items: [item({ date })] }), (blobs, date) => (blobs.json("bookings", `m/${date.slice(0, 7)}`) || { items: [] }).items.length > 0, () => STATED.bookingDays, RETENTION_DAYS],
+  ["a statistics day", (blobs, date) => blobs.seed("stats", `d/${date}`, { views: 1, pages: { forside: 1 }, sources: { direkte: 1 } }), (blobs, date) => blobs.has("stats", `d/${date}`), () => STATED.statsDays, STATS_KEEP_DAYS],
+]) {
+  test(`retention round 2: ${kind} is gone within the stated worst case after its date, not before its threshold`, async (t) => {
+    quiet(t);
+    const date = "2026-11-20";
+    const end = endOfOsloDay(date);
+    const firstRun = Date.parse("2026-11-21T00:00:00Z"); // the first @daily run after the day
+    const clock = new FakeClock(new Date(firstRun + (keepDays - 2) * DAY).toISOString());
+    const blobs = new FakeBlobs({ clock });
+    const d = testDeps({ blobs });
+    seed(blobs, date);
+    const gone = await runUntilGone(clock, d, () => !has(blobs, date), firstRun + (keepDays + 5) * DAY);
+    assert.ok(gone, "deleted at all");
+    assert.ok(gone - end >= keepDays * DAY - 3 * 3600e3, `not before ${keepDays} days`);
+    assert.ok(gone - end <= statedDays() * DAY, `deleted ${((gone - end) / DAY).toFixed(2)} days after the end of the date; stated ${statedDays()}`);
+  });
+}

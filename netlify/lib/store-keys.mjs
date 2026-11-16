@@ -19,7 +19,7 @@ export const KEY_RULES = Object.freeze([
   { stores: BOOKING_STORES, key: "rl/secret", holds: "32 random bytes behind the counter key names; no personal data",
     deletion: "kept for the life of the store; deleting it only resets every counter" },
   { stores: BOOKING_STORES, prefix: "rl/", holds: "rate-limit counters: times of recent attempts under a keyed hash of the client, phone or login (never the number or address itself)",
-    deletion: "daily clean-up: deleted when the newest hit (and any pause alert) is more than 24 hours old" },
+    deletion: "daily clean-up: deleted when the newest hit (and any pause alert) is more than 24 hours old, so at the latest 48 hours after it" },
   { stores: BOOKING_STORES, key: "auth/epoch", holds: "the time «Slå av varsler på alle andre enheter» was last pressed; no personal data",
     deletion: "kept; it only ever moves forward" },
   { stores: BOOKING_STORES, prefix: "auth/", holds: "legacy login counters from before the hashed counters (auth/ip/<address>, auth/all)",

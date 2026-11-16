@@ -65,15 +65,15 @@
       <p>Ingen andre får opplysningene om bestillingen din.</p>
 
       <h2>Vern mot misbruk</h2>
-      <p>For å stoppe falske og automatiske bestillinger teller serveren forsøk per IP-adresse, per telefonnummer og per innlogging i timeboken. Tellerne lagrer bare tidspunkter, under en kode laget av adressen eller nummeret med en hemmelig nøkkel, aldri selve adressen eller nummeret. De slettes 24 timer etter siste forsøk.</p>
+      <p>For å stoppe falske og automatiske bestillinger teller serveren forsøk per IP-adresse, per telefonnummer og per innlogging i timeboken. Tellerne lagrer bare tidspunkter, under en kode laget av adressen eller nummeret med en hemmelig nøkkel, aldri selve adressen eller nummeret. De slettes ved den daglige oppryddingen når det har gått mer enn 24 timer siden siste forsøk, altså senest etter 48 timer.</p>
       <p>Som for alle nettsteder mottar vertskapet (Netlify) IP-adressen din når nettleseren henter siden. Vi lagrer den ikke.</p>
 
       <h2>Hvor lenge opplysningene lagres</h2>
       <ul>
-        <li>En time slettes automatisk 90 dager etter timedatoen, også en avlyst time. Oppryddingen kjører hver dag.</li>
+        <li>En time slettes automatisk 90 dager etter timedatoen, også en avlyst time. Oppryddingen kjører hver natt, så det skjer senest 91 dager etter timedatoen.</li>
         <li>Barberen kan slette en time før det, for eksempel hvis du ber om det.</li>
-        <li>Misbrukstellerne slettes 24 timer etter siste forsøk.</li>
-        <li>Besøksstatistikken (uten personopplysninger, se under) slettes etter 400 dager.</li>
+        <li>Misbrukstellerne slettes ved den daglige oppryddingen når det har gått mer enn 24 timer siden siste forsøk, altså senest etter 48 timer.</li>
+        <li>Besøksstatistikken (uten personopplysninger, se under) slettes etter 400 dager, ved den daglige oppryddingen, altså senest etter 401 dager.</li>
       </ul>
 
       <h2>Besøksstatistikk uten informasjonskapsler</h2>

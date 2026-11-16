@@ -40,6 +40,25 @@ test("D6: what is collected, why, on what basis, for how long, and the visitor's
   assert.ok(text.includes("artikkel 6 nr. 1 bokstav b"), "GDPR art. 6(1)(b)");
   assert.ok(text.includes(`${RETENTION_DAYS} dager`), `bookings are deleted ${RETENTION_DAYS} dager after the appointment`);
   assert.ok(text.includes(`${COUNTER_MAX_AGE_MS / 3600000} timer`), "abuse counters: 24 timer");
+});
+
+// Round 2 (SPEC R30): every retention period on the page is the worst-case lifetime: the threshold plus the time
+// until the next scheduled clean-up (retention.mjs config.schedule). «De slettes 24 timer etter siste forsøk» was
+// false: a counter could live about 48 hours. test/functions/retention.test.mjs checks the code against the same sums.
+test("D6 round 2: the page states each worst case (threshold + one clean-up interval), and no shorter promise", async () => {
+  const { config } = await import("../../netlify/functions/retention.mjs");
+  const every = { "@hourly": 3600e3, "@daily": 864e5 }[config.schedule];
+  assert.ok(every, config.schedule);
+  const text = pageText();
+  const counterH = (COUNTER_MAX_AGE_MS + every) / 3600e3;
+  assert.ok(text.includes(`senest etter ${counterH} timer`), `abuse counters: senest etter ${counterH} timer`);
+  assert.ok(!/slettes 24 timer etter siste forsøk/.test(text), "never «slettes 24 timer etter siste forsøk»");
+  assert.ok(text.includes(`senest ${RETENTION_DAYS + every / 864e5} dager etter timedatoen`), "bookings: the worst case");
+  assert.ok(text.includes(`senest etter ${STATS_KEEP_DAYS + every / 864e5} dager`), "statistics: the worst case");
+  const spec = readRoot("docs/SPEC.md"), deploy = readRoot("DEPLOY.md");
+  assert.ok(spec.includes(`at the latest ${counterH} hours`), "SPEC states the counters' worst case");
+  assert.ok(!/deleted 24 hours after the newest attempt/.test(spec));
+  assert.ok(!/slettes etter 24 timer\)/.test(deploy), "DEPLOY.md does not promise 24 hours");
   for (const right of ["innsyn", "retting", "sletting", "Datatilsynet"]) assert.ok(text.includes(right), right);
   assert.match(read("personvern.html"), /href="https:\/\/www\.datatilsynet\.no\/"/);
 });
