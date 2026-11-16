@@ -580,6 +580,8 @@ form.booking {
 /* ---------- Google-anmeldelser ---------- */
 .rating-summary { display: inline-flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 8px 12px; margin-top: 16px; }
 .rating-summary[hidden] { display: none; }
+/* hidden må vinne over display: grid (tom feed eller ingen anmeldelser med tekst) */
+.social-feed[hidden], .reviews[hidden], .section-lead[hidden] { display: none; }
 .rating-num { font: 700 2rem var(--caps); color: var(--text); }
 .rating-count { color: var(--muted); font-size: .9rem; }
 .g-logo { width: 22px; height: 22px; flex: none; }
@@ -614,9 +616,6 @@ form.booking {
 .review-avatar--initial { display: flex; align-items: center; justify-content: center; background: var(--gold-fill); color: var(--on-gold); font-weight: 700; }
 .review-more { align-self: flex-start; color: var(--gold); font-size: .85rem; }
 .reviews-note { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: .85rem; text-align: center; }
-.review--cta { align-items: center; text-align: center; padding: 32px; }
-.review--cta .g-logo { width: 36px; height: 36px; }
-.review--cta p { margin: 0; color: var(--muted); }
 .review--skeleton { min-height: 220px; background: linear-gradient(100deg, var(--surface) 30%, var(--skeleton-hi) 50%, var(--surface) 70%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
 .reviews-more { text-align: center; margin: 30px 0 0; }
 
@@ -762,7 +761,6 @@ form.booking {
   .rating-summary > * { margin: 4px 6px; }
   .addons li > * + * { margin-left: 12px; }
   .review blockquote { margin: 14px 0; }
-  .review--cta p { margin: 14px 0 0; }
   .review figcaption > * + * { margin-left: 10px; }
   .footer-line > * { margin: 3px 5px; }
   .post--follow > * + * { margin-top: 12px; }

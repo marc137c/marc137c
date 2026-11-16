@@ -7,7 +7,7 @@
 //   over everything every test wrote).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadSite } from "../helpers/site-page.mjs";
+import { loadSite, readSite } from "../helpers/site-page.mjs";
 import { REVIEWS, FEATURED, FEATURED_URL, feed } from "../fixtures/widgets.mjs";
 
 const SITES = [];
@@ -181,6 +181,49 @@ test("F79: the hero badge needs at least 5 reviews and never hides a low score; 
     assert.equal(site.$("rating-summary").hidden, false, name + ": summary");
     if (shown) assert.match(text(site.$("hero-rating")), new RegExp(`^${String(body.rating.toFixed(1)).replace(".", ",")} på Google Maps · ${body.count} anmeldelser$`), name);
   }
+});
+
+// F64, owner default: a heading or lead that promises content is only visible when that content exists. (The
+// unconfigured reviews section is not empty: it shows the owner's FEATURED reviews, D10.)
+test("F64: Google answers with ratings but no text: the card list is hidden and no placeholder box is drawn", async () => {
+  const site = await reviewsPage(REVIEWS.noText);
+  assert.equal(site.$("reviews").hidden, true);
+  assert.equal(site.qsa("#reviews .review").length, 0);
+  assert.equal(site.qs(".review--cta"), null);
+  assert.equal(site.$("rating-summary").hidden, false, "Google's numbers still show");
+  // No rating and no reviews at all: only the heading and the «see all» link are left
+  const none = await reviewsPage({ configured: true, rating: null, count: 0, url: REVIEWS.noText.url, reviews: [] });
+  assert.equal(none.$("reviews").hidden, true);
+  assert.equal(none.$("rating-summary").hidden, true);
+  assert.equal(none.$("hero-rating").hidden, true);
+  // With one text review the list is back
+  const one = await reviewsPage(REVIEWS.one);
+  assert.equal(one.$("reviews").hidden, false);
+  assert.equal(cards(one).length, 1);
+  assert.equal((await reviewsPage(REVIEWS.unconfigured)).$("reviews").hidden, false, "FEATURED shows");
+});
+
+test("F64: no Instagram posts (or /api/social fails): the grid and the section lead are hidden; one post shows both", async () => {
+  for (const routes of [{ "/api/social": { body: feed(0) } }, { "/api/social": { network: true } }, { "/api/social": { status: 500, body: {} } }]) {
+    const site = await open(["social-feed.js"], routes);
+    assert.equal(site.$("social-feed").hidden, true, JSON.stringify(routes));
+    assert.equal(site.qs("#sosiale .section-lead").hidden, true);
+    assert.ok(site.qs("#sosiale .follow-row a[href='https://www.instagram.com/viggos.barbershop/']"), "the follow buttons stay");
+    await site.setLang("en");
+    assert.equal(site.$("social-feed").hidden, true, "still hidden after a language switch");
+    assert.equal(site.qs("#sosiale .section-lead").hidden, true);
+  }
+  const site = await socialPage(feed(1));
+  assert.equal(site.$("social-feed").hidden, false);
+  assert.equal(site.qs("#sosiale .section-lead").hidden, false);
+  assert.equal(text(site.qs("#sosiale .section-lead")), "De nyeste klippene våre fra Instagram.");
+});
+
+test("F64: the hidden attribute wins over display:grid on the feed, the review list and the lead", () => {
+  const css = readSite("styles.css");
+  assert.match(css, /\.social-feed\[hidden\], \.reviews\[hidden\], \.section-lead\[hidden\] \{ display: none; \}/);
+  assert.doesNotMatch(css, /review--cta/, "the old placeholder box is gone");
+  assert.doesNotMatch(readSite("i18n.js"), /reviewsFallback/);
 });
 
 test("widgets: every string reviews.js, social-feed.js and i18n.js wrote in this file is well-formed Unicode", () => {

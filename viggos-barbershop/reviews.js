@@ -84,6 +84,7 @@
     if (heroRating) heroRating.hidden = true; // antall anmeldelser er ukjent uten Google-koblingen
     list.innerHTML = FEATURED.reviews.map((x) => card(Object.assign({}, x, { when: s.googleReview }), G_LOGO)).join("");
     list.classList.remove("reviews--single");
+    list.hidden = false;
     list.setAttribute("aria-busy", "false");
   }
 
@@ -113,10 +114,11 @@
       // Googles krav: en linje om hvordan anmeldelsene er valgt ut og sortert
       list.innerHTML = withText.map((x) => card(x, GM)).join("") + `<p class="reviews-note">${brand(s.reviewsNote)}</p>`;
       list.classList.remove("reviews--single");
+      list.hidden = false;
     } else {
-      // Ikke koblet til Google ennå (eller ingen tekst-anmeldelser): pen henvisning til Google
-      list.innerHTML = `<div class="review review--cta">${G_LOGO}<p>${esc(s.reviewsFallback)}</p></div>`;
-      list.classList.add("reviews--single");
+      // Ingen anmeldelser med tekst: ingen tom boks; overskriften og «Se alle anmeldelser» står igjen
+      list.innerHTML = "";
+      list.hidden = true;
     }
     list.setAttribute("aria-busy", "false");
   }

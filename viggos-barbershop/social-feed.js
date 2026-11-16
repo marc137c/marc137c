@@ -3,6 +3,7 @@
 (() => {
   const grid = document.getElementById("social-feed");
   if (!grid) return;
+  const lead = document.querySelector("#sosiale .section-lead");
 
   const ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17.3" cy="6.7" r="1.2" fill="currentColor"/></svg>';
   const PROFILE = "https://www.instagram.com/viggos.barbershop/";
@@ -50,6 +51,11 @@
   function render() {
     if (!feed) return;
     const posts = (feed.instagram || []).slice(0, 6);
+    // Ingen poster (ikke koblet til, eller Instagram feiler): rutenettet og «De nyeste klippene …» skjules, så
+    // ingenting lover poster som ikke finnes. Følg oss-knappene under står igjen.
+    const empty = posts.length === 0;
+    grid.hidden = empty;
+    if (lead) lead.hidden = empty;
     // Færre enn 6 poster (eller ikke koblet til ennå): avslutt med et «Følg oss»-kort
     const html = posts.map(postCard);
     if (posts.length < 6) html.push(followCard());
