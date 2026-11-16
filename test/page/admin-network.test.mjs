@@ -117,3 +117,39 @@ test("static: every fetch( in admin.js is inside withTimeout(…), and errors ar
   const wrapped = (ADMIN_JS.match(/withTimeout\(fetch\(/g) || []).length;
   assert.equal(wrapped, fetches, "each fetch( is the first argument of withTimeout");
 });
+
+// The rest of the RC2 matrix for the barber's writes: the server's own Norwegian text for 404 and 429, and an
+// uncertain text for the platform's HTML error pages on Slett and on a new booking
+test("server failure matrix: 404 and 429 show the server's text; 502/504 HTML on Slett and on a new booking say to check", async () => {
+  const cases = [
+    ["POST", { status: 404, body: { error: "Ukjent forespørsel." } }, /^Ukjent forespørsel\.$/],
+    ["POST", { status: 429, body: { error: "For mange forespørsler. Vent litt og prøv igjen." } }, /^For mange forespørsler/],
+    ["POST", { status: 502, body: "<html>Bad gateway</html>" }, /^Ingen forbindelse med serveren \(feil 502\) – prøv igjen\. Oppdater siden/],
+    ["DELETE", { status: 504, body: "<html>Timeout</html>" }, /^Ingen forbindelse med serveren \(feil 504\) – prøv igjen\. Oppdater siden/],
+    ["DELETE", { status: 429, body: { error: "For mange forespørsler." } }, /^For mange forespørsler\.$/],
+  ];
+  for (const [method, answer, expect] of cases) {
+    const page = await open({ "POST /api/admin/items": () => answer, [`DELETE /api/admin/items/${enc}`]: () => answer });
+    if (method === "POST") {
+      page.$("add").click();
+      page.field("service").value = "Herreklipp";
+      page.submit();
+    } else {
+      page.tap("timeline", `[data-id="${it.id}"]`);
+      page.$("delete").click();
+    }
+    await page.flush();
+    const m = page.$("edit-msg").textContent;
+    assert.match(m, expect, `${method} ${answer.status}`);
+    assert.doesNotMatch(m, RAW);
+  }
+});
+
+test("server failure matrix: a 429 on login shows the server's text in red", async () => {
+  const page = await open({ "POST /api/admin/login": () => ({ status: 429, body: { error: "For mange forsøk. Vent 15 minutter og prøv igjen." } }) }, { token: null });
+  page.$("pw").value = "x";
+  page.submit("login-form");
+  await page.flush();
+  assert.equal(page.$("login-msg").textContent, "For mange forsøk. Vent 15 minutter og prøv igjen.");
+  assert.equal(page.$("login-msg").className, "msg");
+});

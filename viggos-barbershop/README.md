@@ -33,9 +33,13 @@ Gå til **/admin** (lenke «Admin» nederst på siden), skriv passordet og trykk
 - **Engangsoppsett:** i Netlify → Site configuration → Environment variables, legg inn `ADMIN_PASSWORD` med et passord du velger. Bytt passordet i Netlify, og publiser på nytt (Deploys → Trigger deploy → Deploy site). Først da gjelder det nye passordet: alle blir logget ut, ingen enhet får flere varsler om nye bestillinger før noen logger inn der med det nye passordet, og kalenderlenken slutter å virke (lag en ny under **Oppsett**). Det er det du gjør hvis passordet eller en innlogget telefon kan ha kommet på avveie. Slett så de eldre utrullingene under Deploys.
 - Dagsoversikt med alle tider: røde kort er avtaler (navn, tjeneste, telefon du kan trykke på for å ringe), grå stripete er blokkeringer, grønne er ledige – trykk på en ledig tid for å legge inn en avtale.
 - Trykk på en avtale for å **flytte** (ny dato/tid), endre tjeneste/varighet/navn, **avlyse** (tiden blir ledig igjen) eller **slette**.
-- **Blokker tid** for lunsj, ferie eller fridager – blokkert tid vises som opptatt for kundene.
-- Admin kan legge inn timer utenom åpningstid. Kolliderer en endring med en annen avtale, spør siden om du vil dobbeltbooke.
-- Oversikten oppdaterer seg selv hvert 30. sekund, så nye nettbestillinger dukker opp.
+- **Blokker tid** for lunsj, ferie eller fridager – blokkert tid vises som opptatt for kundene. En dag som er blokkert i hele åpningstiden, står som **stengt** i ukestripen og i dagsoversikten (og for kundene). Ligger det kunder i tiden du blokkerer, lister siden dem opp med tid, navn og telefon: blokkeringen avlyser dem ikke, og de får ingen beskjed, så ring dem og huk av «Avlyst».
+- Admin kan legge inn timer utenom åpningstid; en time før åpning står øverst i dagen. Kolliderer en endring med en annen avtale, spør siden om du vil dobbeltbooke.
+- **Søk** (feltet over dagen): skriv minst 4 sifre av telefonnummeret eller en del av navnet, så ser du kundens timer fra i dag og tre måneder frem (også avlyste). Trykk på en time for å åpne den.
+- **Mange falske nettbestillinger fra ett nummer:** åpne en av dem, og trykk **Avlys alle nettbestillinger fra …**. Det avlyser alle nettbestillinger fra det nummeret fra i dag og fremover (ikke timer du har lagt inn selv), og kundene får ingen beskjed.
+- **Timeboken åpen på to enheter:** en endring sender bare det du har endret. Er avtalen endret eller flyttet på den andre enheten siden du åpnet den, lagres ingenting, og siden sier fra og henter listen på nytt. Går innloggingen ut mens du skriver, kommer avtalen tilbake med det du skrev når du har logget inn igjen; trykk Lagre.
+- **Uten nett** står det «Ingen forbindelse»; ved en endring står det også at du bør oppdatere siden for å se om den ble lagret.
+- Oversikten oppdaterer seg selv hvert 30. sekund, så nye nettbestillinger dukker opp. Står den åpen over natten, viser den «I dag» for den nye dagen neste gang du ser på den.
 
 ### Kalender på telefonen
 Alle timene kan ligge i kalenderen på telefonen (iPhone-kalenderen eller Google Kalender). Det settes opp én gang:
