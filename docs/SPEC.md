@@ -54,6 +54,6 @@ The owner answers these once, in the final yes before going live. Until then the
 - **Per-phone booking cap:** 6 per 24 h.
 - **Hero rating badge:** shown whenever Google reports at least 5 reviews, whatever the score. A low score is never hidden. Built in step 5 (`HERO_MIN` in `viggos-barbershop/reviews.js`, `test/page/site-widgets.test.mjs`).
 - **Empty sections:** an empty Instagram or Google reviews section is hidden. Built in step 5: with no posts the feed and its lead are hidden, and with no review text the card list is hidden (`test/page/site-widgets.test.mjs`). The unconfigured reviews section is not empty: it shows the owner's FEATURED reviews (D10).
-- **Map:** the attribution is plain text, 'Google Maps', and the map loads only after a click.
-- **Site address:** canonical, og:url and the JSON-LD url are `https://www.viggosbarbershop.no/`.
+- **Map:** the attribution is plain text, 'Google Maps', and the map loads only after a click. Built in step 6: the iframe has only `data-src` and `referrerpolicy="no-referrer"` until «Vis kart (Google Maps)» is pressed (`test/page/site-static.test.mjs`, `test/page/site-script.test.mjs`).
+- **Site address:** canonical, og:url and the JSON-LD url are `https://www.viggosbarbershop.no/`. Built in step 6, now that the domain is live (`test/page/site-head.test.mjs`); the release steps are in `DEPLOY.md`.
 - **Still to confirm:** the Facebook profile URL (a share link today), and the wording of the 'uncertain' and 'rateLimited' messages (drafted in step 3).
