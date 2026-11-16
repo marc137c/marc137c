@@ -909,6 +909,8 @@
   const permission = () => (notif() ? notif().permission : "denied");
   const isIos = () => /iPad|iPhone|iPod/.test(navigator.userAgent || "") || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const isStandalone = () => navigator.standalone === true || !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+  // iOS-versjonen fra nettleserens brukeragent («OS 15_8» → [15, 8]), eller null (en iPad som melder seg som Mac)
+  const iosVersion = () => { const m = /OS (\d+)_(\d+)/.exec(navigator.userAgent || ""); return m ? [Number(m[1]), Number(m[2])] : null; };
   // others: hvor mange andre enheter som får varsler (da vises «Slå av varsler på alle andre enheter»)
   // lost: abonnementet her er fjernet fordi push-tjenesten sa at det var borte, så «av» sier at de må slås på igjen
   // limited: { mode, text } når denne nettleseren ikke kan få varsler (eller de er blokkert): panelet viser bare
@@ -1043,6 +1045,10 @@
     pushButtons(null);
     $("push-ios").hidden = true;
     if (!pushSupported()) {
+      // Instruksjonene velges ut fra iOS-versjonen (runde 2, SPEC R26): iOS 15 og eldre får ingen steg som ikke kan
+      // virke der (iPhone SE 1. gen, 6s og 7 stopper på iOS 15), iOS 16.0–16.3 kan oppdatere.
+      const v = isIos() ? iosVersion() : null;
+      if (v && v[0] < 16) return pushLimited(seq, null, `Varsler på iPhone krever iOS 16.4 eller nyere, og denne har iOS ${v[0]}.${v[1]}. Bruk kalenderlenken over, eller slå på varsler på en annen telefon eller PC.`);
       if (isIos() && isStandalone()) return pushLimited(seq, null, "Varsler på iPhone krever iOS 16.4 eller nyere. Oppdater under Innstillinger → Generelt → Programvareoppdatering.");
       if (isIos()) { $("push-ios").hidden = false; return pushLimited(seq, null, ""); }
       return pushLimited(seq, null, "Denne nettleseren kan ikke vise varsler. Bruk en nyere Chrome, Edge, Firefox eller Safari.");

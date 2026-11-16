@@ -81,8 +81,8 @@ test("admin push panel: an iPhone in Safari gets the Home Screen instruction, an
   assert.deepEqual(b.log.registered, []);
 });
 
-test("admin push panel: an iPhone Home Screen app on iOS < 16.4 is told to update", async () => {
-  const b = fakePushBrowser({ device: makeDevice("apple"), ios: true, standalone: true, push: false });
+test("admin push panel: an iPhone Home Screen app on iOS 16.0-16.3 is told to update", async () => {
+  const b = fakePushBrowser({ device: makeDevice("apple"), ios: true, iosVersion: "16_3", standalone: true, push: false });
   const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes() });
   assert.equal(page.$("push-ios").hidden, true);
   assert.match(msg(page), /krever iOS 16\.4 eller nyere/);
@@ -500,7 +500,7 @@ test("admin push panel: «Slå av varsler på alle andre enheter» shows only wh
 test("admin push panel: without push here (iPhone Safari tab, old browser) or with it blocked, the other devices can still be cut off", async () => {
   const cases = [
     ["iPhone Safari tab", () => fakePushBrowser({ device: makeDevice("apple"), ios: true, push: false }), "2 andre enheter får varsler.", []],
-    ["iPhone Home Screen app before iOS 16.4", () => fakePushBrowser({ device: makeDevice("apple"), ios: true, standalone: true, push: false }), "Varsler på iPhone krever iOS 16.4 eller nyere. Oppdater under Innstillinger → Generelt → Programvareoppdatering. 2 andre enheter får varsler.", []],
+    ["iPhone Home Screen app before iOS 16.4", () => fakePushBrowser({ device: makeDevice("apple"), ios: true, iosVersion: "16_3", standalone: true, push: false }), "Varsler på iPhone krever iOS 16.4 eller nyere. Oppdater under Innstillinger → Generelt → Programvareoppdatering. 2 andre enheter får varsler.", []],
     ["no service worker", () => ({ navigator: {}, globals: {} }), "Denne nettleseren kan ikke vise varsler. Bruk en nyere Chrome, Edge, Firefox eller Safari. 2 andre enheter får varsler.", []],
     ["blocked", () => fakePushBrowser({ device: makeDevice(), permission: "denied" }), BLOCKED_TEXT + " 2 andre enheter får varsler.", ["push-retry"]],
   ];
@@ -778,3 +778,25 @@ test("admin push panel: end to end, after «Slå av varsler på alle andre enhet
   assert.equal(page.$("login").hidden, true, "still logged in");
   assert.equal(page.calls.at(-1).headers.Authorization, "Bearer " + kept);
 });
+
+// Round 2 (se1-ios15, se2-ios15-home): support was decided from feature presence plus isIos(), never the version, so
+// an iPhone stuck at iOS 15 (SE 1st gen, 6s, 7) was sent through the Home Screen install and «Oppdater», which can
+// never work there. Guard (SPEC R26): platform instructions come from the detected version; every UA fixture has its
+// exact text and buttons.
+const IOS_OLD = "Varsler på iPhone krever iOS 16.4 eller nyere, og denne har iOS 15.8. Bruk kalenderlenken over, eller slå på varsler på en annen telefon eller PC.";
+const IOS_UA = [
+  ["iOS 15 Safari tab", { iosVersion: "15_8", standalone: false, push: false }, IOS_OLD, [], false],
+  ["iOS 15 Home Screen", { iosVersion: "15_8", standalone: true, push: false }, IOS_OLD, [], false],
+  ["iOS 16.3 Home Screen", { iosVersion: "16_3", standalone: true, push: false }, "Varsler på iPhone krever iOS 16.4 eller nyere. Oppdater under Innstillinger → Generelt → Programvareoppdatering.", [], false],
+  ["iOS 17 Safari tab", { iosVersion: "17_4", standalone: false, push: false }, "", [], true],
+  ["iOS 17 Home Screen", { iosVersion: "17_4", standalone: true, push: true }, "Varsler er av på denne enheten.", ["push-on"], false],
+];
+for (const [label, opts, text, left, hint] of IOS_UA) {
+  test(`admin push panel: ${label} gets exactly its own text and buttons`, async () => {
+    const b = fakePushBrowser(Object.assign({ device: makeDevice("apple"), ios: true }, opts));
+    const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes() });
+    assert.equal(msg(page), text, label);
+    assert.deepEqual(buttons(page), left, label);
+    assert.equal(page.$("push-ios").hidden, !hint, `${label}: the Home Screen steps ${hint ? "shown" : "hidden"}`);
+  });
+}
