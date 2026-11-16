@@ -26,6 +26,7 @@ const kept = (site) => {
 
 const FAILURES = [
   { label: "network error", answer: { network: true }, kind: "uncertain" },
+  { label: "no answer within 20 s", answer: { hang: true }, wait: 20000, kind: "uncertain" },
   { label: "500", answer: { status: 500, body: { error: "Noe gikk galt. Ring oss gjerne." } }, kind: "uncertain" },
   { label: "502 HTML", answer: { status: 502, body: "<html><body>Bad gateway</body></html>" }, kind: "uncertain" },
   { label: "503", answer: { status: 503, body: { error: "Mange endringer samtidig. Prøv igjen." } }, kind: "uncertain" },
@@ -37,7 +38,7 @@ const FAILURES = [
 
 for (const f of FAILURES) {
   test(`F6: a booking that gets ${f.label} tells the customer to call ${CALL}, promises nothing and keeps the form`, async () => {
-    const site = await failedBooking(f.answer);
+    const site = await failedBooking(f.answer, { wait: f.wait });
     const msg = site.message();
     assert.ok(msg.includes(CALL), "the message names the phone number: " + msg);
     assert.doesNotMatch(msg, PROMISE);
@@ -51,7 +52,7 @@ for (const f of FAILURES) {
 
 test("F6: in English, every failure text names the phone number and promises nothing", async () => {
   for (const f of FAILURES) {
-    const site = await failedBooking(f.answer, { lang: "en" });
+    const site = await failedBooking(f.answer, { lang: "en", wait: f.wait });
     const msg = site.message();
     assert.ok(msg.includes(CALL), `${f.label}: ${msg}`);
     assert.doesNotMatch(msg, PROMISE, f.label);
@@ -149,9 +150,9 @@ test("F22: while 'Sender …' shows, the form is locked, and the stored booking 
 });
 
 test("F22: every way a send ends unlocks the form", async () => {
-  for (const answer of [{ network: true }, { status: 500, body: {} }, { status: 404, body: "x" }, RATE_LIMITED,
+  for (const answer of [{ network: true }, { hang: true }, { status: 500, body: {} }, { status: 404, body: "x" }, RATE_LIMITED,
     { status: 409, body: { code: "taken", error: "taken" } }, { status: 400, body: { code: "bad_phone", error: "bad_phone" } }]) {
-    const site = await failedBooking(answer);
+    const site = await failedBooking(answer, { wait: 20000 });
     const label = JSON.stringify(answer);
     assert.notEqual(site.message(), site.s().sending, label);
     assert.equal(site.submitButton.disabled, false, label);
@@ -162,6 +163,54 @@ test("F22: every way a send ends unlocks the form", async () => {
     assert.notEqual(site.form.getAttribute("aria-busy"), "true", label);
     assert.equal(site.type(site.$("f-phone"), "409 63 912"), true, label);
   }
+});
+
+test("F90: a booking with no answer says 'Sender …' for 20 s, then tells the customer to call; a late success still confirms", async () => {
+  const reply = later();
+  const site = await boot({ setup: (s) => s.when((r) => r.url === "/api/bookings", (req, srv) => reply.then(() => srv.book(req)), 1) });
+  await site.pick(FRIDAY);
+  await site.book();
+  await site.advance(19000);
+  assert.equal(site.message(), site.s().sending, "still waiting after 19 s");
+  await site.advance(1000);
+  assert.equal(site.message(), site.s().uncertain, "after 20 s: we do not know, call us");
+  assert.equal(site.submitButton.disabled, false);
+  kept(site);
+  reply.resolve();
+  await site.advance(1000);
+  assert.match(site.message(), /^Timen er booket: Herreklipp · fredag 13. november kl. 14:00./, "the late 2xx is shown");
+  assert.equal(site.server.bookings().length, 1);
+});
+
+test("F90: a stored booking is confirmed at once, even when the availability refresh after it never answers", async () => {
+  const site = await boot();
+  await site.pick(FRIDAY);
+  site.server.when((r) => r.url === "/api/availability", { hang: true });
+  await site.book();
+  assert.match(site.message(), /^Timen er booket: /, "no time had to pass");
+  assert.equal(site.submitButton.disabled, false);
+  assert.equal(site.server.bookings().length, 1);
+});
+
+test("F90: an availability answer that hangs gives up after 15 s, and an older answer arriving after a newer one is ignored", async () => {
+  const slow = later();
+  const site = await boot({ setup: (s) => s.when((r) => r.url === "/api/availability", () => slow, 1) });
+  // the first load hangs: the page still offers Friday 14:00 from what it knows
+  await site.pick({ service: "Herreklipp", date: "2026-11-13" });
+  assert.ok(site.slot(840), "14:00 is offered before any answer");
+  const stale = site.server.availability();           // Friday 14:00 still free in this old answer
+  site.server.add({ date: "2026-11-13", start: 840, dur: 30 });
+  await site.poll();                                  // a newer answer: 14:00 taken
+  assert.ok(!site.slot(840), "the newer answer is applied");
+  slow.resolve({ status: 200, body: stale });         // the old answer finally arrives
+  await site.advance(1000);
+  assert.ok(!site.slot(840), "the older answer does not bring 14:00 back");
+  const gets = site.server.requests.filter((r) => r.url === "/api/availability").length;
+  site.server.when((r) => r.url === "/api/availability", { hang: true }, 1);
+  await site.poll();
+  await site.advance(15000);
+  await site.poll();
+  assert.equal(site.server.requests.filter((r) => r.url === "/api/availability").length, gets + 2, "polling goes on after a hung load");
 });
 
 test("F73: a successful booking is stored once and nothing else is sent (no Netlify Forms copy)", async () => {

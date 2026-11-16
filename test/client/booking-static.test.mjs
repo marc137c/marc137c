@@ -2,7 +2,7 @@
 // without running them. The behaviour itself is tested in test/client/booking.test.mjs.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse } from "acorn";
@@ -80,4 +80,34 @@ test("D3: no i18n text promises a confirmation or says a request was received", 
   const bad = all.filter((s) => /bekreft|mottatt|confirm|received/i.test(s));
   assert.deepEqual(bad, []);
   assert.doesNotMatch(bestill(), /bekreft|mottatt/i);
+});
+
+// SPEC R2: every fetch( in viggos-barbershop/*.js runs inside withTimeout(…) (its first argument), so no request
+// can leave the page waiting for ever. RATCHET: the files below still have a bare fetch and are fixed in steps 4-6.
+// The list can only shrink: a file listed here that has no bare fetch left fails the test until it is removed.
+const PENDING_TIMEOUT = ["admin-stats.js", "admin-sw.js", "admin.js", "reviews.js", "social-feed.js"];
+function bareFetches(src) {
+  const out = [];
+  walk(ast(src), (n, parents) => {
+    if (n.type !== "CallExpression") return;
+    const c = n.callee;
+    const isFetch = (c.type === "Identifier" && c.name === "fetch") || (c.type === "MemberExpression" && !c.computed && c.property.name === "fetch");
+    if (!isFetch) return;
+    const wrapped = parents.some((p) => p.type === "CallExpression" && p.callee.type === "Identifier" && p.callee.name === "withTimeout" &&
+      p.arguments[0] && p.arguments[0].start <= n.start && n.end <= p.arguments[0].end);
+    if (!wrapped) out.push(n.loc.start.line);
+  });
+  return out;
+}
+
+test("R2: the timeout guard finds a bare fetch and accepts one inside withTimeout(…)", () => {
+  assert.deepEqual(bareFetches('fetch("/a").then(f);\nwithTimeout(fetch("/b").then(g), 1);\nwithTimeout(p, fetch("/c"));\nself.fetch("/d");'), [1, 3, 4]);
+});
+
+test("R2: every fetch( in viggos-barbershop/*.js is inside withTimeout(…), except the files still on the ratchet list", () => {
+  const files = readdirSync(SITE).filter((f) => f.endsWith(".js")).sort();
+  const bare = files.filter((f) => bareFetches(read(f)).length > 0);
+  assert.deepEqual(bare, PENDING_TIMEOUT, "files with a fetch outside withTimeout: wrap it, or (only for a listed file) keep it listed");
+  assert.deepEqual(bareFetches(bookingJs), [], "booking.js has no bare fetch");
+  assert.ok(bookingJs.includes('withTimeout(fetch("/api/bookings"'), "the booking POST is the first argument of withTimeout");
 });

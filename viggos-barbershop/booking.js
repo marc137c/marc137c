@@ -7,6 +7,8 @@
   const SLOT_MIN = 30;     // en ny time hvert 30. minutt
   const LEAD_MIN = 60;     // i dag: tidligste time er minst én time frem i tid
   const MAX_DAYS = 60;     // hvor langt frem man kan bestille
+  const SEND_TIMEOUT = 20000; // så lenge venter vi på svar på en bestilling før kunden får beskjed om å ringe
+  const LOAD_TIMEOUT = 15000; // så lenge venter vi på ledige tider
   // Varighet per tjeneste (minutter). Overskrives av serveren hvis den svarer.
   let DURATIONS = {
     "Full service": 60, "Herreklipp": 30, "Herreklipp + skjeggtrim": 30,
@@ -228,11 +230,26 @@
   // Samme regler som serveren: navn minst 2 tegn, telefon 8–15 sifre uansett skrivemåte
   const phoneOk = (v) => { const n = v.replace(/\D/g, "").length; return n >= 8 && n <= 15; };
 
-  // Hent opptatte tider fra serveren
+  // Et løfte som gir opp etter ms millisekunder (AbortController finnes ikke i Safari før 12.1, så forespørselen
+  // selv går videre). .late er svaret selv, i tilfelle det kommer etter at tiden er ute.
+  const withTimeout = (p, ms) => {
+    const t = new Promise((ok, no) => {
+      const timer = setTimeout(() => no(new Error("timeout")), ms);
+      p.then((v) => { clearTimeout(timer); ok(v); }, (err) => { clearTimeout(timer); no(err); });
+    });
+    t.late = p;
+    return t;
+  };
+
+  // Hent opptatte tider fra serveren. Et eldre svar som kommer etter et nyere, brukes ikke.
+  let loads = 0, applied = 0;
   function loadAvailability() {
-    return fetch("/api/availability", { headers: { Accept: "application/json" }, cache: "no-store" })
-      .then((res) => { if (!res.ok) throw new Error(res.status); return res.json(); })
+    const n = ++loads;
+    return withTimeout(fetch("/api/availability", { headers: { Accept: "application/json" }, cache: "no-store" })
+      .then((res) => { if (!res.ok) throw new Error(res.status); return res.json(); }), LOAD_TIMEOUT)
       .then((data) => {
+        if (n < applied || !data || typeof data !== "object") return;
+        applied = n;
         busy = data.busy || {};
         if (data.durations) DURATIONS = data.durations;
         // Åpningstidene kommer fra serveren, så kalenderen og bestillingsreglene alltid er like
@@ -240,7 +257,7 @@
         online = true;
       })
       .catch(() => {
-        online = false; // kalenderen virker fortsatt; bestillingen sendes da som forespørsel
+        online = false; // kalenderen virker fortsatt med det vi vet fra før
       });
   }
   const refresh = () => loadAvailability().then(() => { if (!state.view) initView(); renderAll(); });
@@ -248,6 +265,7 @@
   // Samme bestilling sendt på nytt (etter et tapt svar, tidsavbrudd eller nettfeil) får samme requestId, så serveren
   // lagrer den bare én gang og svarer med timen som allerede er lagret. En endret bestilling får en ny (SPEC R1).
   let attempt = null; // { sig, id }
+  let turns = 0;      // løpenummer for forsøkene
   function newRequestId() {
     let bytes = null;
     try { if (window.crypto && window.crypto.getRandomValues) bytes = window.crypto.getRandomValues(new Uint8Array(12)); } catch (e) { bytes = null; }
@@ -303,20 +321,26 @@
     if (!attempt || attempt.sig !== sig) attempt = { sig, id: newRequestId() };
     body.botField = bot ? bot.value : "";
     body.requestId = attempt.id;
+    const turn = ++turns;
+    const current = () => turn === turns; // svar på et eldre forsøk overstyrer aldri et nyere
     lock(true);
     setMsg("", (t) => t.sending);
     // Hver vei ut låser opp skjemaet først, så feilmeldingen kan flytte fokus og kunden kan rette eller prøve igjen
     const end = (fn) => { lock(false); fn(); };
-    fetch("/api/bookings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(body),
-    }).catch(() => null).then((res) => {
-      if (res && res.ok) {
-        attempt = null;
-        return loadAvailability().then(() => end(() => done((t) => t.booked(whenFor(t)))));
-      }
-      if (res && res.status === 409) {
+    // Timen er lagret: si det med en gang, og hent oppdaterte ledige tider i bakgrunnen
+    const booked = () => {
+      attempt = null;
+      end(() => done((t) => t.booked(whenFor(t))));
+      refresh();
+    };
+    // Vi vet ikke om timen ble lagret (ingen svar, nettfeil, eller et svar vi ikke kan stole på). requestId beholdes,
+    // så et nytt forsøk med det samme blir samme bestilling hos serveren.
+    const uncertain = () => end(() => setMsg("err", (t) => t.uncertain));
+    const ok = (r) => r.status >= 200 && r.status < 300 && !!r.data && r.data.ok === true;
+    const answer = (r) => {
+      const status = r.status, data = r.data || {};
+      if (ok(r)) return booked();
+      if (status === 409 || data.code === "taken") {
         // Noen andre rakk å ta tiden: vis oppdatert kalender
         return loadAvailability().then(() => end(() => {
           state.time = null;
@@ -325,16 +349,23 @@
         }));
       }
       // For mange bestillinger (fra nummeret, nettet eller totalt): et nytt forsøk hjelper ikke, så be om en telefon
-      if (res && res.status === 429) return end(() => setMsg("err", (t) => t.rateLimited));
-      if (res && res.status >= 400 && res.status < 500 && res.status !== 404) {
-        return res.json().catch(() => ({})).then((data) => end(() => fail(ERR[data.code] || ((t) => t.notSaved))));
-      }
-      // 404: bookingsystemet finnes ikke her, så ingenting ble lagret. Ellers (ingen svar, nettfeil, serverfeil)
-      // vet vi ikke om timen ble lagret. Begge ganger: ring oss, og skjemaet beholder alt kunden har valgt og skrevet.
-      end(() => setMsg("err", (t) => (res && res.status === 404 ? t.notSaved : t.uncertain)));
-    }).catch(() => {
-      end(() => setMsg("err", (t) => t.uncertain));
-    });
+      if (status === 429 || data.code === "rate_limited") return end(() => setMsg("err", (t) => t.rateLimited));
+      if (status >= 500 || status < 400) return uncertain();
+      // 404: bookingsystemet finnes ikke her, så ingenting ble lagret. Andre 4xx: serveren sa nei, ingenting ble lagret.
+      if (status === 404) return end(() => setMsg("err", (t) => t.notSaved));
+      end(() => fail(ERR[data.code] || ((t) => t.notSaved)));
+    };
+    const sent = withTimeout(fetch("/api/bookings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(body),
+    }).then((res) => res.json().then((data) => ({ status: res.status, data }), () => ({ status: res.status, data: null }))), SEND_TIMEOUT);
+    sent.then((r) => { if (current()) return answer(r); }, () => {
+      if (!current()) return;
+      uncertain();
+      // Kommer svaret likevel senere og timen ble lagret, får kunden vite det
+      sent.late.then((r) => { if (current() && !sending && ok(r)) booked(); }, () => {});
+    }).catch(() => { if (current()) uncertain(); });
   });
 
   initView();
