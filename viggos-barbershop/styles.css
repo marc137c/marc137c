@@ -537,6 +537,8 @@ form.booking {
   opacity: 1; color: var(--err); background: rgba(239, 124, 115, .1);
   border-color: rgba(239, 124, 115, .35); text-decoration: line-through;
 }
+/* Ledige hull finnes, men valgt tjeneste rekker ikke: stiplet som «for kort»-tidene, ikke rød (F56) */
+.cal-day.is-nofit:disabled { opacity: .6; border-style: dashed; border-color: var(--muted); }
 /* Synlig fokus også etter et trykk (siden flytter fokus hit selv, f.eks. ved en feilmelding) */
 .cal-day:focus, .slot:focus { box-shadow: 0 0 0 3px rgba(201, 163, 92, .55); }
 .slot > * { display: block; }
@@ -548,12 +550,13 @@ form.booking {
   border-color: rgba(239, 124, 115, .4); text-decoration: line-through;
 }
 .slot.is-taken small { text-decoration: none; }
-.slot.is-short, .slot.is-short:hover { cursor: not-allowed; opacity: .4; border-style: dashed; border-color: var(--line); }
+.slot.is-short, .slot.is-short:hover { cursor: not-allowed; opacity: .55; border-style: dashed; border-color: var(--muted); }
 .slot-legend { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 0 0; padding: 0; font-size: .8rem; color: var(--muted); }
 .slot-legend li { display: inline-flex; align-items: center; gap: 6px; }
 .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .dot-free { border: 2px solid var(--ok); }
 .dot-taken { background: var(--err); }
+.dot-short { border: 2px dashed var(--muted); }
 .slots-empty { grid-column: 1 / -1; margin: 0; padding: 14px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); font-size: .92rem; text-align: center; }
 
 .booking label:not(.step-label) { display: grid; grid-gap: 6px; gap: 6px; font-size: .9rem; color: var(--muted); }

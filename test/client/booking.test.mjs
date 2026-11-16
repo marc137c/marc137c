@@ -5,6 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { boot, later, FRIDAY, RATE_LIMITED } from "./booking-harness.mjs";
+import * as CLOSED from "../fixtures/closed-days.mjs";
 
 const CALL = "409 63 911";
 const PROMISE = /mottatt|bekrefter|received|confirm/i;
@@ -480,6 +481,79 @@ test("F50: a tab left open over midnight into a new month moves to that month", 
   await site.advance(1000);
   assert.equal(site.monthShown(), "Desember 2026");
   assert.ok(site.$("cal-prev").disabled, "November is in the past now");
+});
+
+// F56 / F7 (owner decision D4): a day the barber blocked completely is closed in the calendar, like a Sunday, using the
+// shared cases in test/fixtures/closed-days.mjs. A day with only gaps too short for the chosen service is "not
+// available for the selected service", not "fully booked", and a short time says so in visible text.
+test("F7/F56: every case in test/fixtures/closed-days.mjs renders is-closed exactly when the day is closed", async () => {
+  const site = await boot({ now: "2026-11-12T10:00:00+01:00", setup: (s) => { s.items = JSON.parse(JSON.stringify(CLOSED.items)); } });
+  await site.advance(1000);
+  assert.equal(CLOSED.TODAY, "2026-11-12");
+  for (const c of CLOSED.CASES) {
+    const b = await site.day(c.date);
+    assert.ok(b, c.label);
+    const sunday = new Date(c.date + "T00:00:00Z").getUTCDay() === 0;
+    const shut = c.closed || sunday;
+    assert.equal(b.classList.contains("is-closed"), shut, `${c.label}: is-closed`);
+    assert.equal(/, stengt/.test(b.getAttribute("aria-label")), shut, `${c.label}: ${b.getAttribute("aria-label")}`);
+    if (c.closed) {
+      assert.ok(b.disabled, c.label);
+      assert.ok(!b.classList.contains("is-full"), `${c.label}: closed, not fully booked`);
+    }
+  }
+});
+
+test("F7/F56: server.blockDay('2026-11-16') shows the day as ', stengt', and a chosen day that gets blocked is dropped with a reason", async () => {
+  const site = await boot({ setup: (s) => s.blockDay("2026-11-16") });
+  await site.advance(1000);
+  const b = await site.day("2026-11-16");
+  assert.match(b.getAttribute("aria-label"), /^Mandag 16\. november, stengt$/);
+  assert.ok(b.classList.contains("is-closed") && b.disabled);
+  await site.pick({ service: "Herreklipp", date: "2026-11-17", time: 600 });
+  site.server.blockDay("2026-11-17");
+  await site.poll();
+  assert.equal(site.summary(), "");
+  assert.deepEqual(site.visibleMessages().map((el) => el.id), ["msg-day"]);
+  assert.equal(site.message(), site.s().dayGone);
+  assert.match((await site.day("2026-11-17")).getAttribute("aria-label"), /, stengt$/);
+});
+
+test("F56: Full service at 16:25 makes today 'is-nofit' (not fully booked), and short times say 'For kort'", async () => {
+  const site = await boot({ now: "2026-11-12T16:25:00+01:00" });
+  await site.pick({ service: "Herreklipp", date: TODAY, time: 1050 });
+  site.choose(site.select, "Full service"); await site.flush();
+  const today = await site.day(TODAY);
+  assert.ok(today.classList.contains("is-nofit") && !today.classList.contains("is-full"), today.className);
+  assert.equal(today.getAttribute("title"), "Ikke ledig for valgt tjeneste");
+  assert.match(today.getAttribute("aria-label"), /, ikke ledig for valgt tjeneste$/);
+  assert.equal(site.$("slots").textContent, site.s().dayNoFit, "the empty time list says why");
+  await site.pick({ date: "2026-11-14" });
+  const short = site.slots().filter((x) => /is-short/.test(x.cls));
+  assert.deepEqual(short.map((x) => x.text), ["16:30 For kort"], "Saturday closes at 17:00");
+  const legend = site.qsa(".slot-legend li").map((li) => li.textContent.trim());
+  assert.deepEqual(legend, ["Ledig", "Opptatt", "For kort tid til valgt tjeneste"]);
+  site.I18N.set("en"); await site.flush();
+  assert.deepEqual(site.qsa(".slot-legend li").map((li) => li.textContent.trim()), ["Available", "Booked", "Too short for the chosen service"]);
+  assert.deepEqual(site.slots().filter((x) => /is-short/.test(x.cls)).map((x) => x.text), ["4:30 PM Too short"]);
+});
+
+test("D4: the latest applied availability answer is window.bookingAvailability, and each listener is called after every answer", async () => {
+  const site = await boot({ setup: (s) => s.blockDay("2026-11-16") });
+  await site.advance(1000);
+  const seen = [];
+  assert.ok(Array.isArray(site.ctx.bookingAvailabilityListeners), "the list exists");
+  site.ctx.bookingAvailabilityListeners.push((a) => seen.push(a));
+  await site.poll();
+  assert.equal(seen.length, 1);
+  assert.ok(seen[0] === site.ctx.bookingAvailability);
+  assert.deepEqual(seen[0].data.closed, ["2026-11-16"]);
+  assert.equal(typeof seen[0].at, "number");
+  site.ctx.bookingAvailabilityListeners.unshift(() => { throw new Error("a broken listener"); });
+  await site.poll();
+  assert.equal(seen.length, 2, "a listener that throws does not stop the others or the page");
+  assert.ok(seen[1] === site.ctx.bookingAvailability, "the newest answer");
+  assert.ok(site.$("cal-grid").querySelectorAll(".cal-day").some((b) => !b.disabled), "the page still works");
 });
 
 test("F73: a successful booking is stored once and nothing else is sent (no Netlify Forms copy)", async () => {

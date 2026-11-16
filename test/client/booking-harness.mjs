@@ -263,11 +263,13 @@ export async function boot(opts = {}) {
       return null;
     },
     slot(min) { return $("slots").querySelector(`[data-time="${min}"]`); },
-    /** Every slot button with its time (minutes), status class and visible text. */
+    /** Every slot button with its time (minutes), status class, visible text and accessible label. */
     slots() {
       return $("slots").querySelectorAll("button").map((b) => ({
         t: b.getAttribute("data-time") !== null ? +b.getAttribute("data-time") : null,
-        cls: b.className, disabled: b.disabled, text: b.textContent.replace(/\s+/g, " ").trim(), label: b.getAttribute("aria-label"), el: b,
+        // the visible parts (time, then a tag such as 'Opptatt' or 'For kort'), joined with a space as they are laid out
+        cls: b.className, disabled: b.disabled, text: b.children.map((c) => c.textContent.trim()).filter(Boolean).join(" ") || b.textContent.trim(),
+        label: b.getAttribute("aria-label"), el: b,
       }));
     },
     async pick({ service, date, time, name, phone } = {}) {

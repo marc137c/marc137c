@@ -17,6 +17,7 @@
     "Knivbarbering": 30, "Skjegg & line-up": 30, "Barneklipp": 30,
   };
   let busy = {};           // { "ÅÅÅÅ-MM-DD": [[start, slutt], …] } – opptatte tidsrom
+  let closed = {};         // { "ÅÅÅÅ-MM-DD": true } – dager barberen har blokkert helt (stengt)
   let clock = null;        // serverens klokke fra siste svar: { y, m, d, minutes, at }
   let online = false;      // true når bookingsystemet på serveren svarer
 
@@ -60,8 +61,10 @@
   }
   const today = () => { const n = now(); return new Date(n.y, n.m - 1, n.d); }; // ny Date hver gang: kallerne endrer den
   const lastDay = () => { const d = today(); d.setDate(d.getDate() + MAX_DAYS); return d; };
+  // Stengt: søndag (ingen åpningstid) eller en dag barberen har blokkert helt (serverens closed-liste, eierens beslutning D4)
+  const isClosed = (d) => !HOURS[d.getDay()] || closed[iso(d)] === true;
   // Kan dagen bestilles i det hele tatt (åpen og innenfor bestillingsvinduet)?
-  const dayOpen = (d) => d >= today() && d <= lastDay() && !!HOURS[d.getDay()];
+  const dayOpen = (d) => d >= today() && d <= lastDay() && !isClosed(d);
 
   const duration = () => DURATIONS[select.value] || SLOT_MIN;
   const isBusy = (date, start, dur) =>
@@ -70,12 +73,10 @@
   // Alle starttider en gitt dag (minutter etter midnatt) med status:
   // "free" = ledig, "taken" = noen har booket denne tiden, "short" = ledig, men valgt tjeneste rekker ikke før neste avtale/stenging
   function slotsFor(date) {
+    if (!dayOpen(date)) return [];
     const hours = HOURS[date.getDay()];
-    if (!hours) return [];
     const dur = duration();
-    let earliest = -1;
-    if (date < today() || date > lastDay()) return [];
-    if (sameDay(date, today())) earliest = now().minutes + LEAD_MIN;
+    const earliest = sameDay(date, today()) ? now().minutes + LEAD_MIN : -1;
     const out = [];
     for (let t = hours[0]; t + SLOT_MIN <= hours[1]; t += SLOT_MIN) {
       if (t < earliest) continue;
@@ -86,9 +87,9 @@
     }
     return out;
   }
-  const freeSlots = (date) => slotsFor(date).filter((x) => x.status === "free").map((x) => x.t);
-  const hasAnySlot = (date) => slotsFor(date).length > 0;
-  const bookable = (date) => date >= today() && date <= lastDay() && freeSlots(date).length > 0;
+  const isFree = (x) => x.status === "free";
+  const isShort = (x) => x.status === "short";
+  const bookable = (date) => slotsFor(date).some(isFree);
 
   const fmtCache = {};
   const dateLabel = (d, opts = { weekday: "long", day: "numeric", month: "long" }) => {
@@ -115,22 +116,30 @@
       html.push(`<span class="cal-wd" aria-hidden="true">${dateLabel(wd, { weekday: "short" }).replace(".", "")}</span>`);
     }
     for (let i = 0; i < offset; i++) html.push('<span class="cal-blank"></span>');
+    const t0 = today();
     for (let day = 1; day <= daysInMonth; day++) {
       const d = new Date(view.getFullYear(), view.getMonth(), day);
-      const ok = bookable(d);
-      const full = !ok && HOURS[d.getDay()] && d >= today() && d <= lastDay() && hasAnySlot(d);
+      const shut = isClosed(d); // søndag, eller en dag barberen har blokkert helt (D4)
+      const slots = slotsFor(d);
+      const ok = slots.some(isFree);
+      // Ingen ledig tid for valgt tjeneste, men kortere hull finnes: ikke «fullbooket» (F56)
+      const noFit = !ok && slots.some(isShort);
+      const full = !ok && !noFit && slots.length > 0;
       const cls = ["cal-day"];
-      if (sameDay(d, today())) cls.push("is-today");
+      if (sameDay(d, t0)) cls.push("is-today");
       if (sameDay(d, state.date)) cls.push("is-selected");
-      if (!HOURS[d.getDay()]) cls.push("is-closed");
+      if (shut) cls.push("is-closed");
       if (full) cls.push("is-full");
-      const label = cap(dateLabel(d)) + (sameDay(d, today()) ? `, ${s.today.toLowerCase()}` : "") +
-        (!HOURS[d.getDay()] ? `, ${s.closedDay.toLowerCase()}` : "") + (full ? `, ${s.fullDay.toLowerCase()}` : "");
-      html.push(`<button type="button" class="${cls.join(" ")}" data-date="${iso(d)}" aria-label="${label}" aria-pressed="${sameDay(d, state.date)}"${ok ? "" : " disabled"}${full ? ` title="${s.fullDay}"` : ""}>${day}</button>`);
+      if (noFit) cls.push("is-nofit");
+      const label = cap(dateLabel(d)) + (sameDay(d, t0) ? `, ${s.today.toLowerCase()}` : "") +
+        (shut ? `, ${s.closedDay.toLowerCase()}` : "") + (full ? `, ${s.fullDay.toLowerCase()}` : "") +
+        (noFit ? `, ${s.noFitDay.toLowerCase()}` : "");
+      const tip = full ? s.fullDay : noFit ? s.noFitDay : "";
+      html.push(`<button type="button" class="${cls.join(" ")}" data-date="${iso(d)}" aria-label="${label}" aria-pressed="${sameDay(d, state.date)}"${ok ? "" : " disabled"}${tip ? ` title="${tip}"` : ""}>${day}</button>`);
     }
     setGrid(html.join(""));
 
-    const firstOfThisMonth = new Date(today().getFullYear(), today().getMonth(), 1);
+    const firstOfThisMonth = new Date(t0.getFullYear(), t0.getMonth(), 1);
     const firstOfLastMonth = new Date(lastDay().getFullYear(), lastDay().getMonth(), 1);
     prevBtn.disabled = view <= firstOfThisMonth;
     nextBtn.disabled = view >= firstOfLastMonth;
@@ -151,8 +160,9 @@
       dropped.time = was && was.status === "short" ? (t) => t.tooShortPicked : (t) => t.timeGone;
       setMsg("err", dropped.time, "time");
     }
-    if (!slots.some((x) => x.status === "free")) {
-      setSlots(`<p class="slots-empty">${slots.length ? s.dayFull : s.noSlots}</p>`);
+    if (!slots.some(isFree)) {
+      // Bare for korte hull for valgt tjeneste: si det, ikke «alle tider er booket» (F56)
+      setSlots(`<p class="slots-empty">${slots.some(isShort) ? s.dayNoFit : slots.length ? s.dayFull : s.noSlots}</p>`);
       return;
     }
     setSlots(slots.map(({ t, status }) => {
@@ -160,7 +170,7 @@
         return `<button type="button" class="slot is-taken" disabled aria-label="${s.time(t)}, ${s.taken.toLowerCase()}"><span>${s.time(t)}</span><small>${s.taken}</small></button>`;
       }
       if (status === "short") {
-        return `<button type="button" class="slot is-short" disabled title="${s.tooShort}" aria-label="${s.time(t)}, ${s.tooShort.toLowerCase()}"><span>${s.time(t)}</span></button>`;
+        return `<button type="button" class="slot is-short" disabled title="${s.tooShort}" aria-label="${s.time(t)}, ${s.tooShort.toLowerCase()}"><span>${s.time(t)}</span><small>${s.shortTag}</small></button>`;
       }
       const sel = t === state.time;
       return `<button type="button" class="slot${sel ? " is-selected" : ""}" data-time="${t}" aria-pressed="${sel}"><span>${s.time(t)}</span></button>`;
@@ -331,7 +341,19 @@
     if (num(data.maxDays, 0, 400)) MAX_DAYS = data.maxDays;
     const m = YMD.exec(data.today || "");
     if (m && num(data.nowMinutes, 0, 1439)) clock = { y: +m[1], m: +m[2], d: +m[3], minutes: data.nowMinutes, at: Date.now() };
+    // Dager barberen har blokkert helt er stengt, som en søndag (D4)
+    closed = {};
+    if (Array.isArray(data.closed)) data.closed.forEach((d) => { if (typeof d === "string" && YMD.test(d)) closed[d] = true; });
+    // Siste svar fra serveren, til bruk for resten av siden (statuslinjen øverst bruker stengte dager derfra).
+    // Hver funksjon i window.bookingAvailabilityListeners kalles etter hvert svar som tas i bruk.
+    window.bookingAvailability = { data, at: Date.now() };
+    listeners().forEach((fn) => { try { fn(window.bookingAvailability); } catch (e) { /* en feil der stopper ikke kalenderen */ } });
   }
+  const listeners = () => {
+    if (!Array.isArray(window.bookingAvailabilityListeners)) window.bookingAvailabilityListeners = [];
+    return window.bookingAvailabilityListeners.slice();
+  };
+  listeners();
 
   // Hent opptatte tider fra serveren. Et eldre svar som kommer etter et nyere, brukes ikke.
   let loads = 0, applied = 0;
