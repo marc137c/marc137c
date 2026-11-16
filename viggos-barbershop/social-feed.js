@@ -27,8 +27,11 @@
   function postCard(p) {
     const name = "Instagram";
     const caption = p.caption ? esc(p.caption) : "";
+    // Etiketten for skjermlesere: de 80 første hele tegnene av teksten, kuttet FØR escaping (aldri midt i &amp; eller en emoji)
+    const chars = Array.from(p.caption || "");
+    const short = chars.slice(0, 80).join("") + (chars.length > 80 ? "…" : "");
     return `<a class="post post--instagram" href="${esc(safeUrl(p.url))}" target="_blank" rel="noopener"
-        aria-label="${esc(I18N.s().openPost(name))}${p.caption ? ": " + caption.slice(0, 80) : ""}">
+        aria-label="${esc(I18N.s().openPost(name) + (short ? ": " + short : ""))}">
       <img src="${esc(safeUrl(p.image))}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">
       <span class="post-badge" title="${name}">${ICON}</span>
       ${p.video ? `<span class="post-play">${PLAY}</span>` : ""}

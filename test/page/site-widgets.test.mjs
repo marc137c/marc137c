@@ -279,6 +279,26 @@ test("X3.4: every review text, reviewer name and Instagram caption has dir=auto"
   assert.equal(caps[0].textContent, CAPTIONS.arabic);
 });
 
+// F60: the post link's label is cut at 80 characters of the caption itself, then escaped once: never in the middle
+// of an entity (&am…) or of an emoji
+test("F60: a post's aria-label is the caption's first 80 characters, whole, with no broken entity or emoji", async () => {
+  const captions = [CAPTIONS.amp, CAPTIONS.quote, CAPTIONS.emoji, "Kort tekst & greit", ""];
+  const site = await socialPage(feed(captions.length, captions.map((caption) => ({ caption }))));
+  const links = site.qsa("#social-feed .post:not(.post--follow)");
+  assert.equal(links.length, captions.length);
+  captions.forEach((caption, i) => {
+    const chars = Array.from(caption);
+    const short = chars.slice(0, 80).join("") + (chars.length > 80 ? "…" : "");
+    const label = links[i].getAttribute("aria-label");
+    assert.equal(label, "Åpne innlegget på Instagram" + (short ? ": " + short : ""), JSON.stringify(caption));
+    assert.ok(label.isWellFormed(), label);
+    assert.doesNotMatch(label, /&(am|amp|q|quo|quot|#\d*)?$|&(amp|quot|#39|lt|gt);/, "no entity text in the label");
+    if (caption) assert.equal(links[i].querySelector(".post-caption").textContent, caption, "the visible caption is whole");
+  });
+  const raw = site.html.filter((w) => w.id === "social-feed").pop().html;
+  assert.ok(raw.isWellFormed(), "the generated HTML has no lone surrogate");
+});
+
 test("widgets: every string reviews.js, social-feed.js and i18n.js wrote in this file is well-formed Unicode", () => {
   const writes = SITES.reduce((all, s) => all.concat(s.html), []);
   assert.ok(writes.length > 20, `${writes.length} writes checked`);
