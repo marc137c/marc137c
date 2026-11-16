@@ -315,6 +315,39 @@ test("X3.5: 0 to 7 posts give 1 tile at 0 posts and an even number of tiles othe
   }
 });
 
+// Static CSS checks for what a browser would show (the painted geometry itself is in the manual browser pack).
+// The declaration blocks of every rule (also inside @media/@supports) whose selector list holds `selector`.
+function rulesFor(css, selector) {
+  const out = [];
+  for (const m of css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (m[1].split(",").map((s) => s.trim().replace(/\s+/g, " ")).includes(selector)) out.push(m[2]);
+  }
+  return out;
+}
+
+// X3.1: `img, svg { max-width: 100% }` capped the gold star row at the width of its clipping box, so a 4.7 rating
+// painted five shrunken gold stars instead of 94 % of the row
+test("X3.1: the gold star row keeps its full width inside its clipping box (max-width: none)", () => {
+  const css = readSite("styles.css");
+  assert.ok(rulesFor(css, "img").some((d) => /max-width: 100%/.test(d)), "the global cap the star rule must undo");
+  const fg = rulesFor(css, ".stars-fg svg");
+  assert.ok(fg.some((d) => /(^|;)\s*max-width: none;/.test(d)), ".stars-fg svg has max-width: none");
+  for (const sel of [".stars-lg .stars-fg svg", ".hero-rating .stars-fg svg"]) {
+    for (const d of rulesFor(css, sel)) assert.doesNotMatch(d, /max-width/, sel + " does not cap it again");
+  }
+});
+
+// X3.2: a long unspaced name, a URL or a long word must wrap inside its card, never push the card or the page wider
+test("X3.2: names, review texts and captions wrap long words; the name's flex item may shrink", () => {
+  const css = readSite("styles.css");
+  assert.ok(rulesFor(css, ".review figcaption > span").some((d) => /min-width: 0;/.test(d)));
+  for (const sel of [".review figcaption strong", ".review blockquote", ".post-caption"]) {
+    const rules = rulesFor(css, sel);
+    assert.ok(rules.some((d) => /overflow-wrap: break-word;/.test(d) && /word-wrap: break-word;/.test(d)), sel);
+  }
+  assert.doesNotMatch(css, /overflow-wrap:\s*anywhere|word-break:\s*break-all/, "'anywhere' is missing in old Safari");
+});
+
 test("widgets: every string reviews.js, social-feed.js and i18n.js wrote in this file is well-formed Unicode", () => {
   const writes = SITES.reduce((all, s) => all.concat(s.html), []);
   assert.ok(writes.length > 20, `${writes.length} writes checked`);

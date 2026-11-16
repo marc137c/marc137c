@@ -594,7 +594,8 @@ form.booking {
 .stars-row svg { width: 100%; height: 100%; display: block; }
 .stars-bg, .stars-fg { position: absolute; top: 0; right: 0; bottom: 0; left: 0; overflow: hidden; }
 .stars-bg svg { fill: var(--line); }
-.stars-fg svg { fill: #f5b301; width: 100px; }
+/* max-width: none opphever img, svg { max-width: 100% }, ellers krymper gull-raden til den klippede boksen (X3.1) */
+.stars-fg svg { fill: #f5b301; width: 100px; max-width: none; }
 .stars-lg .stars-fg svg { width: 130px; }
 
 .reviews { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); grid-gap: 20px; gap: 20px; }
@@ -610,6 +611,9 @@ form.booking {
   max-height: 11.2em;
 }
 .review figcaption { display: flex; align-items: center; gap: 10px; }
+/* Lange navn, lenker og ord brytes inne i kortet i stedet for å gjøre det (og siden) bredere (X3.2) */
+.review figcaption > span { min-width: 0; }
+.review figcaption strong, .review blockquote, .post-caption { overflow-wrap: break-word; word-wrap: break-word; }
 .review figcaption strong { display: block; font-size: .9rem; }
 .review figcaption a { color: var(--text); }
 .review figcaption small { color: var(--muted); font-size: .8rem; }
