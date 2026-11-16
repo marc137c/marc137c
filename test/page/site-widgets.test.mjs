@@ -89,6 +89,26 @@ test("social: posts render as links to Instagram with their images", async () =>
   assert.equal(site.$("social-feed").getAttribute("aria-busy"), "false");
 });
 
+// F84: Places content shown without a Google map is attributed with the text 'Google Maps' (translate="no"),
+// not a hand-drawn logo: in the summary, on every card and in the hero badge.
+test("F84: Google data is attributed 'Google Maps' in the summary, every card and the hero badge, in both languages", async () => {
+  for (const lang of ["no", "en"]) {
+    const site = await reviewsPage(REVIEWS.many, { lang: lang === "en" ? "en" : null });
+    const places = [site.$("rating-summary"), ...cards(site), site.$("hero-rating")];
+    assert.equal(places.length, 6);
+    for (const el of places) {
+      assert.equal(el.hidden, false);
+      const attr = el.querySelectorAll("[translate=no]").filter((x) => text(x) === "Google Maps");
+      assert.equal(attr.length, 1, `${lang}: one 'Google Maps' label in ${el.outerHTML.slice(0, 80)}`);
+      assert.equal(el.querySelector(".g-logo"), null, "no hand-drawn G logo next to Places data");
+    }
+    assert.equal(text(site.$("rating-summary").querySelector(".rating-count")), lang === "en" ? "based on 41 reviews on Google Maps" : "basert på 41 anmeldelser på Google Maps");
+    assert.equal(text(site.$("hero-rating")), lang === "en" ? "4.7 on Google Maps · 41 reviews" : "4,7 på Google Maps · 41 anmeldelser");
+  }
+  // The owner's FEATURED reviews are not Places data and keep their look (D10)
+  assertFeatured(await reviewsPage(REVIEWS.unconfigured));
+});
+
 test("widgets: every string reviews.js, social-feed.js and i18n.js wrote in this file is well-formed Unicode", () => {
   const writes = SITES.reduce((all, s) => all.concat(s.html), []);
   assert.ok(writes.length > 20, `${writes.length} writes checked`);

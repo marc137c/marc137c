@@ -174,9 +174,10 @@
       bookedLine: (when) => `Timen er booket: ${when}`,
       addToCalendar: "Legg i kalenderen",
       // Anmeldelser
-      basedOn: (n) => `basert på ${n} anmeldelser på Google`,
+      // Data fra Google (Places API) merkes «Google Maps» (Googles krav); reviews.js hindrer at navnet oversettes
+      basedOn: (n) => `basert på ${n} anmeldelser på Google Maps`,
       ratingOf: (r) => `${r} av 5 stjerner`,
-      heroRating: (r, n) => `${r} på Google · ${n} anmeldelser`,
+      heroRating: (r, n) => `${r} på Google Maps · ${n} anmeldelser`,
       reviewsFallback: "Les hva kundene våre sier om oss på Google.",
       onGoogle: "på Google",
       googleReview: "Google-anmeldelse",
@@ -227,9 +228,9 @@
       bookedLine: (when) => `You're booked: ${when}`,
       addToCalendar: "Add to calendar",
       // Reviews
-      basedOn: (n) => `based on ${n} reviews on Google`,
+      basedOn: (n) => `based on ${n} reviews on Google Maps`,
       ratingOf: (r) => `${r} out of 5 stars`,
-      heroRating: (r, n) => `${r} on Google · ${n} reviews`,
+      heroRating: (r, n) => `${r} on Google Maps · ${n} reviews`,
       reviewsFallback: "Read what our customers say about us on Google.",
       onGoogle: "on Google",
       googleReview: "Google review",

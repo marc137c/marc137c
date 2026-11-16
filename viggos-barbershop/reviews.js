@@ -27,7 +27,12 @@
 
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const safeUrl = (u) => (/^https:\/\//.test(u || "") ? u : null);
+  // Bare for eierens utvalgte anmeldelser (FEATURED), som ikke kommer fra Places API
   const G_LOGO = '<svg class="g-logo" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.3-2.1 3.5-5.2 3.5-8.8z"/><path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6h-4a12 12 0 0 0 0 10.8l4-3.1z"/><path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1c.9-2.9 3.6-4.9 6.7-4.9z"/></svg>';
+  // Googles krav for data fra Places API uten kart: kilden står som teksten «Google Maps», som aldri oversettes
+  // (docs/contracts/google-places.md)
+  const GM = '<span class="gm-attr" translate="no">Google Maps</span>';
+  const brand = (t) => esc(t).split("Google Maps").join(GM);
 
   // Fem stjerner der fyllingen viser karakteren (f.eks. 4,7 → 94 % fylt)
   function stars(rating, cls = "") {
@@ -50,7 +55,8 @@
     return rtf.format(Math.round(days / 365), "year");
   }
 
-  function card(r) {
+  // attr: kildemerket øverst på kortet (G-logoen for FEATURED, «Google Maps» for data fra Google)
+  function card(r, attr) {
     const author = r.authorUrl && safeUrl(r.authorUrl)
       ? `<a href="${esc(r.authorUrl)}" target="_blank" rel="noopener">${esc(r.author)}</a>`
       : esc(r.author);
@@ -58,7 +64,7 @@
       ? `<img class="review-avatar" src="${esc(r.photo)}" alt="" width="40" height="40" loading="lazy" referrerpolicy="no-referrer">`
       : `<span class="review-avatar review-avatar--initial" aria-hidden="true">${esc((r.author || "?").charAt(0).toUpperCase())}</span>`;
     return `<figure class="review">
-      <div class="review-top">${stars(r.rating)}${G_LOGO}</div>
+      <div class="review-top">${stars(r.rating)}${attr}</div>
       <blockquote>${esc(r.text)}</blockquote>
       <figcaption>${avatar}<span><strong>${author}</strong><small>${esc(ago(r))}</small></span></figcaption>
     </figure>`;
@@ -72,7 +78,7 @@
     summary.innerHTML = `${G_LOGO}<strong class="rating-num">${r}</strong>${stars(FEATURED.rating, "stars-lg")}<span class="rating-count">${esc(s.onGoogle)}</span>`;
     summary.hidden = false;
     if (heroRating) heroRating.hidden = true; // antall anmeldelser er ukjent uten Google-koblingen
-    list.innerHTML = FEATURED.reviews.map((x) => card(Object.assign({}, x, { when: s.googleReview }))).join("");
+    list.innerHTML = FEATURED.reviews.map((x) => card(Object.assign({}, x, { when: s.googleReview }), G_LOGO)).join("");
     list.classList.remove("reviews--single");
     list.setAttribute("aria-busy", "false");
   }
@@ -87,16 +93,16 @@
     const withText = (data.reviews || []).filter((r) => r.text).slice(0, MAX_CARDS);
     if (data.rating && data.count) {
       const r = data.rating.toFixed(1).replace(".", I18N.lang === "en" ? "." : ",");
-      summary.innerHTML = `${G_LOGO}<strong class="rating-num">${r}</strong>${stars(data.rating, "stars-lg")}<span class="rating-count">${esc(s.basedOn(data.count))}</span>`;
+      summary.innerHTML = `<strong class="rating-num">${r}</strong>${stars(data.rating, "stars-lg")}<span class="rating-count">${brand(s.basedOn(data.count))}</span>`;
       summary.hidden = false;
-      if (heroRating) { heroRating.innerHTML = `${stars(data.rating)}<span>${esc(s.heroRating(r, data.count))}</span>`; heroRating.hidden = false; }
+      if (heroRating) { heroRating.innerHTML = `${stars(data.rating)}<span>${brand(s.heroRating(r, data.count))}</span>`; heroRating.hidden = false; }
     } else {
       summary.hidden = true;
       if (heroRating) heroRating.hidden = true;
     }
 
     if (withText.length) {
-      list.innerHTML = withText.map(card).join("");
+      list.innerHTML = withText.map((x) => card(x, GM)).join("");
       list.classList.remove("reviews--single");
     } else {
       // Ikke koblet til Google ennå (eller ingen tekst-anmeldelser): pen henvisning til Google
