@@ -496,7 +496,6 @@ form.booking {
 }
 .addon-picks { border: 0; margin: 2px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 16px; }
 .addon-picks legend { font-size: .85rem; color: var(--muted); margin-bottom: 6px; padding: 0; }
-.booking .addon-picks label { display: inline-flex; align-items: center; gap: 8px; font-size: .9rem; color: var(--text); cursor: pointer; }
 .addon-picks input { width: 18px; height: 18px; accent-color: var(--gold-fill); padding: 0; }
 
 .cal { border: 1px solid var(--line); border-radius: 16px; padding: 14px; background: var(--bg); }
@@ -561,6 +560,7 @@ form.booking {
 .slots-empty { grid-column: 1 / -1; margin: 0; padding: 14px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); font-size: .92rem; text-align: center; }
 
 .booking label:not(.step-label) { display: grid; grid-gap: 6px; gap: 6px; font-size: .9rem; color: var(--muted); }
+.booking .addon-picks label { display: inline-flex; align-items: center; gap: 8px; font-size: .9rem; color: var(--text); cursor: pointer; }
 .booking-summary {
   margin: 0; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(207, 167, 94, .45);
   background: rgba(207, 167, 94, .08); color: var(--text); font-weight: 600;

@@ -157,3 +157,19 @@ test("F70: input and select borders use --field-line, at least 3:1 against --sur
   assert.ok(rule, "styles.css has the 'input, select' rule");
   assert.match(rule[1], /border: 1px solid var\(--field-line\);/);
 });
+
+// F71: '.booking .addon-picks label' (inline-flex: checkbox and text on one line) and '.booking label:not(.step-label)'
+// (grid: label text above its field) have the same specificity (0,2,1), so the later one wins. The add-on rule must
+// come after the general one, at the top level (the @supports fallbacks further down have their own copies).
+test("F71: the add-on label rule comes directly after the general booking label rule", () => {
+  const css = read("styles.css").replace(/\r\n/g, "\n");
+  const general = css.indexOf("\n.booking label:not(.step-label) {");
+  const addon = css.indexOf("\n.booking .addon-picks label {");
+  assert.ok(general > 0 && addon > 0, "both top-level rules exist");
+  assert.ok(addon > general, `the add-on rule (at ${addon}) comes after the general one (at ${general})`);
+  const between = css.slice(css.indexOf("\n", general + 1), addon);
+  assert.equal(between, "", "nothing in between");
+  assert.match(css.slice(addon), /^\n\.booking \.addon-picks label \{ display: inline-flex; align-items: center; gap: 8px; font-size: \.9rem; color: var\(--text\); cursor: pointer; \}/,
+    "the rule itself is unchanged");
+  assert.equal(css.split("\n.booking .addon-picks label {").length, 2, "only one top-level copy");
+});
