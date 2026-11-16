@@ -399,6 +399,8 @@
   }
 
   function openEditor(item, preset = {}) {
+    sheetSeq++;
+    $("save").disabled = false; // en lagring fra et tidligere ark kan fortsatt være på vei
     fillChoices();
     state.editing = item || null;
     const v = item || Object.assign({ type: "booking", date: state.day, start: firstFree(), dur: 30, service: "", addons: [], name: "", phone: "", note: "", status: "confirmed" }, preset);
@@ -460,39 +462,69 @@
   const GONE_SAVE = "Avtalen er flyttet eller slettet fra en annen enhet, så endringen ble ikke lagret. Listen oppdateres nå.";
   const GONE_DELETE = "Avtalen er flyttet eller slettet fra en annen enhet, så den ble ikke slettet her. Listen oppdateres nå.";
 
-  function save(force = false) {
-    const target = state.editing;
-    let body = payload();
-    if (!body.date || Number.isNaN(body.start)) return ($("edit-msg").textContent = "Velg dato og tid.");
-    if (body.type === "booking" && !body.service && !body.name) return ($("edit-msg").textContent = "Skriv inn tjeneste eller navn.");
-    if (target) {
-      body = changedFields(target, body);
-      if (!Object.keys(body).length) { dlg.close(); return Promise.resolve(); }
-      // expect: avtalen slik denne enheten så den; serveren svarer 412 hvis den er endret et annet sted siden (R3)
-      if (target.updatedAt) body.expect = target.updatedAt;
+  // Hver lagring holder fast det den gjelder fra trykket på Lagre (F27): målet (avtalen), det som sendes, og hvilket
+  // ark det var (sheetSeq øker hver gang et ark åpnes). Et svar som kommer etter at arket er lukket og et annet er
+  // åpnet, skriver aldri i det nye arket og lukker det aldri; en feil blir da et varsel som navngir avtalen.
+  let sheetSeq = 0;
+  // requestId for en ny avtale (SPEC R1): det samme arket lagret på nytt uten endringer (svaret gikk tapt) får
+  // samme id, så serveren lagrer den bare én gang; en endret avtale eller et nytt ark får en ny
+  let attempt = null; // { sheet, sig, id }
+  function newRequestId() {
+    let bytes = null;
+    try { if (window.crypto && window.crypto.getRandomValues) bytes = window.crypto.getRandomValues(new Uint8Array(12)); } catch (e) { bytes = null; }
+    let id = Date.now().toString(36) + "-";
+    for (let i = 0; i < 12; i++) id += ((bytes ? bytes[i] : Math.floor(Math.random() * 256)) % 36).toString(36);
+    return id;
+  }
+
+  // ctx: { target, body, sheet } når en lagring prøves på nytt (409 → «lagre likevel»)
+  function save(force = false, ctx) {
+    const mine = ctx ? ctx.sheet : sheetSeq;
+    const target = ctx ? ctx.target : state.editing;
+    let body = ctx ? ctx.body : payload();
+    if (!ctx) {
+      if (!body.date || Number.isNaN(body.start)) return ($("edit-msg").textContent = "Velg dato og tid.");
+      if (body.type === "booking" && !body.service && !body.name) return ($("edit-msg").textContent = "Skriv inn tjeneste eller navn.");
+      if (target) {
+        body = changedFields(target, body);
+        if (!Object.keys(body).length) { dlg.close(); return Promise.resolve(); }
+        // expect: avtalen slik denne enheten så den; serveren svarer 412 hvis den er endret et annet sted siden (R3)
+        if (target.updatedAt) body.expect = target.updatedAt;
+      } else {
+        const sig = JSON.stringify(body);
+        if (!attempt || attempt.sheet !== mine || attempt.sig !== sig) attempt = { sheet: mine, sig, id: newRequestId() };
+        body.requestId = attempt.id;
+      }
     }
+    // Det samme arket er fortsatt åpent
+    const here = () => dlg.open && sheetSeq === mine;
+    const was = (k) => (body[k] != null ? body[k] : target ? target[k] : null);
+    const who = was("name") || was("service") || (was("type") === "block" ? "Blokkering" : "avtale");
     const q = force ? "?force=1" : "";
-    $("save").disabled = true;
+    if (here()) $("save").disabled = true;
     const sent = target
       ? api(`/api/admin/items/${encodeURIComponent(target.id)}${q}`, { method: "PATCH", body: JSON.stringify(body) })
       : api(`/api/admin/items${q}`, { method: "POST", body: JSON.stringify(body) });
     return sent.then(() => {
-      dlg.close();
+      if (sheetSeq !== mine) return load(); // et annet ark er åpnet siden: la det være i fred
+      if (dlg.open) dlg.close();
       if (body.date && body.date !== state.day) state.day = body.date;
       return load();
     }).catch((err) => {
+      if (err.status === 401) return; // innloggingen vises (og arket kommer tilbake etterpå, F28)
       if ((err.status === 412 || err.status === 404) && target) {
         // Aldri «lagre likevel» her: da ville endringen fra den andre enheten blitt overskrevet
         alert(err.status === 412 ? STALE_TEXT : GONE_SAVE);
-        dlg.close();
+        if (here()) dlg.close();
         return load();
       }
       if (err.status === 409 && !force) {
-        if (confirm(`${err.message}\n\nVil du lagre likevel (dobbeltbooking)?`)) return save(true);
+        if (confirm(`${who} ${hhmm(was("start"))}: ${err.message}\n\nVil du lagre likevel (dobbeltbooking)?`)) return save(true, { target, body, sheet: mine });
       }
-      if (err.status !== 401) $("edit-msg").textContent = errText(err);
+      if (here()) $("edit-msg").textContent = errText(err);
+      else alert(`Ble ikke lagret (${who}): ${errText(err)}`);
     }).then(() => {
-      $("save").disabled = false;
+      if (sheetSeq === mine) $("save").disabled = false;
     });
   }
   f.addEventListener("submit", (e) => { e.preventDefault(); save(); });
