@@ -262,7 +262,7 @@
       const closed = !!state.config && (!hoursOn(d) || fullyBlocked(d, state.week));
       const count = n ? `${n} ${n === 1 ? "time" : "timer"}` : "";
       const label = closed ? (count ? count + " · stengt" : "stengt") : count || "&nbsp;";
-      html.push(`<button type="button" data-day="${d}" class="${d === state.day ? "is-active" : ""}${closed ? " is-closed" : ""}">
+      html.push(`<button type="button" data-day="${d}"${d === state.day ? ' aria-current="date"' : ""} class="${d === state.day ? "is-active" : ""}${closed ? " is-closed" : ""}">
         <span>${esc(fmt(d, { weekday: "short" }).replace(".", ""))}</span><strong>${parse(d).getDate()}</strong>
         <span class="n">${label}</span></button>`);
     }
@@ -272,18 +272,19 @@
   function itemHtml(i, clash) {
     const cls = ["item", i.type === "block" ? "is-block" : "", i.status === "cancelled" ? "is-cancelled" : "", clash ? "is-clash" : ""].join(" ");
     const when = `${hhmm(i.start)}–${hhmm(i.start + i.dur)} · ${i.dur} min`;
+    // Et kort er en div med en ekte <button> (åpner avtalen) og ringelenken ved siden av, aldri inni knappen (F72)
     if (i.type === "block") {
-      return `<button type="button" class="${cls}" data-id="${esc(i.id)}"><span class="when">${when}</span>
-        <span class="what">Blokkert${i.note ? ` – ${esc(i.note)}` : ""}</span></button>`;
+      return `<div class="${cls}" data-id="${esc(i.id)}"><button type="button" class="item-open"><span class="when">${when}</span>
+        <span class="what">Blokkert${i.note ? ` – ${esc(i.note)}` : ""}</span></button></div>`;
     }
     const tel = String(i.phone || "").replace(/[^\d+]/g, "");
-    return `<div role="button" tabindex="0" class="${cls}" data-id="${esc(i.id)}">
+    return `<div class="${cls}" data-id="${esc(i.id)}"><button type="button" class="item-open">
       <span class="when">${when}${i.status === "cancelled" ? " · AVLYST" : ""}</span>
       <span class="what">${esc(i.service || "Avtale")}${i.addons && i.addons.length ? ` + ${esc(i.addons.join(", "))}` : ""}</span>
-      <span class="who">${esc(i.name || "Uten navn")}${tel ? ` · <a href="tel:${esc(tel)}">${esc(i.phone)}</a>` : ""}</span>
+      <span class="who">${esc(i.name || "Uten navn")}</span>
       ${i.note ? `<span class="note">${esc(i.note)}</span>` : ""}
       ${i.source === "nettside" ? '<span class="tag">Bestilt på nett</span>' : ""}
-    </div>`;
+    </button>${tel ? `<a class="item-tel" href="tel:${esc(tel)}">${esc(i.phone)}</a>` : ""}</div>`;
   }
 
   function renderDay() {
@@ -357,9 +358,6 @@
     if (free) return openEditor(null, { type: "booking", start: Number(free.dataset.start) });
     const it = e.target.closest("[data-id]");
     if (it) openEditor(state.items.filter((i) => i.id === it.dataset.id)[0]);
-  });
-  $("timeline").addEventListener("keydown", (e) => {
-    if ((e.key === "Enter" || e.key === " " || e.keyCode === 13 || e.keyCode === 32) && e.target.matches("div[data-id]")) { e.preventDefault(); e.target.click(); }
   });
   // Etter midnatt uten at noe er hentet ennå: ny avtale eller blokkering gjelder likevel den nye dagen
   const freshDay = () => { if (rollDay()) { render(); load(); } };

@@ -66,7 +66,7 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 }
 .week button strong { font-size: 1rem; color: var(--text); }
 /* Safari 10.1–14.0 overser display:grid på <button>: blokker holder linjene adskilt */
-.week button > *, .item > span { display: block; }
+.week button > *, .item-open > span { display: block; }
 .week button .n { font-size: .7rem; font-weight: 700; color: var(--gold); }
 .week button.is-closed { opacity: .45; }
 .week button.is-active { background: var(--gold); border-color: var(--gold); color: var(--on-gold); }
@@ -95,7 +95,8 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 .item .when { font-variant-numeric: tabular-nums; font-size: .82rem; color: var(--muted); }
 .item .what { font-weight: 700; }
 .item .who { font-size: .92rem; }
-.item .who a { font-weight: 600; }
+.item-open { display: grid; grid-gap: 2px; gap: 2px; margin: 0; padding: 0; border: 0; background: none; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.item .item-tel { justify-self: start; font-weight: 600; font-size: .92rem; padding: 4px 0; }
 .item .note { font-size: .85rem; color: var(--muted); font-style: italic; }
 .item .tag { justify-self: start; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: 1px 8px; border-radius: 999px; background: rgba(0,0,0,.25); color: var(--muted); }
 .item.is-block { border-color: rgba(143,154,166,.45); border-left-color: var(--block); background: repeating-linear-gradient(135deg, rgba(143,154,166,.08) 0 10px, rgba(143,154,166,.14) 10px 20px); }
