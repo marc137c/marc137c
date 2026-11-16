@@ -211,3 +211,34 @@ for (const c of CASES) {
     assert.ok(el.textContent.includes(`Åpner ${name}`), `${el.textContent} names ${next}`);
   });
 }
+
+// ---------- Round 2: /#bestill from personvern.html and 404.html lands at the booking form (SPEC R31) ----------
+// The front page opens at the top (the head script and script.js strip any #anchor), so «Bestill time» on the privacy
+// page and the 404 page landed on the hero. The one exception is #bestill: the page opens at the booking section,
+// once, and the address loses the anchor (a reload starts at the top again). Any other anchor keeps the top rule.
+async function landWith(hash) {
+  const into = [], tops = [];
+  const site = await loadSite({ scripts: ["script.js"], inline: true, before(ctx) {
+    ctx.location.hash = hash;
+    ctx.location.href += hash;
+    ctx.pageYOffset = 300; // the browser already jumped somewhere
+    ctx.scrollTo = (x, y) => tops.push([x, y]);
+    const el = ctx.document.getElementById(hash.slice(1));
+    if (el) el.scrollIntoView = () => into.push(hash);
+  } });
+  site.fire("load");
+  await site.advance(2000);
+  return { site, into, tops };
+}
+test("site round 2: /#bestill opens at the booking section and drops the anchor from the address", async () => {
+  const { site, into, tops } = await landWith("#bestill");
+  assert.ok(into.length >= 1, "scrolled to #bestill");
+  assert.deepEqual(tops, [], "never to the top");
+  assert.equal(site.location.hash, "", "the address has no anchor left");
+});
+test("site round 2: any other anchor (/#om) still opens at the top", async () => {
+  const { site, into, tops } = await landWith("#om");
+  assert.deepEqual(into, []);
+  assert.ok(tops.length >= 1 && tops.every(([x, y]) => x === 0 && y === 0));
+  assert.equal(site.location.hash, "");
+});

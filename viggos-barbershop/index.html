@@ -7,8 +7,9 @@
   <meta name="description" data-i18n-attr="content:meta.desc" content="Viggo's Barbershop i Violgata 22, Halden. Klassisk saksklipp, fade, skjeggtrim og knivbarbering. Bestill time på nett eller ring 409 63 911.">
   <meta name="theme-color" content="#0b0f0d">
   <script>
-    // Siden starter alltid øverst: fjern #anker fra adressen før nettleseren rekker å hoppe dit (resten i script.js)
-    try { if (location.hash && history.replaceState) history.replaceState(null, "", location.pathname + location.search); if ("scrollRestoration" in history) history.scrollRestoration = "manual"; } catch (e) {}
+    // Siden starter alltid øverst: fjern #anker fra adressen før nettleseren rekker å hoppe dit (resten i script.js).
+    // Unntaket er #bestill (lenkene «Bestill time» fra personvernsiden og 404-siden): script.js åpner der.
+    try { if (location.hash && location.hash !== "#bestill" && history.replaceState) history.replaceState(null, "", location.pathname + location.search); if ("scrollRestoration" in history) history.scrollRestoration = "manual"; } catch (e) {}
   </script>
   <meta property="og:title" content="Viggo's Barbershop">
   <meta property="og:description" content="Velkommen til Viggo's Barbershop – barber i Violgata 22, Halden.">

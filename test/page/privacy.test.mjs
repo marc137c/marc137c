@@ -123,6 +123,17 @@ test("D6: index.html links personvern.html from the footer and under the booking
   assert.ok(line.querySelector('a[href="/personvern.html"]'), "the English line links too");
 });
 
+// Round 2 (SPEC R31): a link from another page to /#x must land at #x. The front page opens at the top and drops
+// anchors, except those script.js names in START_AT (site-script.test.mjs proves it scrolls there).
+test("D6 round 2: every /#anchor link from personvern.html and 404.html is one the front page opens at", () => {
+  const allowed = (/const START_AT = \[([^\]]*)\]/.exec(read("script.js")) || [, ""])[1].match(/"[^"]+"/g) || [];
+  for (const f of ["personvern.html", "404.html"]) {
+    for (const m of read(f).matchAll(/\shref="\/(?:\?[^"#]*)?#([^"]+)"/g)) {
+      assert.ok(allowed.includes(`"${m[1]}"`), `${f}: /#${m[1]} lands at the top of the front page (START_AT: ${allowed.join(", ") || "none"})`);
+    }
+  }
+});
+
 test("D6: every local link in index.html, personvern.html and 404.html points at a file that exists", () => {
   for (const f of ["index.html", "personvern.html", "404.html"]) {
     const html = read(f);

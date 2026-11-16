@@ -1,17 +1,23 @@
 // Siden åpner alltid øverst: også når adressen har et #anker (f.eks. /#om) eller siden lastes på nytt
 // midt på. Ankeret fjernes fra adressen, så «oppdater» og delte lenker også starter øverst.
+// Unntak (START_AT): /#bestill, som lenkene «Bestill time» på personvernsiden og 404-siden går til, åpner ved
+// bestillingsskjemaet, én gang; ankeret fjernes likevel, så «oppdater» starter øverst (runde 2, SPEC R31).
 // Har besøkeren selv begynt å rulle før siden er ferdig lastet, lar vi det være.
 (() => {
+  const START_AT = ["bestill"];
+  const id = location.hash.slice(1);
+  const start = START_AT.indexOf(id) >= 0 ? document.getElementById(id) : null;
   if ("scrollRestoration" in history) history.scrollRestoration = "manual"; // Safari < 11 har det ikke: load-hoppet under tar det
   if (location.hash && history.replaceState) history.replaceState(null, "", location.pathname + location.search);
   let touched = false;
   const mark = () => { touched = true; };
   ["wheel", "touchstart", "keydown", "mousedown", "click"].forEach((ev) => window.addEventListener(ev, mark, { passive: true, once: true }));
   const toTop = () => {
-    if (touched || !window.pageYOffset) return;
+    if (touched || (!start && !window.pageYOffset)) return;
     const root = document.documentElement;
-    root.style.scrollBehavior = "auto"; // hopp rett opp, ikke myk rulling
-    window.scrollTo(0, 0);
+    root.style.scrollBehavior = "auto"; // hopp rett dit, ikke myk rulling
+    if (start) start.scrollIntoView(); // under menyen: scroll-padding-top (eller #bestill sin padding-top)
+    else window.scrollTo(0, 0);
     root.style.scrollBehavior = "";
   };
   toTop();
