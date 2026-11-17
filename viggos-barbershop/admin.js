@@ -217,8 +217,11 @@
     if (!sub || btn.disabled) return;
     const seq = loginPushSeq;
     btn.disabled = true;
+    // Hvert trykk svarer synlig (runde 3): «Slår av …» står et øyeblikk også når nettleseren sier nei med en gang
+    loginPushMsg("Slår av …", "info");
+    const shown = notBefore(RETRY_SHOW_MS);
     const stop = Promise.resolve().then(() => sub.unsubscribe()).then((ok) => ok === true, () => false);
-    withTimeout(stop, LOGOUT_WAIT_MS, "").catch(() => false).then((ok) => {
+    withTimeout(stop, LOGOUT_WAIT_MS, "").catch(() => false).then((ok) => shown(ok, ok)).then((ok) => {
       btn.disabled = false;
       if (seq !== loginPushSeq) return;
       if (!ok) return loginPushMsg("Kunne ikke slå av varslene her. Slå av varsler for denne siden i nettleserens innstillinger.");
@@ -1358,8 +1361,11 @@
     const endpoint = sub.endpoint;
     btn.disabled = true;
     pushMsg("Slår av …", "info");
+    // Et nei som kommer med en gang, vises først når «Slår av …» har stått et øyeblikk (runde 3): ellers så et nytt trykk
+    // med det samme svaret ut som om ingenting skjedde
+    const shown = notBefore(RETRY_SHOW_MS);
     // Først i nettleseren (ellers kunne siden melde den på igjen neste gang), så på serveren
-    sub.unsubscribe().catch(() => false).then((ok) => {
+    sub.unsubscribe().catch(() => false).then((ok) => shown(ok, ok)).then((ok) => {
       if (!ok) throw Object.assign(new Error("Kunne ikke slå av varsler her. Prøv igjen."), { user: true });
       pushState.sub = null;
       clearNote();
@@ -1490,6 +1496,18 @@
   // Hvert trykk svarer synlig, også når svaret er det samme som sist («Fortsatt blokkert»): først «Sjekker …» med
   // knappen grået ut, så svaret et øyeblikk etter (en tekst som byttes til den samme, ser ut som ingenting skjedde)
   const RETRY_SHOW_MS = 400;
+  // Gir et svar videre tidligst ms etter at notBefore ble kalt (ved trykket): et svar som er likt det forrige og kommer
+  // i samme øyeblikk, ville aldri blitt tegnet annerledes (runde 3: «Slå av varsler» og «Slå av varsler her»)
+  // now: svaret skiller seg fra det som står (f.eks. «slått av»), så det kan vises med en gang (tidtakeren stoppes)
+  function notBefore(ms) {
+    let due = false, wake = null;
+    const timer = setTimeout(() => { due = true; if (wake) wake(); }, ms);
+    return (v, now) => {
+      if (due) return v;
+      if (now) { clearTimeout(timer); return v; }
+      return new Promise((resolve) => { wake = () => resolve(v); });
+    };
+  }
   $("push-retry").addEventListener("click", () => {
     const btn = $("push-retry");
     if (btn.disabled) return;

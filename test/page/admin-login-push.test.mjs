@@ -79,13 +79,18 @@ test("login push: nothing about notifications on a device without a subscription
 test("login push: if the browser cannot unsubscribe, the barber is told what to do and can try again", async () => {
   const b = fakePushBrowser({ device: makeDevice("mozilla"), permission: "granted", subscribed: KEY_BYTES, unsubscribeOk: false });
   const page = await loadAdmin({ token: null, navigator: b.navigator, globals: b.globals });
-  page.$("login-push-off").click();
-  await page.flush();
-  assert.equal(page.$("login-push-msg").textContent, "Kunne ikke slå av varslene her. Slå av varsler for denne siden i nettleserens innstillinger.");
-  assert.equal(page.$("login-push-off").hidden, false);
-  assert.equal(page.$("login-push-off").disabled, false, "the button works again");
-  page.$("login-push-off").click();
-  await page.flush();
+  // Round 3: every tap shows «Slår av …» (button greyed out) for a moment, also when the browser says no at once, so a
+  // second tap with the same answer is never a tap that seems to do nothing
+  for (let n = 1; n <= 2; n++) {
+    page.$("login-push-off").click();
+    await page.flush();
+    assert.equal(page.$("login-push-msg").textContent, "Slår av …", `tap ${n}`);
+    assert.equal(page.$("login-push-off").disabled, true);
+    await page.advance(400);
+    assert.equal(page.$("login-push-msg").textContent, "Kunne ikke slå av varslene her. Slå av varsler for denne siden i nettleserens innstillinger.");
+    assert.equal(page.$("login-push-off").hidden, false);
+    assert.equal(page.$("login-push-off").disabled, false, "the button works again");
+  }
   assert.equal(b.log.unsubscribed.length, 2, "a second tap tries again");
   // An unsubscribe() that never settles (push service unreachable) does not leave the button stuck
   const c = fakePushBrowser({ device: makeDevice("fcm"), permission: "granted", subscribed: KEY_BYTES });

@@ -316,8 +316,27 @@ test("admin push panel: if the browser cannot unsubscribe, the server is not tol
   const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes() });
   page.$("push-off").click();
   await page.flush();
+  await page.advance(400);
   assert.match(msg(page), /Kunne ikke slå av varsler her/);
   assert.equal(pushCalls(page).filter((c) => c.path === "/api/admin/push/unsubscribe").length, 0);
+});
+
+// Round 3 (notify leftover, the «Prøv igjen» rule beyond push-retry): a browser that refuses at once answered a second
+// tap on «Slå av varsler» with the same text in the same instant, so the tap looked like it did nothing. Every tap
+// shows «Slår av …» with the button greyed out for at least a moment, then the answer.
+test("admin push panel round 3: every tap on «Slå av varsler» that fails at once still shows «Slår av …» before the answer", async () => {
+  const b = fakePushBrowser({ device: makeDevice(), permission: "granted", subscribed: KEY_BYTES, unsubscribeOk: false });
+  const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes() });
+  for (let n = 1; n <= 3; n++) {
+    page.$("push-off").click();
+    await page.flush();
+    assert.equal(msg(page), "Slår av …", `tap ${n}: the browser said no at once, and the page still shows it is working`);
+    assert.equal(page.$("push-off").disabled, true);
+    await page.advance(400);
+    assert.equal(msg(page), "Kunne ikke slå av varsler her. Prøv igjen.", `tap ${n}`);
+    assert.equal(page.$("push-off").disabled, false);
+  }
+  assert.equal(b.log.unsubscribed.length, 3);
 });
 
 test("admin push panel: closing «Oppsett» clears the panel, and a late answer does not come back", async () => {
