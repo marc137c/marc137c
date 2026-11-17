@@ -186,6 +186,8 @@ export function validateCustomer(input, now = new Date()) {
   return { value };
 }
 const REQUEST_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
+// En idempotens-nøkkel slik /admin og bestillingssiden lager dem (8–64 tegn: bokstaver, sifre, _ og -)
+export const isRequestId = (s) => typeof s === "string" && REQUEST_ID_RE.test(s);
 
 // Regler for admin: kan legge inn hva som helst på 5-minutters rutenett, også utenom åpningstid
 export function validateAdmin(input, { partial = false } = {}) {
@@ -285,14 +287,15 @@ const hasChanges = (item, changes) => Object.keys(changes).every((k) => JSON.str
 const STALE = { error: "Avtalen er endret på en annen enhet. Lukk og åpne den på nytt.", code: "stale", status: 412 };
 const NOT_FOUND = { error: "Fant ikke avtalen.", status: 404 };
 const BUSY = { error: "Mange endringer samtidig. Prøv igjen.", status: 503 };
-// movedOut og deletedOut (under): en oppføring tas bort når den er over et døgn gammel, ved neste skriving i måneden
-// eller ved den daglige oppryddingen (pruneOutLogs, netlify/functions/retention.mjs), altså senest etter 48 timer
+// movedOut, deletedOut og cancelLog (under): en oppføring tas bort når den er over et døgn gammel, ved neste skriving
+// i måneden eller ved den daglige oppryddingen (pruneOutLogs, netlify/functions/retention.mjs), altså senest etter 48 timer
 export const OUT_LOG_MS = 24 * 60 * 60 * 1000;
 const freshOut = (e, nowMs) => e && Date.parse(e.at) > nowMs - OUT_LOG_MS;
-// Tar bort oppføringene over OUT_LOG_MS gamle i begge loggene (en tom logg fjernes). Svarer hvor mange som gikk.
+// Tar bort oppføringene over OUT_LOG_MS gamle i alle loggene (en tom logg fjernes). Svarer hvor mange som gikk.
+export const OUT_LOGS = Object.freeze(["movedOut", "deletedOut", "cancelLog"]);
 export function pruneOutLogs(doc, nowMs) {
   let dropped = 0;
-  for (const f of ["movedOut", "deletedOut"]) {
+  for (const f of OUT_LOGS) {
     if (!Array.isArray(doc[f])) continue;
     const keep = doc[f].filter((e) => freshOut(e, nowMs));
     dropped += doc[f].length - keep.length;
@@ -563,15 +566,18 @@ async function undoCopy(store, toMonth, copyId, m) {
 // avlyst, nytt nummer), svarer det 412 «stale» og ingenting slettes (SPEC R3, som for PATCH). Uten expect (en
 // gammel fane) som før. En avtale midt i en flytting gjøres ferdig flyttet eller tilbake først (settleMove), så
 // svaret aldri er 200 mens avtalen lever videre på den andre datoen (runde 3).
-// deletedOut: en kort logg i månedsdokumentet over slettinger (id, et tilfeldig merke for kallet, tid; ingen
-// kundedata, høyst et døgn og 50 stykker), som movedOut for flyttinger. Går svaret på vår egen skriving tapt, kjøres
-// endringen på nytt og finner avtalen borte; bare merket skiller det fra at en annen enhet flyttet den ut (412) eller
-// slettet den (404) i mellomtiden. Vakt-regel (runde 2): et nytt forsøk kjenner igjen sitt eget tidligere forsøk bare
-// på et merke i dokumentet, aldri på et flagg i minnet, for et forsøk som satte flagget, kan ha mistet skrivingen.
-export async function deleteItem(store, id, { expect, now = new Date() } = {}) {
+// deletedOut: en kort logg i månedsdokumentet over slettinger (id, et tilfeldig merke, tid; ingen kundedata, høyst
+// et døgn og 50 stykker), som movedOut for flyttinger. Går svaret på vår egen skriving tapt, kjøres endringen på nytt
+// og finner avtalen borte; bare merket skiller det fra at en annen enhet flyttet den ut (412) eller slettet den (404)
+// i mellomtiden. Vakt-regel (runde 2): et nytt forsøk kjenner igjen sitt eget tidligere forsøk bare på et merke i
+// dokumentet, aldri på et flagg i minnet, for et forsøk som satte flagget, kan ha mistet skrivingen.
+// req (SPEC R1, runde 3): /admin sin idempotens-nøkkel for dette trykket på Slett (?req=), brukt som merket. Et nytt
+// kall med den samme (svaret på det første gikk tapt på nettet) finner sitt eget merke og svarer 200, ikke 404 og
+// «slettet fra en annen enhet». Uten req (en side fra før runde 3) et tilfeldig merke per kall, som før.
+export async function deleteItem(store, id, { expect, now = new Date(), req } = {}) {
   const date = dateOfId(id);
   if (!isDate(date)) return NOT_FOUND;
-  const mark = randomBytes(6).toString("hex");
+  const mark = isRequestId(req) ? req : randomBytes(6).toString("hex");
   return settled(store, now, () => mutateMonth(store, monthOf(date), (doc) => {
     const log = Array.isArray(doc.deletedOut) ? doc.deletedOut : [];
     const it = doc.items.find((i) => i.id === id);
@@ -608,11 +614,18 @@ export function monthsBetween(fromDate, toDate) {
 // Månedene gås gjennom minst to ganger (CANCEL_PASSES): en avtale som flyttes fra en måned kallet ikke har nådd, til
 // en det allerede har lest (en flytting bakover i tid), slapp ellers unna, og svaret ble «0 avlyst» mens den sto
 // aktiv (runde 3). En runde til bare når den forrige avlyste noe nytt, høyst tre til sammen.
+// req (SPEC R1, runde 3): /admin sin idempotens-nøkkel for dette trykket. Hver avtale kallet avlyser, får en oppføring
+// { id, m: req, at } i månedens cancelLog (ingen kundedata, høyst et døgn), i den samme skrivingen som avlyser den.
+// Et nytt kall med den samme nøkkelen (svaret på det første gikk tapt) teller dem med, så svaret er det samme som
+// det første kallet ville gitt, ikke «0 avlyst». Uten req skrives ingen logg.
 // Svarer { ok, cancelled } eller { error, status: 503, cancelled } (det som rakk å bli avlyst; kall igjen).
 const CANCEL_PASSES = { min: 2, max: 3 };
-export async function cancelMatching(store, months, match, now = new Date()) {
+const CANCEL_LOG_MAX = 300;
+export async function cancelMatching(store, months, match, now = new Date(), { req } = {}) {
   const stamp = now.toISOString();
-  const done = new Set(); // id-halene dette kallet har avlyst
+  const nowMs = now.getTime();
+  const key = isRequestId(req) ? req : null;
+  const done = new Set(); // id-halene dette kallet (eller et tidligere med samme nøkkel) har avlyst
   for (let pass = 0; pass < CANCEL_PASSES.max; pass++) {
     let fresh = 0; // id-haler denne runden avlyste for første gang
     for (const ym of months) {
@@ -622,16 +635,21 @@ export async function cancelMatching(store, months, match, now = new Date()) {
         r = await settled(store, now, () => mutateMonth(store, ym, (doc) => {
           const moving = doc.items.find((i) => active(i) && match(i) && pendingMove(i));
           if (moving) return { unsettled: pendingMove(moving), noWrite: true };
-          let changed = false;
+          const log = Array.isArray(doc.cancelLog) ? doc.cancelLog : [];
+          const earlier = key ? log.filter((e) => e && e.m === key && freshOut(e, nowMs)).map((e) => String(e.id)) : [];
+          const hit = []; // avlyst i denne skrivingen
           for (const i of doc.items) {
             if (!active(i) || !match(i)) continue;
             i.status = "cancelled";
             i.updatedAt = stamp;
             attempted.add(i.id);
-            changed = true;
+            hit.push(i.id);
+          }
+          if (key && hit.length) {
+            doc.cancelLog = log.filter((e) => freshOut(e, nowMs)).concat(hit.map((id) => ({ id, m: key, at: stamp }))).slice(-CANCEL_LOG_MAX);
           }
           const ids = doc.items.filter((i) => attempted.has(i.id) && i.status === "cancelled" && i.updatedAt === stamp).map((i) => i.id);
-          return changed ? { ok: true, ids } : { ok: true, noWrite: true, ids };
+          return hit.length ? { ok: true, ids, earlier } : { ok: true, noWrite: true, ids, earlier };
         }));
       } catch (err) {
         console.error("Avlysning: lagringen svarte ikke:", err && err.name);
@@ -642,6 +660,7 @@ export async function cancelMatching(store, months, match, now = new Date()) {
         if (!done.has(idSuffix(id))) fresh++;
         done.add(idSuffix(id));
       }
+      for (const id of r.earlier) done.add(idSuffix(id));
     }
     if (pass + 1 >= CANCEL_PASSES.min && !fresh) break;
   }

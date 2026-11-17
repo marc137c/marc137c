@@ -745,6 +745,14 @@
       btn.hidden = false;
     }, () => {});
   }
+  // Idempotens-nøkler (SPEC R1, runde 3): et trykk på Slett eller «Avlys alle» får en nøkkel, og et nytt trykk etter
+  // et svar som aldri kom (ikke noe nett, ingen svar på 15 s, en 5xx-side fra plattformen) sender den samme, så
+  // serveren svarer med resultatet av det første: «slettet», ikke 404 og «en annen enhet»; det første antallet, ikke
+  // «0 … er avlyst». En ny nøkkel først når serveren har svart sikkert (2xx, eller 4xx unntatt 401), eller for en
+  // annen avtale, en annen versjon av den, eller et annet nummer.
+  const deleteKeys = {}; // avtalens id → { v: updatedAt, key }
+  const cancelKeys = {}; // phoneKey(nummeret) → nøkkel
+  const settledAnswer = (err) => !!err.status && err.status !== 401 && err.status < 500;
   $("cancel-phone").addEventListener("click", () => {
     const fl = flood;
     const btn = $("cancel-phone");
@@ -754,13 +762,20 @@
     call.lock();
     const busy = "Avlyser …";
     $("edit-msg").textContent = busy;
-    api("/api/admin/cancel-phone", { method: "POST", body: JSON.stringify({ phone: fl.phone }) }).then((r) => {
+    const pk = phoneKey(fl.phone);
+    const key = cancelKeys[pk] || (cancelKeys[pk] = newRequestId());
+    const forget = () => { if (cancelKeys[pk] === key) delete cancelKeys[pk]; };
+    api("/api/admin/cancel-phone", { method: "POST", body: JSON.stringify({ phone: fl.phone, requestId: key }) }).then((r) => {
+      forget();
       const n = Number(r.cancelled) || 0;
       cancelledHere[last8(fl.phone)] = true;
       if (call.here()) dlg.close();
       alert(`${n} ${n === 1 ? "nettbestilling" : "nettbestillinger"} fra ${fl.phone} er avlyst. Kundene har ikke fått beskjed.`);
       return load();
-    }).catch((err) => call.error(err)).then(() => {
+    }).catch((err) => {
+      if (settledAnswer(err)) forget();
+      call.error(err);
+    }).then(() => {
       if (call.here() && $("edit-msg").textContent === busy) $("edit-msg").textContent = "";
       call.unlock();
     });
@@ -830,13 +845,21 @@
     deleting[it.id] = true;
     call.lock();
     $("edit-msg").textContent = DELETING;
-    // expect: avtalen slik denne enheten så den; er den endret et annet sted siden, svarer serveren 412 (R3)
-    const q = it.updatedAt ? `?expect=${encodeURIComponent(it.updatedAt)}` : "";
+    // expect: avtalen slik denne enheten så den; er den endret et annet sted siden, svarer serveren 412 (R3).
+    // req: nøkkelen for dette trykket, den samme når det samme trykket sendes på nytt (deleteKeys over)
+    const v = it.updatedAt || "";
+    const prev = deleteKeys[it.id];
+    const key = prev && prev.v === v ? prev.key : newRequestId();
+    deleteKeys[it.id] = { v, key };
+    const forget = () => { if (deleteKeys[it.id] && deleteKeys[it.id].key === key) delete deleteKeys[it.id]; };
+    const q = `${it.updatedAt ? `?expect=${encodeURIComponent(it.updatedAt)}&` : "?"}req=${encodeURIComponent(key)}`;
     api(`/api/admin/items/${encodeURIComponent(it.id)}${q}`, { method: "DELETE" }).then(() => {
+      forget();
       ownWrites[it.id] = { deleted: true };
       if (call.here()) dlg.close(); // også et ark som er åpnet på nytt for den samme avtalen
       return load();
     }).catch((err) => {
+      if (settledAnswer(err)) forget();
       if (err.status === 412 || err.status === 404) {
         alert(err.status === 412 ? STALE_DELETE : GONE_DELETE);
         if (call.here()) dlg.close();

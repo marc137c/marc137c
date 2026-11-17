@@ -125,7 +125,8 @@ test("two devices X1.1: Slett sends expect=updatedAt; a 412 closes the sheet, re
   await page.flush();
   const del = page.calls.filter((c) => c.method === "DELETE");
   assert.equal(del.length, 1);
-  assert.equal(del[0].url, `/api/admin/items/${encodeURIComponent(list[0].id)}?expect=${encodeURIComponent(U1)}`);
+  // and req: the tap's idempotency key (SPEC R1, test/page/admin-retry-key.test.mjs)
+  assert.match(del[0].url, new RegExp(`^/api/admin/items/${encodeURIComponent(list[0].id)}\\?expect=${encodeURIComponent(U1).replace(/[.%]/g, "\\$&")}&req=[A-Za-z0-9_-]{8,64}$`));
   assert.deepEqual(page.alerts, ["Avtalen er endret på en annen enhet, så den ble ikke slettet. Listen oppdateres nå."]);
   assert.equal(page.$("editor").open, false);
   assert.ok(gets(page) > before, "the list is fetched again");

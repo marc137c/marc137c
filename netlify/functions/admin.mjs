@@ -4,9 +4,11 @@
 //   GET    /api/admin/items?from&to    alle avtaler og blokkeringer i perioden
 //   POST   /api/admin/items            ny avtale/blokkering   (?force=1 = lagre selv om det kolliderer)
 //   PATCH  /api/admin/items/:id        endre (flytte, ny tjeneste, avlyse …)
-//   DELETE /api/admin/items/:id        slette for godt (?expect=<updatedAt>: 412 «stale» hvis endret et annet sted)
-//   POST   /api/admin/cancel-phone     { phone } avlys alle kommende nettbestillinger fra dette nummeret, uansett
-//                                      skrivemåte (etter en flom av falske bestillinger, X2.4) → { ok, cancelled }
+//   DELETE /api/admin/items/:id        slette for godt (?expect=<updatedAt>: 412 «stale» hvis endret et annet sted;
+//                                      ?req=<nøkkel>: det samme trykket sendt på nytt svarer 200, ikke 404, SPEC R1)
+//   POST   /api/admin/cancel-phone     { phone, requestId? } avlys alle kommende nettbestillinger fra dette nummeret,
+//                                      uansett skrivemåte (etter en flom av falske bestillinger, X2.4) → { ok, cancelled };
+//                                      det samme trykket sendt på nytt (samme requestId) svarer det samme antallet
 //   GET    /api/admin/calendar         lenken til kalenderen på telefonen: { enabled, createdAt, links }, eller
 //                                      { enabled: false, expired: true } når passordet er byttet siden den ble laget
 //   POST   /api/admin/calendar         lag lenken { replace: false } (beholder en som finnes) eller lag en ny
@@ -28,6 +30,7 @@ import { liveDeps, bookingStore, isRetiredDeploy, retiredResponse, jsonObject } 
 import {
   CONFIG, addDays, isDate, osloNow, readMonths, validateAdmin,
   createItem, updateItem, deleteItem, cancelMatching, monthsBetween, checkPassword, makeToken, checkSession, bumpEpoch, makeDeviceMark, verifyDeviceMark,
+  isRequestId,
 } from "../lib/booking-core.mjs";
 import { take, peek, release, newToken, counterRef, limiterSecret, clientKey, phoneKey, LOGIN_LIMITS, LOGIN_ALL_KEY } from "../lib/limits.mjs";
 import { readFeedState, createFeed, feedLinks, feedGen } from "../lib/calendar.mjs";
@@ -159,9 +162,11 @@ export async function handle(req, context, deps) {
       const raw = body && typeof body.phone === "string" ? body.phone.trim() : "";
       const key = phoneKey(raw);
       if (raw.length > 30 || key.length < 8 || key.length > 15) return json({ error: "Ugyldig telefonnummer.", code: "bad_phone" }, 400);
+      // requestId: /admin sin nøkkel for dette trykket (SPEC R1); et nytt forsøk med den samme teller det første med
+      if (body.requestId !== undefined && !isRequestId(body.requestId)) return BAD_BODY();
       const today = osloNow(deps.now()).date;
       const r = await cancelMatching(store, monthsBetween(today, addDays(today, 92)), (i) =>
-        i.source === "nettside" && (i.type ?? "booking") === "booking" && isDate(i.date) && i.date >= today && phoneKey(i.phone) === key, deps.now());
+        i.source === "nettside" && (i.type ?? "booking") === "booking" && isDate(i.date) && i.date >= today && phoneKey(i.phone) === key, deps.now(), { req: body.requestId });
       if (r.error) return json({ error: r.error, cancelled: r.cancelled }, r.status);
       return json({ ok: true, cancelled: r.cancelled });
     }
@@ -232,8 +237,14 @@ export async function handle(req, context, deps) {
       // ?expect=<updatedAt slik denne enheten så avtalen>: 412 «stale» hvis den er endret et annet sted siden (R3)
       const expect = url.searchParams.get("expect");
       if (expect !== null && expect.length > 40) return json({ error: "Ugyldig versjon." }, 400);
-      const r = await deleteItem(store, decodeURIComponent(id), expect === null ? { now: deps.now() } : { expect, now: deps.now() });
-      return r.error ? json(r, r.status) : json(r);
+      // ?req=<nøkkel for dette trykket på Slett> (SPEC R1): sendt på nytt etter et svar som gikk tapt, svarer det 200
+      const reqKey = url.searchParams.get("req");
+      if (reqKey !== null && !isRequestId(reqKey)) return BAD_BODY();
+      const opts = { now: deps.now() };
+      if (expect !== null) opts.expect = expect;
+      if (reqKey !== null) opts.req = reqKey;
+      const r = await deleteItem(store, decodeURIComponent(id), opts);
+      return r.error ? json(r, r.status) : json({ ok: true }); // det samme svaret når det er et nytt forsøk
     }
     return json({ error: "Ukjent forespørsel." }, 404);
   } catch (err) {

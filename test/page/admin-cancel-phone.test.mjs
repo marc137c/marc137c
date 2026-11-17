@@ -40,7 +40,10 @@ test("cancel-phone X2.4: a web booking whose number has 3 web bookings from toda
   assert.match(page.confirms[0], /^Avlyse alle 3 nettbestillingene fra 400 00 000 fra i dag og fremover\?/);
   assert.match(page.confirms[0], /Kundene får ingen beskjed\./);
   const post = page.calls.find((c) => c.path === "/api/admin/cancel-phone");
-  assert.deepEqual(post.body, { phone: "400 00 000" });
+  // requestId: the tap's idempotency key (SPEC R1, test/page/admin-retry-key.test.mjs)
+  assert.deepEqual(Object.keys(post.body).sort(), ["phone", "requestId"]);
+  assert.equal(post.body.phone, "400 00 000");
+  assert.match(post.body.requestId, /^[A-Za-z0-9_-]{8,64}$/);
   assert.equal(post.method, "POST");
   assert.deepEqual(page.alerts, ["3 nettbestillinger fra 400 00 000 er avlyst. Kundene har ikke fått beskjed."]);
   assert.equal(page.$("editor").open, false);

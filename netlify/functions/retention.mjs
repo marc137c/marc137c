@@ -46,8 +46,8 @@ const job = (tally, what, fn) => async () => {
   }
 };
 
-// En måned i en timebok: avtaler eldre enn grensen går, og oppføringer i flytte- og slettelogger (movedOut,
-// deletedOut) over et døgn gamle (runde 3: før ble de bare tatt bort når måneden fikk en ny, så i en rolig måned
+// En måned i en timebok: avtaler eldre enn grensen går, og oppføringer i flytte-, slette- og avlysningslogger
+// (movedOut, deletedOut, cancelLog: OUT_LOGS i booking-core.mjs) over et døgn gamle (runde 3: før ble de bare tatt bort når måneden fikk en ny, så i en rolig måned
 // ble de liggende til hele dokumentet gikk). En måned som er helt eldre enn grensen og blir tom, slettes i sin
 // helhet (uten å skrives tom først).
 async function cleanMonth(store, key, month, cutoff, nowMs, tally) {
