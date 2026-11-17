@@ -242,3 +242,26 @@ test("layout fix-up: the CSS fallback (before the script has measured) clears th
   assert.ok(m && Number(m[1]) >= 249, "a ≤374-px fallback of at least 249 px");
   assert.ok(css.indexOf(m[0]) < css.indexOf("@media (max-height: 500px)"), "before the landscape rule, which sets 0 and must win");
 });
+
+// Fix-up round 2 (c60-admin-320content.png, c60-admin-320-nospin.png): 7.6em was tuned to current Chrome. Chromium 60
+// (Samsung Internet 8 is Chromium 63) reserves room inside the date field for the clear, spin and picker controls:
+// at 136 px it showed «11/17/2», and with clear and spin hidden «11/17/202», so about 146 px are needed at 16 px.
+// Guard: at 359 px and below the field gets at least 9.5em (152 px) with the clear and spin buttons hidden, and the
+// row (round buttons, gaps, «I dag») still fits 288 px, also with the margin fallback for browsers without flex gap.
+// (The whole value must still be checked by eye in Chromium 60 at a 320-px content width: DEPLOY §4.)
+test("layout fix-up: at 359 px and below the date field has room for «11/17/2026» in Chromium 60, and the row fits 288 px", () => {
+  const q = "@media (max-width: 359px)";
+  const em = /min-width:\s*([\d.]+)em/.exec(ruleIn(q, ".day-nav input"));
+  assert.ok(em && Number(em[1]) * 16 >= 146 + 6, `min-width ${em && em[1]}em`);
+  const css = readFileSync(new URL("../../viggos-barbershop/admin.css", import.meta.url), "utf8");
+  assert.match(css, /\.day-nav input::-webkit-clear-button, \.day-nav input::-webkit-inner-spin-button \{ display: none; \}/);
+  const icon = px(ruleIn(q, ".day-nav .icon"), "width");
+  const gap = px(ruleIn(q, ".day-nav"), "gap");
+  const chipPad = Number(/padding:\s*0\s+(\d+)px/.exec(ruleIn(q, ".day-nav .chip"))[1]);
+  const fallbackGap = Number(/@media \(max-width: 359px\) \{ \.day-nav > \* \+ \* \{ margin-left: (\d+)px; \} \}/.exec(css)[1]);
+  for (const g of [gap, fallbackGap]) {
+    const used = 2 * icon + Number(em[1]) * 16 + (40 + 2 * chipPad) + 3 * g;
+    assert.ok(used <= 288, `the row needs ${used} px of 288 (gap ${g})`);
+  }
+  assert.ok(icon >= 32, "the round buttons stay easy to hit");
+});
