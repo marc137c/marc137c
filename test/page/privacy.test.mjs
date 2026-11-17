@@ -176,3 +176,22 @@ test("privacy: every claim that depends on a browser feature holds on every targ
     assert.ok(readRoot(file).split(/\r?\n/).some((l) => l.includes("test(") && l.includes(title)), `${file} has the test «${title}»`);
   }
 });
+
+// Fix-up round 2 (demo-counters.test.mjs): the page said the abuse counters store «bare tidspunkter» and named a
+// counter «per innlogging» that does not exist. Guard: the page describes each stored field of the stores it
+// explains, with the same field list as KEY_RULES (which store-keys.test.mjs checks against what the handlers store).
+const FIELD_WORDS = {
+  "rl/": { "hits[].t": "tidspunktet for hvert forsøk", "hits[].id": "en kode for forsøket", alertedAt: "når taket sist ble nådd" },
+  "d/": { views: "hvor mange ganger", pages: "forsiden og denne siden", sources: "hvor besøkene kom fra" },
+};
+test("privacy: the page names every field the abuse counters and the visitor statistics store, and only counters that exist", async () => {
+  const { KEY_RULES } = await import("../../netlify/lib/store-keys.mjs");
+  const text = pageText();
+  for (const [prefix, words] of Object.entries(FIELD_WORDS)) {
+    const row = KEY_RULES.find((r) => r.prefix === prefix);
+    assert.deepEqual(Object.keys(words).sort(), [...row.fields].sort(), `${prefix}: one page phrase per stored field`);
+    for (const [field, phrase] of Object.entries(words)) assert.ok(text.includes(phrase), `${prefix} ${field}: the page says «${phrase}»`);
+  }
+  assert.doesNotMatch(text, /bare tidspunkter|per innlogging/);
+  assert.match(text, /logge inn i timeboken per IP-adresse/);
+});

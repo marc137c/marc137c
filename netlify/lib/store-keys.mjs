@@ -12,13 +12,16 @@ export const OAUTH_STATE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // an Instagram conne
 export const BOOKING_STORES = ["bookings", "bookings-preview"];
 export const STATS_STORES = ["stats", "stats-preview"];
 
-// { stores, key (exact) | prefix, holds, deletion }. The most specific row wins: an exact key, then the longest prefix.
+// { stores, key (exact) | prefix, holds, deletion, fields? }. The most specific row wins: an exact key, then the longest
+// prefix. fields: every field path a document under the row may hold («name[].sub» inside a list); store-keys.test.mjs
+// checks it against what the handlers store, and privacy.test.mjs that personvern.html describes each one.
 export const KEY_RULES = Object.freeze([
   { stores: BOOKING_STORES, prefix: "m/", holds: "one month of bookings and blocks: date, time, service, add-ons, name, phone, note (and movedOut, deletedOut: ids of moves out of the month and of deletions in the last 24 h, no customer data)",
     deletion: `daily clean-up: every item ${RETENTION_DAYS} days after its date (cancelled ones too, and impossible dates); a month document left empty is deleted once the whole month is past that limit. The barber can delete an item at any time («Slett»).` },
   { stores: BOOKING_STORES, key: "rl/secret", holds: "32 random bytes behind the counter key names; no personal data",
     deletion: "kept for the life of the store; deleting it only resets every counter" },
-  { stores: BOOKING_STORES, prefix: "rl/", holds: "rate-limit counters: times of recent attempts under a keyed hash of the client, phone or login (never the number or address itself)",
+  { stores: BOOKING_STORES, prefix: "rl/", holds: "rate-limit counters, one document per client (IP address or IPv6 /64) or phone number for web bookings, per client for logins, and one shared counter each for all web bookings and all logins; the document name is a keyed hash of the address or number (never the value itself). Each hit holds its time and an id for the attempt; for a web booking the id is a keyed hash of the booking's requestId, date, time and phone, so with store access a counter can be linked to its booking while both exist. The shared booking counter also holds when the cap last alerted the barber.",
+    fields: ["hits[].t", "hits[].id", "alertedAt"],
     deletion: "daily clean-up: deleted when the newest hit (and any pause alert) is more than 24 hours old, so at the latest 48 hours after it" },
   { stores: BOOKING_STORES, key: "auth/epoch", holds: "the time «Slå av varsler på alle andre enheter» was last pressed; no personal data",
     deletion: "kept; it only ever moves forward" },
@@ -31,6 +34,7 @@ export const KEY_RULES = Object.freeze([
   { stores: BOOKING_STORES, key: "calendar/feed", holds: "the secret in the barber's private calendar link",
     deletion: "replaced when the barber makes a new link; stops working after a password change" },
   { stores: STATS_STORES, prefix: "d/", holds: "visitor counts for one day: page views per page and per source; no IP address, no ID, no personal data",
+    fields: ["views", "pages", "sources"],
     deletion: `daily clean-up: deleted ${STATS_KEEP_DAYS} days after that day` },
   { stores: ["social"], prefix: "oauth-state-", holds: "a random value for one Instagram connection attempt; no personal data",
     deletion: "deleted when the connection finishes; daily clean-up: deleted after 24 hours if it never did" },

@@ -96,7 +96,29 @@ test("store keys: after every handler has run, every stored key has a deletion r
     assert.ok(keys.some((k) => k.startsWith(prefix)), `${prefix} in ${keys.join(", ")}`);
   }
   assert.deepEqual(d.blobs.keys("stats"), ["d/2026-11-12"]);
+  // Fix-up round 2 (demo-counters.test.mjs): the privacy facts said the counters store «bare tidspunkter», but every
+  // hit also stores an id (for a web booking derived from its request). A row that lists its fields must name every
+  // field the handlers actually store under it, as paths: «hits[].t», «alertedAt».
+  const fieldProblems = [];
+  for (const store of stores) {
+    for (const key of d.blobs.keys(store)) {
+      const rule = ruleFor(store, key);
+      if (!rule || !rule.fields) continue;
+      for (const f of fieldPaths(d.blobs.json(store, key))) if (!rule.fields.includes(f)) fieldProblems.push(`${store} ${key}: stores «${f}», not in its row's fields ${JSON.stringify(rule.fields)}`);
+    }
+  }
+  assert.deepEqual(fieldProblems, []);
+  for (const prefix of ["rl/", "d/"]) assert.ok(KEY_RULES.some((r) => r.prefix === prefix && Array.isArray(r.fields)), `the ${prefix} row lists its fields`);
 });
+// Field paths in a stored JSON document: top-level names, and «name[].sub» for arrays of objects
+function fieldPaths(doc) {
+  const out = new Set();
+  for (const [k, v] of Object.entries(doc || {})) {
+    if (Array.isArray(v) && v.some((x) => x && typeof x === "object")) for (const x of v) for (const sub of Object.keys(x || {})) out.add(`${k}[].${sub}`);
+    else out.add(k);
+  }
+  return [...out];
+}
 
 test("store keys: the Google reviews and Instagram code writes only keys with a deletion rule, and the rows name its limits", async (t) => {
   quiet(t);

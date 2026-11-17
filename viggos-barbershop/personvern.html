@@ -65,7 +65,7 @@
       <p>Ingen andre får opplysningene om bestillingen din.</p>
 
       <h2>Vern mot misbruk</h2>
-      <p>For å stoppe falske og automatiske bestillinger teller serveren forsøk per IP-adresse, per telefonnummer og per innlogging i timeboken. Tellerne lagrer bare tidspunkter, under en kode laget av adressen eller nummeret med en hemmelig nøkkel, aldri selve adressen eller nummeret. De slettes ved den daglige oppryddingen når det har gått mer enn 24 timer siden siste forsøk, altså senest etter 48 timer.</p>
+      <p>For å stoppe falske og automatiske bestillinger teller serveren nettbestillinger per IP-adresse, per telefonnummer og samlet, og forsøk på å logge inn i timeboken per IP-adresse og samlet. Tellerne lagrer tidspunktet for hvert forsøk og en kode for forsøket (den samlede telleren for bestillinger også når taket sist ble nådd), under et navn laget av adressen eller nummeret med en hemmelig nøkkel, aldri selve adressen eller nummeret. For en nettbestilling lages koden for forsøket med den hemmelige nøkkelen av bestillingens forespørsel, tid og telefonnummer, så den som har tilgang til lagringen, kan knytte telleren til bestillingen så lenge begge finnes. De slettes ved den daglige oppryddingen når det har gått mer enn 24 timer siden siste forsøk, altså senest etter 48 timer.</p>
       <p>Som for alle nettsteder mottar vertskapet (Netlify) IP-adressen din når nettleseren henter siden. Vi lagrer den ikke.</p>
 
       <h2>Hvor lenge opplysningene lagres</h2>
