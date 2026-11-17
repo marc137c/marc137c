@@ -364,7 +364,10 @@ export async function updateItem(store, id, changes, { force = false, now = new 
     adopted = null;
     const twin = doc.items.find((o) => o && idSuffix(o.id) === suffix);
     if (twin && twin.updatedAt !== next.updatedAt) {
-      if (!sameExceptVersion(twin, next)) return STALE; // en annen enhet har flyttet eller endret den hit
+      // Bare en kopi med flyttemerket (mv) kan være den samme flyttingen fra en annen enhet. En avtale uten merke er
+      // ikke en kopi, men avtalen selv (f.eks. originalen når en enhet flytter kopien tilbake midt i en flytting):
+      // å ta den over uten å skrive, lot den andre flyttingen fjerne den etterpå, og avtalen ble borte (runde 3).
+      if (!twin.mv || !sameExceptVersion(twin, next)) return STALE; // en annen enhet har flyttet eller endret den hit
       adopted = twin;
       return { ok: true, item: twin, noWrite: true };
     }
