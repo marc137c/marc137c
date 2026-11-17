@@ -2,12 +2,12 @@
 // POST /api/hit  – nettsiden melder én sidevisning: bare dato (norsk tid), side og hvilket nettsted besøket kom fra.
 //                  Et «besøk» er en visning som IKKE kom fra en annen side på samme nettsted. Ingen IP-adresse, ingen ID,
 //                  ingenting lagres på besøkerens enhet. Roboter og forhåndsvisninger (deploy previews) telles ikke.
-// GET  /api/stats?days=7|30|90 – bare tall (aldri navn eller telefon). Krever innlogget barber (samme billett som /admin)
-//                  ELLER lesenøkkelen STATS_READ_KEY i headeren X-Stats-Key (eierens oversikt over alle bedrifter).
+// GET  /api/stats?days=7|30|90 – bare tall (aldri navn eller telefon), og BARE for eierens egen oversikt: krever
+//                  lesenøkkelen STATS_READ_KEY i headeren X-Stats-Key. Barberens /admin-innlogging gir IKKE tilgang.
 // Nettstedets egen adresse leses fra forespørselen, så filen kan brukes uendret på nye bedrifters sider.
 import { createHash, timingSafeEqual } from "node:crypto";
 import { getStore } from "@netlify/blobs";
-import { osloNow, addDays, verifyToken } from "../lib/booking-core.mjs";
+import { osloNow, addDays } from "../lib/booking-core.mjs";
 import { bookingStats, sumDays } from "../lib/stats-bookings.mjs";
 
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -54,9 +54,10 @@ export async function bump(store, key, page, source) {
 export default async (req, context) => {
   const url = new URL(req.url);
   const production = !context || !context.deploy || !context.deploy.context || context.deploy.context === "production";
-  const store = getStore({ name: production ? "stats" : "stats-preview", consistency: "strong" });
+  const openStore = () => getStore({ name: production ? "stats" : "stats-preview", consistency: "strong" });
 
   if (url.pathname === "/api/hit") {
+    const store = openStore();
     if (req.method !== "POST") return json({ error: "Bruk POST." }, 405);
     if (!production || BOT.test(req.headers.get("user-agent") || "")) return new Response(null, { status: 204 });
     let body = {};
@@ -69,9 +70,9 @@ export default async (req, context) => {
 
   // GET /api/stats
   if (req.method !== "GET") return json({ error: "Bruk GET." }, 405);
-  const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-  const viaKey = keyMatches(req.headers.get("x-stats-key"), process.env.STATS_READ_KEY);
-  if (!viaKey && !verifyToken(token, process.env.ADMIN_PASSWORD)) return json({ error: "Logg inn på nytt." }, 401);
+  // Bare eierens oversikt (lesenøkkelen) – ikke barberens innlogging
+  if (!keyMatches(req.headers.get("x-stats-key"), process.env.STATS_READ_KEY)) return json({ error: "Mangler gyldig lesenøkkel." }, 401);
+  const store = openStore();
 
   const n = RANGES.includes(Number(url.searchParams.get("days"))) ? Number(url.searchParams.get("days")) : 30;
   const today = osloNow().date;

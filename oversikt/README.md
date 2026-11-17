@@ -1,11 +1,12 @@
 # Oversikt – alle bedriftene
 
-Eierens egen side: besøk og bookinger for alle bedriftene, side om side. Egen Netlify-side (ikke Viggo's).
+Eierens egen side (bare du har passordet): besøk og bookinger for alle bedriftene, side om side. Egen Netlify-side (ikke Viggo's).
 
 ## Slik henger det sammen
 - Hver bedrifts side har `netlify/functions/stats.mjs` + `netlify/lib/stats-bookings.mjs` (samme filer som Viggo's).
   De teller besøk uten informasjonskapsler og regner bookingtall ut fra bookingene – bare tall, aldri navn eller telefon.
-- Bedriftens side svarer på `/api/stats` bare til innlogget barber **eller** med lesenøkkelen `STATS_READ_KEY`.
+- Bedriftens side svarer på `/api/stats` **bare** med lesenøkkelen `STATS_READ_KEY` – kun eieren ser statistikken.
+  Bedriftene (f.eks. Viggo i /admin) ser den ikke.
 - Oversikten (`netlify/functions/overview.mjs`) henter alle bedriftene samtidig med hver sin nøkkel
   (`STATS_KEY_<NAVN>` i oversiktens innstillinger) og viser dem i én tabell + ett kort per bedrift.
 - Innlogging: passordet `OVERVIEW_PASSWORD` (settes i et skjult vindu, vises aldri). 8 feil på 15 min = pause.

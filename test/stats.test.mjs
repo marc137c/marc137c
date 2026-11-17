@@ -130,3 +130,15 @@ test("bookingStats: en frossen dag skrives ikke over, og en dag med hits beholde
   await bookingStats(bookings, stats, dates, TODAY, docs);
   assert.equal(stats.m.get(`d/${old}`).etag, etag, "ingen ny skriving når dagen er frosset");
 });
+
+test("tilgang: barberens /admin-innlogging gir IKKE statistikk – bare eierens lesenøkkel", async () => {
+  const { default: handler } = await import("../netlify/functions/stats.mjs");
+  const { makeToken } = await import("../netlify/lib/booking-core.mjs");
+  process.env.ADMIN_PASSWORD = "barber-pw";
+  process.env.STATS_READ_KEY = "eier-nokkel";
+  const call = (headers) => handler(new Request("https://www.viggosbarbershop.no/api/stats", { headers }), { deploy: { context: "production" } });
+  assert.equal((await call({ authorization: "Bearer " + makeToken("barber-pw") })).status, 401);
+  assert.equal((await call({ "x-stats-key": "feil" })).status, 401);
+  assert.equal((await call({})).status, 401);
+  delete process.env.ADMIN_PASSWORD; delete process.env.STATS_READ_KEY;
+});
