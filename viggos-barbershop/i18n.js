@@ -176,6 +176,9 @@
       dayFull: "Alle tider er booket denne dagen. Velg en annen dag.",
       dayNoFit: "Valgt tjeneste rekker ikke på noen ledig tid denne dagen. Velg en kortere tjeneste eller en annen dag.",
       takenNow: "Beklager, noen rakk å booke den tiden akkurat nå. Velg en annen tid.",
+      // /api/availability svarer ikke: tidene vises, men kan være opptatt, og et «tatt» kan være gammelt (runde 3)
+      availDown: "Vi fikk ikke hentet ledige tider akkurat nå, så noen av tidene under kan være opptatt. Ring oss gjerne på 409 63 911.",
+      takenUnknown: "Den tiden er opptatt, og vi fikk ikke hentet hvilke tider som er ledige. Ring oss på 409 63 911, så finner vi en tid.",
       dayFullNow: "Beklager, noen rakk å booke den siste ledige tiden denne dagen. Velg en annen dag.",
       timeGone: "Tiden du valgte er ikke ledig lenger. Velg en annen tid.",
       tooShortPicked: "Valgt tjeneste rekker ikke før neste avtale eller stengetid. Velg en annen tid.",
@@ -238,6 +241,8 @@
       dayFull: "Every time is booked this day. Please choose another day.",
       dayNoFit: "The selected service doesn't fit in any free time this day. Please choose a shorter service or another day.",
       takenNow: "Sorry, someone just booked that time. Please choose another time.",
+      availDown: "We couldn't load the free times right now, so some of the times below may be taken. Feel free to call us on 409 63 911.",
+      takenUnknown: "That time is taken, and we couldn't load which times are free. Please call us on 409 63 911 and we'll find a time.",
       dayFullNow: "Sorry, someone just booked the last free time this day. Please choose another day.",
       timeGone: "The time you chose is no longer available. Please choose another time.",
       tooShortPicked: "The selected service doesn't fit before the next appointment or closing time. Please choose another time.",

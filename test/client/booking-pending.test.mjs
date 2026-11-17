@@ -230,7 +230,7 @@ test("pending: today, not stored (network error), retried after the lead time: Â
   assert.equal(site.message(), s.timeGone, "the server's answer for this requestId is definite");
   assert.equal(site.$("msg-time").textContent, s.timeGone, "at the time step");
   assert.equal(site.summary(), "", "the past time is no longer chosen");
-  assert.equal(site.slot(660), null, "11:00 is not offered");
+  assert.ok(!site.slot(660), "11:00 is not offered");
   await site.book();
   await site.advance(1000);
   assert.notEqual(site.message(), s.uncertainStill, "no loop");

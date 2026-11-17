@@ -87,7 +87,7 @@ for (const [oLabel, order] of Object.entries(ORDERS)) {
       await site.advance(1000);
       assert.equal(site.server.bookings().length, 1, "no second booking");
       await site.pick({ service: "Herreklipp", date: FRIDAY.date });
-      assert.equal(site.slot(FRIDAY.time), null, "14:00 is shown busy");
+      assert.ok(!site.slot(FRIDAY.time), "14:00 is shown busy");
     });
   }
 }
@@ -120,7 +120,7 @@ test("own booking: after a 201, 14:00 stays busy on this page although every ava
   assert.match(site.message(), /^Timen er booket: Herreklipp · fredag 13\. november kl\. 14:00\./);
   await site.poll();
   await site.pick({ service: "Barneklipp", date: FRIDAY.date });
-  assert.equal(site.slot(FRIDAY.time), null, "14:00 is not offered");
+  assert.ok(!site.slot(FRIDAY.time), "14:00 is not offered");
   assert.ok(site.slot(FRIDAY.time + 30), "14:30 still is");
 });
 

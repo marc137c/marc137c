@@ -115,6 +115,38 @@ test("R2: every fetch( in viggos-barbershop/*.js is inside withTimeout(…)", ()
   assert.ok(bookingJs.includes('withTimeout(fetch("/api/bookings"'), "the booking POST is the first argument of withTimeout");
 });
 
+// Round 3 (still_open 8): `online` was set on every availability load and never read, so «we do not know which times
+// are free» changed nothing on the page, and every time was shown free. Guard (SPEC R48): every variable a site script
+// declares is read somewhere. A plain «x = …» or a bare «x++» is a write; a value used in an expression is a read.
+function unreadVariables(src) {
+  const declared = new Map();
+  const reads = new Set();
+  walk(ast(src), (n, parents) => {
+    if (n.type === "VariableDeclarator" && n.id.type === "Identifier") declared.set(n.id.name, n.loc.start.line);
+    if (n.type !== "Identifier") return;
+    const p = parents[parents.length - 1];
+    const gp = parents[parents.length - 2];
+    if (p.type === "VariableDeclarator" && p.id === n) return;
+    if (p.type === "AssignmentExpression" && p.left === n && p.operator === "=" && gp && gp.type === "ExpressionStatement") return;
+    if (p.type === "UpdateExpression" && gp && gp.type === "ExpressionStatement") return;
+    if (p.type === "MemberExpression" && p.property === n && !p.computed) return;
+    if (p.type === "Property" && p.key === n && !p.computed && !p.shorthand) return;
+    reads.add(n.name);
+  });
+  return [...declared].filter(([name]) => !reads.has(name)).map(([name, line]) => `${name} (line ${line})`);
+}
+
+test("R48: the unread-variable guard finds a variable that is only written and accepts one that is read", () => {
+  assert.deepEqual(unreadVariables("let a = 1; a = 2;\nlet b = 0; f(b);\nlet c = 0; c++;\nlet d = 0; const e = ++d; g(e);\nlet h = 0; h += 1;\nconst o = { a: 1 }; o.k = 2;"),
+    ["a (line 1)", "c (line 3)"]);
+});
+
+test("R48: every variable a site script declares is read somewhere (no state that changes nothing)", () => {
+  const files = readdirSync(SITE).filter((f) => f.endsWith(".js")).sort();
+  const found = files.map((f) => [f, unreadVariables(read(f))]).filter(([, u]) => u.length);
+  assert.deepEqual(found, [], "variables written but never read: use them or remove them");
+});
+
 test("F8: index.html has a message box at steps 1-3, and a focused day or time is visibly outlined", () => {
   const html = bestill();
   for (const id of ["msg-service", "msg-day", "msg-time"]) {

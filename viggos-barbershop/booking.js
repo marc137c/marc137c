@@ -11,6 +11,7 @@
   let MAX_DAYS = 60;       // hvor langt frem man kan bestille
   const SEND_TIMEOUT = 20000; // så lenge venter vi på svar på en bestilling før kunden får beskjed om å ringe
   const LOAD_TIMEOUT = 15000; // så lenge venter vi på ledige tider
+  const STALE_MS = 120000;    // så gamle ledige tider viser vi uten beskjed når nye ikke kan hentes
   // Varighet per tjeneste (minutter). Serverens liste legges oppå denne (F24).
   let DURATIONS = {
     "Full service": 60, "Herreklipp": 30, "Herreklipp + skjeggtrim": 30,
@@ -19,7 +20,13 @@
   let busy = {};           // { "ÅÅÅÅ-MM-DD": [[start, slutt], …] } – opptatte tidsrom
   let closed = {};         // { "ÅÅÅÅ-MM-DD": true } – dager barberen har blokkert helt (stengt)
   let clock = null;        // serverens klokke fra siste svar: { y, m, d, minutes, at }
-  let online = false;      // true når bookingsystemet på serveren svarer
+  let knownAt = 0;         // da et svar fra /api/availability sist ble tatt i bruk (Date.now()); 0 = aldri, eller et 409
+                           // «tatt» har vist at det er utdatert
+  let loadFailed = false;  // siste henting av ledige tider feilet (nettfeil, ingen svar på 15 s, ikke-2xx, ikke JSON)
+  // Vi vet ikke hvilke tider som er ledige: siste henting feilet, og vi har ikke et svar fra de siste 2 minuttene. Da
+  // viser steg 3 en beskjed (ring oss), og et 409 «tatt» sier ikke «noen rakk … akkurat nå» (runde 3, SPEC R48).
+  // Tidene vises fortsatt: serveren avgjør, og en tid den svarer «tatt» på, merkes opptatt (mark).
+  const availUnknown = () => loadFailed && (!knownAt || Date.now() - knownAt > STALE_MS);
 
   const $ = (id) => document.getElementById(id);
   const focusOn = (el) => { if (el) el.focus(); };
@@ -258,8 +265,14 @@
       dropped.day = own ? (t) => t.uncertainStill : (t) => t.dayGone;
       setMsg("err", dropped.day, "day");
     }
-    renderCalendar(); renderSlots(); renderSummary(); renderMsg();
+    renderCalendar(); renderSlots(); renderSummary(); renderMsg(); renderNote();
   };
+  // Beskjeden ved steg 3 når vi ikke vet hvilke tider som er ledige (availUnknown); tom ellers (skjules da i CSS)
+  const note = $("avail-note");
+  function renderNote() {
+    const text = availUnknown() ? I18N.s().availDown : "";
+    if (note && note.textContent !== text) note.textContent = text;
+  }
 
   // Tegner på nytt uten at tastaturfokuset i kalenderen eller tidene forsvinner: står fokus på en dag eller tid som
   // tegnes på nytt, flyttes det til den samme (eller den valgte, eller den første ledige)
@@ -410,20 +423,25 @@
   };
   listeners();
 
-  // Hent opptatte tider fra serveren. Et eldre svar som kommer etter et nyere, brukes ikke.
+  // Hent opptatte tider fra serveren. Et eldre svar som kommer etter et nyere, brukes ikke. Et svar som ikke er et
+  // JSON-objekt, er en feil som alle andre: da vet vi ikke hvilke tider som er ledige (availUnknown).
   function loadAvailability() {
     const n = ++loads;
     return withTimeout(fetch("/api/availability", { headers: { Accept: "application/json" }, cache: "no-store" })
       .then((res) => { if (!res.ok) throw new Error(res.status); return res.json(); }), LOAD_TIMEOUT)
       .then((data) => {
-        if (n < applied || !data || typeof data !== "object") return;
+        if (!data || typeof data !== "object") throw new Error("availability");
+        if (n < applied) return;
         applied = n;
         useServer(data);
         marks = marks.filter((x) => n <= x.load); // et merke satt før denne hentingen startet, vet svaret selv om
-        online = true;
+        knownAt = Date.now();
+        loadFailed = false;
       })
       .catch(() => {
-        online = false; // kalenderen virker fortsatt med det vi vet fra før
+        // Kalenderen virker fortsatt med det vi vet fra før (og merkene); en eldre henting som feiler etter at en nyere
+        // er tatt i bruk, endrer ingenting
+        if (n > applied) loadFailed = true;
       });
   }
   // Etter nye data fra serveren: tegn på nytt uten å miste fokus
@@ -510,9 +528,7 @@
     body.requestId = attempt.id;
     const turn = ++turns;
     const current = () => turn === turns; // svar på et eldre forsøk overstyrer aldri beskjeden til et nyere
-    const mine = { requestId: body.requestId, service: svcValue, date: body.date, start: body.start, dur: duration() };
-    // Skjemaet viser fortsatt akkurat dette forsøkets valg
-    const formShows = () => select.value === mine.service && !!state.date && iso(state.date) === mine.date && state.time === t0;
+    const mine = { requestId: body.requestId, date: body.date, start: body.start, dur: duration() };
     // Et sikkert svar (ja eller nei) på dette forsøket: tidsrommet det kan ha lagret, er ikke lenger usikkert
     const settle = () => { delete unsettled[mine.requestId]; };
     // Prøvde dette forsøket et tidsrom som fortsatt er usikkert (det samme forsøket på nytt, eller et endret forsøk som
@@ -595,9 +611,11 @@
     }));
     // Steget for beskjeden velges ut fra hvordan siden ser ut etter at ledige tider er hentet på nytt, ikke bare fra
     // serverens kode: er dagen stengt nå (barberen blokkerte den), eller er det ingen ledig tid igjen den dagen, gjelder
-    // beskjeden dagen, med fokus på en åpen dag (runde 2).
-    const rejected = (what, textFn) => { settle(); return loadAvailability().then(() => end(() => {
+    // beskjeden dagen, med fokus på en åpen dag (runde 2). Vet vi ikke hvilke tider som er ledige (hentingen feilet igjen),
+    // sier vi ikke «akkurat nå» eller «den siste ledige tiden», men unknownFn (runde 3).
+    const rejected = (what, textFn, unknownFn) => { settle(); return loadAvailability().then(() => end(() => {
       if (what === "time" && state.date && !dayOpen(state.date)) { what = "day"; textFn = (t) => t.dayGone; }
+      else if (unknownFn && availUnknown()) textFn = unknownFn;
       else if (what === "time" && state.date && !bookable(state.date)) {
         what = "day";
         textFn = slotsFor(state.date).some(isShort) ? (t) => t.dayNoFit : (t) => t.dayFullNow;
@@ -623,7 +641,11 @@
       // «tatt»); 409 på et endret forsøk som overlapper et usikkert tidsrom, kan være kundens egen time
       if (status === 409 || data.code === "taken") {
         if (doubt(mine.requestId)) { settle(); return stillUnsure(); }
-        return rejected("time", (t) => t.takenNow);
+        // Svaret beviser at tidsrommet er opptatt: det tilbys ikke igjen, selv om hentingen av ledige tider feiler. Og det
+        // beviser at tidene siden viste, er utdaterte: feiler hentingen nå, vet vi ikke hvilke som er ledige (availUnknown)
+        mark(mine.date, mine.start, mine.start + mine.dur);
+        knownAt = 0;
+        return rejected("time", (t) => t.takenNow, (t) => t.takenUnknown);
       }
       // Klokkeregler: serveren ser etter sin egen lagrede time med denne requestId-en før den sier nei (SPEC R36), så et
       // nei til akkurat dette forsøket er sikkert (ingenting er lagret under den): tiden eller dagen slippes, med grunnen.

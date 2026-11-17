@@ -253,6 +253,9 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 .step-msg { margin: 0; font-size: .93rem; font-weight: 600; }
 .step-msg:empty { display: none; }
 .step-msg.err { color: var(--err); }
+/* Ledige tider kunne ikke hentes (booking.js renderNote): står ved tidene til et nytt svar kommer */
+.avail-note { margin: 0; font-size: .93rem; font-weight: 600; color: var(--err); }
+.avail-note:empty { display: none; }
 /* Skjult for øyet, men lest opp av skjermlesere */
 .sr-only {
   position: absolute; width: 1px; height: 1px; min-height: 0; margin: -1px; padding: 0; border: 0;
