@@ -4,7 +4,8 @@
 name: Bookingvarsel (midlertidig)
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    # Ujevne minutter: GitHub hopper lettere over kjøringer på «runde» tidspunkter når det er travelt
+    - cron: "2,7,12,17,22,27,32,37,42,47,52,57 * * * *"
   workflow_dispatch:
 concurrency:
   group: booking-alarm
