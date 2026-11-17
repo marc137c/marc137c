@@ -19,7 +19,10 @@ Eierens egen side (bare du har passordet): besøk og bookinger for alle bedrifte
 4. Publiser bedriftens side og oversikten på nytt.
 
 ## Publisere oversikten
-Fra denne mappen: `netlify deploy --prod --site <oversiktens side-id>` (funksjonene bygges fra `netlify/functions`).
+Fra denne mappen, FØRST `npm install` (funksjonen trenger `@netlify/blobs` i `oversikt/node_modules`: CLI-en pakker fra
+repo-roten og følger ikke en Windows-kobling til `node_modules`, da mangler pakken når funksjonen kjører), deretter:
+`netlify deploy --prod --site <oversiktens side-id> --dir public --functions netlify/functions`.
+Sjekk etterpå: `/api/overview` uten innlogging skal gi 401 (502 betyr at pakken mangler).
 
 ## Teste lokalt
 `npm test` i rotmappen kjører testene for statistikken og oversikten.
