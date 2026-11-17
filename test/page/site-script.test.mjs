@@ -265,3 +265,29 @@ test("F47: a browser with referrerPolicy on the iframe keeps the button and the 
   const site = await page();
   assert.equal(site.$("map-load").tagName, "BUTTON");
 });
+
+// Round 3 (clients): both visitor beacons (script.js on the front page, the inline one on personvern.html) send t,
+// the navigation type, so /api/hit can tell a new arrival from a reload or a Back that reuses document.referrer.
+// Navigation Timing 2 where it exists (Chrome 57+, Firefox 58+, Safari 15+), else performance.navigation.type
+// (Safari/iOS 10+, Firefox 55–57, Samsung Internet 8), and the beacon is sent anyway when neither is there or throws.
+const PERF = {
+  "Timing 2: reload": [{ getEntriesByType: (k) => (k === "navigation" ? [{ type: "reload" }] : []), navigation: { type: 0 } }, "reload"],
+  "Timing 2: back_forward": [{ getEntriesByType: (k) => (k === "navigation" ? [{ type: "back_forward" }] : []), navigation: { type: 0 } }, "back_forward"],
+  "Timing 2: navigate": [{ getEntriesByType: (k) => (k === "navigation" ? [{ type: "navigate" }] : []), navigation: { type: 1 } }, "navigate"],
+  "Firefox 57: no navigation entry, navigation.type 1": [{ getEntriesByType: () => [], navigation: { type: 1 } }, "reload"],
+  "Safari 10: no getEntriesByType, navigation.type 2": [{ navigation: { type: 2 } }, "back_forward"],
+  "navigation.type 0": [{ navigation: { type: 0 } }, "navigate"],
+  "getEntriesByType throws": [{ getEntriesByType: () => { throw new Error("x"); }, navigation: { type: 1 } }, "reload"],
+};
+for (const [pageFile, opts] of [["index.html", { scripts: ["script.js"] }], ["personvern.html", { page: "personvern.html", inline: true, scripts: [] }]]) {
+  test(`visitor beacon on ${pageFile}: sends t, the navigation type from the Performance API, in every browser generation`, async () => {
+    for (const [name, [perf, want]] of Object.entries(PERF)) {
+      const site = await loadSite(Object.assign({}, opts, { before(ctx) { ctx.performance = perf; } }));
+      assert.equal(site.beacons.length, 1, name);
+      assert.equal(JSON.parse(site.beacons[0].body).t, want, name);
+    }
+    const none = await loadSite(Object.assign({}, opts, { before(ctx) { delete ctx.performance; } }));
+    assert.equal(none.beacons.length, 1, "no Performance API: the beacon is still sent");
+    assert.ok(!["reload", "back_forward"].includes(JSON.parse(none.beacons[0].body).t), "and it is an arrival");
+  });
+}

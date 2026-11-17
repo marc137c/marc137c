@@ -257,6 +257,32 @@ test("stats: a store error while counting is logged without details and still an
   assert.equal(out.error.length, 1);
 });
 
+// Round 3 (clients): the beacon decided «visit» from document.referrer alone, and a reload, a tab the browser
+// restores or a Back that is not from the back/forward cache keeps the history entry's referrer. One arrival from
+// Instagram, two reloads, a click to personvern and Back counted 4 visits. The beacon now sends t, the navigation
+// type from the Performance API; «reload» and «back_forward» are a view only, like a page reached from the site.
+test("stats: an arrival, two reloads, a page of the site and Back to the front page are ONE visit (D12)", async () => {
+  const d = testDeps({ now: NOW, env: ENV });
+  const seq = [
+    { p: "/", r: "l.instagram.com", t: "navigate" },
+    { p: "/", r: "l.instagram.com", t: "reload" },
+    { p: "/", r: "l.instagram.com", t: "reload" },
+    { p: "/personvern.html", r: "viggos.test", t: "navigate" },
+    { p: "/", r: "l.instagram.com", t: "back_forward" },
+  ];
+  for (const b of seq) assert.equal((await hit(d, b)).status, 204);
+  const x = day(d, "2026-11-12");
+  const sourced = Object.values(x.sources).reduce((a, n) => a + n, 0);
+  assert.deepEqual([x.views, x.visits, x.sources.instagram, sourced, x.pages.forside, x.pages.personvern], [5, 1, 1, 1, 4, 1]);
+});
+
+test("stats: a hit without t (a cached old page), with «navigate», «prerender» or any other value is an arrival as before", async () => {
+  const d = testDeps({ now: NOW, env: ENV });
+  for (const t of [undefined, "navigate", "prerender", "", 5, "RELOAD "]) assert.equal((await hit(d, { p: "/", r: "www.google.no", t })).status, 204);
+  const x = day(d, "2026-11-12");
+  assert.deepEqual([x.views, x.visits, x.sources.google], [6, 6, 6]);
+});
+
 test("stats: bump counts a view from the site itself as a view only, and many at once all count", async () => {
   const d = testDeps({ now: NOW });
   const store = d.getStore({ name: "stats", consistency: "strong" });

@@ -287,11 +287,29 @@ document.getElementById("year").textContent = new Date().getFullYear();
 
 // Besøksteller uten informasjonskapsler: bare dato, side og hvilket nettsted besøket kom fra
 // (f.eks. instagram.com). Ingen IP-adresse eller ID lagres, og ingenting lagres på besøkerens enhet.
+// t = hvordan siden ble åpnet: en ny innlasting eller Tilbake beholder document.referrer fra første gang, så
+// /api/hit teller «reload» og «back_forward» som visning, ikke som et nytt besøk (runde 3). Navigation Timing 2
+// der den finnes, ellers performance.navigation.type (Safari/iOS 10+, Firefox 55–57, Samsung Internet 8).
 (() => {
+  const navType = () => {
+    try {
+      const perf = window.performance;
+      if (!perf) return "";
+      if (typeof perf.getEntriesByType === "function") {
+        try {
+          const e = perf.getEntriesByType("navigation")[0];
+          if (e && typeof e.type === "string") return e.type;
+        } catch (e) { /* eldre nettleser: se under */ }
+      }
+      const n = perf.navigation;
+      if (n) return n.type === 1 ? "reload" : n.type === 2 ? "back_forward" : "navigate";
+    } catch (e) { /* ukjent: telles som et nytt besøk, som før */ }
+    return "";
+  };
   try {
     const x = new XMLHttpRequest();
     x.open("POST", "/api/hit", true);
     x.setRequestHeader("Content-Type", "text/plain");
-    x.send(JSON.stringify({ p: location.pathname, r: document.referrer ? (document.referrer.split("/")[2] || "") : "" }));
+    x.send(JSON.stringify({ p: location.pathname, r: document.referrer ? (document.referrer.split("/")[2] || "") : "", t: navType() }));
   } catch (e) { /* telleren er ikke viktig for siden */ }
 })();

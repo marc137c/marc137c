@@ -78,7 +78,7 @@
       </ul>
 
       <h2>Besøksstatistikk uten informasjonskapsler</h2>
-      <p>For hver dag (norsk tid) teller vi hvor mange ganger forsiden og denne siden er vist, hvor mange av visningene som er nye besøk (ikke et klikk fra en annen side her), og hvor besøkene kom fra, i grove grupper: Instagram, Facebook, Google, TikTok, direkte eller annet. Når dagen er 14 dager gammel, legger vi til antall bestillinger som ble gjort den dagen: fra nettsiden eller fra timeboken, hvor mange som er avlyst, per tjeneste og per ukedag. Bare tall, uten navn, telefonnummer eller annet om kunden. Det er alt.</p>
+      <p>For hver dag (norsk tid) teller vi hvor mange ganger forsiden og denne siden er vist, hvor mange av visningene som er nye besøk (ikke et klikk fra en annen side her, ikke en ny innlasting av siden og ikke et trykk på Tilbake), og hvor besøkene kom fra, i grove grupper: Instagram, Facebook, Google, TikTok, direkte eller annet. Når dagen er 14 dager gammel, legger vi til antall bestillinger som ble gjort den dagen: fra nettsiden eller fra timeboken, hvor mange som er avlyst, per tjeneste og per ukedag. Bare tall, uten navn, telefonnummer eller annet om kunden. Det er alt.</p>
       <p>Vi bruker ingen informasjonskapsler og lagrer ingen IP-adresse, ingen ID, ingen opplysninger om nettleseren din og ikke adressen du kom fra. Ingenting lagres på enheten din for å telle deg. Roboter og forhåndsvisninger telles ikke, bare besøk på den publiserte nettsiden. Tallene lagres hos Netlify (serverfunksjoner og Netlify Blobs) og slettes etter 400 dager.</p>
 
       <h2>Innhold fra andre nettsteder</h2>
@@ -104,13 +104,29 @@
   </div>
 
   <script>
-    // Besøksteller uten informasjonskapsler (se «Besøksstatistikk» over): bare side og hvilket nettsted besøket kom fra
+    // Besøksteller uten informasjonskapsler (se «Besøksstatistikk» over): bare side, hvilket nettsted besøket kom fra,
+    // og t = hvordan siden ble åpnet (en ny innlasting eller Tilbake er ikke et nytt besøk), som i script.js
     (function () {
+      function navType() {
+        try {
+          var perf = window.performance;
+          if (!perf) return "";
+          if (typeof perf.getEntriesByType === "function") {
+            try {
+              var e = perf.getEntriesByType("navigation")[0];
+              if (e && typeof e.type === "string") return e.type;
+            } catch (e2) { /* eldre nettleser: se under */ }
+          }
+          var n = perf.navigation;
+          if (n) return n.type === 1 ? "reload" : n.type === 2 ? "back_forward" : "navigate";
+        } catch (e3) { /* ukjent: telles som et nytt besøk */ }
+        return "";
+      }
       try {
         var x = new XMLHttpRequest();
         x.open("POST", "/api/hit", true);
         x.setRequestHeader("Content-Type", "text/plain");
-        x.send(JSON.stringify({ p: location.pathname, r: document.referrer ? (document.referrer.split("/")[2] || "") : "" }));
+        x.send(JSON.stringify({ p: location.pathname, r: document.referrer ? (document.referrer.split("/")[2] || "") : "", t: navType() }));
       } catch (e) { /* telleren er ikke viktig for siden */ }
     })();
   </script>

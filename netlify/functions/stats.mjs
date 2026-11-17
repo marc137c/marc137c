@@ -1,6 +1,8 @@
 // Besøks- og bookingstatistikk uten informasjonskapsler.
 // POST /api/hit  – nettsiden melder én sidevisning: bare dato (norsk tid), side og hvilket nettsted visningen kom fra.
-//                  Et «besøk» er en visning som IKKE kom fra en annen side på samme nettsted; bare besøk får en kilde
+//                  Et «besøk» er en visning som IKKE kom fra en annen side på samme nettsted, og som ikke er en ny
+//                  innlasting eller Tilbake (t = «reload»/«back_forward» fra Performance API-et: de beholder
+//                  document.referrer fra første gang, så de ville ellers telt som nye besøk); bare besøk får en kilde
 //                  (instagram, facebook, google, tiktok, direkte, annet). Ingen IP-adresse, ingen ID, ingen
 //                  nettleserinfo, ingen henvisningsadresse, ingenting lagres på besøkerens enhet. Roboter,
 //                  forhåndsvisninger, grener, gamle permalenker og kall fra andre nettsteder telles ikke.
@@ -33,6 +35,10 @@ export function sourceOf(host) {
   if (/tiktok/.test(h)) return "tiktok";
   return "annet";
 }
+// Er visningen den samme siden vist på nytt (ny innlasting, Tilbake/Frem, en fane nettleseren henter fram igjen)?
+// Da er document.referrer fortsatt den fra første gang, så det er en visning, ikke et nytt besøk. Uten t (en eldre
+// side fra hurtigbufferen) eller med en annen verdi telles den som et besøk, som før.
+export const isRedisplay = (t) => t === "reload" || t === "back_forward";
 // Kom visningen fra en annen side på det samme nettstedet (med eller uten www)?
 export const isInternal = (refHost, siteHost) => !!bare(refHost) && bare(refHost) === bare(siteHost);
 
@@ -88,7 +94,7 @@ export async function handle(req, context, deps) {
     if (raw === null) return json({ error: "For stor forespørsel." }, 413);
     const body = jsonObject(raw) || {}; // en melding vi ikke kan lese (eller som ikke er et objekt), teller som forsiden
     const page = /personvern/.test(String(body.p || "")) ? "personvern" : "forside";
-    const source = isInternal(body.r, url.hostname) ? null : sourceOf(body.r);
+    const source = isInternal(body.r, url.hostname) || isRedisplay(body.t) ? null : sourceOf(body.r);
     try {
       const r = await bump(statsStore(deps, context), `d/${osloNow(deps.now()).date}`, page, source);
       if (r.error) console.error("Statistikk: for mange samtidige treff, ett ble ikke telt");
