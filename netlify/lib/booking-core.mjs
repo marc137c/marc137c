@@ -605,34 +605,45 @@ export function monthsBetween(fromDate, toDate) {
 // månedene. Teller bare det dette kallet avlyste, også når et svar gikk tapt og skrivingen ble prøvd igjen, og hver
 // avtale én gang (etter id-halen). En avtale midt i en flytting gjøres ferdig flyttet eller tilbake først
 // (settleMove), og måneden leses på nytt.
+// Månedene gås gjennom minst to ganger (CANCEL_PASSES): en avtale som flyttes fra en måned kallet ikke har nådd, til
+// en det allerede har lest (en flytting bakover i tid), slapp ellers unna, og svaret ble «0 avlyst» mens den sto
+// aktiv (runde 3). En runde til bare når den forrige avlyste noe nytt, høyst tre til sammen.
 // Svarer { ok, cancelled } eller { error, status: 503, cancelled } (det som rakk å bli avlyst; kall igjen).
+const CANCEL_PASSES = { min: 2, max: 3 };
 export async function cancelMatching(store, months, match, now = new Date()) {
   const stamp = now.toISOString();
   const done = new Set(); // id-halene dette kallet har avlyst
-  for (const ym of months) {
-    const attempted = new Set();
-    let r;
-    try {
-      r = await settled(store, now, () => mutateMonth(store, ym, (doc) => {
-        const moving = doc.items.find((i) => active(i) && match(i) && pendingMove(i));
-        if (moving) return { unsettled: pendingMove(moving), noWrite: true };
-        let changed = false;
-        for (const i of doc.items) {
-          if (!active(i) || !match(i)) continue;
-          i.status = "cancelled";
-          i.updatedAt = stamp;
-          attempted.add(i.id);
-          changed = true;
-        }
-        const ids = doc.items.filter((i) => attempted.has(i.id) && i.status === "cancelled" && i.updatedAt === stamp).map((i) => i.id);
-        return changed ? { ok: true, ids } : { ok: true, noWrite: true, ids };
-      }));
-    } catch (err) {
-      console.error("Avlysning: lagringen svarte ikke:", err && err.name);
-      r = { error: true };
+  for (let pass = 0; pass < CANCEL_PASSES.max; pass++) {
+    let fresh = 0; // id-haler denne runden avlyste for første gang
+    for (const ym of months) {
+      const attempted = new Set();
+      let r;
+      try {
+        r = await settled(store, now, () => mutateMonth(store, ym, (doc) => {
+          const moving = doc.items.find((i) => active(i) && match(i) && pendingMove(i));
+          if (moving) return { unsettled: pendingMove(moving), noWrite: true };
+          let changed = false;
+          for (const i of doc.items) {
+            if (!active(i) || !match(i)) continue;
+            i.status = "cancelled";
+            i.updatedAt = stamp;
+            attempted.add(i.id);
+            changed = true;
+          }
+          const ids = doc.items.filter((i) => attempted.has(i.id) && i.status === "cancelled" && i.updatedAt === stamp).map((i) => i.id);
+          return changed ? { ok: true, ids } : { ok: true, noWrite: true, ids };
+        }));
+      } catch (err) {
+        console.error("Avlysning: lagringen svarte ikke:", err && err.name);
+        r = { error: true };
+      }
+      if (r.error) return { error: "Fikk ikke avlyst alle. Prøv igjen om litt.", status: 503, cancelled: done.size };
+      for (const id of r.ids) {
+        if (!done.has(idSuffix(id))) fresh++;
+        done.add(idSuffix(id));
+      }
     }
-    if (r.error) return { error: "Fikk ikke avlyst alle. Prøv igjen om litt.", status: 503, cancelled: done.size };
-    for (const id of r.ids) done.add(idSuffix(id));
+    if (pass + 1 >= CANCEL_PASSES.min && !fresh) break;
   }
   return { ok: true, cancelled: done.size };
 }

@@ -30,7 +30,6 @@ const PW = "fake-admin-password";
 // Where the booking starts: November (its moves to December and January go forward, «MOVE_NOV» stays in the month)
 // and December (MOVE_NOV goes backward, MOVE_DEC stays in the month, MOVE_JAN goes forward)
 const SEEDS = ["2026-11-27", "2026-12-08"];
-const FIRST_SEEDS = ["2026-11-27"];
 const live = (s) => s && s.status !== "cancelled";
 // op: how to send it; model(state) → { state, count } for the store a successful reply stands for.
 // onCopy: B acts on the copy a GET shows in the middle of A's cross-month move (another id with the same suffix),
@@ -149,8 +148,8 @@ test("interleaving: every admin write B before every store call of every admin w
   quiet(t);
   const pairs = [];
   for (const aName of Object.keys(OPS)) for (const bName of Object.keys(OPS)) pairs.push([aName, bName]);
-  const { problems, tried } = await sweep(pairs, FIRST_SEEDS);
-  assert.ok(tried > 400, `${tried} interleavings tried`);
+  const { problems, tried } = await sweep(pairs);
+  assert.ok(tried > 800, `${tried} interleavings tried`);
   assert.deepEqual(problems, []);
 });
 

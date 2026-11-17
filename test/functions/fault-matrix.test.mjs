@@ -456,6 +456,41 @@ test("fault matrix: cancel-phone after the original is gone but before the move'
   assert.deepEqual(stored.map((i) => `${i.id} ${i.status}`), [`2026-12-02_${suffix(b.id)} cancelled`]);
   assert.ok(stored.every((i) => !("mv" in i)), JSON.stringify(stored));
 });
+// Round 3 (audit/round2/verify-server/r4/backward-move-cancel.mjs): cancel-phone walked the months once, in order.
+// A booking moved from a month it had not reached (December) into one it had already read (November) escaped it:
+// «0 avlyst» while the booking stayed active on 27 November. Neither serial order gives that. The whole backward
+// move now runs before each of cancel-phone's store calls, and also a forward move (27 Nov → 8 Dec) for contrast;
+// a bulk write must change and report every booking that matched for the whole call.
+for (const [label, from, to] of [["backward (8 Dec → 27 Nov)", "2026-12-08", "2026-11-27"], ["forward (27 Nov → 8 Dec)", "2026-11-27", "2026-12-08"]]) {
+  test(`fault matrix: a ${label} move between any two of cancel-phone's store calls is still cancelled and counted («1 avlyst»)`, async (t) => {
+    quiet(t);
+    let reached = 0;
+    for (let k = 0; k < 40; k++) {
+      const d = testDeps({ now: "2026-11-20T08:00:00Z", env: { ADMIN_PASSWORD: PW } });
+      const [b] = seedItems(d.blobs, [item({ date: from, start: 600 })]);
+      let byB = null;
+      const depsA = hooked(d, async (n) => {
+        if (n !== k || byB) return;
+        d.clock.advance(1000);
+        byB = await patchAs(d, b.id, { date: to, expect: b.updatedAt });
+        d.clock.advance(1000);
+      });
+      const byA = await cancelPhoneAs(depsA);
+      if (!byB) break; // cancel-phone made fewer than k + 1 store calls: every point tried
+      reached++;
+      const stored = storedItems(d.blobs).filter((i) => suffix(i.id) === suffix(b.id));
+      const where = `move before cancel-phone's store call ${k}: move ${byB.status}, cancel-phone ${byA.status} ${JSON.stringify(byA.body)}, store ${JSON.stringify(stored.map((i) => `${i.id} ${i.status}`))}`;
+      assert.equal(byA.status, 200, where);
+      assert.equal(byA.body.cancelled, 1, where);
+      assert.equal(stored.length, 1, where);
+      assert.equal(stored[0].status, "cancelled", where);
+      // the move either came first (the booking is cancelled on its new date) or lost to the cancel (412)
+      assert.equal(stored[0].date, byB.status === 200 ? to : from, where);
+      assert.ok(byB.status === 200 || byB.status === 412, where);
+    }
+    assert.ok(reached >= 3, `${reached} points tried`);
+  });
+}
 test("fault matrix: an undisturbed cross-month move leaves no move mark on the booking", async (t) => {
   quiet(t);
   const { d, b } = moveSetup();
