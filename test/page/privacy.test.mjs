@@ -293,6 +293,47 @@ const ART13 = {
   "13(2)(e)": /Du må oppgi navn og telefonnummer/,
   "13(2)(f)": null,
 };
+// Round 3 (still_open 19, transfer-basis-art13): the checklist went per processor named in the owner decision, so the
+// phone calendar, a recipient added later, never got a transfer row, and one Netlify sentence would have answered
+// 13(1)(f) for every recipient. Guard: every recipient under «Hvem som får opplysningene» is listed here. Each one that
+// gets readable customer data has its own transfer sentence in its <li>, citing a source that SPEC and DEPLOY name, or
+// a SPEC row «Art. 13(1)(f), <name>» («not applicable, because …», or «open: …» with a DEPLOY §6 line naming it).
+const TRANSFER = /(Data Privacy Framework|standard personvernbestemmelser|innenfor EØS)/;
+const RECIPIENTS = [
+  { strong: "Netlify", readable: true, source: "https://www.netlify.com/pdf/netlify-dpa.pdf" },
+  // encrypted on our server for the barber's device (push.mjs encryptPayload, RFC 8291): the push service only carries it
+  { strong: "Varsel til barberen:", readable: false },
+  { strong: "Kalenderen på barberens telefon:", readable: true, spec: "the barber's phone calendar", deploy: "kalenderen på telefonen" },
+];
+test("privacy: art. 13(1)(f) is answered for each recipient of readable customer data, not once for all", () => {
+  const html = read("personvern.html");
+  const from = html.indexOf("<h2>Hvem som får opplysningene</h2>");
+  const section = html.slice(from, html.indexOf("<h2>", from + 5));
+  const listed = [...section.matchAll(/<li><strong>([^<]+)<\/strong>/g)].map((m) => m[1]);
+  assert.deepEqual(listed, RECIPIENTS.map((r) => r.strong), "every recipient on the page has a row here, which says how art. 13(1)(f) is answered");
+  assert.match(readRoot("netlify/lib/push.mjs"), /encryptPayload\(/, "the push notice is encrypted for the device, so the push service cannot read it");
+  const specText = readRoot("docs/SPEC.md");
+  const spec = specText.split(/\r?\n/);
+  const deploy = readRoot("DEPLOY.md");
+  const six = deploy.slice(deploy.indexOf("## 6.")).split(/\r?\n/).filter((l) => l.startsWith("- [ ]"));
+  for (const r of RECIPIENTS.filter((x) => x.readable)) {
+    const item = recipientItem(r.strong);
+    if (TRANSFER.test(item)) {
+      const raw = new RegExp(`<li><strong>${r.strong}</strong>([\\s\\S]*?)</li>`).exec(html)[1];
+      assert.ok(r.source && raw.includes(`href="${r.source}"`), `«${r.strong}»: the transfer sentence links its source`);
+      assert.ok(specText.includes(r.source) && deploy.includes(r.source), `SPEC and DEPLOY cite ${r.source}`);
+      continue;
+    }
+    const row = r.spec && spec.find((l) => l.startsWith(`- **Art. 13(1)(f), ${r.spec}**`));
+    assert.ok(row, `«${r.strong}» gets readable customer data: its <li> needs a transfer sentence (${TRANSFER}) or SPEC a row «- **Art. 13(1)(f), …** open: / not applicable, because …»`);
+    if (/^- \*\*[^*]+\*\* open:/.test(row)) {
+      assert.ok(six.some((l) => l.includes("artikkel 13 nr. 1 bokstav f") && l.toLowerCase().includes(r.deploy)), `art. 13(1)(f) for ${r.spec} is open, so a DEPLOY §6 line asks about ${r.deploy}`);
+    } else {
+      assert.match(row, /\*\* not applicable, because /, `art. 13(1)(f), ${r.spec}: «not applicable, because …» or «open: …»`);
+    }
+  }
+});
+
 test("privacy: every GDPR art. 13 item is on the page, or SPEC says why not (and an open one is a DEPLOY §6 line)", () => {
   const text = pageText();
   const spec = readRoot("docs/SPEC.md");
