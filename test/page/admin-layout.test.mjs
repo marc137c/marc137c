@@ -207,3 +207,38 @@ test("layout round 2: at 359 px and below the date field keeps room for the whol
   const used = 2 * icon + Number(em[1]) * 16 + (40 + 2 * Number(chipPad[1])) + 3 * gap;
   assert.ok(used <= 288, `the row needs ${used} px of 288`);
 });
+
+// Fix-up round 2 (probe-misc6b.log, old-fresh.jsonl): html { scroll-padding-top: 210px } was one number taken at
+// 390 px, but the sticky header is 221 px at 320–360 px (the top row wraps), 244 px in Chromium 60 and 249 px in
+// Firefox 57, so a focused row still landed partly under it. Guard: an offset that has to clear a sticky element is
+// set from that element's measured height (plus a margin) on start, on resize and when the header's text changes,
+// at every guard width and engine height; 0 when the header is not sticky (phone landscape).
+async function padPage(position) {
+  const resize = [];
+  const page = await loadAdmin({ globals: {
+    getComputedStyle: () => ({ position }),
+    addEventListener: (type, fn) => { if (type === "resize") resize.push(fn); },
+  } });
+  page.doc.documentElement = { style: {} };
+  return { page, resize: (h) => { page.$("top").offsetHeight = h; resize.forEach((fn) => fn()); return page.doc.documentElement.style.scrollPaddingTop; } };
+}
+test("layout fix-up: scroll-padding-top follows the sticky header's measured height at every guard width and engine", async () => {
+  const { resize } = await padPage("sticky");
+  // 320/360 px (wrapped top row), 390/768/1280 px, Chromium 60 and Firefox 57 at a 373-px content width
+  for (const h of [221, 221, 201, 201, 201, 244, 249]) {
+    const pad = resize(h);
+    assert.match(String(pad), /^\d+px$/, `set for ${h}`);
+    assert.ok(parseInt(pad, 10) >= h, `${pad} clears a ${h}-px header`);
+  }
+  assert.equal(resize(249), "257px");
+});
+test("layout fix-up: -webkit-sticky counts as sticky, and a static header (phone landscape) gets 0", async () => {
+  assert.equal((await padPage("-webkit-sticky")).resize(230), "238px");
+  assert.equal((await padPage("static")).resize(230), "0px");
+});
+test("layout fix-up: the CSS fallback (before the script has measured) clears the old engines' 249-px header below 375 px", () => {
+  const css = readFileSync(new URL("../../viggos-barbershop/admin.css", import.meta.url), "utf8");
+  const m = /@media \(max-width: 374px\) \{\s*html \{ scroll-padding-top: (\d+)px; \}/.exec(css);
+  assert.ok(m && Number(m[1]) >= 249, "a ≤374-px fallback of at least 249 px");
+  assert.ok(css.indexOf(m[0]) < css.indexOf("@media (max-height: 500px)"), "before the landscape rule, which sets 0 and must win");
+});

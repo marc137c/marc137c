@@ -88,10 +88,22 @@
     $("pw").focus();
     loginPushCheck();
   }
+  // Toppen er klebrig (sticky), så scroll-padding-top må være minst like høy som den, ellers havner et element som får
+  // fokus delvis under den. Høyden avhenger av bredden (topplinjen brytes), klokketeksten og nettleserens skrift, så den
+  // måles (runde 2): når timeboken vises, ved endret størrelse og når «Oppdatert …» endres. Ikke klebrig (liggende
+  // telefon): 0. Uten måling gjelder verdiene i admin.css.
+  function fitScrollPadding() {
+    const top = $("top"), root = document.documentElement;
+    if (!top || !root || !root.style) return;
+    const pos = typeof window.getComputedStyle === "function" ? String(window.getComputedStyle(top).position || "") : "";
+    root.style.scrollPaddingTop = /sticky/.test(pos) ? (top.offsetHeight + 8) + "px" : "0px";
+  }
+  if (typeof window.addEventListener === "function") window.addEventListener("resize", fitScrollPadding);
   function showApp() {
     loginPushHide();
     $("login").hidden = true;
     $("app").hidden = false;
+    fitScrollPadding();
     // Paneler i #app som tegnes av andre skript (admin-stats.js) får beskjed med en gang (runde 2, SPEC R29)
     const shown = Array.isArray(window.adminShownListeners) ? window.adminShownListeners.slice() : [];
     shown.forEach((fn) => { try { fn(); } catch (e) { /* en feil i et panel stopper ikke timeboken */ } });
@@ -347,10 +359,12 @@
         else if (!fresh || fresh.updatedAt !== ed.updatedAt) $("edit-msg").textContent = ownChange(ed, fresh) ? OWN_CHANGE : "Avtalen er endret et annet sted – lukk og åpne den på nytt.";
       }
       $("sync").textContent = `Oppdatert ${hhmm(new Date().getHours() * 60 + new Date().getMinutes())}`;
+      fitScrollPadding();
     }).catch((err) => {
       if (seq !== loadSeq) return; // et nyere svar er på vei
       if (err.status === 401) return;
       $("sync").textContent = "Ingen forbindelse";
+      fitScrollPadding();
       // Dagen på skjermen er ikke hentet: si det, i stedet for «Henter …» som aldri blir ferdig. Tidtakeren og
       // det å komme tilbake til fanen prøver igjen.
       if (state.itemsDay !== state.day) $("timeline").innerHTML = '<li class="empty">Kunne ikke hente avtaler – prøver igjen …</li>';

@@ -9,6 +9,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.45 var(--sans); }
 /* Fokus og «rull inn i bildet» havner aldri under den faste toppen (tittel, dato, ukestripe: om lag 200 px) */
+/* Før skriptet har målt toppen (fitScrollPadding i admin.js setter høyden + 8 px): 210 px fra 390 px bredde */
 html { scroll-padding-top: 210px; }
 [hidden] { display: none !important; }
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -185,6 +186,10 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 
 /* Telefon på tvers (844×390, 667×375): den faste toppen tok over halve skjermen, og et trykk på «+ Ny avtale» traff
    den. Under 500 px høyde ruller toppen med siden (fast pynt får dekke høyst 35 % av høyden). */
+/* Under 375 px brytes topplinjen: 221 px i Chrome, 244 i Chromium 60 og 249 i Firefox 57 (runde 2) */
+@media (max-width: 374px) {
+  html { scroll-padding-top: 256px; }
+}
 @media (max-height: 500px) {
   .top { position: static; }
   html { scroll-padding-top: 0; }
