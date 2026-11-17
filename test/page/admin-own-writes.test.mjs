@@ -234,3 +234,66 @@ test("own writes: after «Avlys alle», the other booking's card tapped before t
   const stored = (await s.items(t)).filter((i) => i.id === ali2.id)[0];
   assert.deepEqual([stored.status, stored.note], ["cancelled", "Notat 1"], "the note is saved on the cancelled booking");
 });
+
+// Round 3 fix-up 1 (clients): a write has a scope, the bookings it changes: one booking for Lagre and Slett, every
+// web booking from the number for «Avlys alle». The lock was tied to the open sheet's own booking only, so a Lagre or
+// Slett on Ali's 11:00 booking (A) that was still on its way did not stop «Avlys alle» pressed in the sheet for
+// Ali's 15:00 booking (B, same number), and when the server handled «Avlys alle» first, A's own write got 412 and
+// said «endret på en annen enhet». Rule: a write starts, and its control unlocks, only when no write from this device
+// that is on its way touches any booking in its scope. Matrix: first control on A × second control in B's sheet.
+// Overlapping scopes: nothing is sent until the first has landed, then the control works in place. Separate scopes
+// (Lagre/Slett on A, then Lagre/Slett on B): sent at once. Never «en annen enhet».
+async function setupTwo(first) {
+  const s = await realServer();
+  const t = await s.login();
+  const a = await s.web({ start: 660, name: "Ali", phone: PHONE });
+  const b = await s.web({ start: 900, name: "Ali", phone: PHONE });
+  const h = held();
+  const routes = { "GET /api/admin/items": s.route, "POST /api/admin/login": s.route, "GET /api/admin/push": s.route, "POST /api/admin/cancel-phone": s.route };
+  for (const it of [a, b]) { routes[CONTROLS["Lagre"].route(it)] = s.route; routes[CONTROLS["Slett"].route(it)] = s.route; }
+  let holding = true;
+  routes[CONTROLS[first].route(a)] = (c) => (holding ? h.route(c).then(() => { holding = false; return s.route(c); }) : s.route(c));
+  const page = await loadRealAdmin({ token: t, now: DAY + "T09:00", confirm: () => true, routes });
+  const open = async (it) => { page.tap("timeline", `[data-id="${it.id}"] button.item-open`); await page.flush(); };
+  return { s, t, a, b, h, page, open };
+}
+const overlapping = (first, second) => first === "Avlys alle" || second === "Avlys alle";
+
+for (const first of Object.keys(CONTROLS)) {
+  for (const second of Object.keys(CONTROLS)) {
+    const held_ = overlapping(first, second);
+    test(`own writes across bookings: ${first} on Ali 11:00 pending, ${second} in the sheet for Ali 15:00 (same number): ${held_ ? "nothing is sent until the first has landed" : "sent at once"}, and nothing blames another device`, async () => {
+      const { a, b, h, page, open } = await setupTwo(first);
+      await open(a);
+      assert.equal(page.$("cancel-phone").hidden, false, "«Avlys alle» is shown for Ali");
+      CONTROLS[first].start(page, 1);
+      await page.flush();
+      assert.equal(h.pending(), 1, `${first} is on its way`);
+      if (page.$("editor").open) page.$("cancel-edit").click();
+      await open(b);
+      assert.equal(page.$("cancel-phone").hidden, false, "«Avlys alle» is shown for Ali's other booking");
+      const route = CONTROLS[second].route(b), before = sent(page, route);
+      CONTROLS[second].start(page, 2);
+      await page.flush();
+      if (held_) {
+        assert.equal(sent(page, route), before, `${second} sent nothing while ${first} was on its way`);
+        assert.equal(page.$(CONTROLS[second].id).disabled, true, `${second} is locked`);
+        assert.notEqual(page.$("edit-msg").textContent, "", "the sheet says what it waits for");
+      } else {
+        assert.equal(sent(page, route), before + 1, `${second} on another booking is not held up`);
+      }
+      h.release("go");
+      await page.flush();
+      assert.doesNotMatch(said(page), BLAME, said(page));
+      if (held_ && page.$("editor").open && !page.$(CONTROLS[second].id).hidden) {
+        assert.equal(page.$(CONTROLS[second].id).disabled, false, `${second} can be pressed once ${first} has landed`);
+        assert.doesNotMatch(page.$("edit-msg").textContent, /…$/, "no waiting text is left");
+        page.alerts.length = 0;
+        CONTROLS[second].start(page, 2);
+        await page.flush();
+        assert.equal(sent(page, route), before + 1, `${second} was sent`);
+        assert.doesNotMatch(said(page), BLAME, said(page));
+      }
+    });
+  }
+}

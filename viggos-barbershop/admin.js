@@ -672,6 +672,24 @@
     for (let i = 0; i < pending.length; i++) if (pending[i].touches(it)) return pending[i];
     return null;
   }
+  // Hver endring har et omfang, avtalene den endrer: én for Lagre og Slett, alle nettbestillingene fra nummeret
+  // (flood.items) for «Avlys alle». «Avlys alle» er låst så lenge en endring herfra som er på vei, gjelder én av
+  // dem (runde 3: en Lagre eller Slett for Alis 11:00 var på vei, «Avlys alle» fra arket for Alis 15:00 avlyste også
+  // 11:00, og når serveren tok «Avlys alle» først, fikk denne enhetens egen lagring 412 og «en annen enhet»).
+  const FLOOD_WAIT = "«Avlys alle» venter til endringen herfra er ferdig …";
+  function floodBusy() {
+    if (!flood || flood.sheet !== sheetSeq) return null;
+    for (let i = 0; i < flood.items.length; i++) { const p = pendingFor(flood.items[i]); if (p) return p; }
+    return null;
+  }
+  function syncFloodLock() {
+    if (!dlg.open || !flood || flood.sheet !== sheetSeq) return;
+    if (state.editing && pendingFor(state.editing)) return; // hele arket er låst for sin egen avtale
+    const busy = floodBusy();
+    $("cancel-phone").disabled = !!busy;
+    if (busy && !$("edit-msg").textContent) $("edit-msg").textContent = FLOOD_WAIT;
+    if (!busy && $("edit-msg").textContent === FLOOD_WAIT) $("edit-msg").textContent = "";
+  }
   // Svaret kom aldri fram: endringen kan ha blitt lagret (ikke en 4xx, og ikke en 5xx der serveren sier hva som skjedde)
   const noAnswer = (err) => !!(err && (err.network || err.timeout || (err.status >= 500 && !err.code)));
   function sheetCall(action, who, verb, { sheet = sheetSeq, id = null, pk = null, target = null, body = null } = {}) {
@@ -693,9 +711,11 @@
         call.done = true;
         const i = pending.indexOf(call);
         if (i >= 0) pending.splice(i, 1);
-        if (!call.mine() || (state.editing && pendingFor(state.editing))) return;
-        lockSheet(false);
-        if ($("edit-msg").textContent === BUSY_TEXT[action]) $("edit-msg").textContent = "";
+        if (call.mine() && !(state.editing && pendingFor(state.editing))) {
+          lockSheet(false);
+          if ($("edit-msg").textContent === BUSY_TEXT[action]) $("edit-msg").textContent = "";
+        }
+        syncFloodLock(); // «Avlys alle» i et ark for en annen avtale fra nummeret kan nå brukes
       },
       // Et sikkert svar (2xx) for avtalen: en tidligere endring uten svar spiller ingen rolle for den lenger
       settled() {
@@ -819,7 +839,7 @@
     return d;
   };
   // Nettbestillingene fra dette nummeret fra i dag og 92 dager frem (det samme som POST /api/admin/cancel-phone avlyser)
-  let flood = null; // { sheet, phone, n }
+  let flood = null; // { sheet, phone, n, items }: items = nettbestillingene «Avlys alle» endrer
   function floodCheck(it) {
     const btn = $("cancel-phone");
     btn.hidden = true;
@@ -828,11 +848,13 @@
     const sheet = sheetSeq, key = phoneKey(it.phone), today = todayIso();
     api(`/api/admin/items?from=${today}&to=${addDays(today, 92)}`).then((r) => {
       if (sheet !== sheetSeq || !dlg.open) return;
-      const n = (r.items || []).filter((i) => i.type === "booking" && i.source === "nettside" && active(i) && i.date >= today && phoneKey(i.phone) === key).length;
+      const items = (r.items || []).filter((i) => i.type === "booking" && i.source === "nettside" && active(i) && i.date >= today && phoneKey(i.phone) === key);
+      const n = items.length;
       if (n < 2) return;
-      flood = { sheet, phone: it.phone, n };
+      flood = { sheet, phone: it.phone, n, items };
       btn.textContent = `Avlys alle nettbestillinger fra ${it.phone} (${n})`;
       btn.hidden = false;
+      syncFloodLock();
     }, () => {});
   }
   // Idempotens-nøkler (SPEC R1, runde 3): et trykk på Slett eller «Avlys alle» får en nøkkel, og et nytt trykk etter
@@ -847,6 +869,7 @@
     const fl = flood;
     const btn = $("cancel-phone");
     if (!fl || fl.sheet !== sheetSeq || btn.disabled) return;
+    if (floodBusy()) { syncFloodLock(); return; } // en endring herfra av én av avtalene er fortsatt på vei
     if (!confirm(`Avlyse alle ${fl.n} nettbestillingene fra ${fl.phone} fra i dag og fremover?\n\nDe blir merket «Avlyst», og tidene blir ledige igjen. Kundene får ingen beskjed.`)) return;
     const pk = phoneKey(fl.phone);
     const call = sheetCall("cancel-phone", fl.phone, "Ble ikke avlyst", { sheet: fl.sheet, pk });
