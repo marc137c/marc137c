@@ -14,8 +14,8 @@ Eierens egen side (bare du har passordet): besøk og bookinger for alle bedrifte
 ## Ny bedrift
 1. Gi bedriftens side de to statistikkfilene og beacon-linjene i `script.js` (som Viggo's).
 2. Legg til én linje i `sites.mjs`: `{ id, name, url, keyEnv: "STATS_KEY_<NAVN>" }`.
-3. Kjør `tools/link-stats-key.sh <bedriftens-netlify-side-id> STATS_KEY_<NAVN>` – lager en tilfeldig nøkkel og
-   lagrer den på begge sidene uten å vise den.
+3. Kjør `viggos-work/tools/link-stats-key.sh <bedriftens Netlify-mappe> <oversiktens Netlify-mappe> STATS_KEY_<NAVN>`
+   (mappene er koblet med `netlify link`) – lager en tilfeldig nøkkel og lagrer den på begge sidene uten å vise den.
 4. Publiser bedriftens side og oversikten på nytt.
 
 ## Publisere oversikten
