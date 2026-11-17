@@ -7,12 +7,15 @@
 // 4) bruker et nyere nettleser-API uten å sjekke at det finnes først (if ("X" in window), typeof …, try).
 // Med vilje unntatt? Skriv «compat-ok» i en kommentar på samme linje eller linjen over.
 // Mål: Safari/iOS 10+, Chrome 60+, Firefox 55+, Samsung 8+ (se «browserslist» i package.json).
-// Bruk: node scripts/check-es2015.mjs [mappe]   (standard: viggos-barbershop)
+// Bruk: node scripts/check-es2015.mjs [mappe] [versjon]   (standard: viggos-barbershop, 2015)
+//       versjon 5 = ES5 (f.eks. statistikk-settets beacon: ingen pilfunksjoner, const/let, malstrenger …)
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "acorn";
 
 const dir = process.argv[2] || "viggos-barbershop";
+const ES = Number(process.argv[3]) === 5 ? 5 : 2015;
+const ES_NAME = ES === 5 ? "ES5" : "ES2015";
 const files = readdirSync(dir);
 const htmlFiles = files.filter((f) => f.endsWith(".html"));
 
@@ -71,9 +74,9 @@ const report = (where, line, msg) => { failed = true; console.error(`${where}:${
 function check(where, code, lineOffset = 0) {
   let ast;
   try {
-    ast = parse(code, { ecmaVersion: 2015, sourceType: "script", locations: true });
+    ast = parse(code, { ecmaVersion: ES, sourceType: "script", locations: true });
   } catch (err) {
-    report(where, (err.loc ? err.loc.line : 0) + lineOffset, `${err.message} (nyere syntaks enn ES2015)`);
+    report(where, (err.loc ? err.loc.line : 0) + lineOffset, `${err.message} (nyere syntaks enn ${ES_NAME})`);
     return;
   }
   const lines = code.split("\n");
@@ -146,4 +149,4 @@ if (failed) {
   console.error("Rett linjene over, så virker siden også på eldre telefoner.");
   process.exit(1);
 }
-console.log("ES2015-sjekk OK (syntaks, globale navn, DOM-samlinger, nyere API-er)");
+console.log(`${ES_NAME}-sjekk OK (syntaks, globale navn, DOM-samlinger, nyere API-er)`);
