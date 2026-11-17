@@ -235,6 +235,8 @@ async function sameSheetPage(ctl) {
   await page.flush();
   return { page, h, list };
 }
+const BUSY = { "Lagre": "Lagrer …", "Slett": "Sletter …", "Avlys alle nettbestillinger": "Avlyser …" };
+const WRITES = ["save", "delete", "cancel-phone"];
 const SERVER_DID = {
   "Lagre": (list) => { list[0].note = "Ali-notat"; list[0].updatedAt = "2026-11-19T08:01:00.000Z"; return { ok: true, item: list[0] }; },
   "Slett": (list) => { list.splice(0, 1); return { ok: true }; },
@@ -251,14 +253,29 @@ for (const [label, ctl] of Object.entries(CONTROLS)) {
       page.tap("timeline", `[data-id="${ali.id}"] button.item-open`);
       await page.flush();
       assert.equal(page.$("editor").open, true, "Ali's sheet is open again");
-      if (label === "Slett") {
-        assert.equal(page.$("edit-msg").textContent, "Sletter …", "the reopened sheet says the delete is on its way");
-        assert.equal(page.$("delete").disabled, true, "and Slett is locked there");
-      }
+      // Round 3: the reopened sheet says what is on its way, and every control that writes is locked there (one write
+      // per booking at a time from this device); a pending Lagre shows what is being saved
+      assert.equal(page.$("edit-msg").textContent, BUSY[label], "the reopened sheet says what is on its way");
+      for (const id of WRITES) assert.equal(page.$(id).disabled, true, `${id} is locked in the reopened sheet`);
+      if (label === "Lagre") assert.equal(page.field("note").value, "Ali-notat", "the reopened sheet shows the change being saved");
       if (outcome === "ok") h.release(SERVER_DID[label](list));
       else OUTCOMES[outcome](h);
       await page.flush();
-      if (outcome === "401") await logInAgain(page);
+      if (outcome === "401") {
+        await logInAgain(page);
+        // Round 3 (still_open 10): the sheet that comes back names the interrupted action, and its control works
+        assert.equal(page.$("editor").open, true, "the reopened sheet is back");
+        assert.equal(page.$("edit-msg").textContent, ctl.resume);
+        assert.deepEqual(page.alerts, [], "no alert: the sheet itself says it");
+        for (const id of WRITES) assert.equal(page.$(id).disabled, false, `${id} can be pressed`);
+        if (label === "Lagre") assert.equal(page.field("note").value, "Ali-notat", "«trykk Lagre» saves the interrupted change");
+      }
+      if (outcome === "ok") assert.equal(page.$("editor").open, false, "the booking's sheet closes, as after its own save, delete or cancel");
+      if (outcome === "fail") {
+        assert.equal(page.$("editor").open, true);
+        assert.match(page.$("edit-msg").textContent, /Ingen forbindelse/, "the error is written in the reopened sheet");
+        for (const id of WRITES) assert.equal(page.$(id).disabled, false, `${id} can be tried again`);
+      }
       await page.flush();
       const said = [page.$("edit-msg").textContent].concat(page.alerts).join(" | ");
       if (outcome !== "404") assert.doesNotMatch(said, BLAME, said);

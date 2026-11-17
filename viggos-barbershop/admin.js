@@ -263,9 +263,12 @@
         if (resumeEdit) {
           // dialog.close() tømmer ikke skjemaet, og state.editing er den samme: bare vis arket igjen
           resumeEdit = false;
-          $("edit-msg").textContent = RESUME_TEXT[resumeAction] || RESUME_TEXT.save;
+          const act = resumeAction;
           resumeAction = null;
+          $("edit-msg").textContent = RESUME_TEXT[act] || RESUME_TEXT.save;
           $("editor").showModal();
+          // «Avlys alle» i et ark åpnet på nytt: knappen kom kanskje aldri fram (innloggingen gikk ut også for den)
+          if (act === "cancel-phone" && $("cancel-phone").hidden) floodCheck(state.editing);
         } else openPushIfAsked();
       }).catch((err) => {
       loginMsg(errText(err));
@@ -376,12 +379,16 @@
       state.config = day.config;
       render();
       // Arket står åpent (fanen kom tilbake), og avtalen er endret eller borte på serveren siden det ble åpnet (X1.2)
-      // Ikke for en endring denne enheten selv gjorde (ownChange; runde 2): da sier arket det, eller lukkes (slettet)
-      if (dlg.open && state.editing && state.editing.date === d) {
+      // Ikke for en endring denne enheten selv gjorde (ownChange; runde 2): da sier arket det, eller lukkes (slettet).
+      // Ikke mens en endring herfra av avtalen venter på svar (runde 3): svaret avgjør arket. Og en endring herfra som
+      // det aldri kom svar på, kan være den som endret den (maybeOwn).
+      if (dlg.open && state.editing && state.editing.date === d && !pendingFor(state.editing)) {
         const ed = state.editing;
         const fresh = day.items.filter((i) => i.id === ed.id)[0];
         if (!fresh && ownWrites[ed.id] && ownWrites[ed.id].deleted) dlg.close();
-        else if (!fresh || fresh.updatedAt !== ed.updatedAt) $("edit-msg").textContent = ownChange(ed, fresh) ? OWN_CHANGE : "Avtalen er endret et annet sted – lukk og åpne den på nytt.";
+        else if (!fresh || fresh.updatedAt !== ed.updatedAt) {
+          $("edit-msg").textContent = ownChange(ed, fresh) ? OWN_CHANGE : maybeOwn(ed) ? MAYBE_OWN_CHANGE : "Avtalen er endret et annet sted – lukk og åpne den på nytt.";
+        }
       }
       $("sync").textContent = `Oppdatert ${hhmm(new Date().getHours() * 60 + new Date().getMinutes())}`;
       fitScrollPadding();
@@ -544,15 +551,24 @@
   }
 
   function openEditor(item, preset = {}) {
+    // Et kort fra en liste som ikke er hentet på nytt etter denne enhetens egen endring (runde 3): en avtale enheten
+    // har slettet, åpnes ikke; en den har lagret eller avlyst, åpnes slik enheten fikk den tilbake. Ellers bar arket en
+    // utdatert expect, og et 412 eller 404 ble skyldt på «en annen enhet».
+    if (item && ownWrites[item.id] && ownWrites[item.id].deleted) { load(); return; }
+    if (item) item = freshest(item);
     sheetSeq++;
     resumeAction = null;
-    // en lagring, sletting eller avlysning fra et tidligere ark kan fortsatt være på vei: knappene her er dette arkets
-    $("save").disabled = false;
-    $("delete").disabled = false;
-    $("cancel-phone").disabled = false;
+    // Lagre, Slett eller «Avlys alle» for denne avtalen kan fortsatt være på vei fra et ark som ble lukket (runde 2 og
+    // 3): da er alle tre låst her til svaret er kommet, og arket sier hva som venter. En lagring som venter, vises
+    // slik den ble sendt (den samme avtalen og det som lagres), så arket er det samme som arket den ble startet i.
+    const busy = item ? pendingFor(item) : null;
+    const saving = busy && busy.action === "save" && busy.target && busy.target.id === item.id ? busy : null;
+    if (saving) item = saving.target;
+    lockSheet(!!busy);
     fillChoices();
     state.editing = item || null;
-    const v = item || Object.assign({ type: "booking", date: state.day, start: firstFree(), dur: 30, service: "", addons: [], name: "", phone: "", note: "", status: "confirmed" }, preset);
+    const v = item ? (saving ? Object.assign({}, item, saving.body) : item)
+      : Object.assign({ type: "booking", date: state.day, start: firstFree(), dur: 30, service: "", addons: [], name: "", phone: "", note: "", status: "confirmed" }, preset);
     $("edit-title").textContent = item ? (item.type === "block" ? "Endre blokkering" : "Endre avtale") : (v.type === "block" ? "Blokker tid" : "Ny avtale");
     dlg.classList.toggle("is-edit", !!item);
     E.type.value = v.type;
@@ -566,12 +582,7 @@
     E.phone.value = v.phone || "";
     E.note.value = v.note || "";
     E.cancelled.checked = v.status === "cancelled";
-    $("edit-msg").textContent = "";
-    // En sletting av denne avtalen er fortsatt på vei (fra et ark som ble lukket): si det, og lås Slett (runde 2)
-    if (item && deleting[item.id]) {
-      $("delete").disabled = true;
-      $("edit-msg").textContent = DELETING;
-    }
+    $("edit-msg").textContent = busy ? BUSY_TEXT[busy.action] : "";
     syncType();
     floodCheck(item);
     dlg.showModal();
@@ -614,8 +625,9 @@
   // Avtalen er endret på en annen enhet siden arket ble åpnet (412 «stale», X1.1)
   const STALE_TEXT = "Avtalen er endret på en annen enhet, så endringen ble ikke lagret. Listen oppdateres nå.";
   const STALE_DELETE = "Avtalen er endret på en annen enhet, så den ble ikke slettet. Listen oppdateres nå.";
-  // Det denne enheten selv har skrevet per avtale-id (runde 2): { deleted } etter Slett, { updatedAt, moved } etter
-  // Lagre; og numrene «Avlys alle» avlyste. load() skylder da aldri på «et annet sted» for det enheten gjorde selv.
+  // Det denne enheten selv har skrevet per avtale-id (runde 2 og 3): { deleted } etter Slett, { updatedAt, moved, item }
+  // etter Lagre; og numrene «Avlys alle» avlyste. load() skylder da aldri på «et annet sted» for det enheten gjorde selv,
+  // og et kort fra en liste som ikke er hentet på nytt, åpnes slik enheten fikk avtalen tilbake (freshest).
   const ownWrites = {};
   const cancelledHere = {}; // de siste 8 sifrene i et nummer → true
   const last8 = (phone) => String(phone || "").replace(/\D/g, "").slice(-8);
@@ -626,27 +638,70 @@
     if (w && !fresh && w.moved) return true;
     return !!fresh && fresh.status === "cancelled" && !!cancelledHere[last8(fresh.phone)];
   }
+  function freshest(it) {
+    const w = ownWrites[it.id];
+    return w && w.item && w.updatedAt && String(w.updatedAt) > String(it.updatedAt || "") ? w.item : it;
+  }
   // Avtalen er flyttet til en annen måned (ny id) eller slettet på en annen enhet (404, X1.3)
   const GONE_SAVE = "Avtalen er flyttet eller slettet fra en annen enhet, så endringen ble ikke lagret. Listen oppdateres nå.";
   const GONE_DELETE = "Avtalen er flyttet eller slettet fra en annen enhet, så den ble ikke slettet her. Listen oppdateres nå.";
+  // En endring herfra som nådde serveren uten at svaret kom fram (ikke noe nett, 15 s uten svar, en 5xx-side), kan være
+  // den som gjorde avtalen utdatert (runde 3): et 412 eller 404 for den sier det, ikke «en annen enhet»
+  const unsure = []; // touches-funksjonene til slike forespørsler (de siste 20)
+  const maybeOwn = (it) => !!it && unsure.some((touches) => touches(it));
+  const MAYBE_OWN_CHANGE = "Avtalen er endret siden arket ble åpnet, kanskje av endringen herfra som det ikke kom svar på – lukk og åpne den på nytt.";
+  const maybeOwnText = (status, what) => `Avtalen er ${status === 404 ? "flyttet eller slettet" : "endret"} siden arket ble åpnet, kanskje av endringen herfra som det ikke kom svar på, så ${what}. Listen oppdateres nå.`;
 
-  // Én forespørsel startet fra redigeringsarket: Lagre, Slett og «Avlys alle nettbestillinger» (F27, F28; runde 2,
-  // SPEC R21). Den hører til arket den ble startet i (sheet): knappen er låst mens den venter, svaret skrives bare i
-  // det arket, og er arket lukket eller et annet åpnet siden, kommer en feil som en alert som navngir avtalen (who).
-  // En 401 (innloggingen gikk ut) huskes som den avbrutte handlingen når arket kommer tilbake etter ny innlogging;
-  // ellers sies det fra med en gang.
-  // id (runde 2): avtalen forespørselen gjelder. Et ark som er åpnet på nytt for den samme avtalen, regnes som dens
-  // ark: svaret og feilen skrives der, og knappen låses opp der.
-  function sheetCall(action, button, who, verb, sheet = sheetSeq, id = null) {
+  // Forespørsler fra redigeringsarket som venter på svar: Lagre, Slett og «Avlys alle nettbestillinger» (F27, F28;
+  // runde 2 og 3, SPEC R21 og R39). Hver gjelder én avtale (id), eller ett nummers nettbestillinger fra i dag (pk, det
+  // serveren avlyser). Regelen står ett sted (touches): et ark for en avtale forespørselen gjelder, er dens ark, enten
+  // det er arket den ble startet i (sheet) eller et som er åpnet på nytt. Der er Lagre, Slett og «Avlys alle» låst til
+  // svaret er kommet, og arket sier hva som venter; svaret og feilen skrives der, og arket lukkes etter et vellykket
+  // svar. Slik sender denne enheten aldri to endringer av den samme avtalen samtidig, og et 412 eller 404 er en annen
+  // enhets verk. Er arket lukket eller et ark for en annen avtale åpnet, kommer en feil som en alert som navngir
+  // avtalen (who). En 401 (innloggingen gikk ut) huskes som den avbrutte handlingen når arket kommer tilbake etter ny
+  // innlogging, også i et ark åpnet på nytt (før sto det «trykk Lagre» der etter en avbrutt Slett, med Slett grået ut).
+  const pending = [];
+  const WRITE_BUTTONS = ["save", "delete", "cancel-phone"];
+  const BUSY_TEXT = { save: "Lagrer …", delete: "Sletter …", "cancel-phone": "Avlyser …" };
+  const lockSheet = (on) => WRITE_BUTTONS.forEach((b) => { $(b).disabled = on; });
+  function pendingFor(it) {
+    for (let i = 0; i < pending.length; i++) if (pending[i].touches(it)) return pending[i];
+    return null;
+  }
+  // Svaret kom aldri fram: endringen kan ha blitt lagret (ikke en 4xx, og ikke en 5xx der serveren sier hva som skjedde)
+  const noAnswer = (err) => !!(err && (err.network || err.timeout || (err.status >= 500 && !err.code)));
+  function sheetCall(action, who, verb, { sheet = sheetSeq, id = null, pk = null, target = null, body = null } = {}) {
     const own = () => sheetSeq === sheet;
-    const sameItem = () => !!id && dlg.open && !!state.editing && state.editing.id === id;
     const call = {
-      here: () => dlg.open && (own() || sameItem()),
-      lock() { if (call.here()) $(button).disabled = true; },
-      unlock() { if (own() || sameItem()) $(button).disabled = false; },
+      action, target, body,
+      touches: (it) => !!it && (id ? it.id === id
+        : !!pk && it.type === "booking" && it.source === "nettside" && active(it) && String(it.date) >= todayIso() && phoneKey(it.phone) === pk),
+      mine: () => own() || call.touches(state.editing),
+      here: () => dlg.open && call.mine(),
+      lock() {
+        pending.push(call);
+        if (call.here()) lockSheet(true);
+      },
+      // Når svaret er kommet (før listen hentes på nytt): knappene i dette arket virker igjen (med mindre en annen
+      // forespørsel for avtalen fortsatt venter), og «Lagrer …», «Sletter …» eller «Avlyser …» blir aldri stående
+      unlock() {
+        if (call.done) return;
+        call.done = true;
+        const i = pending.indexOf(call);
+        if (i >= 0) pending.splice(i, 1);
+        if (!call.mine() || (state.editing && pendingFor(state.editing))) return;
+        lockSheet(false);
+        if ($("edit-msg").textContent === BUSY_TEXT[action]) $("edit-msg").textContent = "";
+      },
+      // Et sikkert svar (2xx) for avtalen: en tidligere endring uten svar spiller ingen rolle for den lenger
+      settled() {
+        for (let i = unsure.length - 1; i >= 0; i--) if (target && unsure[i](target)) unsure.splice(i, 1);
+      },
       error(err) {
+        if (noAnswer(err)) { unsure.push(call.touches); if (unsure.length > 20) unsure.shift(); }
         if (err.status === 401) {
-          if (own() && resumeEdit) resumeAction = action;
+          if (resumeEdit && call.mine()) resumeAction = action;
           else alert(`${verb} (${who}): innloggingen hadde gått ut. Logg inn og prøv igjen.`);
           return;
         }
@@ -684,6 +739,9 @@
   function save(force = false, ctx) {
     const mine = ctx ? ctx.sheet : sheetSeq;
     const target = ctx ? ctx.target : state.editing;
+    // En endring av denne avtalen herfra venter fortsatt på svar (Enter i et felt sender skjemaet også når Lagre er låst)
+    const busy = !ctx && target ? pendingFor(target) : null;
+    if (busy) { $("edit-msg").textContent = BUSY_TEXT[busy.action]; return Promise.resolve(); }
     let body = ctx ? ctx.body : payload();
     if (!ctx) {
       if (!body.date || Number.isNaN(body.start)) return ($("edit-msg").textContent = "Velg dato og tid.");
@@ -701,8 +759,8 @@
     }
     const was = (k) => (body[k] != null ? body[k] : target ? target[k] : null);
     const who = was("name") || was("service") || (was("type") === "block" ? "Blokkering" : "avtale");
-    const call = sheetCall("save", "save", who, "Ble ikke lagret", mine);
-    // Det samme arket er fortsatt åpent
+    const call = sheetCall("save", who, "Ble ikke lagret", { sheet: mine, id: target ? target.id : null, target, body });
+    // Arket for denne lagringen er åpent (det samme arket, eller et som er åpnet på nytt for avtalen)
     const here = call.here;
     const q = force ? "?force=1" : "";
     call.lock();
@@ -711,8 +769,11 @@
       : api(`/api/admin/items${q}`, { method: "POST", body: JSON.stringify(body) });
     return sent.then((r) => {
       const saved = r && r.item;
-      if (target && saved) ownWrites[target.id] = { updatedAt: saved.updatedAt, moved: !!saved.id && saved.id !== target.id };
-      if (sheetSeq !== mine) return load(); // et annet ark er åpnet siden: la det være i fred
+      if (target && saved && typeof saved.updatedAt === "string") ownWrites[target.id] = { updatedAt: saved.updatedAt, moved: !!saved.id && saved.id !== target.id, item: saved };
+      call.settled();
+      const mineOpen = here();
+      call.unlock();
+      if (!mineOpen && sheetSeq !== mine) return load(); // et ark for en annen avtale er åpnet siden: la det være i fred
       if (dlg.open) dlg.close();
       if (body.date && body.date !== state.day) state.day = body.date;
       return load();
@@ -720,8 +781,9 @@
       if (err.status === 401) return call.error(err); // innloggingen vises (og arket kommer tilbake etterpå, F28)
       if ((err.status === 412 || err.status === 404) && target) {
         // Aldri «lagre likevel» her: da ville endringen fra den andre enheten blitt overskrevet
-        alert(err.status === 412 ? STALE_TEXT : GONE_SAVE);
+        alert(maybeOwn(target) ? maybeOwnText(err.status, "endringen ble ikke lagret") : err.status === 412 ? STALE_TEXT : GONE_SAVE);
         if (here()) dlg.close();
+        call.unlock();
         return load();
       }
       if (err.status === 409 && !force && was("type") === "block") {
@@ -783,11 +845,10 @@
     const btn = $("cancel-phone");
     if (!fl || fl.sheet !== sheetSeq || btn.disabled) return;
     if (!confirm(`Avlyse alle ${fl.n} nettbestillingene fra ${fl.phone} fra i dag og fremover?\n\nDe blir merket «Avlyst», og tidene blir ledige igjen. Kundene får ingen beskjed.`)) return;
-    const call = sheetCall("cancel-phone", "cancel-phone", fl.phone, "Ble ikke avlyst", fl.sheet);
-    call.lock();
-    const busy = "Avlyser …";
-    $("edit-msg").textContent = busy;
     const pk = phoneKey(fl.phone);
+    const call = sheetCall("cancel-phone", fl.phone, "Ble ikke avlyst", { sheet: fl.sheet, pk });
+    call.lock();
+    $("edit-msg").textContent = BUSY_TEXT["cancel-phone"];
     const key = cancelKeys[pk] || (cancelKeys[pk] = newRequestId());
     const forget = () => { if (cancelKeys[pk] === key) delete cancelKeys[pk]; };
     api("/api/admin/cancel-phone", { method: "POST", body: JSON.stringify({ phone: fl.phone, requestId: key }) }).then((r) => {
@@ -795,15 +856,13 @@
       const n = Number(r.cancelled) || 0;
       cancelledHere[last8(fl.phone)] = true;
       if (call.here()) dlg.close();
+      call.unlock();
       alert(`${n} ${n === 1 ? "nettbestilling" : "nettbestillinger"} fra ${fl.phone} er avlyst. Kundene har ikke fått beskjed.`);
       return load();
     }).catch((err) => {
       if (settledAnswer(err)) forget();
       call.error(err);
-    }).then(() => {
-      if (call.here() && $("edit-msg").textContent === busy) $("edit-msg").textContent = "";
-      call.unlock();
-    });
+    }).then(() => call.unlock());
   });
 
   // ---------- Søk etter en kunde (X2.1) ----------
@@ -855,21 +914,18 @@
     });
   });
 
-  // Slettinger på vei (avtalens id): et nytt trykk på Slett for den samme avtalen mens den første venter, sender
-  // ingenting (ellers fikk det andre 404 og en falsk «slettet fra en annen enhet»)
-  const deleting = {};
-  const DELETING = "Sletter …";
+  // Slett: mens en endring av avtalen herfra venter (også en sletting), sender et nytt trykk ingenting (pending over)
   $("delete").addEventListener("click", () => {
     const it = state.editing;
     if (!it || $("delete").disabled) return;
-    if (deleting[it.id]) { $("edit-msg").textContent = DELETING; return; }
+    const busy = pendingFor(it);
+    if (busy) { $("edit-msg").textContent = BUSY_TEXT[busy.action]; return; }
     const what = it.type === "block" ? "blokkeringen" : `avtalen med ${it.name || "kunden"}${it.phone ? ` (${it.phone})` : ""}`;
     if (!confirm(`Slette ${what} ${fmt(it.date, { day: "numeric", month: "long" })} kl. ${hhmm(it.start)} for godt?\n\nTips: huk av «Avlyst» i stedet hvis du vil ha historikken.`)) return;
     const who = `${it.type === "block" ? "blokkeringen" : it.name || "avtalen"} kl. ${hhmm(it.start)}`;
-    const call = sheetCall("delete", "delete", who, "Ble ikke slettet", sheetSeq, it.id);
-    deleting[it.id] = true;
+    const call = sheetCall("delete", who, "Ble ikke slettet", { id: it.id, target: it });
     call.lock();
-    $("edit-msg").textContent = DELETING;
+    $("edit-msg").textContent = BUSY_TEXT.delete;
     // expect: avtalen slik denne enheten så den; er den endret et annet sted siden, svarer serveren 412 (R3).
     // req: nøkkelen for dette trykket, den samme når det samme trykket sendes på nytt (deleteKeys over)
     const v = it.updatedAt || "";
@@ -881,22 +937,20 @@
     api(`/api/admin/items/${encodeURIComponent(it.id)}${q}`, { method: "DELETE" }).then(() => {
       forget();
       ownWrites[it.id] = { deleted: true };
+      call.settled();
       if (call.here()) dlg.close(); // også et ark som er åpnet på nytt for den samme avtalen
+      call.unlock();
       return load();
     }).catch((err) => {
       if (settledAnswer(err)) forget();
       if (err.status === 412 || err.status === 404) {
-        alert(err.status === 412 ? STALE_DELETE : GONE_DELETE);
+        alert(maybeOwn(it) ? maybeOwnText(err.status, "den ble ikke slettet") : err.status === 412 ? STALE_DELETE : GONE_DELETE);
         if (call.here()) dlg.close();
+        call.unlock();
         return load();
       }
       call.error(err);
-    }).then(() => {
-      delete deleting[it.id];
-      // aldri «Sletter …» etter svaret: ikke i dette arket, et ark åpnet på nytt for avtalen, eller et lukket ark
-      if ((call.here() || !dlg.open) && $("edit-msg").textContent === DELETING) $("edit-msg").textContent = "";
-      call.unlock();
-    });
+    }).then(() => call.unlock()); // aldri «Sletter …» etter svaret, i noe ark for avtalen
   });
 
   // ---------- Oppsett: kalender på telefonen ----------
