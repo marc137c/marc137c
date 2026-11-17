@@ -16,7 +16,7 @@
 // eldre utgaver, den eneste mengden som kan være stor, og som ikke lenger vokser.
 // Planen står i denne fila (Netlify: planlagte funksjoner kjører bare på den publiserte utrullingen).
 import { liveDeps, isProduction, isRetiredDeploy, retiredResponse } from "../lib/runtime.mjs";
-import { addDays, isDate, osloNow, mutateJSON, EPOCH_KEY } from "../lib/booking-core.mjs";
+import { addDays, isDate, osloNow, mutateJSON, pruneOutLogs, EPOCH_KEY } from "../lib/booking-core.mjs";
 import { SECRET_KEY, ALL_KEY, LOGIN_ALL_KEY, BUCKET_RE } from "../lib/limits.mjs";
 import { RETENTION_DAYS, COUNTER_MAX_AGE_MS, STATS_KEEP_DAYS, OAUTH_STATE_MAX_AGE_MS } from "../lib/store-keys.mjs";
 
@@ -46,17 +46,21 @@ const job = (tally, what, fn) => async () => {
   }
 };
 
-// En måned i en timebok: avtaler eldre enn grensen går; en måned som er helt eldre enn grensen og blir tom, slettes
-// i sin helhet (uten å skrives tom først)
-async function cleanMonth(store, key, month, cutoff, tally) {
+// En måned i en timebok: avtaler eldre enn grensen går, og oppføringer i flytte- og slettelogger (movedOut,
+// deletedOut) over et døgn gamle (runde 3: før ble de bare tatt bort når måneden fikk en ny, så i en rolig måned
+// ble de liggende til hele dokumentet gikk). En måned som er helt eldre enn grensen og blir tom, slettes i sin
+// helhet (uten å skrives tom først).
+async function cleanMonth(store, key, month, cutoff, nowMs, tally) {
   const whole = lastDayOf(Number(month[1]), Number(month[2])) < cutoff;
-  let removed = 0, empty = false;
+  let removed = 0, empty = false, logs = 0;
   const r = await mutateJSON(store, key, (d) => (d && Array.isArray(d.items) ? d : { items: [] }), (doc) => {
     const keep = doc.items.filter((i) => i && isDate(i.date) && i.date >= cutoff);
     removed = doc.items.length - keep.length;
     empty = keep.length === 0;
+    logs = 0;
     if (whole && empty) return { ok: true, noWrite: true }; // hele dokumentet slettes under
-    if (!removed) return { ok: true, noWrite: true };
+    logs = pruneOutLogs(doc, nowMs);
+    if (!removed && !logs) return { ok: true, noWrite: true };
     doc.items = keep;
     return { ok: true };
   });
@@ -67,8 +71,8 @@ async function cleanMonth(store, key, month, cutoff, tally) {
     tally.deleted += removed + 1;
     return;
   }
-  if (removed) tally.changed++;
-  tally.deleted += removed;
+  if (removed || logs) tally.changed++;
+  tally.deleted += removed + logs;
 }
 
 // En teller (en bøtte eller en felles teller): skrives på nytt uten treffene og pausevarselet som er over
@@ -107,9 +111,9 @@ const socialJob = (store, { nowMs }, tally) => (key) => job(tally, "Instagram-ti
   const at = data && Number.isFinite(data.created_at) ? data.created_at : -Infinity;
   if (data !== null && data !== undefined && nowMs - at > OAUTH_STATE_MAX_AGE_MS) { await store.delete(key); tally.deleted++; }
 });
-const monthJob = (store, { today }, tally) => (key) => {
+const monthJob = (store, { today, nowMs }, tally) => (key) => {
   const month = MONTH_RE.exec(key);
-  return month ? job(tally, "en måned", () => cleanMonth(store, key, month, addDays(today, -RETENTION_DAYS), tally)) : null;
+  return month ? job(tally, "en måned", () => cleanMonth(store, key, month, addDays(today, -RETENTION_DAYS), nowMs, tally)) : null;
 };
 const counterJob = (store, { nowMs }, tally) => (key) => job(tally, "en teller", () => cleanCounter(store, key, nowMs, tally));
 // Rester fra eldre utgaver, som ingen kode skriver lenger: et tellerdokument per klient eller nummer

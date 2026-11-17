@@ -282,6 +282,21 @@ const idSuffix = (id) => { const s = String(id); return s.slice(s.indexOf("_") +
 // Hver endring står allerede i avtalen (et nytt forsøk etter et svar som gikk tapt)
 const hasChanges = (item, changes) => Object.keys(changes).every((k) => JSON.stringify(item[k]) === JSON.stringify(changes[k]));
 const STALE = { error: "Avtalen er endret på en annen enhet. Lukk og åpne den på nytt.", code: "stale", status: 412 };
+// movedOut og deletedOut (under): en oppføring tas bort når den er over et døgn gammel, ved neste skriving i måneden
+// eller ved den daglige oppryddingen (pruneOutLogs, netlify/functions/retention.mjs), altså senest etter 48 timer
+export const OUT_LOG_MS = 24 * 60 * 60 * 1000;
+const freshOut = (e, nowMs) => e && Date.parse(e.at) > nowMs - OUT_LOG_MS;
+// Tar bort oppføringene over OUT_LOG_MS gamle i begge loggene (en tom logg fjernes). Svarer hvor mange som gikk.
+export function pruneOutLogs(doc, nowMs) {
+  let dropped = 0;
+  for (const f of ["movedOut", "deletedOut"]) {
+    if (!Array.isArray(doc[f])) continue;
+    const keep = doc[f].filter((e) => freshOut(e, nowMs));
+    dropped += doc[f].length - keep.length;
+    if (keep.length) doc[f] = keep; else delete doc[f];
+  }
+  return dropped;
+}
 const MOVE_HALF_DONE = "Avtalen er lagt inn på den nye datoen, men den gamle tiden ble ikke fjernet. Trykk Lagre én gang til.";
 const MOVE_RACE_HALF = "Avtalen ble endret på en annen enhet mens du flyttet den. Oppdater siden og sjekk avtalen.";
 
@@ -385,7 +400,7 @@ export async function updateItem(store, id, changes, { force = false, now = new 
       }
       if (old.updatedAt !== current.updatedAt) return { conflict: true, noWrite: true };
       doc.items = doc.items.filter((i) => i.id !== currentId);
-      doc.movedOut = log.filter((m) => m && Date.parse(m.at) > now.getTime() - 864e5)
+      doc.movedOut = log.filter((m) => freshOut(m, now.getTime()))
         .concat({ id: currentId, to: next.id, m: moveMark, at: now.toISOString() }).slice(-20);
       return { ok: true };
     });
@@ -485,7 +500,7 @@ export async function deleteItem(store, id, { expect, now = new Date() } = {}) {
     }
     if (expect !== undefined && it.updatedAt !== expect) return STALE;
     doc.items = doc.items.filter((i) => i.id !== id);
-    doc.deletedOut = log.filter((g) => g && Date.parse(g.at) > now.getTime() - 864e5)
+    doc.deletedOut = log.filter((g) => freshOut(g, now.getTime()))
       .concat({ id, m: mark, at: now.toISOString() }).slice(-50);
     return { ok: true };
   });

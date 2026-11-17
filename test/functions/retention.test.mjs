@@ -336,3 +336,47 @@ test("retention budget: a counter with a stale hit costs two Blobs calls (read, 
   assert.deepEqual(on(/^rl\/b\/phone\//), Array(16).fill("GET"));
   assert.deepEqual(on(/^rl\/ip\//), Array(20).fill("DELETE"));
 });
+
+// ---------- Round 3 (tombstone-age.mjs): the move and deletion logs in a month document ----------
+// KEY_RULES said the movedOut/deletedOut logs hold the moves and deletions «in the last 24 h», but an entry was
+// pruned only when the same month got a new one, so after a quiet month it stayed until the month document went
+// (90+ days): it shows that a booking existed on that date and was deleted. Guard rule: every field in KEY_RULES with
+// a stated period has a test that seeds an old value, runs the clean-up on schedule, and requires it gone within that
+// period. Here: an entry is gone by the first run after it is 24 h old (stated: at the latest 48 hours), by the
+// clean-up alone; newer entries, the bookings and a second quiet run stay unchanged.
+test("retention round 3: move and deletion log entries in a month go by the first run after they are 24 h old (at the latest 48 h), newer ones and the bookings stay", async (t) => {
+  quiet(t);
+  const { KEY_RULES } = await import("../../netlify/lib/store-keys.mjs");
+  const row = KEY_RULES.find((r) => r.prefix === "m/");
+  assert.match(row.holds, /movedOut, deletedOut/);
+  assert.match(row.holds + " " + row.deletion, /movedOut[\s\S]*at the latest 48 hours/, "the row states the period this test checks");
+  const runAt = Date.parse("2026-11-21T00:00:00Z"); // @daily: midnight UTC
+  const clock = new FakeClock(new Date(runAt).toISOString());
+  const blobs = new FakeBlobs({ clock });
+  const d = testDeps({ blobs });
+  const kept = item({ date: "2026-11-27", name: "Blir" });
+  const old = "2026-11-20T08:00:00.000Z"; // 16 h before the first run, 40 h before the second
+  blobs.seed("bookings", "m/2026-11", {
+    items: [kept],
+    deletedOut: [{ id: "2026-11-27_seed0001", m: "aaaaaaaaaaaa", at: old }],
+    movedOut: [{ id: "2026-11-28_seed0002", to: "2026-12-03_seed0002", m: "bbbbbbbbbbbb", at: old }],
+  });
+  assert.equal((await run(d)).status, 200);
+  assert.equal(blobs.json("bookings", "m/2026-11").deletedOut.length, 1, "16 h old: still kept (the threshold is 24 h)");
+  clock.set(runAt + DAY - 3600e3); // an hour before the second run another booking is deleted
+  const doc = blobs.json("bookings", "m/2026-11");
+  const fresh = { id: "2026-11-29_seed0003", m: "cccccccccccc", at: new Date(clock.now()).toISOString() };
+  blobs.seed("bookings", "m/2026-11", { ...doc, deletedOut: [...doc.deletedOut, fresh] });
+  clock.set(runAt + DAY);
+  const second = await run(d);
+  assert.equal(second.status, 200);
+  const after = blobs.json("bookings", "m/2026-11");
+  assert.deepEqual(after.items, [kept], "the booking is unchanged");
+  assert.deepEqual(after.deletedOut, [fresh], "the 40-h-old deletion entry went, the 1-h-old one stayed");
+  assert.ok(!after.movedOut || after.movedOut.length === 0, `the 40-h-old move entry went: ${JSON.stringify(after.movedOut)}`);
+  assert.ok(Date.parse(old) + 48 * 3600e3 >= runAt + DAY, "within the stated 48 h");
+  const before = blobs.log.length;
+  clock.set(runAt + DAY + 3600e3);
+  assert.equal((await run(d)).body.changed, 0);
+  assert.equal(blobs.log.slice(before).filter((e) => e.method === "PUT" || e.method === "DELETE").length, 0, "a quiet run writes nothing");
+});
