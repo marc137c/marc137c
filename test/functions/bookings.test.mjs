@@ -221,3 +221,23 @@ test("bookings replay: the same requestId on a cancelled booking is not a replay
   assert.equal(first.status, 201);
   assert.deepEqual([retry.status, retry.body.code], [400, "too_early"]);
 });
+// Round 3 (still_open 7): the page now takes a clock-rule «no» to the same requestId as «nothing is stored under it»
+// (definite: the time is dropped and the customer may pick another). That holds only if a requestId the server HAS
+// stored at another time never gets a clock «no»: the customer called about an uncertain booking, the barber moved it,
+// and the page retried. Rule (SPEC R36): before any clock rule, an active booking with this requestId at another time
+// answers 409 request_reused, as it does on the normal path.
+test("bookings replay: a booking the barber moved, retried with its requestId after the lead time, answers 409 request_reused, never too_early", async () => {
+  const d = testDeps({ now: BOOKED_AT });
+  const first = await read(await handle(post(today), PRODUCTION, d));
+  assert.equal(first.status, 201);
+  const doc = d.blobs.json("bookings", "m/2026-11");
+  doc.items[0].start = 720; // moved to 12:00 in /admin
+  d.blobs.seed("bookings", "m/2026-11", doc);
+  d.clock.set(RETRY_AT);
+  const retry = await read(await handle(post(today), PRODUCTION, d));
+  assert.deepEqual([retry.status, retry.body.code], [409, "request_reused"]);
+  assert.equal(storedItems(d.blobs).length, 1);
+  // a requestId nobody stored still gets the clock rule
+  const other = await read(await handle(post({ ...today, requestId: "never-stored-02" }), PRODUCTION, d));
+  assert.deepEqual([other.status, other.body.code], [400, "too_early"]);
+});

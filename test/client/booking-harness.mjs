@@ -104,8 +104,12 @@ export class FakeServer {
     // requestId, date and start is answered before any rule that depends on the clock or the opening hours
     const requestId = typeof b.requestId === "string" && REQUEST_ID.test(b.requestId) ? b.requestId : undefined;
     const replay = requestId && this.active().find((i) => i.requestId === requestId && i.date === b.date && i.start === b.start);
+    // … and one stored at another time in that month (the barber moved it) answers request_reused before any clock rule
+    // (bookings.mjs, findRequest; round 3), so a clock «no» to a requestId means nothing is stored under it
+    const month = String(b.date).slice(0, 7);
+    const reused = !replay && requestId && this.active().some((i) => i.requestId === requestId && i.date.slice(0, 7) === month);
     const { date: today, minutes } = this.oslo();
-    const clockRule = (code) => (replay ? this.created(replay) : bad(code));
+    const clockRule = (code) => (replay ? this.created(replay) : reused ? { status: 409, body: { error: "request_reused", code: "request_reused" } } : bad(code));
     if (typeof b.date !== "string" || b.date < today || b.date > addDays(today, this.config.maxDays)) return clockRule("bad_date");
     const h = this.config.hours[dow(b.date)];
     if (!h) return clockRule("closed");

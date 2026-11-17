@@ -3,7 +3,7 @@
 // Hver ny bestilling gir et varsel på Viggos telefon/PC (Web Push, netlify/lib/push.mjs). Varselet sendes etter at
 // timen er lagret, og får aldri felle bestillingen eller holde igjen svaret mer enn BOOKING_PUSH_WAIT_MS.
 import { liveDeps, bookingStore, afterResponse, isRetiredDeploy, retiredResponse, jsonObject } from "../lib/runtime.mjs";
-import { validateCustomer, createItem, findReplay } from "../lib/booking-core.mjs";
+import { validateCustomer, createItem, findReplay, findRequest, REQUEST_REUSED } from "../lib/booking-core.mjs";
 import { takeBookingSlot, releaseBookingSlot, forgetToken } from "../lib/limits.mjs";
 import { announceBooking, pushToDevices, bookingsPausedMessage, pushGen, BOOKING_PUSH_WAIT_MS } from "../lib/push.mjs";
 
@@ -34,8 +34,11 @@ export async function handle(req, context, deps) {
     // Bare lagret, aktiv avtale med samme requestId, dato og tid er et nytt forsøk; ellers gjelder avvisningen
     const stored = () => findReplay(store, input);
     if (v.error) {
-      const same = await stored();
-      if (same) return answer(same, store, req, context, deps);
+      const found = await findRequest(store, input);
+      if (found.same) return answer(found.same, store, req, context, deps);
+      // requestId-en står på en annen tid (barberen har flyttet timen): aldri et klokke-nei, som siden tar som «ikke
+      // lagret» og lar kunden bestille på nytt, men request_reused, som ellers (runde 3, SPEC R36)
+      if (found.reused) return json({ error: REQUEST_REUSED.error, code: REQUEST_REUSED.code }, REQUEST_REUSED.status);
       return json({ error: v.error, code: v.code }, v.status);
     }
     // Tak mot flom (F2): per klient (IP eller IPv6 /64), per telefonnummer og totalt, telt konfliktsikkert før timen lagres

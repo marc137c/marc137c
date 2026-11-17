@@ -583,8 +583,10 @@
         if (doubt(mine.requestId)) { settle(); return stillUnsure(); }
         return rejected("time", (t) => t.takenNow);
       }
-      // Klokkeregler: et nei til et usikkert tidsrom sier ingenting om det første forsøket (runde 2)
-      if (/^(too_early|bad_time|bad_date|closed)$/.test(data.code || "") && doubt()) return stillUnsure();
+      // Klokkeregler: serveren ser etter sin egen lagrede time med denne requestId-en før den sier nei (SPEC R36), så et
+      // nei til akkurat dette forsøket er sikkert (ingenting er lagret under den): tiden eller dagen slippes, med grunnen.
+      // Et nei til et endret forsøk som overlapper et ANNET usikkert tidsrom, sier ingenting om det (runde 3)
+      if (/^(too_early|bad_time|bad_date|closed)$/.test(data.code || "") && doubt(mine.requestId)) { settle(); return stillUnsure(); }
       if (data.code === "too_early" || data.code === "bad_time") return rejected("time", (t) => t.timeGone);
       if (data.code === "bad_date" || data.code === "closed") return rejected("day", (t) => t.dayGone);
       // For mange bestillinger (fra nummeret, nettet eller totalt): et nytt forsøk hjelper ikke, så be om en telefon

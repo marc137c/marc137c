@@ -10,6 +10,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { boot, later, FRIDAY } from "./booking-harness.mjs";
+import { CONFIG } from "../../netlify/lib/booking-core.mjs";
 
 // Every way the first POST can end uncertain. stored: whether the server stored it before the answer went wrong.
 const UNCERTAIN = {
@@ -187,16 +188,20 @@ test("409 on a day that still has free times: «takenNow» at the time step, as 
 // ---------- Fix-up round 2: the clock passes a rule between the uncertain attempt and the retry ----------
 // s2-too-early-retry.mjs: today 11:00 booked at 10:00:40, stored, reply lost; the retry at 10:01:23 (same requestId)
 // got 400 too_early because validation ran before the replay lookup, and the page said «Tiden du valgte er ikke ledig
-// lenger». The server (and this harness's FakeServer, which mirrors it) now answers the replay first; and the page
-// never turns a clock-rule «no» to an uncertain attempt's slot into a «gone» or «taken» text.
+// lenger». The server (and this harness's FakeServer, which mirrors it) now answers the replay first.
+// The times come from CONFIG.leadMin, so the retry really is inside the lead time whatever its value (15 since D11):
+// BOOKED_AT is the last minute at which 11:00 is still offered, and two minutes later 11:00 is too early.
 const TODAY_11 = { service: "Herreklipp", date: "2026-11-12", time: 660, name: "Kari Nordmann", phone: "409 63 955" };
+const hm = (min) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+const BOOKED_AT = `2026-11-12T${hm(660 - CONFIG.leadMin - 1)}:40+01:00`;
+const PAST_LEAD = 120000;
 test("pending: a stored same-day booking retried after the lead time has passed is confirmed (201 replay), and only one is stored", async () => {
-  const site = await boot({ now: "2026-11-12T10:00:40+01:00", setup: (s) => s.when((r) => r.url === "/api/bookings", (req, srv) => { srv.book(req); return { network: true }; }, 1) });
+  const site = await boot({ now: BOOKED_AT, setup: (s) => s.when((r) => r.url === "/api/bookings", (req, srv) => { srv.book(req); return { network: true }; }, 1) });
   await site.pick(TODAY_11);
   await site.book();
   await site.advance(1000);
   assert.equal(site.message(), site.s().uncertain);
-  await site.advance(42000); // 10:01:23: 11:00 is now inside the lead time
+  await site.advance(PAST_LEAD); // 11:00 is now inside the lead time
   await site.book();
   await site.advance(1000);
   assert.equal(site.bookingPosts()[1].json.requestId, site.bookingPosts()[0].json.requestId);
@@ -204,19 +209,80 @@ test("pending: a stored same-day booking retried after the lead time has passed 
   assert.equal(site.server.bookings().length, 1);
   assert.equal(doneLines(site).length, 1);
 });
-for (const code of ["too_early", "bad_time", "bad_date", "closed"]) {
-  test(`pending: a ${code} answer to the retry of an uncertain attempt keeps it uncertain («ring oss»), never «gone»`, async () => {
-    const site = await boot({ setup: (s) => {
-      s.when((r) => r.url === "/api/bookings", (req, srv) => { srv.book(req); return { network: true }; }, 1);
-    } });
+
+// Round 3 (still_open 7, t7-too-early-not-stored.mjs): the server answers a replay first (R36), and a requestId it has
+// stored at another time (the barber moved the booking) answers request_reused, so a clock-rule «no» to the SAME
+// requestId means nothing is stored under it: it is definite. The page kept answering every tap with «Vi vet fortsatt
+// ikke …», the past time still chosen, because doubt() counted the attempt's own slot. Rule (SPEC R37): such a «no»
+// settles the attempt and gets the step's text; only an EDITED attempt over another uncertain slot gets «uncertainStill».
+test("pending: today, not stored (network error), retried after the lead time: «timeGone», 11:00 dropped, and the next tap never loops back to «uncertainStill» (t7)", async () => {
+  const site = await boot({ now: BOOKED_AT, setup: (s) => s.when((r) => r.url === "/api/bookings", { network: true }, 1) });
+  await site.pick(TODAY_11);
+  await site.book();
+  await site.advance(1000);
+  assert.equal(site.message(), site.s().uncertain);
+  await site.advance(PAST_LEAD);
+  assert.match(site.summary(), /kl\. 11:00/, "the choice is kept while the outcome is open");
+  await site.book();
+  await site.advance(1000);
+  const s = site.s();
+  assert.equal(site.bookingPosts()[1].json.requestId, site.bookingPosts()[0].json.requestId, "the same request");
+  assert.equal(site.message(), s.timeGone, "the server's answer for this requestId is definite");
+  assert.equal(site.$("msg-time").textContent, s.timeGone, "at the time step");
+  assert.equal(site.summary(), "", "the past time is no longer chosen");
+  assert.equal(site.slot(660), null, "11:00 is not offered");
+  await site.book();
+  await site.advance(1000);
+  assert.notEqual(site.message(), s.uncertainStill, "no loop");
+  assert.equal(site.bookingPosts().length, 2, "nothing more was sent");
+  assert.equal(site.server.bookings().length, 0);
+});
+test("pending: stored, then moved by the barber, retried after the lead time: request_reused, so «uncertainStill» (call), never «timeGone»", async () => {
+  const site = await boot({ now: BOOKED_AT, setup: (s) => s.when((r) => r.url === "/api/bookings", (req, srv) => { srv.book(req); return { network: true }; }, 1) });
+  await site.pick(TODAY_11);
+  await site.book();
+  await site.advance(1000);
+  site.server.bookings()[0].start = 720; // the customer called, and Viggo moved it to 12:00
+  await site.advance(PAST_LEAD);
+  await site.book();
+  await site.advance(1000);
+  const s = site.s();
+  assert.equal(site.message(), s.uncertainStill);
+  assert.ok(!site.message().includes(s.timeGone));
+  assert.equal(site.server.bookings().length, 1);
+});
+const CLOCK_NO = { too_early: ["time", "timeGone"], bad_time: ["time", "timeGone"], bad_date: ["day", "dayGone"], closed: ["day", "dayGone"] };
+for (const [code, [step, text]] of Object.entries(CLOCK_NO)) {
+  test(`pending: not stored, then ${code} to the same requestId is definite: «${text}» at the ${step} step, the choice dropped, no «uncertainStill»`, async () => {
+    const site = await boot({ setup: (s) => s.when((r) => r.url === "/api/bookings", { network: true }, 1) });
     await site.pick(FRIDAY);
     await site.book();
     await site.advance(1000);
-    // an older server: validates the clock rules before it looks for the replay
+    assert.equal(site.message(), site.s().uncertain);
     site.server.when((r) => r.url === "/api/bookings", { status: 400, body: { error: code, code } }, 1);
     await site.book();
     await site.advance(1000);
     const s = site.s();
+    assert.equal(site.bookingPosts()[1].json.requestId, site.bookingPosts()[0].json.requestId);
+    assert.equal(site.message(), s[text]);
+    assert.equal(site.$("msg-" + step).textContent, s[text], "at the " + step + " step");
+    assert.equal(site.summary(), "", "the stale choice is dropped");
+    await site.book();
+    await site.advance(1000);
+    assert.notEqual(site.message(), s.uncertainStill, "no loop");
+    assert.equal(site.bookingPosts().length, 2, "nothing more was sent");
+  });
+  test(`pending: an EDITED attempt over an uncertain (stored) slot that gets ${code} still says «uncertainStill» and keeps the choice`, async () => {
+    const site = await boot({ setup: (s) => s.when((r) => r.url === "/api/bookings", (req, srv) => { srv.book(req); return { network: true }; }, 1) });
+    await site.pick(FRIDAY);
+    await site.book();
+    await site.advance(1000);
+    site.type(site.$("f-phone"), "40963955");
+    site.server.when((r) => r.url === "/api/bookings", { status: 400, body: { error: code, code } }, 1);
+    await site.book();
+    await site.advance(1000);
+    const s = site.s();
+    assert.notEqual(site.bookingPosts()[1].json.requestId, site.bookingPosts()[0].json.requestId, "an edit is a new request");
     for (const no of [s.timeGone, s.takenNow, s.dayGone]) assert.ok(!site.message().includes(no), site.message());
     assert.equal(site.message(), s.uncertainStill);
     assert.match(site.summary(), /fredag 13\. november kl\. 14:00/, "the choice is kept");

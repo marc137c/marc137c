@@ -186,6 +186,8 @@ export function validateCustomer(input, now = new Date()) {
   return { value };
 }
 const REQUEST_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
+// Samme requestId på en aktiv avtale med en annen tid (createItem, og bookings.mjs før klokkereglene: findRequest)
+export const REQUEST_REUSED = Object.freeze({ error: "Denne forespørselen er allerede brukt. Last siden på nytt.", code: "request_reused", status: 409 });
 // En idempotens-nøkkel slik /admin og bestillingssiden lager dem (8–64 tegn: bokstaver, sifre, _ og -)
 export const isRequestId = (s) => typeof s === "string" && REQUEST_ID_RE.test(s);
 
@@ -250,7 +252,7 @@ export async function createItem(store, value, { source, force = false, now = ne
       const same = doc.items.find((o) => o.requestId === item.requestId && active(o) && o.date === item.date && o.start === item.start);
       if (same) return { ok: true, item: same, replay: true, noWrite: true };
       if (doc.items.some((o) => o.requestId === item.requestId && active(o))) {
-        return { error: "Denne forespørselen er allerede brukt. Last siden på nytt.", code: "request_reused", status: 409 };
+        return { ...REQUEST_REUSED };
       }
     }
     const clash = active(item) && doc.items.find((o) => active(o) && o.date === item.date && overlaps(item.start, item.dur, o.start, o.dur));
@@ -265,12 +267,21 @@ export async function createItem(store, value, { source, force = false, now = ne
 // som avhenger av klokken eller av lagret tilstand (datovinduet, ledetiden, åpningstidene, takene). Ellers ble et nytt
 // forsøk etter at ledetiden hadde passert, besvart «for tidlig», og kunden bestilte en gang til.
 export async function findReplay(store, input) {
-  if (!input || typeof input.requestId !== "string" || !REQUEST_ID_RE.test(input.requestId) || !isDate(input.date)) return null;
+  return (await findRequest(store, input)).same;
+}
+// Det som er lagret under en requestId i datoens måned, med én lesing: same = det nye forsøkets lagrede avtale (som
+// findReplay), reused = en aktiv avtale med denne requestId-en står på en annen tid (barberen har flyttet den).
+// Runde 3: siden tar et klokke-nei til samme requestId som «ingenting er lagret» (sikkert); derfor får en requestId som
+// ER lagret på en annen tid, request_reused før klokkereglene, slik den får det ellers (createItem).
+export async function findRequest(store, input) {
+  const none = { same: null, reused: false };
+  if (!input || typeof input.requestId !== "string" || !REQUEST_ID_RE.test(input.requestId) || !isDate(input.date)) return none;
   const start = Number(input.start);
-  if (!Number.isInteger(start)) return null;
+  if (!Number.isInteger(start)) return none;
   const doc = await store.get(monthKey(monthOf(input.date)), { type: "json" });
-  const items = doc && Array.isArray(doc.items) ? doc.items : [];
-  return items.find((o) => o && o.requestId === input.requestId && active(o) && o.date === input.date && o.start === start) || null;
+  const mine = (doc && Array.isArray(doc.items) ? doc.items : []).filter((o) => o && o.requestId === input.requestId && active(o));
+  const same = mine.find((o) => o.date === input.date && o.start === start) || null;
+  return { same, reused: !same && mine.length > 0 };
 }
 
 export async function findItem(store, id) {
