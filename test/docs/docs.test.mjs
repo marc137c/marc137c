@@ -123,3 +123,28 @@ test("docs round 2: README «Språk» says only the toggle is remembered, and ea
     assert.ok(tests.includes(name), `site-i18n.test.mjs has «${name}»`);
   }
 });
+
+// Fix-up round 2 (DEPLOY §6 asked the owner to approve «Tomme seksjoner … skjules», a behaviour that was never
+// built): every owner question in DEPLOY §6 about how the site behaves names the test that encodes it, as
+// «Test: `file` «a fragment of the test's title»», and that test exists; the other lines are texts or notices,
+// marked «Godkjenning.» or «Beskjed.».
+test("DEPLOY §6: every owner question names its test (which exists), or is marked as a text approval or a notice", () => {
+  const deploy = read("DEPLOY.md");
+  const from = deploy.indexOf("## 6.");
+  const next = deploy.indexOf("\n## ", from + 5);
+  const part = deploy.slice(from, next < 0 ? deploy.length : next);
+  const lines = part.split(/\r?\n/).filter((l) => l.startsWith("- [ ]"));
+  assert.ok(lines.length >= 10, `${lines.length} lines in §6`);
+  for (const line of lines) {
+    const refs = [...line.matchAll(/Test: `([^`]+)` «([^«»]+)»/g)];
+    if (!refs.length) {
+      assert.match(line, /(Godkjenning|Beskjed)\.$/, `no test and no «Godkjenning.»/«Beskjed.»: ${line.slice(0, 90)}`);
+      continue;
+    }
+    for (const [, file, title] of refs) {
+      assert.ok(existsSync(ROOT + file), `${file} exists`);
+      const titled = read(file).split(/\r?\n/).some((l) => l.includes("test(") && l.includes(title));
+      assert.ok(titled, `${file} has a test whose title contains «${title}»`);
+    }
+  }
+});

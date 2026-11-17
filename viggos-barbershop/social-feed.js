@@ -4,6 +4,7 @@
   const grid = document.getElementById("social-feed");
   if (!grid) return;
   const lead = document.querySelector("#sosiale .section-lead");
+  const head = document.querySelector("#sosiale .section-head");
 
   const ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17.3" cy="6.7" r="1.2" fill="currentColor"/></svg>';
   const PROFILE = "https://www.instagram.com/viggos.barbershop/";
@@ -54,11 +55,13 @@
   function render() {
     if (!feed) return;
     const posts = (feed.instagram || []).slice(0, 6);
-    // Ingen poster (ikke koblet til, eller Instagram feiler): rutenettet og «De nyeste klippene …» skjules, så
-    // ingenting lover poster som ikke finnes. Følg oss-knappene under står igjen.
+    // Ingen poster (ikke koblet til, eller Instagram feiler): rutenettet og hele overskriften («Sosiale medier»,
+    // «Ferskt fra stolen», «De nyeste klippene …») skjules, så ingenting lover poster som ikke finnes. Følg oss-knappene
+    // under står igjen (eierens standard «tomme seksjoner skjules», DEPLOY del 6; runde 2).
     const empty = posts.length === 0;
     grid.hidden = empty;
     if (lead) lead.hidden = empty;
+    if (head) head.hidden = empty;
     // To kolonner: et «Følg oss»-kort fyller den tomme ruten når antallet poster er oddetall (og står alene uten poster)
     const html = posts.map(postCard);
     if (posts.length === 0 || posts.length % 2 === 1) html.push(followCard());

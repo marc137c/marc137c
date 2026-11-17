@@ -372,3 +372,31 @@ test("widgets: every string reviews.js, social-feed.js and i18n.js wrote in this
   const bad = writes.filter((w) => !w.html.isWellFormed());
   assert.deepEqual(bad.map((w) => `#${w.id}: ${JSON.stringify(w.html.slice(0, 120))}`), []);
 });
+
+// Fix-up round 2 (demo-empty-social.test.mjs): DEPLOY §6 asked the owner to approve «Tomme seksjoner … skjules», but
+// only the grid and the lead were hidden: «Sosiale medier / Ferskt fra stolen» stood above three buttons, and «Hva
+// kundene sier» stood with nothing under it. The F64 rule now covers the heading: a section head that promises
+// content is hidden when the content is not there; the follow buttons and «Se alle anmeldelser» stay. DEPLOY §6
+// lists exactly these elements and names this test.
+test("F64 headings: no Instagram posts (none, a network failure, a 500): the whole section head (eyebrow, heading, lead) is hidden; the follow buttons stay", async () => {
+  for (const routes of [{ "/api/social": { body: feed(0) } }, { "/api/social": { network: true } }, { "/api/social": { status: 500, body: {} } }]) {
+    const site = await open(["social-feed.js"], routes);
+    assert.equal(site.qs("#sosiale .section-head").hidden, true, JSON.stringify(routes));
+    assert.equal(site.qsa("#sosiale .follow-row a").length, 3, "Instagram, TikTok and Facebook stay");
+  }
+  const site = await socialPage(feed(1));
+  assert.equal(site.qs("#sosiale .section-head").hidden, false, "one post shows the heading again");
+  assert.equal(text(site.qs("#sosiale-title")), "Ferskt fra stolen");
+});
+test("F64 headings: Google with no rating and no text reviews hides the reviews heading; with a rating it stays; FEATURED always shows it", async () => {
+  const none = await reviewsPage({ configured: true, rating: null, count: 0, url: REVIEWS.noText.url, reviews: [] });
+  assert.equal(none.qs("#anmeldelser .section-head").hidden, true, "«Hva kundene sier» over nothing is hidden");
+  assert.ok(none.$("reviews-link"), "«Se alle anmeldelser på Google» stays");
+  const noText = await reviewsPage(REVIEWS.noText);
+  assert.equal(noText.qs("#anmeldelser .section-head").hidden, false, "the heading and Google's score stay");
+  assert.equal(noText.$("rating-summary").hidden, false);
+  assert.equal((await reviewsPage(REVIEWS.unconfigured)).qs("#anmeldelser .section-head").hidden, false);
+});
+test("F64 headings: the hidden attribute wins over the section head's display", () => {
+  assert.match(readSite("styles.css"), /\.section-head\[hidden\] \{ display: none; \}/);
+});

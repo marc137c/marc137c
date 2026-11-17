@@ -5,6 +5,7 @@
   if (!list) return;
   const summary = document.getElementById("rating-summary");
   const link = document.getElementById("reviews-link");
+  const head = document.querySelector("#anmeldelser .section-head");
   const heroRating = document.getElementById("hero-rating"); // stjernene øverst på siden
   const MAX_CARDS = 4;
   const HERO_MIN = 5; // eierens standardvalg (docs/SPEC.md): stjernene i toppen fra 5 anmeldelser, uansett snitt
@@ -82,6 +83,7 @@
     const r = FEATURED.rating.toFixed(1).replace(".", I18N.lang === "en" ? "." : ",");
     summary.innerHTML = `${G_LOGO}<strong class="rating-num">${r}</strong>${stars(FEATURED.rating, "stars-lg")}<span class="rating-count">${esc(s.onGoogle)}</span>`;
     summary.hidden = false;
+    if (head) head.hidden = false;
     if (heroRating) heroRating.hidden = true; // antall anmeldelser er ukjent uten Google-koblingen
     list.innerHTML = FEATURED.reviews.map((x) => card(Object.assign({}, x, { when: s.googleReview }), G_LOGO)).join("");
     list.classList.remove("reviews--single");
@@ -117,10 +119,13 @@
       list.classList.toggle("reviews--single", withText.length === 1); // ett kort: smalt og midtstilt
       list.hidden = false;
     } else {
-      // Ingen anmeldelser med tekst: ingen tom boks; overskriften og «Se alle anmeldelser» står igjen
+      // Ingen anmeldelser med tekst: ingen tom boks; overskriften (med Googles snitt) og «Se alle anmeldelser» står igjen
       list.innerHTML = "";
       list.hidden = true;
     }
+    // Verken snitt eller anmeldelser med tekst: «Hva kundene sier» lover noe som ikke finnes, så overskriften skjules;
+    // «Se alle anmeldelser på Google» står igjen (runde 2)
+    if (head) head.hidden = !(data.rating && data.count) && !withText.length;
     list.setAttribute("aria-busy", "false");
   }
 

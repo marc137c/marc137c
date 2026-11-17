@@ -593,6 +593,7 @@ form.booking {
 .rating-summary[hidden] { display: none; }
 /* hidden må vinne over display: grid (tom feed eller ingen anmeldelser med tekst) */
 .social-feed[hidden], .reviews[hidden], .section-lead[hidden] { display: none; }
+.section-head[hidden] { display: none; } /* en overskrift som lover noe som ikke finnes (F64, runde 2) */
 .rating-num { font: 700 2rem var(--caps); color: var(--text); }
 .rating-count { color: var(--muted); font-size: .9rem; }
 .g-logo { width: 22px; height: 22px; flex: none; }
