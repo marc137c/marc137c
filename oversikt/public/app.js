@@ -151,15 +151,32 @@
   }
 
   // ---------- flyt ----------
-  function showLogin(msg) { $("app").hidden = true; $("login").hidden = false; $("login-msg").textContent = msg || ""; try { $("pw").focus(); } catch (e) { /* gammel nettleser */ } }
+  // Tre tilstander: logget ut (#login), logget inn mens tallene hentes eller hentingen feilet (#app med statuslinjen
+  // #app-msg, «Oppdater» og «Logg ut»), og tallene vist (#app med #data). Statuslinjen står aldri inne i noe skjult.
+  var seq = 0; // bare svaret på den siste forespørselen gjelder (perioden byttet to ganger raskt)
+  function showLogin(msg) {
+    seq++;
+    $("app").hidden = true; $("app-msg").textContent = ""; $("login").hidden = false; $("login-msg").textContent = msg || "";
+    try { $("pw").focus(); } catch (e) { /* gammel nettleser */ }
+  }
+  function showApp() { $("login").hidden = true; $("login-msg").textContent = ""; $("app").hidden = false; }
   function load() {
     var t = getToken();
     if (!t) { showLogin(""); return; }
+    var mine = ++seq;
+    showApp();
     $("app-msg").textContent = "Henter tall …";
     request("GET", "/api/overview?days=" + state.days, null, t, function (status, d) {
-      if (status === 401) { setToken(null); showLogin("Logg inn på nytt."); return; }
-      if (status !== 200 || !d) { $("app-msg").textContent = "Kunne ikke hente tallene (" + (status || "ingen forbindelse") + "). Trykk Oppdater."; return; }
-      $("login").hidden = true; $("app").hidden = false; $("app-msg").textContent = "";
+      if (mine !== seq) return;
+      if (status === 401) { setToken(null); state.data = null; $("data").hidden = true; showLogin("Logg inn på nytt."); return; }
+      if (status !== 200 || !d || !Array.isArray(d.sites)) {
+        // Tallene for en annen periode blir ikke stående under en ny periodeknapp
+        state.data = null; $("data").hidden = true;
+        $("app-msg").textContent = "Kunne ikke hente tallene (" + (status === 200 ? "ukjent svar" : status || "ingen forbindelse") + "). Trykk Oppdater.";
+        return;
+      }
+      $("app-msg").textContent = "";
+      $("data").hidden = false;
       state.data = d;
       var now = new Date();
       $("updated").textContent = "· oppdatert " + ("0" + now.getHours()).slice(-2) + ":" + ("0" + now.getMinutes()).slice(-2);
@@ -194,7 +211,7 @@
   });
   $("same").addEventListener("change", render);
   $("refresh").addEventListener("click", load);
-  $("logout").addEventListener("click", function () { setToken(null); state.data = null; showLogin("Du er logget ut."); });
+  $("logout").addEventListener("click", function () { setToken(null); state.data = null; $("data").hidden = true; showLogin("Du er logget ut."); });
   markDays();
   load();
 })();

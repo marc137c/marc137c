@@ -36,7 +36,9 @@
       </div>
     </header>
     <main class="wrap">
+      <!-- Statuslinjen står utenfor #data: den vises mens tallene hentes og når hentingen feiler (runde 3) -->
       <p class="msg" id="app-msg" role="alert"></p>
+      <div id="data" hidden>
       <section class="card">
         <h2>Sammenligning</h2>
         <div class="table-wrap"><table id="compare"><thead></thead><tbody></tbody></table></div>
@@ -44,6 +46,7 @@
       </section>
       <label class="check same"><input id="same" type="checkbox" checked> Lik skala i diagrammene (for å sammenligne bedriftene)</label>
       <div id="cards"></div>
+      </div>
     </main>
   </div>
   <script src="app.js"></script>
