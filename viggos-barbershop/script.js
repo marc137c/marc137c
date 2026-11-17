@@ -180,13 +180,14 @@ if ("IntersectionObserver" in window) {
 
 document.getElementById("year").textContent = new Date().getFullYear();
 
-// Besøksteller uten informasjonskapsler: bare dato, side og hvilket nettsted besøket kom fra
-// (f.eks. instagram.com). Ingen IP-adresse eller ID lagres, og ingenting lagres på besøkerens enhet.
+// Besøksteller uten informasjonskapsler: bare dato, side, hvilket nettsted besøket kom fra (f.eks. instagram.com)
+// og en eventuell merket lenke (?fra=instagram). Ingen IP-adresse eller ID lagres, og ingenting lagres på enheten.
 (() => {
   try {
+    const tag = /[?&]fra=([a-z0-9_-]{1,20})/i.exec(location.search || "");
     const x = new XMLHttpRequest();
     x.open("POST", "/api/hit", true);
     x.setRequestHeader("Content-Type", "text/plain");
-    x.send(JSON.stringify({ p: location.pathname, r: document.referrer ? (document.referrer.split("/")[2] || "") : "" }));
+    x.send(JSON.stringify({ p: location.pathname, r: document.referrer ? (document.referrer.split("/")[2] || "") : "", f: tag ? tag[1].toLowerCase() : "" }));
   } catch (e) { /* telleren er ikke viktig for siden */ }
 })();

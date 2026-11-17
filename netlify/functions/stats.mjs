@@ -12,18 +12,24 @@ import { bookingStats, sumDays } from "../lib/stats-bookings.mjs";
 
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 const BOT = /bot|crawl|spider|slurp|preview|headless|lighthouse|facebookexternalhit|whatsapp|telegram|discord|curl|wget|python|node-fetch/i;
-const SOURCES = ["instagram", "facebook", "google", "tiktok", "direkte", "annet"];
+// Merkede lenker (?fra=instagram osv.) – samme liste som stats-kit, så oversikten viser alle bedriftene likt
+export const TAGS = ["instagram", "facebook", "google", "tiktok", "snapchat", "qr", "sms", "epost", "visittkort"];
+const SOURCES = [...TAGS, "direkte", "annet"];
 const RANGES = [7, 30, 90];
 const bare = (h) => String(h || "").toLowerCase().replace(/^www\./, "");
 
-// Hvor et besøk utenfra kom fra (tom avsender = skrevet inn, bokmerke eller app som ikke sender avsender)
-export function sourceOf(host) {
+// Hvor et besøk utenfra kom fra: merket lenke først (apper som Instagram sender ofte ingen avsender),
+// ellers avsendernettstedet (tom avsender = skrevet inn, bokmerke eller app uten avsender)
+export function sourceOf(host, tag) {
+  const t = String(tag || "").toLowerCase();
+  if (t) return TAGS.includes(t) ? t : "annet";
   const h = bare(host);
   if (!h) return "direkte";
   if (/instagram/.test(h)) return "instagram";
   if (/facebook|(^|\.)fb\.(com|me)$/.test(h)) return "facebook";
   if (/(^|\.)google\./.test(h)) return "google";
   if (/tiktok/.test(h)) return "tiktok";
+  if (/snapchat/.test(h)) return "snapchat";
   return "annet";
 }
 export const isInternal = (refHost, siteHost) => !!bare(refHost) && bare(refHost) === bare(siteHost);
@@ -63,7 +69,7 @@ export default async (req, context) => {
     let body = {};
     try { body = JSON.parse((await req.text()).slice(0, 500)) || {}; } catch { /* tom melding teller som forsiden */ }
     const page = /personvern/.test(String(body.p || "")) ? "personvern" : "forside";
-    const source = isInternal(body.r, url.hostname) ? null : sourceOf(body.r);
+    const source = isInternal(body.r, url.hostname) ? null : sourceOf(body.r, body.f);
     try { await bump(store, `d/${osloNow().date}`, page, source); } catch (err) { console.error("Statistikk:", err && err.message); }
     return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
   }

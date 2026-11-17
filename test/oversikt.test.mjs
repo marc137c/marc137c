@@ -106,3 +106,23 @@ test("slim: bare valgt periode, og ingen bookingtall blir null (ikke 0)", () => 
   const t = slim({ days: [{ date: "2026-11-15", visits: 1, views: 1, bookings: null }] }, 7);
   assert.equal(t.days[0].booked, null);
 });
+
+test("bedriftsliste: bedrifter fra lageret kommer med, ugyldige hoppes over, fast oppføring vinner, nøkkelen sendes ikke videre", async () => {
+  const { mergeSites, validEntry } = await import("../oversikt/netlify/functions/overview.mjs");
+  const good = { id: "frisor-anna", name: "Frisør Anna", url: "https://anna.example", key: "k".repeat(43) };
+  assert.equal(validEntry(good), true);
+  for (const bad of [{ ...good, id: "Store Bokstaver" }, { ...good, url: "http://anna.example" }, { ...good, url: "javascript:alert(1)" },
+    { ...good, url: "https://user:pw@anna.example" }, { ...good, key: "kort" }, { ...good, name: "" }, null, "tekst"]) assert.equal(validEntry(bad), false);
+  const merged = mergeSites(SITES, [good, { ...good, id: "a", name: "Kopi av A" }, { id: "x" }]);
+  assert.deepEqual(merged.map((s) => s.id), ["a", "b", "c", "frisor-anna"]);
+  assert.equal(merged.find((s) => s.id === "a").name, "A", "fast oppføring vinner ved lik id");
+
+  const d = deps({ registry: async () => [good] });
+  const calls = [];
+  d.fetchImpl = async (url, opts) => { calls.push({ url, key: opts.headers["X-Stats-Key"] }); return new Response(JSON.stringify(STATS), { status: 200 }); };
+  const j = await (await overview(d, makeToken("riktig-passord", d.now()), 7)).json();
+  const anna = j.sites.find((s) => s.id === "frisor-anna");
+  assert.equal(anna.ok, true);
+  assert.ok(calls.some((c) => c.url.startsWith("https://anna.example/api/stats") && c.key === good.key), "henter med nøkkelen fra lageret");
+  assert.equal(JSON.stringify(j).includes(good.key), false, "nøkkelen sendes aldri til nettleseren");
+});

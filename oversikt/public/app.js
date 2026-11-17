@@ -6,7 +6,8 @@
   var KEY = "oversikt-token";
   var DAYS = ["søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"];
   var SHORT = ["søn", "man", "tir", "ons", "tor", "fre", "lør"];
-  var SRC = { instagram: "Instagram", facebook: "Facebook", google: "Google", tiktok: "TikTok", direkte: "Direkte", annet: "Annet" };
+  var SRC = { instagram: "Instagram", facebook: "Facebook", google: "Google", tiktok: "TikTok", snapchat: "Snapchat", qr: "QR-kode",
+    sms: "SMS", epost: "E-post", visittkort: "Visittkort", direkte: "Direkte", annet: "Annet" };
   var state = { days: 30, data: null, sort: { key: "visits", dir: -1 } };
   var $ = function (id) { return document.getElementById(id); };
 

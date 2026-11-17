@@ -59,10 +59,34 @@ export function slim(d, n) {
   return { today: d.today, range: n, visits: d.totals ? d.totals.visits || 0 : 0, views: d.totals ? d.totals.views || 0 : 0, sources: d.sources || {}, bookings: d.bookings || null, days };
 }
 
+// Bedriftslisten = den faste listen i sites.mjs + bedrifter lagt til med tools/add-site.sh (lagret i oversiktens
+// Blobs-lager «oversikt-sites» som site/<id> = {id, name, url, key}). Da trengs verken kodeendring eller ny
+// publisering når en ny bedrift kommer til. Ugyldige oppføringer hoppes over; en fast oppføring vinner ved lik id.
+export function validEntry(e) {
+  if (!e || typeof e !== "object") return false;
+  if (typeof e.id !== "string" || !/^[a-z0-9-]{1,40}$/.test(e.id)) return false;
+  if (typeof e.name !== "string" || !e.name.trim() || e.name.length > 80) return false;
+  if (typeof e.key !== "string" || e.key.length < 20) return false;
+  try { const u = new URL(e.url); return u.protocol === "https:" && !u.username && !u.password; } catch { return false; }
+}
+export function mergeSites(fixed, registry) {
+  const ids = new Set(fixed.map((s) => s.id));
+  const extra = (registry || []).filter((e) => validEntry(e) && !ids.has(e.id))
+    .map((e) => ({ id: e.id, name: e.name.trim(), url: e.url, key: e.key }))
+    .sort((a, b) => a.name.localeCompare(b.name, "nb"));
+  return [...fixed, ...extra];
+}
+async function loadRegistry(store) {
+  try {
+    const { blobs } = await store.list({ prefix: "site/" });
+    return (await Promise.all(blobs.map((b) => store.get(b.key, { type: "json" }).catch(() => null)))).filter(Boolean);
+  } catch (err) { console.error("Bedriftslisten kunne ikke leses:", err && err.message); return []; }
+}
+
 async function fetchSite(site, n, env, fetchImpl) {
-  const base = { id: site.id, name: site.name, url: site.url };
-  const key = env[site.keyEnv];
-  if (!key) return { ...base, ok: false, error: "Mangler lesenøkkel (" + site.keyEnv + ")" };
+  const base = { id: site.id, name: site.name, url: site.url }; // nøkkelen sendes aldri videre til nettleseren
+  const key = site.key || env[site.keyEnv];
+  if (!key) return { ...base, ok: false, error: "Mangler lesenøkkel (" + (site.keyEnv || site.id) + ")" };
   try {
     const r = await fetchImpl(site.url.replace(/\/$/, "") + "/api/stats?days=" + n, {
       headers: { "X-Stats-Key": key, Accept: "application/json" }, signal: AbortSignal.timeout(TIMEOUT_MS), redirect: "follow",
@@ -100,7 +124,8 @@ export async function handle(req, context, deps) {
     const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
     if (!verifyToken(token, env.OVERVIEW_PASSWORD, now())) return json({ error: "Logg inn på nytt." }, 401);
     const n = RANGES.includes(Number(url.searchParams.get("days"))) ? Number(url.searchParams.get("days")) : 30;
-    const results = await Promise.all(sites.map((s) => fetchSite(s, n, env, fetchImpl)));
+    const all = mergeSites(sites, deps.registry ? await deps.registry() : []);
+    const results = await Promise.all(all.map((s) => fetchSite(s, n, env, fetchImpl)));
     return json({ range: n, sites: results });
   }
   return json({ error: "Finnes ikke." }, 404);
@@ -108,6 +133,7 @@ export async function handle(req, context, deps) {
 
 export default (req, context) => handle(req, context, {
   env: process.env, store: getStore({ name: "oversikt-auth", consistency: "strong" }), fetchImpl: fetch, now: () => Date.now(), sites: SITES,
+  registry: () => loadRegistry(getStore({ name: "oversikt-sites", consistency: "strong" })),
 });
 
 export const config = { path: ["/api/login", "/api/overview"] };
