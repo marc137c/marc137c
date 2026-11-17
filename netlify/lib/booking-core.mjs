@@ -279,9 +279,12 @@ export async function findItem(store, id) {
 }
 
 const idSuffix = (id) => { const s = String(id); return s.slice(s.indexOf("_") + 1); };
+const dateOfId = (id) => String(id).split("_")[0];
 // Hver endring står allerede i avtalen (et nytt forsøk etter et svar som gikk tapt)
 const hasChanges = (item, changes) => Object.keys(changes).every((k) => JSON.stringify(item[k]) === JSON.stringify(changes[k]));
 const STALE = { error: "Avtalen er endret på en annen enhet. Lukk og åpne den på nytt.", code: "stale", status: 412 };
+const NOT_FOUND = { error: "Fant ikke avtalen.", status: 404 };
+const BUSY = { error: "Mange endringer samtidig. Prøv igjen.", status: 503 };
 // movedOut og deletedOut (under): en oppføring tas bort når den er over et døgn gammel, ved neste skriving i måneden
 // eller ved den daglige oppryddingen (pruneOutLogs, netlify/functions/retention.mjs), altså senest etter 48 timer
 export const OUT_LOG_MS = 24 * 60 * 60 * 1000;
@@ -300,23 +303,118 @@ export function pruneOutLogs(doc, nowMs) {
 const MOVE_HALF_DONE = "Avtalen er lagt inn på den nye datoen, men den gamle tiden ble ikke fjernet. Trykk Lagre én gang til.";
 const MOVE_RACE_HALF = "Avtalen ble endret på en annen enhet mens du flyttet den. Oppdater siden og sjekk avtalen.";
 
+// ---------- Flytting til en annen måned (runde 3, SPEC R33) ----------
+// En flytting til en annen måned skriver to dokumenter. Hvert steg er en betinget skriving:
+//   1. originalen får merket moving { to: ny id, m } i den gamle måneden (m: flyttingens tilfeldige merke), i den
+//      samme skrivingen som sjekker forutsetningene (expect, ingen annen flytting på gang);
+//   2. kopien legges inn i den nye måneden med mv { m, from: gammel id };
+//   3. originalen fjernes, bare mens den har merket m, og movedOut får { id, to, m, at };
+//   4. merket tas bort fra kopien.
+// Vakt-regel: det første steget merker posten de andre skriverne sjekker (originalen), i det samme dokumentet. Før
+// fikk bare kopien et merke, og en DELETE av originalen etter et steg 3 som feilet, svarte 200 mens kopien levde
+// videre. Nå gjør enhver annen skriver som møter et av merkene (PATCH, DELETE, «Avlys alle fra nummeret», en ny
+// flytting), flyttingen ferdig eller angrer den først (settleMove), og prøver så på nytt med sin egen forutsetning.
+// Merkene har ingen kundedata: bare id-er og et tilfeldig merke.
+export function pendingMove(it) {
+  if (!it || typeof it !== "object") return null;
+  if (it.moving && typeof it.moving === "object") return { from: String(it.id), to: String(it.moving.to), m: String(it.moving.m) };
+  if (it.mv && typeof it.mv === "object") return { from: String(it.mv.from), to: String(it.id), m: String(it.mv.m) };
+  if (it.mv) return { from: "", to: String(it.id), m: String(it.mv) }; // et merke uten opphav: kopien beholdes
+  return null;
+}
+const copyMark = (o) => (o && o.mv ? (typeof o.mv === "object" ? o.mv.m : o.mv) : undefined);
+const isCopyOf = (o, id, m) => !!o && o.id === id && copyMark(o) === m;
+
+// Gjør en flytting som ikke er ferdig, ferdig, eller angrer den. Svarer { ok, outcome }:
+//   forward  avtalen står på den nye datoen (originalen fjernet, merket tatt bort fra kopien);
+//   back     avtalen står på den gamle datoen (merket tatt bort fra originalen, kopien fjernet);
+//   keep     ingen spor av flyttingen i den gamle måneden (loggen er eldre enn et døgn): kopien beholdes uten merke.
+// Har originalen fortsatt merket, bestemmer kopien: ligger den i den nye måneden, gjøres flyttingen ferdig (som
+// steg 3), ellers angres den (flyttingen selv får da 412 i steg 3 og tar bort en kopi den rakk å legge inn).
+// Kopien kan ikke forsvinne mens originalen har merket, for alle som ville endre den, kommer hit først. Uten merket
+// på originalen: movedOut med m betyr ferdig; originalen der fortsatt, eller slettet eller flyttet et annet sted
+// (deletedOut, movedOut med et annet merke), betyr angret. Aldri borte uten et spor av det.
+async function settleMove(store, move, now) {
+  const { from, to, m } = move;
+  const nowMs = now.getTime();
+  const fromYm = isDate(dateOfId(from)) ? monthOf(dateOfId(from)) : null;
+  const toYm = isDate(dateOfId(to)) ? monthOf(dateOfId(to)) : null;
+  let copyThere = false;
+  if (toYm) {
+    const doc = await store.get(monthKey(toYm), { type: "json" });
+    copyThere = !!(doc && Array.isArray(doc.items) && doc.items.some((o) => isCopyOf(o, to, m)));
+  }
+  let outcome = "keep";
+  if (fromYm) {
+    const r = await mutateMonth(store, fromYm, (doc) => {
+      const o = doc.items.find((i) => i && i.id === from);
+      const moved = Array.isArray(doc.movedOut) ? doc.movedOut : [];
+      if (o && o.moving && o.moving.m === m) {
+        if (copyThere) {
+          doc.items = doc.items.filter((i) => i !== o);
+          doc.movedOut = moved.filter((e) => freshOut(e, nowMs)).concat({ id: from, to, m, at: now.toISOString() }).slice(-20);
+          outcome = "forward";
+        } else {
+          delete o.moving;
+          outcome = "back";
+        }
+        return { ok: true };
+      }
+      const deleted = Array.isArray(doc.deletedOut) ? doc.deletedOut : [];
+      if (moved.some((e) => e && e.id === from && e.m === m)) outcome = "forward";
+      else if (o || moved.some((e) => e && e.id === from) || deleted.some((g) => g && g.id === from)) outcome = "back";
+      else outcome = "keep";
+      return { ok: true, noWrite: true };
+    });
+    if (r.error) return r;
+  }
+  if (toYm) {
+    const c = await mutateMonth(store, toYm, (doc) => {
+      const copy = doc.items.find((o) => isCopyOf(o, to, m));
+      if (!copy) return { ok: true, noWrite: true };
+      if (outcome === "back") doc.items = doc.items.filter((o) => o !== copy);
+      else delete copy.mv;
+      return { ok: true };
+    });
+    if (c.error) return c;
+  }
+  return { ok: true, outcome };
+}
+
+// Kjører et forsøk (attempt) på nytt etter at en flytting det møtte, er gjort ferdig eller angret (settleMove), eller
+// når avtalen ble borte mellom lesingen og skrivingen (restart). Høyst fire runder, så 503 «Mange endringer».
+async function settled(store, now, attempt) {
+  for (let round = 0; round < 4; round++) {
+    const r = await attempt();
+    if (r.restart) continue;
+    if (!r.unsettled) return r;
+    const s = await settleMove(store, r.unsettled, now);
+    if (s.error) return s;
+  }
+  return BUSY;
+}
+
 // Endrer en avtale. changes: feltene fra validateAdmin (partial). expect: updatedAt slik /admin så avtalen; er den
 // lagrede endret siden og endringen ikke allerede gjort, svarer det 412 «stale» (X1.1/X1.2). Uten expect (en gammel
 // fane) som før. Kollisjon sjekkes bare når tiden endres (dato, start, varighet, eller en avlyst time blir aktiv
 // igjen), så et nytt telefonnummer på en time under en blokkering ikke gir 409 (F32).
-// Flytting til en annen måned beholder id-ens tilfeldige del (`${dato}_${suffix}`): avtalen legges inn i den nye
-// måneden (og erstatter en med samme id, så et nytt forsøk aldri gir to), og fjernes så fra den gamle. Feiler
-// fjerningen, svarer det 503 MOVE_HALF_DONE, og «Lagre» én gang til gjør jobben ferdig (F17).
+// Flytting til en annen måned beholder id-ens tilfeldige del (`${dato}_${suffix}`), i de fire stegene over. Feiler
+// steg 3, svarer det 503 MOVE_HALF_DONE, og «Lagre» én gang til gjør jobben ferdig (F17).
 export async function updateItem(store, id, changes, { force = false, now = new Date(), expect } = {}) {
+  return settled(store, now, () => updateOnce(store, id, changes, { force, now, expect }));
+}
+
+async function updateOnce(store, id, changes, { force, now, expect }) {
   let current = await findItem(store, id);
   // Ble flyttingen lagret i et tidligere forsøk (svaret gikk tapt), ligger avtalen allerede på den nye datoen
   if (!current && changes.date !== undefined && isDate(changes.date)) current = await findItem(store, `${changes.date}_${idSuffix(id)}`);
-  if (!current) return { error: "Fant ikke avtalen.", status: 404 };
+  if (!current) return NOT_FOUND;
   const currentId = current.id;
   const fromMonth = monthOf(current.date);
   const toMonth = monthOf(changes.date ?? current.date);
   const build = (base) => {
-    const next = { ...base, ...changes, updatedAt: now.toISOString() };
+    const { moving, mv, ...plain } = base;
+    const next = { ...plain, ...changes, updatedAt: now.toISOString() };
     if (next.start + next.dur > 1440) return { error: "Avtalen går over midnatt.", status: 400 };
     return { next };
   };
@@ -324,19 +422,24 @@ export async function updateItem(store, id, changes, { force = false, now = new 
   const clashIn = (doc, next, selfId) => active(next) && doc.items.find((o) =>
     o.id !== selfId && active(o) && o.date === next.date && overlaps(next.start, next.dur, o.start, o.dur));
   const CLASH = { error: "Det nye tidspunktet kolliderer med en annen avtale.", status: 409 };
-  // null: gå videre; ellers svaret (en gjentakelse som allerede er gjort, eller 412)
-  const versionCheck = (base) => {
-    if (expect === undefined || base.updatedAt === expect) return null;
-    return hasChanges(base, changes) ? { ok: true, item: base, noWrite: true } : STALE;
+  // null: gå videre. Ellers svaret: 412 (endret et annet sted, og endringen er ikke allerede gjort), { unsettled }
+  // (en flytting av avtalen er ikke ferdig: den gjøres ferdig eller angres først), eller en gjentakelse som allerede
+  // er gjort. 412 kommer før merket, så en forespørsel som uansett taper, aldri angrer en annen enhets flytting.
+  const precheck = (base) => {
+    const stale = expect !== undefined && base.updatedAt !== expect;
+    if (stale && !hasChanges(base, changes)) return STALE;
+    const move = pendingMove(base);
+    if (move) return { unsettled: move, noWrite: true };
+    return stale ? { ok: true, item: base, noWrite: true } : null;
   };
 
   if (fromMonth === toMonth) {
     return mutateMonth(store, fromMonth, (doc) => {
       const idx = doc.items.findIndex((i) => i.id === currentId);
-      if (idx < 0) return { error: "Fant ikke avtalen.", status: 404 };
+      if (idx < 0) return { restart: true, noWrite: true }; // borte siden vi leste den: les på nytt
       const base = doc.items[idx];
-      const seen = versionCheck(base);
-      if (seen) return seen;
+      const pre = precheck(base);
+      if (pre) return pre;
       const { next, error, status } = build(base);
       if (error) return { error, status };
       if (timeChanged(base, next) && clashIn(doc, next, currentId) && !force) return CLASH;
@@ -344,67 +447,72 @@ export async function updateItem(store, id, changes, { force = false, now = new 
       return { ok: true, item: next };
     });
   }
-  const seen = versionCheck(current);
-  if (seen) return seen;
-  const { next, error, status } = build(current);
-  if (error) return { error, status };
-  next.id = `${next.date}_${idSuffix(currentId)}`;
+  const pre = precheck(current);
+  if (pre) return pre;
   const suffix = idSuffix(currentId);
-  // mv: flyttingens tilfeldige merke på kopien i den nye måneden, til den gamle tiden er fjernet (runde 2). Kopien er
-  // første halvdel av en skriving i to dokumenter, og andre skrivere (f.eks. «Avlys alle fra nummeret») kan endre den
-  // i mellomtiden; angringen kjenner den igjen på merket, aldri på updatedAt, så det aldri blir to kopier.
-  const moveMark = randomBytes(6).toString("hex");
-  next.mv = moveMark;
-  // Hver forutsetning sjekkes inne i skrivingen som bygger på den (vakt-regel SPEC R16): en annen enhets endring
-  // mellom lesingen over og de to skrivingene under, skal gi 412, aldri bli borte eller gi to kopier (runde 2).
-  // adopted: den nye måneden har allerede nøyaktig denne flyttingen (et tidligere forsøk fra oss, eller den samme
-  // flyttingen fra en annen enhet). Da står den, og bare den gamle tiden skal fjernes.
-  let adopted = null;
-  const addToNewMonth = () => mutateMonth(store, toMonth, (doc) => {
-    adopted = null;
-    const twin = doc.items.find((o) => o && idSuffix(o.id) === suffix);
-    if (twin && twin.updatedAt !== next.updatedAt) {
-      // Bare en kopi med flyttemerket (mv) kan være den samme flyttingen fra en annen enhet. En avtale uten merke er
-      // ikke en kopi, men avtalen selv (f.eks. originalen når en enhet flytter kopien tilbake midt i en flytting):
-      // å ta den over uten å skrive, lot den andre flyttingen fjerne den etterpå, og avtalen ble borte (runde 3).
-      if (!twin.mv || !sameExceptVersion(twin, next)) return STALE; // en annen enhet har flyttet eller endret den hit
-      adopted = twin;
-      return { ok: true, item: twin, noWrite: true };
+  const nextId = `${changes.date}_${suffix}`;
+  const m = randomBytes(6).toString("hex");
+  let next = null;
+  // Steg 1: merket på originalen, i skrivingen som sjekker forutsetningene på den lagrede versjonen
+  const begun = await mutateMonth(store, fromMonth, (doc) => {
+    const o = doc.items.find((i) => i.id === currentId);
+    if (!o) return { restart: true, noWrite: true };
+    const own = !!o.moving && o.moving.m === m; // vårt eget merke står allerede der
+    if (!own) {
+      const p = precheck(o);
+      if (p) return p;
     }
-    if (clashIn(doc, next, next.id) && !force) return CLASH;
-    const same = doc.items.findIndex((o) => o.id === next.id);
-    if (same >= 0) doc.items[same] = next; else doc.items.push(next);
-    return { ok: true, item: next };
+    const b = build(o);
+    if (b.error) return { error: b.error, status: b.status };
+    next = { ...b.next, id: nextId, mv: { m, from: currentId } };
+    if (own) return { ok: true, noWrite: true };
+    o.moving = { to: nextId, m };
+    return { ok: true };
   });
+  if (begun.error || begun.restart || begun.unsettled || begun.item) return begun;
+  // Angrer steg 1 når steg 2 sikkert ikke ble lagret. Går ikke det, blir merket stående, og neste som endrer avtalen,
+  // angrer flyttingen (settleMove: ingen kopi).
+  const unmark = () => mutateMonth(store, fromMonth, (doc) => {
+    const o = doc.items.find((i) => i.id === currentId && i.moving && i.moving.m === m);
+    if (!o) return { ok: true, noWrite: true };
+    delete o.moving;
+    return { ok: true };
+  }).catch((err) => console.error("Flytting: merket på originalen ble stående:", err && err.name));
+  // Steg 2. En avtale med samme id-hale i den nye måneden er enten vårt eget forsøk (merket m), en kopi fra en annen
+  // flytting som ikke er ferdig (gjøres ferdig eller angres først), eller avtalen selv, flyttet eller endret et annet
+  // sted (412). Den blir aldri tatt over uten å skrive (runde 3: det lot en annen flytting fjerne den etterpå).
   let added;
   try {
-    added = await addToNewMonth();
+    added = await mutateMonth(store, toMonth, (doc) => {
+      const twin = doc.items.find((o) => o && idSuffix(o.id) === suffix);
+      if (twin && !isCopyOf(twin, nextId, m)) {
+        const other = pendingMove(twin);
+        return other ? { unsettled: other, noWrite: true } : STALE;
+      }
+      if (clashIn(doc, next, nextId) && !force) return CLASH;
+      if (twin) doc.items[doc.items.indexOf(twin)] = next; else doc.items.push(next);
+      return { ok: true, item: next };
+    });
   } catch (err) {
-    // Usikkert om skrivingen ble lagret (svaret kom aldri): se etter. Ligger den der, fullfør flyttingen.
-    const there = await findItem(store, next.id).catch(() => null);
-    if (!there || there.updatedAt !== next.updatedAt) throw err;
+    // Usikkert om kopien ble lagret (svaret kom aldri): se etter. Ligger den der, fullfør flyttingen.
+    const there = await findItem(store, nextId).catch(() => undefined);
+    if (there === undefined) throw err; // vet ikke: merkene står, og neste skriver gjør flyttingen ferdig eller angrer den
+    if (!isCopyOf(there, nextId, m)) { await unmark(); throw err; }
     added = { ok: true, item: there };
   }
-  if (added.error) return added;
-  // Fjern den gamle tiden, men bare den versjonen flyttingen bygde på. Er den endret (avlyst, nytt nummer …) eller
-  // borte (slettet eller flyttet et annet sted) siden, tas vår kopi i den nye måneden bort igjen, og svaret er 412.
-  // movedOut: en kort logg i den gamle måneden over flyttinger ut av den (id, ny id, et tilfeldig merke, tid; ingen
-  // kundedata, høyst et døgn og 20 stykker). Går svaret på vår egen fjerning tapt, prøver klienten skrivingen igjen og
-  // finner avtalen borte; bare merket skiller det fra at en annen enhet slettet eller flyttet den i mellomtiden.
+  if (added.error || added.unsettled) { await unmark(); return added; }
+  // Steg 3: fjern originalen, men bare mens den har vårt merke. movedOut: en kort logg i den gamle måneden over
+  // flyttinger ut av den (id, ny id, merket, tid; ingen kundedata, høyst et døgn og 20 stykker). Går svaret på vår
+  // egen fjerning tapt, eller har en annen skriver gjort flyttingen ferdig, står merket der.
   let removed;
   try {
     removed = await mutateMonth(store, fromMonth, (doc) => {
       const log = Array.isArray(doc.movedOut) ? doc.movedOut : [];
-      const old = doc.items.find((i) => i.id === currentId);
-      if (!old) {
-        // vår egen fjerning, eller en annen enhet har gjort nøyaktig samme flytting (den tok vår kopi som sin)
-        if (adopted || log.some((m) => m && m.id === currentId && (m.m === moveMark || m.to === next.id))) return { ok: true, noWrite: true };
-        return { conflict: true, noWrite: true };
-      }
-      if (old.updatedAt !== current.updatedAt) return { conflict: true, noWrite: true };
-      doc.items = doc.items.filter((i) => i.id !== currentId);
-      doc.movedOut = log.filter((m) => freshOut(m, now.getTime()))
-        .concat({ id: currentId, to: next.id, m: moveMark, at: now.toISOString() }).slice(-20);
+      if (log.some((e) => e && e.id === currentId && e.m === m)) return { ok: true, noWrite: true };
+      const o = doc.items.find((i) => i.id === currentId);
+      if (!o || !o.moving || o.moving.m !== m) return { conflict: true, noWrite: true }; // angret av en annen skriver
+      doc.items = doc.items.filter((i) => i !== o);
+      doc.movedOut = log.filter((e) => freshOut(e, now.getTime())).concat({ id: currentId, to: nextId, m, at: now.toISOString() }).slice(-20);
       return { ok: true };
     });
   } catch (err) {
@@ -412,23 +520,21 @@ export async function updateItem(store, id, changes, { force = false, now = new 
     removed = { error: true };
   }
   if (removed.conflict) {
-    if (adopted) return STALE; // kopien er ikke vår: la den stå
     try {
-      await undoCopy(store, { toMonth, fromMonth, copyId: next.id, mark: moveMark, originalId: currentId });
+      await undoCopy(store, toMonth, nextId, m);
     } catch (err) {
+      // Kopien blir stående med merket; originalen er uten. Neste skriver som møter den, tar den bort (settleMove).
       console.error("Flytting: kunne ikke ta tilbake kopien etter en samtidig endring:", err && err.name);
       return { error: MOVE_RACE_HALF, code: "move_conflict", status: 503 };
     }
     return STALE;
   }
   if (removed.error) return { error: MOVE_HALF_DONE, code: "move_half_done", status: 503 };
-  // Flyttingen er ferdig: ta bort merket (vårt, eller det på en kopi vi tok over). Går det ikke, står merket bare
-  // som et ufarlig felt; neste flytting av avtalen tar det bort.
-  const marks = [moveMark].concat(adopted && adopted.mv ? [adopted.mv] : []);
-  let item = added.item;
+  // Steg 4: flyttingen er ferdig, ta bort merket på kopien. Går det ikke, gjør neste skriver det (settleMove).
+  let item = next;
   try {
     const done = await mutateMonth(store, toMonth, (doc) => {
-      const o = doc.items.find((i) => i.id === next.id && marks.includes(i.mv));
+      const o = doc.items.find((i) => isCopyOf(i, nextId, m));
       if (!o) return { ok: true, noWrite: true };
       delete o.mv;
       item = o;
@@ -438,75 +544,50 @@ export async function updateItem(store, id, changes, { force = false, now = new 
   } catch (err) {
     console.warn("Flytting: merket på kopien ble stående:", err && err.name);
   }
-  const { mv, ...shown } = item;
+  const { mv, moving, ...shown } = item;
   return { ok: true, item: shown };
 }
 
-// Tar bort kopien en flytting la i den nye måneden (kjent på merket mark, uansett updatedAt). Har kopien fått en
-// status i mellomtiden (avlyst av «Avlys alle fra nummeret»), flyttes den først over på originalen, så avlysningen
-// står; feiler det, blir kopien liggende og kallet kaster (503 MOVE_RACE_HALF).
-async function undoCopy(store, { toMonth, fromMonth, copyId, mark, originalId }) {
-  let carried = false;
-  for (let round = 0; round < 3; round++) {
-    let carry = null;
-    const r = await mutateMonth(store, toMonth, (doc) => {
-      carry = null;
-      const copy = doc.items.find((o) => o.id === copyId && o.mv === mark);
-      if (!copy) return { ok: true, noWrite: true };
-      if (!active(copy) && !carried) { carry = copy; return { ok: true, noWrite: true }; }
-      doc.items = doc.items.filter((o) => o !== copy);
-      return { ok: true };
-    });
-    if (r.error) throw new Error(r.error);
-    if (!carry) return;
-    const c = await mutateMonth(store, fromMonth, (doc) => {
-      const o = doc.items.find((i) => i.id === originalId);
-      if (!o || !active(o)) return { ok: true, noWrite: true };
-      o.status = carry.status;
-      o.updatedAt = carry.updatedAt;
-      return { ok: true };
-    });
-    if (c.error) throw new Error(c.error);
-    carried = true;
-  }
-  throw new Error("kopien ble endret under angringen");
-}
-// To avtaler er like bortsett fra versjonen (updatedAt), varselmerket og flyttemerket
-function sameExceptVersion(a, b) {
-  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  keys.delete("updatedAt");
-  keys.delete("notifiedAt");
-  keys.delete("mv");
-  for (const k of keys) if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) return false;
-  return true;
+// Tar bort kopien en flytting la i den nye måneden (kjent på merket m, uansett updatedAt)
+async function undoCopy(store, toMonth, copyId, m) {
+  const r = await mutateMonth(store, toMonth, (doc) => {
+    const copy = doc.items.find((o) => isCopyOf(o, copyId, m));
+    if (!copy) return { ok: true, noWrite: true };
+    doc.items = doc.items.filter((o) => o !== copy);
+    return { ok: true };
+  });
+  if (r.error) throw new Error(r.error);
 }
 
 // Sletter en avtale for godt. expect: updatedAt slik /admin så den; er den endret et annet sted siden (flyttet,
 // avlyst, nytt nummer), svarer det 412 «stale» og ingenting slettes (SPEC R3, som for PATCH). Uten expect (en
-// gammel fane) som før.
+// gammel fane) som før. En avtale midt i en flytting gjøres ferdig flyttet eller tilbake først (settleMove), så
+// svaret aldri er 200 mens avtalen lever videre på den andre datoen (runde 3).
 // deletedOut: en kort logg i månedsdokumentet over slettinger (id, et tilfeldig merke for kallet, tid; ingen
 // kundedata, høyst et døgn og 50 stykker), som movedOut for flyttinger. Går svaret på vår egen skriving tapt, kjøres
 // endringen på nytt og finner avtalen borte; bare merket skiller det fra at en annen enhet flyttet den ut (412) eller
 // slettet den (404) i mellomtiden. Vakt-regel (runde 2): et nytt forsøk kjenner igjen sitt eget tidligere forsøk bare
 // på et merke i dokumentet, aldri på et flagg i minnet, for et forsøk som satte flagget, kan ha mistet skrivingen.
 export async function deleteItem(store, id, { expect, now = new Date() } = {}) {
-  const date = String(id).split("_")[0];
-  if (!isDate(date)) return { error: "Fant ikke avtalen.", status: 404 };
+  const date = dateOfId(id);
+  if (!isDate(date)) return NOT_FOUND;
   const mark = randomBytes(6).toString("hex");
-  return mutateMonth(store, monthOf(date), (doc) => {
+  return settled(store, now, () => mutateMonth(store, monthOf(date), (doc) => {
     const log = Array.isArray(doc.deletedOut) ? doc.deletedOut : [];
     const it = doc.items.find((i) => i.id === id);
     if (!it) {
       if (log.some((g) => g && g.id === id && g.m === mark)) return { ok: true, noWrite: true }; // vår egen sletting
-      if (Array.isArray(doc.movedOut) && doc.movedOut.some((m) => m && m.id === id)) return STALE; // flyttet ut: åpne på nytt
-      return { error: "Fant ikke avtalen.", status: 404 };
+      if (Array.isArray(doc.movedOut) && doc.movedOut.some((e) => e && e.id === id)) return STALE; // flyttet ut: åpne på nytt
+      return NOT_FOUND;
     }
     if (expect !== undefined && it.updatedAt !== expect) return STALE;
-    doc.items = doc.items.filter((i) => i.id !== id);
+    const move = pendingMove(it);
+    if (move) return { unsettled: move, noWrite: true };
+    doc.items = doc.items.filter((i) => i !== it);
     doc.deletedOut = log.filter((g) => freshOut(g, now.getTime()))
       .concat({ id, m: mark, at: now.toISOString() }).slice(-50);
     return { ok: true };
-  });
+  }));
 }
 
 // Månedene («ÅÅÅÅ-MM») fra og med fromDate til og med toDate
@@ -522,8 +603,8 @@ export function monthsBetween(fromDate, toDate) {
 
 // Avlyser (status «cancelled», ny updatedAt; aldri slettet) alle aktive avtaler match(item) godtar i disse
 // månedene. Teller bare det dette kallet avlyste, også når et svar gikk tapt og skrivingen ble prøvd igjen, og hver
-// avtale én gang: en avtale midt i en flytting til en annen måned (originalen og kopien med merket mv) har samme
-// id-hale i begge, og avlyses i begge, men telles som én (runde 2).
+// avtale én gang (etter id-halen). En avtale midt i en flytting gjøres ferdig flyttet eller tilbake først
+// (settleMove), og måneden leses på nytt.
 // Svarer { ok, cancelled } eller { error, status: 503, cancelled } (det som rakk å bli avlyst; kall igjen).
 export async function cancelMatching(store, months, match, now = new Date()) {
   const stamp = now.toISOString();
@@ -532,7 +613,9 @@ export async function cancelMatching(store, months, match, now = new Date()) {
     const attempted = new Set();
     let r;
     try {
-      r = await mutateMonth(store, ym, (doc) => {
+      r = await settled(store, now, () => mutateMonth(store, ym, (doc) => {
+        const moving = doc.items.find((i) => active(i) && match(i) && pendingMove(i));
+        if (moving) return { unsettled: pendingMove(moving), noWrite: true };
         let changed = false;
         for (const i of doc.items) {
           if (!active(i) || !match(i)) continue;
@@ -543,7 +626,7 @@ export async function cancelMatching(store, months, match, now = new Date()) {
         }
         const ids = doc.items.filter((i) => attempted.has(i.id) && i.status === "cancelled" && i.updatedAt === stamp).map((i) => i.id);
         return changed ? { ok: true, ids } : { ok: true, noWrite: true, ids };
-      });
+      }));
     } catch (err) {
       console.error("Avlysning: lagringen svarte ikke:", err && err.name);
       r = { error: true };

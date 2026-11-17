@@ -26,9 +26,11 @@ retryDelay.ms = () => 0;
 const NOW = "2026-11-12T09:00:00Z"; // Thursday 10:00 in Oslo
 
 // A competing writer that rewrites the document (same content, new ETag) just before each of our next n writes
-function competing(blobs, key, n) {
-  let left = n;
+// (after letting skip writes through)
+function competing(blobs, key, n, skip = 0) {
+  let left = n, passed = 0;
   return blobs.inject({ method: "PUT", key, latencyMs: 1, times: Infinity, match: (req) => {
+    if (passed < skip) { passed++; return false; }
     if (left > 0) {
       left--;
       const cur = blobs.text(req.store, req.key);
@@ -38,11 +40,13 @@ function competing(blobs, key, n) {
   } });
 }
 
+// skip: how many writes to that key go through first (a cross-month move writes the old month twice: its intent
+// mark, then the removal of the original)
 const FAULTS = {
-  "fail-before 500 on every attempt": (blobs, key) => blobs.inject({ method: "PUT", key, fault: "fail-before", status: 500, times: 6 }),
-  "a lost response": (blobs, key) => blobs.inject({ method: "PUT", key, fault: "lost-response" }),
-  "fail-after 502 on every attempt": (blobs, key) => blobs.inject({ method: "PUT", key, fault: "fail-after", status: 502, times: 6 }),
-  "8 CAS losses to a competing write": (blobs, key) => competing(blobs, key, 8),
+  "fail-before 500 on every attempt": (blobs, key, skip = 0) => blobs.inject({ method: "PUT", key, skip, fault: "fail-before", status: 500, times: 6 }),
+  "a lost response": (blobs, key, skip = 0) => blobs.inject({ method: "PUT", key, skip, fault: "lost-response" }),
+  "fail-after 502 on every attempt": (blobs, key, skip = 0) => blobs.inject({ method: "PUT", key, skip, fault: "fail-after", status: 502, times: 6 }),
+  "8 CAS losses to a competing write": (blobs, key, skip = 0) => competing(blobs, key, 8, skip),
 };
 
 const HALF_DONE = "Avtalen er lagt inn på den nye datoen, men den gamle tiden ble ikke fjernet. Trykk Lagre én gang til.";
@@ -51,7 +55,8 @@ const adminCall = (d, path, method, json) => admin.handle(request(path, { method
 const suffix = (id) => id.slice(id.indexOf("_") + 1);
 
 // Each write: setup(d) seeds and returns ctx; call(d, ctx) → { status, body } (a throw counts as 500); key: the
-// faulted key; done(d, ctx): asserts the intended state is in the store; retryOk: statuses a retry may give.
+// faulted key (skip: the writes to it that go through first); done(d, ctx): asserts the intended state is in the
+// store; retryOk: statuses a retry may give.
 const WRITES = {
   "web create": {
     key: "m/2026-11",
@@ -96,8 +101,20 @@ const WRITES = {
       assert.deepEqual([items[0].date, suffix(items[0].id)], ["2026-12-02", suffix(b.id)], "the move keeps the id suffix");
     },
   },
+  "cross-month PATCH (the old month's intent mark fails)": {
+    key: "m/2026-11",
+    setup: (d) => ({ b: seedItems(d.blobs, [item({ date: "2026-11-27", start: 600 })])[0] }),
+    call: (d, { b }) => adminCall(d, `/api/admin/items/${b.id}`, "PATCH", { date: "2026-12-02", expect: b.updatedAt }),
+    done: (d, { b }) => {
+      const items = storedItems(d.blobs);
+      assert.equal(items.length, 1, JSON.stringify(items.map((i) => i.id)));
+      assert.deepEqual([items[0].date, suffix(items[0].id)], ["2026-12-02", suffix(b.id)]);
+      assert.ok(!("moving" in items[0]) && !("mv" in items[0]), JSON.stringify(items[0]));
+    },
+  },
   "cross-month PATCH (the old month's removal fails)": {
     key: "m/2026-11",
+    skip: 1,
     setup: (d) => ({ b: seedItems(d.blobs, [item({ date: "2026-11-27", start: 600 })])[0] }),
     call: (d, { b }) => adminCall(d, `/api/admin/items/${b.id}`, "PATCH", { date: "2026-12-02", expect: b.updatedAt }),
     done: (d, { b }) => {
@@ -158,7 +175,7 @@ for (const [writeName, w] of Object.entries(WRITES)) {
       const d = testDeps({ now: NOW, env: { ADMIN_PASSWORD: PW }, fetch: push.fetch });
       await subscribed(d, push);
       const ctx = w.setup(d);
-      inject(d.blobs, w.key);
+      inject(d.blobs, w.key, w.skip);
       const first = await attempt(() => w.call(d, ctx));
       if (first.status >= 200 && first.status < 300) {
         oneCopyPerSuffix(d);
@@ -192,7 +209,7 @@ test("fault matrix: a failed removal after a cross-month move says so (503), and
   quiet(t);
   const d = testDeps({ now: NOW, env: { ADMIN_PASSWORD: PW } });
   const [b] = seedItems(d.blobs, [item({ date: "2026-11-27", start: 600 })]);
-  d.blobs.inject({ method: "PUT", key: "m/2026-11", fault: "fail-before", status: 500, times: Infinity });
+  d.blobs.inject({ method: "PUT", key: "m/2026-11", skip: 1, fault: "fail-before", status: 500, times: Infinity }); // the intent mark goes through
   const patch = () => adminCall(d, `/api/admin/items/${b.id}`, "PATCH", { date: "2026-12-02" });
   const r1 = await patch();
   assert.equal(r1.status, 503, JSON.stringify(r1.body));
@@ -404,17 +421,33 @@ function moveWithCancelPhone(when) {
   } }) };
   return { d, b, depsA, byB: () => byB };
 }
-test("fault matrix: cancel-phone between the December copy and the removal of the original: one cancelled copy, «1 avlyst», and the move answers 412", async (t) => {
+// A's writes: the intent mark on November's original (0), the December copy (1), the removal of the original (2),
+// clearing the copy's mark (3). Round 3: cancel-phone finds the original marked and the copy in place, so it
+// finishes the move first (settleMove) and cancels the booking on its new date; the move then finds its own mark
+// in movedOut and answers 200. Serial order: the move, then the cancel.
+test("fault matrix: cancel-phone between the December copy and the removal of the original finishes the move first: one cancelled booking on 2 December, «1 avlyst», and the move answers 200", async (t) => {
   quiet(t);
-  const { d, b, depsA, byB } = moveWithCancelPhone((key) => key === "m/2026-11"); // right before A removes November's original
+  const { d, b, depsA, byB } = moveWithCancelPhone((key, n) => key === "m/2026-11" && n === 2); // right before A removes November's original
+  const byA = await patchAs(depsA, b.id, { date: "2026-12-02", expect: b.updatedAt });
+  assert.equal(byA.status, 200, JSON.stringify(byA.body));
+  assert.deepEqual([byB().status, byB().body.cancelled], [200, 1]);
+  const stored = storedItems(d.blobs);
+  assert.deepEqual(stored.map((i) => `${i.id} ${i.status}`), [`2026-12-02_${suffix(b.id)} cancelled`]);
+  assert.ok(stored.every((i) => !("mv" in i) && !("moving" in i)), JSON.stringify(stored));
+});
+test("fault matrix: cancel-phone between the intent mark and the December copy takes the move back first: the original is cancelled, «1 avlyst», and the move answers 412", async (t) => {
+  quiet(t);
+  const { d, b, depsA, byB } = moveWithCancelPhone((key, n) => key === "m/2026-12" && n === 1); // right before A writes the copy
   const byA = await patchAs(depsA, b.id, { date: "2026-12-02", expect: b.updatedAt });
   assert.equal(byA.status, 412, JSON.stringify(byA.body));
   assert.deepEqual([byB().status, byB().body.cancelled], [200, 1]);
-  assert.deepEqual(storedItems(d.blobs).map((i) => `${i.id} ${i.status}`), [`${b.id} cancelled`]);
+  const stored = storedItems(d.blobs);
+  assert.deepEqual(stored.map((i) => `${i.id} ${i.status}`), [`${b.id} cancelled`]);
+  assert.ok(stored.every((i) => !("mv" in i) && !("moving" in i)), JSON.stringify(stored));
 });
 test("fault matrix: cancel-phone after the original is gone but before the move's mark is cleared cancels the December booking once; the mark never stays", async (t) => {
   quiet(t);
-  const { d, b, depsA, byB } = moveWithCancelPhone((key, n) => key === "m/2026-12" && n === 2); // right before A clears mv
+  const { d, b, depsA, byB } = moveWithCancelPhone((key, n) => key === "m/2026-12" && n === 3); // right before A clears mv
   const byA = await patchAs(depsA, b.id, { date: "2026-12-02", expect: b.updatedAt });
   assert.equal(byA.status, 200, JSON.stringify(byA.body));
   assert.equal(byA.body.item.mv, undefined);
@@ -428,5 +461,5 @@ test("fault matrix: an undisturbed cross-month move leaves no move mark on the b
   const { d, b } = moveSetup();
   const r = await patchAs(d, b.id, { date: "2026-12-02", expect: b.updatedAt });
   assert.equal(r.status, 200);
-  assert.ok(storedItems(d.blobs).every((i) => !("mv" in i)));
+  assert.ok(storedItems(d.blobs).every((i) => !("mv" in i) && !("moving" in i)));
 });

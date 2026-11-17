@@ -17,7 +17,7 @@ export const STATS_STORES = ["stats", "stats-preview"];
 // prefix. fields: every field path a document under the row may hold («name[].sub» inside a list); store-keys.test.mjs
 // checks it against what the handlers store, and privacy.test.mjs that personvern.html describes each one.
 export const KEY_RULES = Object.freeze([
-  { stores: BOOKING_STORES, prefix: "m/", holds: "one month of bookings and blocks: date, time, service, add-ons, name, phone, note (and movedOut, deletedOut: logs of moves out of the month and of deletions, each entry an id, the new id for a move, a random mark and the time, no customer data)",
+  { stores: BOOKING_STORES, prefix: "m/", holds: "one month of bookings and blocks: date, time, service, add-ons, name, phone, note (and movedOut, deletedOut: logs of moves out of the month and of deletions, each entry an id, the new id for a move, a random mark and the time, no customer data; while a move to another month is unfinished, the booking carries moving and its copy mv: ids and the move's random mark, removed when the move is finished or undone)",
     deletion: `daily clean-up: every item ${RETENTION_DAYS} days after its date (cancelled ones too, and impossible dates); a month document left empty is deleted once the whole month is past that limit. A movedOut or deletedOut entry is dropped once it is more than 24 hours old, by the next write to that month or by the daily clean-up, so at the latest 48 hours after it. The barber can delete an item at any time («Slett»).` },
   { stores: BOOKING_STORES, key: "rl/secret", holds: "32 random bytes behind the counter key names; no personal data",
     deletion: "kept for the life of the store; deleting it only resets every counter" },
