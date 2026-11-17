@@ -1,0 +1,40 @@
+# MIDLERTIDIG: varsel til Viggos telefon (ntfy-appen) når noen booker. Erstattes av de ekte push-varslene
+# når fix/server publiseres – slett da denne filen og .github/booking-alarm.mjs.
+# Bruker ingen Netlify-kreditter i seg selv (GitHub kjører jobben gratis i et offentlig repo).
+name: Bookingvarsel (midlertidig)
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+concurrency:
+  group: booking-alarm
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Husk forrige kjøring
+        uses: actions/cache/restore@v4
+        with:
+          path: .alarm
+          key: booking-alarm-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: booking-alarm-
+      - name: Se etter nye bookinger
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: node .github/booking-alarm.mjs
+      - name: Lagre tilstanden
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .alarm
+          key: booking-alarm-${{ github.run_id }}-${{ github.run_attempt }}
