@@ -207,11 +207,13 @@ test("oversikt: en bedriftsliste som henger eller feiler stopper ikke de faste b
 
 test("bedriftsliste: ugyldige oppføringer og lik id som en fast bedrift meldes som hoppet over (ikke stille)", async () => {
   const good = { id: "frisor-anna", name: "Frisør Anna", url: "https://anna.example/", key: "k".repeat(43) };
-  const d = deps({ registry: async () => [good, { ...good, id: "lang", name: "n".repeat(81) }, { ...good, id: "a" }, { id: "uleselig" }, { id: "<b>" }] });
+  const aase = { id: "aase", name: "  Åse Hår  ", url: "https://aase.example", key: "q".repeat(43) };
+  const d = deps({ registry: async () => [aase, good, { ...good, id: "lang", name: "n".repeat(81) }, { ...good, id: "a" }, { id: "uleselig" }, { id: "<b>" }] });
   const j = await (await overview(d, tokenFor(d))).json();
-  assert.deepEqual(j.sites.map((s) => s.id), ["a", "b", "c", "frisor-anna"]);
+  assert.deepEqual(j.sites.map((s) => s.id), ["a", "b", "c", "frisor-anna", "aase"], "faste først, så bedriftslisten sortert på norsk (Å sist)");
   assert.deepEqual(j.skipped, ["lang", "a", "uleselig", "(ukjent)"]);
   assert.equal(j.sites[3].url, "https://anna.example", "adressen lagres som opprinnelse (uten sti)");
+  assert.equal(j.sites[4].name, "Åse Hår", "navnet vises uten mellomrom rundt");
 });
 
 test("loadRegistry: én uleselig oppføring blir et navn i «hoppet over»; feil ved listing kastes videre (vises som registryError)", async () => {

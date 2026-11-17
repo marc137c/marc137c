@@ -4,13 +4,18 @@
 //                  (?fra=instagram osv.) hvis den finnes, ellers avsendernettstedet. Ingen IP, ingen ID, ingenting lagres
 //                  på besøkerens enhet. Roboter og forhåndsvisninger (deploy previews) telles ikke.
 // GET  /api/stats?days=7|30|90 – bare tall, og bare med X-Stats-Key = STATS_READ_KEY (eierens oversikt).
-// Selvstendig: trenger bare @netlify/blobs. Nettstedets egen adresse leses fra forespørselen.
+// Dagstall eldre enn KEEP_DAYS slettes (første besøk hver dag rydder), så ingenting lagres for alltid.
+// Selvstendig: trenger bare @netlify/blobs (versjon 10 eller nyere). Nettstedets egen adresse leses fra forespørselen.
 import { createHash, timingSafeEqual } from "node:crypto";
 import { getStore } from "@netlify/blobs";
 
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" } });
-const BOT = /bot|crawl|spider|slurp|preview|headless|lighthouse|facebookexternalhit|whatsapp|telegram|discord|curl|wget|python|node-fetch/i;
+// «bot» men ikke «CUBOT» (en telefon-merkevare som står i nettleser-ID-en til ekte telefoner)
+const BOT = /(?<!cu)bot|crawl|spider|slurp|preview|headless|lighthouse|facebookexternalhit|whatsapp|telegram|discord|curl|wget|python|node-fetch/i;
 const RANGES = [7, 30, 90];
+export const KEEP_DAYS = 400;
+const MAX_PAGES = 30; // ulike sidenavn per dag; flere havner under «annen»
+const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 // Merkede lenker (?fra=...) som telles som egen kilde. Alt annet blir «annet».
 export const TAGS = ["instagram", "facebook", "google", "tiktok", "snapchat", "qr", "sms", "epost", "visittkort"];
 export const SOURCES = [...TAGS, "direkte", "annet"];
@@ -39,22 +44,36 @@ export const isInternal = (refHost, siteHost) => !!bare(refHost) && bare(refHost
 const digest = (s) => createHash("sha256").update(String(s)).digest();
 export const keyMatches = (given, expected) => !!expected && !!given && timingSafeEqual(digest(given), digest(expected));
 
+// Teller én visning i dagens dokument. Svarer "new" når dagens dokument ble laget nå (første besøk i dag), ellers true/false.
 export async function bump(store, key, page, source) {
   for (let attempt = 0; attempt < 6; attempt++) {
     const cur = await store.getWithMetadata(key, { type: "json" });
     const doc = cur && cur.data ? cur.data : { views: 0, visits: 0, pages: {}, sources: {} };
     doc.views = (doc.views || 0) + 1;
     doc.visits = doc.visits || 0; doc.pages = doc.pages || {}; doc.sources = doc.sources || {};
-    doc.pages[page] = (doc.pages[page] || 0) + 1;
-    if (source) { doc.visits += 1; doc.sources[source] = (doc.sources[source] || 0) + 1; }
+    // Høyst MAX_PAGES ulike sidenavn per dag, og bare egne tellere (ikke arvede som «constructor»)
+    if (!own(doc.pages, page) && Object.keys(doc.pages).length >= MAX_PAGES) page = "annen";
+    doc.pages[page] = (own(doc.pages, page) ? doc.pages[page] : 0) + 1;
+    if (source) { doc.visits += 1; doc.sources[source] = (own(doc.sources, source) ? doc.sources[source] : 0) + 1; }
     const w = await store.setJSON(key, doc, cur ? { onlyIfMatch: cur.etag } : { onlyIfNew: true });
-    if (w && w.modified) return true;
+    // @netlify/blobs før versjon 10 ignorerer onlyIfMatch og svarer undefined: da ville hvert besøk telles opptil 6 ganger
+    if (!w || typeof w.modified !== "boolean") throw new Error("@netlify/blobs 10 eller nyere trengs (betinget skriving)");
+    if (w.modified) return cur ? true : "new";
     await new Promise((r) => setTimeout(r, 15 * 2 ** attempt + Math.random() * 15));
   }
   return false;
 }
 
-// Sidenavn: bare enkle tegn og maks 40, så lagringen ikke kan fylles med tilfeldige navn
+// Sletter dagstall eldre enn keep dager. Kjøres når dagens første besøk lager dagens dokument (én gang per dag).
+export async function prune(store, today, keep = KEEP_DAYS) {
+  const cutoff = addDays(today, -keep);
+  const { blobs } = await store.list({ prefix: "d/" });
+  const old = blobs.map((b) => b.key).filter((k) => /^d\/\d{4}-\d{2}-\d{2}$/.test(k) && k.slice(2) < cutoff);
+  await Promise.all(old.map((k) => store.delete(k)));
+  return old.length;
+}
+
+// Sidenavn: bare enkle tegn og maks 40; antallet ulike navn per dag begrenses i bump()
 export const pageName = (p) => { const s = String(p || "/").toLowerCase().replace(/\.html$/, "").replace(/^\/+|\/+$/g, ""); return /^[a-z0-9\-/]{0,40}$/.test(s) ? (s || "forside") : "annen"; };
 
 export async function handle(req, context, deps) {
@@ -67,7 +86,10 @@ export async function handle(req, context, deps) {
     try { body = JSON.parse((await req.text()).slice(0, 1000)) || {}; } catch { /* tom melding teller som forsiden */ }
     if (typeof body !== "object") body = {};
     const source = isInternal(body.r, url.hostname) ? null : sourceOf(body.r, body.f);
-    try { await bump(deps.store(), `d/${osloDate(deps.now())}`, pageName(body.p), source); } catch (err) { console.error("Statistikk:", err && err.message); }
+    try {
+      const store = deps.store(), today = osloDate(deps.now());
+      if ((await bump(store, `d/${today}`, pageName(body.p), source)) === "new") await prune(store, today);
+    } catch (err) { console.error("Statistikk:", err && err.message); }
     return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
   }
   if (req.method !== "GET") return json({ error: "Bruk GET." }, 405);

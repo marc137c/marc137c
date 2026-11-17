@@ -11,7 +11,8 @@ import { osloNow, addDays } from "../lib/booking-core.mjs";
 import { bookingStats, sumDays } from "../lib/stats-bookings.mjs";
 
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
-const BOT = /bot|crawl|spider|slurp|preview|headless|lighthouse|facebookexternalhit|whatsapp|telegram|discord|curl|wget|python|node-fetch/i;
+// «bot» men ikke «CUBOT» (en telefon-merkevare som står i nettleser-ID-en til ekte telefoner) – samme regel som stats-kit
+const BOT = /(?<!cu)bot|crawl|spider|slurp|preview|headless|lighthouse|facebookexternalhit|whatsapp|telegram|discord|curl|wget|python|node-fetch/i;
 // Merkede lenker (?fra=instagram osv.) – samme liste som stats-kit, så oversikten viser alle bedriftene likt
 export const TAGS = ["instagram", "facebook", "google", "tiktok", "snapchat", "qr", "sms", "epost", "visittkort"];
 const SOURCES = [...TAGS, "direkte", "annet"];
@@ -57,31 +58,31 @@ export async function bump(store, key, page, source) {
   return false;
 }
 
-export default async (req, context) => {
+// deps: { env, now: () => Date, stats: () => statistikk-lager, bookings: () => booking-lager } (testene gir egne)
+export async function handle(req, context, deps) {
   const url = new URL(req.url);
   const production = !context || !context.deploy || !context.deploy.context || context.deploy.context === "production";
-  const openStore = () => getStore({ name: production ? "stats" : "stats-preview", consistency: "strong" });
 
   if (url.pathname === "/api/hit") {
-    const store = openStore();
     if (req.method !== "POST") return json({ error: "Bruk POST." }, 405);
     if (!production || BOT.test(req.headers.get("user-agent") || "")) return new Response(null, { status: 204 });
     let body = {};
     try { body = JSON.parse((await req.text()).slice(0, 500)) || {}; } catch { /* tom melding teller som forsiden */ }
+    if (typeof body !== "object") body = {};
     const page = /personvern/.test(String(body.p || "")) ? "personvern" : "forside";
     const source = isInternal(body.r, url.hostname) ? null : sourceOf(body.r, body.f);
-    try { await bump(store, `d/${osloNow().date}`, page, source); } catch (err) { console.error("Statistikk:", err && err.message); }
+    try { await bump(deps.stats(), `d/${osloNow(deps.now()).date}`, page, source); } catch (err) { console.error("Statistikk:", err && err.message); }
     return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
   }
 
   // GET /api/stats
   if (req.method !== "GET") return json({ error: "Bruk GET." }, 405);
   // Bare eierens oversikt (lesenøkkelen) – ikke barberens innlogging
-  if (!keyMatches(req.headers.get("x-stats-key"), process.env.STATS_READ_KEY)) return json({ error: "Mangler gyldig lesenøkkel." }, 401);
-  const store = openStore();
+  if (!keyMatches(req.headers.get("x-stats-key"), deps.env.STATS_READ_KEY)) return json({ error: "Mangler gyldig lesenøkkel." }, 401);
+  const store = deps.stats();
 
   const n = RANGES.includes(Number(url.searchParams.get("days"))) ? Number(url.searchParams.get("days")) : 30;
-  const today = osloNow().date;
+  const today = osloNow(deps.now()).date;
   const dates = Array.from({ length: Math.max(n, 30) }, (_, i) => addDays(today, -i)); // nyeste først
   let docs;
   try { docs = await Promise.all(dates.map((d) => store.get(`d/${d}`, { type: "json" }))); }
@@ -90,7 +91,7 @@ export default async (req, context) => {
   dates.forEach((d, i) => { dayDocs[d] = docs[i] || null; });
 
   let b = null;
-  try { b = await bookingStats(getStore({ name: "bookings", consistency: "strong" }), store, dates, today, dayDocs); }
+  try { b = await bookingStats(deps.bookings(), store, dates, today, dayDocs); }
   catch (err) { console.error("Bookingstatistikk:", err && err.message); }
 
   const days = dates.map((date, i) => {
@@ -111,6 +112,15 @@ export default async (req, context) => {
     sources,
     days,
     bookings: bt ? { web: bt.web, admin: bt.admin, cancelled: bt.cancelled, services: bt.services, weekdays: bt.weekdays, upcoming7: b.upcoming7 } : null,
+  });
+}
+
+export default (req, context) => {
+  const production = !context || !context.deploy || !context.deploy.context || context.deploy.context === "production";
+  return handle(req, context, {
+    env: process.env, now: () => new Date(),
+    stats: () => getStore({ name: production ? "stats" : "stats-preview", consistency: "strong" }),
+    bookings: () => getStore({ name: "bookings", consistency: "strong" }),
   });
 };
 
