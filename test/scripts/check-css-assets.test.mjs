@@ -100,3 +100,37 @@ for (const [label, css] of SCROLL_GOOD) {
     assert.equal(r.status, 0, r.out);
   });
 }
+
+// Round 3 (still_open 21): at 320–354 px the Instagram «Følg oss» button squashed its round icon into an oval in
+// Chromium (12x30 at 320 px) and ran past the 16-px gutter in Firefox 57. Root cause: the svg is a flex item of the
+// inline-flex .btn-follow with the default flex-shrink: 1, and the unbreakable «@viggos.barbershop» made the content
+// wider than the box; Chromium shrank the icon, Firefox kept its minimum and grew the button. Layout checks tested only
+// overflow, never shape. Rule (SPEC R49): every «.x svg» / «.x img» rule whose .x is a flex or inline-flex box has a
+// «.x svg» (or img) rule with flex: none, flex: 0 0 …, or flex-shrink: 0.
+const ICON_BAD = [
+  ["an icon in an inline-flex button", ".b { display: inline-flex; } .b svg { width: 18px; height: 18px; }"],
+  ["an icon in a flex row", ".row { display: flex; gap: 6px; } .row img { width: 40px; }"],
+  ["only a variant sets colours", ".b { display: inline-flex; } .b[href*=\"x\"] svg { background: red; }"],
+  ["flex: 1 does not count", ".b { display: inline-flex; } .b svg { flex: 1; }"],
+  ["the fix inside a media query only", ".b { display: inline-flex; } .b svg { width: 18px; } @media (max-width: 359px) { .b svg { flex: none; } }"],
+];
+const ICON_GOOD = [
+  ["flex: none", ".b { display: inline-flex; } .b svg { width: 18px; flex: none; }"],
+  ["flex-shrink: 0", ".b { display: flex; } .b > svg { width: 18px; flex-shrink: 0; }"],
+  ["flex: 0 0 auto in another rule", ".b { display: inline-flex; } .b svg { width: 18px; } .b svg { flex: 0 0 auto; }"],
+  ["not a flex box", ".b { display: block; } .b svg { width: 18px; }"],
+  ["a marked exception", ".b { display: flex; } .b img { position: absolute; /* compat-ok: not a flex item */ }"],
+];
+for (const [label, css] of ICON_BAD) {
+  test(`check-css-assets: ${label} without flex: none fails`, () => {
+    const r = check(css);
+    assert.equal(r.status, 1, r.out);
+    assert.match(r.out, /flex-element og krymper/);
+  });
+}
+for (const [label, css] of ICON_GOOD) {
+  test(`check-css-assets: icon in a flex box with ${label} passes`, () => {
+    const r = check(css);
+    assert.equal(r.status, 0, r.out);
+  });
+}

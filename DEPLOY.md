@@ -52,6 +52,8 @@ Status 16.11.2026 (meldt): domenet virker. www er primæradresse, viggosbarbersh
 - [ ] Eierens oversikt (`oversikt/public`, egen Netlify-side) i Chromium 60 og Firefox 57, på en iPhone og i Samsung Internet: logg inn, bytt mellom 7, 30 og 90 dager, sorter tabellen, og kortene med søylene vises uten vannrett rulling ved 320 px. Lokalt: `viggos-work/tools/oversikt-dev.mjs` med `stats-dev.mjs` (laget data).
 - [ ] Konsollen i hver nettleser: ingen advarsel eller feil fra våre egne sider (bortsett fra forventede 4xx/5xx-svar).
 - [ ] Anmeldelser: gullstjernene ved 4,7, lange navn bryter pent ved 320/375/768/1440 px, arabisk tekst står til høyre, og merket øverst står på egen linje i Safari 10 og Firefox 55.
+- [ ] Knappene under «Sosiale medier» ved 320, 340, 354 og 360 px (iPhone SE/Samsung, og Chromium 60 og Firefox 57): ikonene er runde (30×30), og Instagram-knappen holder seg innenfor 16 px kant på hver side; er den for bred, står «@viggos.barbershop» på egen linje, midtstilt. Sjekket lokalt i runde 3 (Chromium 60, Firefox 57, Chrome 157); iPhone og Samsung gjenstår.
+- [ ] Bestilling uten ledige tider: stopp `/api/availability` lokalt (f.eks. 503): ved «Velg tid» står «Vi fikk ikke hentet ledige tider akkurat nå … 409 63 911», og en tid som er tatt sier «Den tiden er opptatt … Ring oss på 409 63 911» og vises ikke som ledig igjen.
 
 ## 5. Eierens gjennomgang av timeboken (på Viggos egen telefon)
 

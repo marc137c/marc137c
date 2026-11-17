@@ -343,7 +343,7 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
   transition: border-color .2s, transform .2s, color .2s;
 }
 .socials a:hover { border-color: var(--gold); color: var(--gold-hover); transform: translateY(-2px); }
-.socials svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.socials svg { flex: none; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .socials-sm a { width: 36px; height: 36px; border-radius: 10px; }
 .socials-sm svg { width: 18px; height: 18px; }
 .socials[hidden], .socials a[hidden], .hero-rating[hidden] { display: none; }
@@ -396,7 +396,7 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
   display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 12px;
   color: #fff; box-shadow: 0 6px 16px rgba(0, 0, 0, .4);
 }
-.post-badge svg { width: 21px; height: 21px; }
+.post-badge svg { flex: none; width: 21px; height: 21px; }
 .post--instagram .post-badge { background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%); }
 
 .post-play {
@@ -406,7 +406,7 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   color: #fff; transition: transform .3s, background .3s;
 }
-.post-play svg { width: 26px; height: 26px; margin-left: 3px; }
+.post-play svg { flex: none; width: 26px; height: 26px; margin-left: 3px; }
 .post:hover .post-play { transform: scale(1.08); background: rgba(207, 167, 94, .85); }
 
 .post-meta { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 18px 16px; display: grid; grid-gap: 6px; gap: 6px; }
@@ -429,8 +429,8 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 @keyframes shimmer { to { background-position: -200% 0; } }
 
 .follow-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
-.btn-follow { display: inline-flex; align-items: center; gap: 10px; padding: 11px 22px; font-size: .95rem; }
-.btn-follow svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.btn-follow { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; max-width: 100%; padding: 11px 22px; font-size: .95rem; text-align: center; }
+.btn-follow svg { flex: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 @media (max-width: 600px) {
   .social-feed { grid-gap: 12px; gap: 12px; }

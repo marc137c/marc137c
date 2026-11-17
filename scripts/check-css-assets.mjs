@@ -9,6 +9,7 @@
 //       – scroll-padding-*/scroll-margin-* (annet enn 0/auto) uten «/* reserve: … */» i regelen: Chrome < 69, Samsung < 10,
 //         Firefox < 68 og Safari < 14.1 bruker dem ikke når fokus eller et anker flytter siden (runde 3)
 //       – dialog-stil «.x[open]» inni @supports uten tilsvarende «.x.dialog-shim[open]» utenfor (Safari < 15.4, Firefox < 98)
+//       – ikon (svg/img) i en flex-boks uten «flex: none» (det krymper til en oval eller skyver boksen ut over kanten)
 //  Filer – WebP i <source> uten JPG/PNG-<img> i samme <picture>, data-full .webp uten .jpg ved siden av
 //          (lysboksen bytter til .jpg i nettlesere uten WebP), og lenker til filer som ikke finnes.
 // Med vilje unntatt? Skriv /* compat-ok */ inni regelen.
@@ -84,6 +85,29 @@ function checkCss(name, src) {
     if (/^@media[^{]*\([^)]*(<=|>=|<|>)/.test(a.text)) report(`${name}:${a.line}`, `media-spørring med område-syntaks («${a.text}»): bruk min-width/max-width.`);
   }
   const shimSelectors = rules.filter((r) => !r.ctx.some((c) => c.startsWith("@supports"))).map((r) => r.selector).join(",");
+  // Et ikon (svg/img) som er flex-element, krymper når teksten ved siden av ikke får plass: Chromium klemmer det til en
+  // oval, Firefox lar knappen gå ut over kanten (Instagram-knappen ved 320 px, runde 3). En «.x svg»/«.x img» der .x er
+  // en flex-boks, trenger en «.x svg { flex: none }» (eller flex: 0 0 …/flex-shrink: 0) utenfor @media/@supports.
+  const items = (sel) => sel.split(",").map((s) => s.trim().replace(/\s*>\s*/g, " ").replace(/\s+/g, " "));
+  const flexBoxes = new Set();
+  const iconFixed = new Set();
+  for (const r of rules) {
+    if (r.decls.some(([p, v]) => p === "display" && /^(inline-)?flex$/.test(v))) items(r.selector).filter((s) => /^[.#]?[\w-]+$/.test(s)).forEach((s) => flexBoxes.add(s));
+    if (!r.ctx.length && r.decls.some(([p, v]) => (p === "flex" && /^(none|0 0\b)/.test(v)) || (p === "flex-shrink" && v === "0"))) items(r.selector).forEach((s) => iconFixed.add(s));
+  }
+  const iconMissing = new Map();
+  for (const r of rules) {
+    if (r.allowed) continue;
+    for (const s of items(r.selector)) {
+      const m = /(?:^|\s)(\S+)\s(svg|img)$/.exec(s);
+      if (!m) continue;
+      for (const box of m[1].replace(/\[[^\]]*\]/g, "").match(/[.#][\w-]+/g) || []) {
+        const want = `${box} ${m[2]}`;
+        if (flexBoxes.has(box) && !iconFixed.has(want) && !iconMissing.has(want)) iconMissing.set(want, `${name}:${r.line} (${r.selector.slice(0, 50)})`);
+      }
+    }
+  }
+  for (const [want, where] of iconMissing) report(where, `${want} er flex-element og krymper når teksten ved siden av ikke får plass (Chromium klemmer ikonet, Firefox lar boksen gå ut over kanten). Legg til «${want} { flex: none; }».`);
   for (const r of rules) {
     if (r.allowed || /^(from|to|\d+%)/.test(r.selector)) continue; // nøkkelbilder i @keyframes
     const where = `${name}:${r.line} (${r.selector.slice(0, 50)})`;

@@ -125,3 +125,30 @@ test("round 3: the front page's scroll-padding-top has its reserve for browsers 
   const SUPPORT = { scrollPadding: { chrome: 69, firefox: 68, safari: 14.1 }, aspectRatio: { chrome: 88, firefox: 89, safari: 15 } };
   for (const b of Object.keys(SUPPORT.scrollPadding)) assert.ok(SUPPORT.aspectRatio[b] >= SUPPORT.scrollPadding[b], b);
 });
+
+// Round 3 (still_open 21): the Instagram «Følg oss» button at 320–354 px. Its text («Instagram» + the unbreakable
+// «@viggos.barbershop») is wider than a 320-px phone's 288-px content box, so Chromium squashed the round icon (12x30)
+// and Firefox 57 let the button run past the 16-px gutter. The icon keeps its size (flex: none, also enforced for every
+// icon in a flex box by scripts/check-css-assets.mjs, SPEC R49) and the button may wrap the handle onto its own line,
+// centred, never wider than the row. Real-browser check: DEPLOY part 4 (320/340/354/360 px).
+test("R49: the follow buttons keep a round icon and wrap the handle instead of growing past the gutter", () => {
+  const css = read("styles.css").replace(/\r\n/g, "\n");
+  // the bodies of every top-level rule with exactly this selector, joined
+  const rule = (sel) => {
+    const out = [];
+    for (let at = css.indexOf("\n" + sel + " {"); at >= 0; at = css.indexOf("\n" + sel + " {", at + 1)) {
+      out.push(css.slice(css.indexOf("{", at) + 1, css.indexOf("}", at)));
+    }
+    assert.ok(out.length, "styles.css has a top-level «" + sel + "» rule");
+    return out.join(";");
+  };
+  const btn = rule(".btn-follow");
+  assert.match(btn, /display: inline-flex;/);
+  assert.match(btn, /flex-wrap: wrap;/, "the handle can move to its own line");
+  assert.match(btn, /justify-content: center;/, "both lines are centred");
+  assert.match(btn, /max-width: 100%;/, "never wider than the row");
+  assert.match(rule(".btn-follow svg"), /flex: none;/, "the icon never shrinks");
+  const html = read("index.html");
+  assert.match(html, /<a class="btn btn-ghost btn-follow" href="https:\/\/www\.instagram\.com\/viggos\.barbershop\/"[^>]*><svg [^>]*>[\s\S]*?<\/svg>Instagram <span class="handle">@viggos\.barbershop<\/span><\/a>/,
+    "the Instagram button is icon, name and handle, as the rule assumes");
+});
