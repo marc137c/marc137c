@@ -6,6 +6,8 @@
 //       – grid med gap uten grid-gap, sticky uten -webkit-sticky, backdrop-filter uten -webkit-
 //       – aspect-ratio uten en «@supports not (aspect-ratio …)»-reserve, @container/@layer/@property, color-mix/oklch
 //       – background-clip: text uten nok padding over/under (sløyfene i skrivefonten blir kuttet)
+//       – scroll-padding-*/scroll-margin-* (annet enn 0/auto) uten «/* reserve: … */» i regelen: Chrome < 69, Samsung < 10,
+//         Firefox < 68 og Safari < 14.1 bruker dem ikke når fokus eller et anker flytter siden (runde 3)
 //       – dialog-stil «.x[open]» inni @supports uten tilsvarende «.x.dialog-shim[open]» utenfor (Safari < 15.4, Firefox < 98)
 //  Filer – WebP i <source> uten JPG/PNG-<img> i samme <picture>, data-full .webp uten .jpg ved siden av
 //          (lysboksen bytter til .jpg i nettlesere uten WebP), og lenker til filer som ikke finnes.
@@ -114,6 +116,8 @@ function checkCss(name, src) {
         const earlier = r.decls.slice(0, idx).some(([p2, v2]) => covers(p2) && !MODERN_VALUE.test(v2));
         if (!earlier) report(where, `«${p}: ${v.slice(0, 50)}» trenger en vanlig verdi først (f.eks. ${p}: 300px;), ellers mangler den i eldre nettlesere (min/max/clamp: Safari < 11.1, Chrome < 79; dvh/svh: alle før 2022).`);
       }
+      if (/^scroll-(padding|margin)(-|$)/.test(p) && !/^(0(px)?|auto)$/.test(v) && !/\/\*\s*reserve:/.test(r.body))
+        report(where, `«${p}: ${v}» virker ikke for fokus og ankre i Chrome < 69, Samsung < 10, Firefox < 68 og Safari < 14.1. Skriv i regelen hva som gjør jobben der (/* reserve: … */), og test reserven.`);
       if (p === "position" && v === "sticky" && !(props.get("position") || []).includes("-webkit-sticky")) report(where, "position: sticky trenger position: -webkit-sticky først (Safari < 13).");
       if (p === "backdrop-filter" && !props.has("-webkit-backdrop-filter")) report(where, "backdrop-filter trenger -webkit-backdrop-filter (Safari).");
       if (p === "aspect-ratio" && !hasAspectFallback) report(where, "aspect-ratio uten «@supports not (aspect-ratio: 1)»-reserve (Safari < 15, Chrome < 88).");

@@ -99,6 +99,34 @@
     root.style.scrollPaddingTop = /sticky/.test(pos) ? (top.offsetHeight + 8) + "px" : "0px";
   }
   if (typeof window.addEventListener === "function") window.addEventListener("resize", fitScrollPadding);
+  // scroll-padding finnes ikke i Chrome < 69 (Samsung Internet 8) og Firefox < 68, og der ruller focus() ikke i det hele
+  // tatt når elementet allerede er «synlig» under den klebrige toppen: det ble liggende skjult (runde 3, målt i ekte
+  // Chromium 60 og Firefox 57). Derfor sjekker siden hvor fokus faktisk havnet, i alle nettlesere: etter et fokus som
+  // ikke kom fra et trykk (tastaturet eller skriptet), og etter at nettleseren selv har rullet, rulles et element som
+  // ligger helt eller delvis under toppen, til 8 px under den. Der scroll-padding virker, ligger det aldri der, og da
+  // skjer ingenting. Ikke etter et trykk (det traff noe synlig, og siden skal ikke hoppe under fingeren), ikke i en
+  // dialog eller i selve toppen, og ikke når toppen ikke er klebrig (liggende telefon).
+  const TAP_MS = 800;
+  let tappedAt = -Infinity;
+  function clearOfTop(el) {
+    const top = $("top");
+    if (!top || !el || el !== document.activeElement || $("app").hidden || typeof el.getBoundingClientRect !== "function") return;
+    if ((typeof top.contains === "function" && top.contains(el)) || (typeof el.closest === "function" && el.closest("dialog"))) return;
+    const pos = typeof window.getComputedStyle === "function" ? String(window.getComputedStyle(top).position || "") : "";
+    if (!/sticky/.test(pos) || typeof window.scrollBy !== "function") return;
+    const bar = top.getBoundingClientRect().bottom, at = el.getBoundingClientRect().top;
+    if (at < bar) window.scrollBy(0, Math.floor(at - bar - 8));
+  }
+  if (typeof document.addEventListener === "function") {
+    const tapped = () => { tappedAt = Date.now(); };
+    document.addEventListener("mousedown", tapped, true);
+    document.addEventListener("touchstart", tapped, true);
+    document.addEventListener("focusin", (e) => {
+      if (Date.now() - tappedAt < TAP_MS) return;
+      const el = e.target;
+      setTimeout(() => clearOfTop(el), 0);
+    });
+  }
   function showApp() {
     loginPushHide();
     $("login").hidden = true;

@@ -261,7 +261,7 @@ test("layout fix-up: -webkit-sticky counts as sticky, and a static header (phone
 });
 test("layout fix-up: the CSS fallback (before the script has measured) clears the old engines' 249-px header below 375 px", () => {
   const css = readFileSync(new URL("../../viggos-barbershop/admin.css", import.meta.url), "utf8");
-  const m = /@media \(max-width: 374px\) \{\s*html \{ scroll-padding-top: (\d+)px; \}/.exec(css);
+  const m = /@media \(max-width: 374px\) \{\s*html \{ scroll-padding-top: (\d+)px;[^}]*\}/.exec(css);
   assert.ok(m && Number(m[1]) >= 249, "a ≤374-px fallback of at least 249 px");
   assert.ok(css.indexOf(m[0]) < css.indexOf("@media (max-height: 500px)"), "before the landscape rule, which sets 0 and must win");
 });
@@ -313,3 +313,65 @@ test("layout round 3: the date field hides old Chromium's clear and spin buttons
   assert.ok(icon >= 30, `the round buttons get ${icon} px each`);
 });
 
+// Round 3 (r4 «focus under sticky header», still_open 20): the fix above only sets scroll-padding-top, which Chromium 60,
+// Samsung Internet 8 and Firefox 57 do not have, so focus() there did not scroll at all and the focused row stayed
+// under the sticky header (Chromium 60 at 320 and 1280 px, Firefox 57 at 390 and 1280 px). Guard: a fix for a target
+// browser never rests on a property newer than the targets alone. Here the page checks where focus actually landed:
+// after a focus that did not come from a tap (keyboard, script), once the browser has scrolled, an element under the
+// sticky header is scrolled to 8 px below it. Nothing happens where the browser already kept it clear, for a tap (the
+// page must not jump under the finger), inside a dialog or the header itself, or when the header is not sticky.
+async function focusPage({ position = "sticky", bar = 244 } = {}) {
+  const scrolls = [];
+  const page = await loadAdmin({ now: "2026-11-17T09:00", globals: {
+    getComputedStyle: () => ({ position }),
+    scrollBy: (x, y) => { scrolls.push([x, y]); },
+  } });
+  page.doc.documentElement = { style: {} }; // no scrollPaddingTop: Chromium 60, Firefox 57
+  const top = page.$("top");
+  top.getBoundingClientRect = () => ({ top: 0, bottom: bar });
+  const inTop = { getBoundingClientRect: () => ({ top: 60, bottom: 104 }), closest: () => null };
+  top.contains = (el) => el === top || el === inTop;
+  const at = (y, extra = {}) => Object.assign({ getBoundingClientRect: () => ({ top: y, bottom: y + 46 }), closest: () => null }, extra);
+  const focus = async (el, { tap = false } = {}) => {
+    if (tap) (page.doc.listeners.mousedown || []).forEach((fn) => fn({ type: "mousedown", target: el }));
+    page.doc.activeElement = el;
+    (page.doc.listeners.focusin || []).forEach((fn) => fn({ type: "focusin", target: el }));
+    await page.advance(0);
+  };
+  return { page, scrolls, focus, at, inTop };
+}
+test("layout round 3: without scroll-padding, a focused row under the sticky header is scrolled to 8 px below it", async () => {
+  const { scrolls, focus, at } = await focusPage({ bar: 244 });
+  await focus(at(60)); // Chromium 60 at 390 px: header 244 px, the row at 60
+  assert.deepEqual(scrolls, [[0, 60 - 244 - 8]]);
+  await focus(at(243.5)); // one pixel under it is still under it
+  assert.deepEqual(scrolls.at(-1), [0, Math.floor(243.5 - 244 - 8)]);
+  await focus(at(-300)); // above the screen (the browser's own scroll put it at the top edge or left it there)
+  assert.deepEqual(scrolls.at(-1), [0, -300 - 244 - 8]);
+});
+test("layout round 3: no scroll where focus is already clear of the header, after a tap, in a dialog or in the header", async () => {
+  const { page, scrolls, focus, at, inTop } = await focusPage({ bar: 195 });
+  await focus(at(195)); // the browser (scroll-padding) already put it below the header
+  await focus(at(400));
+  await focus(at(60, { closest: (s) => (s === "dialog" ? {} : null) })); // the editor or Oppsett
+  await focus(inTop); // the date row, the week strip
+  // Focus moved on before the check ran: only the element that has focus counts
+  const first = at(60);
+  page.doc.activeElement = first;
+  (page.doc.listeners.focusin || []).forEach((fn) => fn({ type: "focusin", target: first }));
+  page.doc.activeElement = at(400);
+  await page.advance(0);
+  assert.deepEqual(scrolls, []);
+  await focus(at(60), { tap: true }); // a tap hit something visible: no jump under the finger
+  assert.deepEqual(scrolls, []);
+  // A tap long ago does not count for a later keyboard focus
+  await page.advance(5000);
+  page.setNow("2026-11-17T09:01");
+  await focus(at(60));
+  assert.deepEqual(scrolls, [[0, 60 - 195 - 8]]);
+});
+test("layout round 3: a header that is not sticky (phone landscape) never scrolls the page on focus", async () => {
+  const { scrolls, focus, at } = await focusPage({ position: "static" });
+  await focus(at(60));
+  assert.deepEqual(scrolls, []);
+});

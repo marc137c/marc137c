@@ -69,3 +69,34 @@ test("check-css-assets: the site and the owner's overview pass, and npm run chec
     assert.ok(pkg.scripts.check.includes(part), "npm run check runs: " + part);
   }
 });
+
+// Round 3 (still_open 20, SPEC R45): /admin kept focus out from under its sticky header with scroll-padding-top alone.
+// Chrome < 69 (Samsung Internet < 10) and Firefox < 68 do not use it when focus or an anchor moves the page, and Safari
+// before 14.1 only for scroll snapping, so the focused row stayed hidden there. Rule: a scroll-padding-* or
+// scroll-margin-* value other than 0/auto names, in the same rule, what does the job in those browsers
+// («/* reserve: … */»), and that reserve has its own test. Zero needs none (it relies on nothing).
+const SCROLL_BAD = [
+  ["scroll-padding-top without a reserve", "html { scroll-padding-top: 210px; }"],
+  ["scroll-padding shorthand", "html { scroll-padding: 80px 0 0; }"],
+  ["scroll-margin-top on a section", "#bestill { scroll-margin-top: 76px; }"],
+  ["inside a media query", "@media (max-width: 374px) { html { scroll-padding-top: 256px; } }"],
+  ["a reserve comment in another rule", "/* reserve: x */ html { scroll-padding-top: 76px; }"],
+];
+const SCROLL_GOOD = [
+  ["a named reserve", "html { scroll-padding-top: 210px; /* reserve: clearOfTop i admin.js */ }"],
+  ["zero", "@media (max-height: 500px) { html { scroll-padding-top: 0; } }"],
+  ["auto", "html { scroll-padding-top: auto; }"],
+];
+for (const [label, css] of SCROLL_BAD) {
+  test(`check-css-assets: ${label} fails`, () => {
+    const r = check(css);
+    assert.equal(r.status, 1, r.out);
+    assert.match(r.out, /virker ikke for fokus og ankre i Chrome < 69/);
+  });
+}
+for (const [label, css] of SCROLL_GOOD) {
+  test(`check-css-assets: scroll offset with ${label} passes`, () => {
+    const r = check(css);
+    assert.equal(r.status, 0, r.out);
+  });
+}

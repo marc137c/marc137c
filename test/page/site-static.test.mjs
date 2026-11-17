@@ -103,3 +103,25 @@ test("F47: the map iframe has no src at load, keeps its address in data-src and 
   assert.ok(btn && btn.localName === "button" && btn.getAttribute("type") === "button");
   assert.equal(btn.textContent.trim(), "Vis kart (Google Maps)");
 });
+
+// ---------- Round 3 (SPEC R45): the reserve for scroll-padding-top on the front page ----------
+// html { scroll-padding-top } keeps «Bestill time» out from under the fixed menu only where the browser uses it for
+// anchors (Chrome 69+, Firefox 68+, Safari 14.1+). check-css-assets.mjs makes every such rule name its reserve; here
+// it is tested: #bestill gets at least the same room as padding-top inside «@supports not (aspect-ratio: 1)», which
+// every browser without scroll-padding reads (aspect-ratio came later in each: Chrome 88, Firefox 89, Safari 15).
+test("round 3: the front page's scroll-padding-top has its reserve for browsers without it", () => {
+  const css = read("styles.css").replace(/\/\*[\s\S]*?\*\//g, "");
+  const pad = /(^|\})\s*html\s*\{[^}]*scroll-padding-top:\s*(\d+)px/.exec(css);
+  assert.ok(pad, "html has scroll-padding-top");
+  const at = css.indexOf("@supports not (aspect-ratio: 1)");
+  assert.ok(at >= 0, "an «@supports not (aspect-ratio: 1)» block");
+  let depth = 0, i = css.indexOf("{", at);
+  const start = i;
+  for (; i < css.length; i++) { if (css[i] === "{") depth++; else if (css[i] === "}" && --depth === 0) break; }
+  const block = css.slice(start + 1, i);
+  const reserve = /(^|[\s}])#bestill\s*\{[^}]*padding-top:\s*(\d+)px/.exec(block);
+  assert.ok(reserve, "#bestill gets padding-top inside the block");
+  assert.ok(Number(reserve[2]) >= Number(pad[2]), `#bestill's ${reserve[2]} px clears the ${pad[2]}-px menu`);
+  const SUPPORT = { scrollPadding: { chrome: 69, firefox: 68, safari: 14.1 }, aspectRatio: { chrome: 88, firefox: 89, safari: 15 } };
+  for (const b of Object.keys(SUPPORT.scrollPadding)) assert.ok(SUPPORT.aspectRatio[b] >= SUPPORT.scrollPadding[b], b);
+});
