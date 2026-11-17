@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { FakeBlobs } from "./helpers/fake-blobs.mjs";
 import { FakeClock } from "./helpers/clock.mjs";
 import { handle, makeToken, verifyToken, slim } from "../oversikt/netlify/functions/overview.mjs";
+import { readFileSync } from "node:fs";
 
 const AUTH_STORE = "oversikt-auth";
 function fakeStore() {
@@ -176,4 +177,57 @@ test("slim: bare valgt periode, og ingen bookingtall blir null (ikke 0)", () => 
   assert.equal(s.days.length, 2);
   const t = slim({ days: [{ date: "2026-11-15", visits: 1, views: 1, bookings: null }] }, 7);
   assert.equal(t.days[0].booked, null);
+});
+
+// Round 3 (devices): the live overview answered «Passordet er ikke satt ennå.» because OVERVIEW_PASSWORD was set after
+// its last production deploy (each deploy keeps the variables it was built with), and the README's only check,
+// «/api/overview uten innlogging skal gi 401», passes whether or not the password is in the deploy. The smoke probe
+// (oversikt/smoke.mjs) must tell the two apart; here it runs against handle() and the real public/index.html.
+const PUBLIC_INDEX = readFileSync(new URL("../oversikt/public/index.html", import.meta.url), "utf8");
+function siteFetch(d, { bundleMissing = false } = {}) {
+  return async (url, init = {}) => {
+    const u = new URL(url);
+    if (u.pathname === "/" || u.pathname === "/index.html") return new Response(PUBLIC_INDEX, { status: 200, headers: { "Content-Type": "text/html" } });
+    if (bundleMissing) return new Response("<html>502 Bad Gateway</html>", { status: 502 });
+    return handle(new Request(url, init), { ip: "192.0.2.10" }, d);
+  };
+}
+const smokeOf = async () => (await import("../oversikt/smoke.mjs")).smoke;
+
+test("smoke probe: a deploy WITH the password passes; one built before OVERVIEW_PASSWORD was set FAILS and says to deploy again", async () => {
+  const smoke = await smokeOf();
+  const good = await smoke({ origin: "https://o.example", fetchFn: siteFetch(deps()) });
+  assert.equal(good.ok, true, JSON.stringify(good.results));
+  const unset = await smoke({ origin: "https://o.example", fetchFn: siteFetch(deps({ env: {} })) });
+  assert.equal(unset.ok, false, "a deploy without the password must not pass: " + JSON.stringify(unset.results));
+  assert.match(unset.results.filter((r) => !r.ok).map((r) => r.detail).join(" "), /ikke med i denne publiseringen.*publiser oversikten på nytt/i);
+  const missing = await smoke({ origin: "https://o.example", fetchFn: siteFetch(deps(), { bundleMissing: true }) });
+  assert.equal(missing.ok, false);
+  assert.match(missing.results.filter((r) => !r.ok).map((r) => r.detail).join(" "), /@netlify\/blobs/);
+});
+
+test("smoke probe: the made-up password is never the real one, and the probe only reads (one login attempt, no token kept)", async () => {
+  const smoke = await smokeOf();
+  const d = deps();
+  const seen = [];
+  const f = siteFetch(d);
+  await smoke({ origin: "https://o.example", fetchFn: async (url, init = {}) => { seen.push([init.method || "GET", new URL(url).pathname, init.body]); return f(url, init); } });
+  const posts = seen.filter(([m]) => m === "POST");
+  assert.deepEqual(posts.map(([, p]) => p), ["/api/login"]);
+  assert.notEqual(JSON.parse(posts[0][2]).password, "riktig-passord");
+  assert.ok(JSON.parse(posts[0][2]).password.length >= 24, "a long random made-up password");
+});
+
+test("oversikt/README.md: the variables come before the deploy, a changed variable needs a new deploy, and the check is the smoke probe", () => {
+  const readme = readFileSync(new URL("../oversikt/README.md", import.meta.url), "utf8");
+  const section = readme.slice(readme.indexOf("## Publisere oversikten"));
+  assert.ok(section.startsWith("## Publisere oversikten"), "the section exists");
+  assert.match(section, /OVERVIEW_PASSWORD/);
+  assert.match(section, /STATS_KEY_/);
+  assert.match(section, /gjelder først etter en ny publisering/);
+  assert.match(section, /node smoke\.mjs/);
+  assert.match(section, /Mangler lesenøkkel/);
+  assert.match(section, /Lesenøkkelen ble ikke godtatt/);
+  assert.doesNotMatch(section, /uten innlogging skal gi 401 \(/, "the old check cannot tell a deploy without the password from one with it");
+  assert.ok(section.indexOf("OVERVIEW_PASSWORD") < section.indexOf("netlify deploy"), "set the variables first, then deploy");
 });

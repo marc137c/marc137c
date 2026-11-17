@@ -19,10 +19,19 @@ Eierens egen side (bare du har passordet): besøk og bookinger for alle bedrifte
 4. Publiser bedriftens side og oversikten på nytt.
 
 ## Publisere oversikten
-Fra denne mappen, FØRST `npm install` (funksjonen trenger `@netlify/blobs` i `oversikt/node_modules`: CLI-en pakker fra
-repo-roten og følger ikke en Windows-kobling til `node_modules`, da mangler pakken når funksjonen kjører), deretter:
-`netlify deploy --prod --site <oversiktens side-id> --dir public --functions netlify/functions`.
-Sjekk etterpå: `/api/overview` uten innlogging skal gi 401 (502 betyr at pakken mangler).
+1. Legg inn variablene FØRST: `OVERVIEW_PASSWORD` (`set-overview-password.sh`) og hver `STATS_KEY_<NAVN>`
+   (`link-stats-key.sh`). Hver publisering beholder variablene den ble laget med, så en ny eller endret variabel
+   gjelder først etter en ny publisering av oversikten (og en ny lesenøkkel også etter en ny publisering av bedriftens side).
+2. Fra denne mappen, `npm install` (funksjonen trenger `@netlify/blobs` i `oversikt/node_modules`: CLI-en pakker fra
+   repo-roten og følger ikke en Windows-kobling til `node_modules`, da mangler pakken når funksjonen kjører), deretter:
+   `netlify deploy --prod --site <oversiktens side-id> --dir public --functions netlify/functions`.
+3. Sjekk etterpå: `node smoke.mjs https://<oversiktens adresse>`. Den prøver å logge inn med et tilfeldig, påfunnet
+   passord: 401 «Feil passord.» betyr at passordet er med i publiseringen. 503 «Passordet er ikke satt ennå.» betyr at
+   publiseringen ble laget før passordet: publiser på nytt. 502 betyr at `@netlify/blobs` mangler i pakken.
+   (`/api/overview` uten innlogging gir 401 også når passordet mangler, så den alene sier ingenting.)
+4. Logg inn: Viggo's rad skal vise tall, ikke «Mangler lesenøkkel» (`STATS_KEY_VIGGOS` er ikke med i denne
+   publiseringen) eller «Lesenøkkelen ble ikke godtatt» (nøklene på de to sidene er ulike, eller bedriftens side er ikke
+   publisert på nytt etter at `STATS_READ_KEY` ble lagt inn).
 
 ## Teste lokalt
 `npm test` i rotmappen kjører testene for statistikken og oversikten.
