@@ -12,12 +12,15 @@ eierens beslutninger i `docs/SPEC.md`.
 - [ ] Netlify → Forms: skjemagjenkjenning er slått av (Form detection → Disable), og de gamle «booking»-innsendingene er slettet. Dette må være gjort før `personvern.html` publiseres, fordi siden sier at Netlify Blobs er det eneste stedet bestillinger lagres.
 - [ ] Netlify → Site configuration → Build & deploy: Deploy Previews er av eller krever godkjenning, og grenutrullinger (branch deploys) er av.
 - [ ] Ingen miljøvariabler for den fjernede meldingstjenesten finnes i noen kontekst, og de opprettes aldri (navnene står i `OLD_ENV` i test/no-sms.test.mjs). Koden bruker dem ikke.
+- [ ] `STATS_READ_KEY` er satt på Viggo's side, med samme verdi som `STATS_KEY_VIGGOS` i eierens oversikt (`oversikt/README.md`). Uten den svarer `/api/stats` 401 til alle, også oversikten (eierens beslutning D12). Barberens passord gir aldri statistikk.
 - [ ] Husk: en endret miljøvariabel gjelder først etter en ny publisering (Deploys → Trigger deploy → Deploy site). Hver utrulling beholder verdiene den ble bygget med.
 - [ ] Prøvekjøring på en godkjent forhåndsvisning (eget lager `bookings-preview`): én nettbestilling, ett nytt forsøk etter et tapt svar, én flytting over månedsskifte, én helt blokkert dag (står som stengt i kalenderen, i linjen øverst og i ukestripen), «Avlys alle nettbestillinger fra …», varselet «Ny time» på barberens telefon, kalenderabonnementet, kundens «Legg i kalenderen» og en 429-melding med 409 63 911.
 
 ## 2. Rett etter første publisering av denne koden
 
 - [ ] Slett alle eldre utrullinger, også deploy-preview-1 og deploy-preview-2: Deploys → velg utrullingen → Options → Delete deploy. De har gammel kode og det gamle passordet på sine egne adresser (`<id>--…`); den nye koden svarer 410 «Bruk hovedsiden.» der, men bare slettede utrullinger er helt borte.
+- [ ] Eierens oversikt viser Viggo's besøk og bookinger etter publiseringen (den henter `/api/stats` med lesenøkkelen).
+- [ ] Når varslene om nye bestillinger virker på Viggos telefon (del 5): slett det midlertidige bookingvarselet fra main (bb764bd), `.github/booking-alarm.mjs` og `.github/workflows/booking-alarm.yml`, og GitHub-hemmeligheten `NTFY_TOPIC`. Til da gir det Viggo varsel om nye opptatte tider via ntfy.
 - [ ] Kjør `node scripts/smoke-live.mjs https://www.viggosbarbershop.no <gamle permalenkeverter …>`. Alle linjer er OK, og hver gamle permalenke svarer 410 eller 404 på `/api/admin/items`, aldri 401.
 - [ ] Etter første døgn: Netlify → Logs → Functions → `retention` viser «Opprydding: N slettet, …». Gamle oppføringer med umulige datoer og de gamle `auth/*`-tellerne er borte, og timeboken viser ingen avtale som ikke kan slettes. Står det «stoppet etter 20 s» i loggen, var det mange gamle `auth/*`-tellere fra den forrige utgaven; de neste nettene sletter resten (se at meldingen forsvinner).
 
@@ -45,7 +48,8 @@ Status 16.11.2026 (meldt): domenet virker. www er primæradresse, viggosbarbersh
 - [ ] Chromium 60 og Firefox 57 (`viggos-work/oldbrowsers`), én iPhone og én Android: bestill en ledig tid helt gjennom; feilmeldinger synes, fokus havner riktig, bekreftelsen blir stående og «Legg i kalenderen» åpner.
 - [ ] Menyen lukkes med Esc og med et trykk utenfor; Tab går i samme rekkefølge som man ser (1440 px); «Til toppen» går helt opp (375 og 1440 px).
 - [ ] Bildeboksen i galleriet, språkbryteren (norsk som standard, engelsk huskes) og «Vis kart» virker; ingen vannrett rulling ved 320 px, og språkbryteren og ikonene øverst er lette å treffe ved 320 og 360 px.
-- [ ] /admin ved 320 og 375 px (dato-raden viser hele året, også i Chromium 60 med 320 px innholdsbredde, søket, linjen om varsler, kortene og statistikkortet har minst 12 px kant på hver side), på tvers (844×390: toppen ruller med siden), axe-core på admin.html, og at trykk på påminnelsen fra Timebok åpner Oppsett på iPhone.
+- [ ] /admin ved 320 og 375 px (dato-raden viser hele året, også i Chromium 60 med 320 px innholdsbredde, søket, linjen om varsler og kortene har minst 12 px kant på hver side; /admin har ingen statistikk), på tvers (844×390: toppen ruller med siden), axe-core på admin.html, og at trykk på påminnelsen fra Timebok åpner Oppsett på iPhone.
+- [ ] Eierens oversikt (`oversikt/public`, egen Netlify-side) i Chromium 60 og Firefox 57, på en iPhone og i Samsung Internet: logg inn, bytt mellom 7, 30 og 90 dager, sorter tabellen, og kortene med søylene vises uten vannrett rulling ved 320 px. Lokalt: `viggos-work/tools/oversikt-dev.mjs` med `stats-dev.mjs` (laget data).
 - [ ] Konsollen i hver nettleser: ingen advarsel eller feil fra våre egne sider (bortsett fra forventede 4xx/5xx-svar).
 - [ ] Anmeldelser: gullstjernene ved 4,7, lange navn bryter pent ved 320/375/768/1440 px, arabisk tekst står til høyre, og merket øverst står på egen linje i Safari 10 og Firefox 55.
 

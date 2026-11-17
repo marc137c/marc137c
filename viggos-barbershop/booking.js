@@ -7,7 +7,7 @@
 (() => {
   // Reserveverdier til serveren har svart (se useServer)
   let SLOT_MIN = 30;       // en ny time hvert 30. minutt
-  let LEAD_MIN = 60;       // i dag: tidligste time er minst én time frem i tid
+  let LEAD_MIN = 15;       // i dag: tidligste time er minst 15 minutter frem i tid (må være lik CONFIG.leadMin)
   let MAX_DAYS = 60;       // hvor langt frem man kan bestille
   const SEND_TIMEOUT = 20000; // så lenge venter vi på svar på en bestilling før kunden får beskjed om å ringe
   const LOAD_TIMEOUT = 15000; // så lenge venter vi på ledige tider

@@ -1,0 +1,28 @@
+# Oversikt – alle bedriftene
+
+Eierens egen side (bare du har passordet): besøk og bookinger for alle bedriftene, side om side. Egen Netlify-side (ikke Viggo's).
+
+## Slik henger det sammen
+- Hver bedrifts side har `netlify/functions/stats.mjs` + `netlify/lib/stats-bookings.mjs` (samme filer som Viggo's).
+  De teller besøk uten informasjonskapsler og regner bookingtall ut fra bookingene – bare tall, aldri navn eller telefon.
+- Bedriftens side svarer på `/api/stats` **bare** med lesenøkkelen `STATS_READ_KEY` – kun eieren ser statistikken.
+  Bedriftene (f.eks. Viggo i /admin) ser den ikke.
+- Oversikten (`netlify/functions/overview.mjs`) henter alle bedriftene samtidig med hver sin nøkkel
+  (`STATS_KEY_<NAVN>` i oversiktens innstillinger) og viser dem i én tabell + ett kort per bedrift.
+- Innlogging: passordet `OVERVIEW_PASSWORD` (settes i et skjult vindu, vises aldri). 8 feil på 15 min = pause.
+
+## Ny bedrift
+1. Gi bedriftens side de to statistikkfilene og beacon-linjene i `script.js` (som Viggo's).
+2. Legg til én linje i `sites.mjs`: `{ id, name, url, keyEnv: "STATS_KEY_<NAVN>" }`.
+3. Kjør `viggos-work/tools/link-stats-key.sh <bedriftens Netlify-mappe> <oversiktens Netlify-mappe> STATS_KEY_<NAVN>`
+   (mappene er koblet med `netlify link`) – lager en tilfeldig nøkkel og lagrer den på begge sidene uten å vise den.
+4. Publiser bedriftens side og oversikten på nytt.
+
+## Publisere oversikten
+Fra denne mappen, FØRST `npm install` (funksjonen trenger `@netlify/blobs` i `oversikt/node_modules`: CLI-en pakker fra
+repo-roten og følger ikke en Windows-kobling til `node_modules`, da mangler pakken når funksjonen kjører), deretter:
+`netlify deploy --prod --site <oversiktens side-id> --dir public --functions netlify/functions`.
+Sjekk etterpå: `/api/overview` uten innlogging skal gi 401 (502 betyr at pakken mangler).
+
+## Teste lokalt
+`npm test` i rotmappen kjører testene for statistikken og oversikten.

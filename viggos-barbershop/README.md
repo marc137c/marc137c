@@ -22,7 +22,7 @@ Adressen er **https://www.viggosbarbershop.no** (viggosbarbershop.no og den gaml
 
 ## Bestillingskalender
 `booking.js`: kunden velger tjeneste (og eventuelle tillegg), dag og tid, og skriver navn og telefon.
-- Kalenderen følger åpningstidene: søndager og passerte dager er stengt, tider deles i 30 minutter, i dag vises bare tider minst én time frem, og man kan bestille opptil 60 dager frem.
+- Kalenderen følger åpningstidene: søndager og passerte dager er stengt, tider deles i 30 minutter, i dag vises bare tider minst 15 minutter frem, og man kan bestille opptil 60 dager frem.
 - **Opptatte tider vises i rødt med «Opptatt»**, og fullbookede dager blir røde. Tider der valgt tjeneste ikke rekker før neste avtale eller stengetid er grået ut og merket «For kort». En dag du har blokkert helt i timeboken, vises som stengt.
 - Bestillingen lagres med en gang (`/api/bookings`). To kunder kan aldri få samme tid: den som kommer sist får beskjed om å velge en annen.
 - Etter hver bestilling står bekreftelsen over skjemaet så lenge siden er åpen, med lenken «Legg i kalenderen» (timen som kalenderfil).
@@ -68,8 +68,8 @@ Hver gang en kunde bestiller time på nettsiden, kommer det et varsel på telefo
 - Ingenting å sette opp i Netlify: nøkkelparet (VAPID) lages automatisk første gang og ligger i timeboken i Netlify Blobs. Den private nøkkelen forlater aldri serveren. Forhåndsvisninger har egne nøkler og egne enheter.
 - Teknisk: standard Web Push (RFC 8030/8291/8292) i `netlify/lib/push.mjs`, `/api/admin/push` i `netlify/functions/admin.mjs`, service worker `admin-sw.js` (bytter nettleseren ut abonnementet, gir den serveren det nye på `/api/push/renew`, `netlify/functions/push-renew.mjs`, som bare godtar det med den gamle adressen og dens hemmelige nøkkel; går ikke det, kommer et varsel fra Timebok som åpner **Oppsett** med **Slå på varsler** når du trykker på det) og app-filen `admin.webmanifest` (ikonene lages av `scripts/make-admin-icons.mjs`). Varselet går kryptert via Apple, Google, Mozilla eller Microsoft sin push-tjeneste, så bare enheten kan lese det, og telefonnummeret sendes ikke med. Alle varsler er like lange, så push-tjenesten ikke kan se hvor langt kundens navn er. Serveren sender bare til disse fire tjenestene, fjerner enheter tjenesten sier er borte og godtar dem ikke igjen (da står det under Oppsett at varslene må slås på igjen), og en bestilling venter aldri mer enn 1,5 sekunder på varslene.
 
-### Besøk på nettsiden
-I timeboken står **Besøk på nettsiden**: sidevisninger i dag, siste 7 og 30 dager, og hvor besøkene kom fra (Instagram, Facebook, Google, TikTok, direkte eller annet). Telleren bruker ingen informasjonskapsler og lagrer ingen IP-adresse, ingen ID og ingenting på besøkerens enhet; bare dato, side og kildegruppe (`netlify/functions/stats.mjs`). Bare den publiserte nettsiden telles, ikke roboter eller forhåndsvisninger, og tallene slettes etter 400 dager.
+### Besøksstatistikk
+Timeboken viser ingen statistikk: tallene er eierens egne (eierens beslutning D12 i `docs/SPEC.md`). Nettsiden teller besøk uten informasjonskapsler (`/api/hit`, `netlify/functions/stats.mjs`), og bare eierens oversikt (`oversikt/`, en egen Netlify-side) leser dem fra `/api/stats` med lesenøkkelen `STATS_READ_KEY`. Hva som telles, står i `personvern.html`.
 
 ## Personvern
 `personvern.html` (lenket nederst på siden og under «Bestill time») forteller kundene hvilke opplysninger som lagres, hvem som får dem (Netlify, push-tjenesten som frakter varselet ditt, kalenderen på telefonen din hvis du har koblet den til, Google Maps etter et trykk, bilder fra Google og Instagram når de seksjonene viser innhold), og at timene slettes 90 dager etter timedatoen. Endrer du hvordan siden bruker opplysninger, må siden oppdateres; `test/page/privacy.test.mjs` stopper publiseringen hvis koden har en flyt siden ikke nevner.

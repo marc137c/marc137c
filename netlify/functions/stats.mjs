@@ -1,29 +1,46 @@
-// Besøksstatistikk uten informasjonskapsler.
-// POST /api/hit  – nettsiden melder én sidevisning: bare dato (norsk tid), side og hvor besøket kom fra
+// Besøks- og bookingstatistikk uten informasjonskapsler.
+// POST /api/hit  – nettsiden melder én sidevisning: bare dato (norsk tid), side og hvilket nettsted visningen kom fra.
+//                  Et «besøk» er en visning som IKKE kom fra en annen side på samme nettsted; bare besøk får en kilde
 //                  (instagram, facebook, google, tiktok, direkte, annet). Ingen IP-adresse, ingen ID, ingen
 //                  nettleserinfo, ingen henvisningsadresse, ingenting lagres på besøkerens enhet. Roboter,
 //                  forhåndsvisninger, grener, gamle permalenker og kall fra andre nettsteder telles ikke.
 //                  Ett dokument per dag (d/ÅÅÅÅ-MM-DD), konfliktsikkert; slettes etter STATS_KEEP_DAYS (retention.mjs).
-// GET  /api/stats – siste 30 dager, bare for innlogget barber (samme billett som /admin, også auth/epoch).
+// GET  /api/stats?days=7|30|90 – bare tall (aldri navn eller telefon), og BARE for eierens egen oversikt (oversikt/):
+//                  krever lesenøkkelen STATS_READ_KEY i headeren X-Stats-Key. Barberens /admin-innlogging gir IKKE
+//                  tilgang (eierens beslutning 17.11.2026). Bookingtallene regnes ut ved å lese bookingene
+//                  (netlify/lib/stats-bookings.mjs); bestillingen selv skriver ingenting til statistikken.
+// Nettstedets egen adresse leses fra forespørselen, så filen kan brukes uendret på nye bedrifters sider.
+import { createHash, timingSafeEqual } from "node:crypto";
 import { liveDeps, bookingStore, isProduction, isRetiredDeploy, retiredResponse, jsonObject } from "../lib/runtime.mjs";
-import { osloNow, addDays, mutateJSON, readSession } from "../lib/booking-core.mjs";
+import { osloNow, addDays, mutateJSON } from "../lib/booking-core.mjs";
+import { statsDay, bookingStats, sumDays, SOURCES, PAGES } from "../lib/stats-bookings.mjs";
 
+export { SOURCES, PAGES };
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 const noContent = () => new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
 const BOT = /bot|crawl|spider|slurp|preview|headless|lighthouse|facebookexternalhit|whatsapp|telegram|discord|curl|wget|python|node-fetch|axios|go-http/i;
-export const SOURCES = ["instagram", "facebook", "google", "tiktok", "direkte", "annet"];
-// Sidene som teller (panelet i /admin nevner hver av dem, test/page/admin-stats.test.mjs)
-export const PAGES = ["forside", "personvern"];
+export const RANGES = Object.freeze([7, 30, 90]);
 export const MAX_HIT_BYTES = 1024;
+const bare = (h) => String(h || "").toLowerCase().replace(/^www\./, "");
 
-function sourceOf(host) {
-  const h = String(host || "").toLowerCase();
-  if (!h || /(^|\.)viggosbarbershop\.no$|netlify\.app$/.test(h)) return "direkte";
+// Hvor et besøk utenfra kom fra (tom avsender = skrevet inn, bokmerke eller app som ikke sender avsender)
+export function sourceOf(host) {
+  const h = bare(host);
+  if (!h) return "direkte";
   if (/instagram/.test(h)) return "instagram";
-  if (/facebook|(^|\.)fb\.com$|(^|\.)fb\.me$/.test(h)) return "facebook";
+  if (/facebook|(^|\.)fb\.(com|me)$/.test(h)) return "facebook";
   if (/(^|\.)google\./.test(h)) return "google";
   if (/tiktok/.test(h)) return "tiktok";
   return "annet";
+}
+// Kom visningen fra en annen side på det samme nettstedet (med eller uten www)?
+export const isInternal = (refHost, siteHost) => !!bare(refHost) && bare(refHost) === bare(siteHost);
+
+// Lesenøkkelen, sammenlignet på konstant tid (hashene er like lange uansett hva som sendes)
+const digest = (s) => createHash("sha256").update(String(s)).digest();
+export function keyMatches(given, expected) {
+  if (!expected || !given) return false;
+  return timingSafeEqual(digest(given), digest(expected));
 }
 
 // Teksten i forespørselen, men aldri mer enn max byte (null hvis den er større)
@@ -44,16 +61,15 @@ async function readCapped(req, max) {
   return Buffer.concat(chunks.map((c) => Buffer.from(c))).toString("utf8");
 }
 
-// Dagens dokument i fast form: bare kjente sider og kilder med heltall, uansett hva som lå der
-function dayDoc(data) {
-  const src = data && typeof data === "object" ? data : {};
-  const count = (v) => (Number.isInteger(v) && v >= 0 ? v : 0);
-  const pick = (obj, names) => {
-    const out = {};
-    for (const n of names) if (obj && typeof obj === "object" && count(obj[n])) out[n] = count(obj[n]);
-    return out;
-  };
-  return { views: count(src.views), pages: pick(src.pages, PAGES), sources: pick(src.sources, SOURCES) };
+// Teller én visning i dagens dokument; source = null for en visning fra en annen side her (ikke et besøk).
+// Mange kan komme samtidig; hver kollisjon betyr at en annen ble telt, så det prøves opptil 20 ganger.
+export function bump(store, key, page, source) {
+  return mutateJSON(store, key, statsDay, (doc) => {
+    doc.views += 1;
+    doc.pages[page] = (doc.pages[page] || 0) + 1;
+    if (source) { doc.visits += 1; doc.sources[source] = (doc.sources[source] || 0) + 1; }
+    return { ok: true };
+  }, { attempts: 20 });
 }
 
 const statsStore = (deps, context) => deps.getStore({ name: isProduction(context) ? "stats" : "stats-preview", consistency: "strong" });
@@ -72,14 +88,9 @@ export async function handle(req, context, deps) {
     if (raw === null) return json({ error: "For stor forespørsel." }, 413);
     const body = jsonObject(raw) || {}; // en melding vi ikke kan lese (eller som ikke er et objekt), teller som forsiden
     const page = /personvern/.test(String(body.p || "")) ? "personvern" : "forside";
-    const source = sourceOf(body.r);
+    const source = isInternal(body.r, url.hostname) ? null : sourceOf(body.r);
     try {
-      const r = await mutateJSON(statsStore(deps, context), `d/${osloNow(deps.now()).date}`, dayDoc, (doc) => {
-        doc.views += 1;
-        doc.pages[page] = (doc.pages[page] || 0) + 1;
-        doc.sources[source] = (doc.sources[source] || 0) + 1;
-        return { ok: true };
-      }, { attempts: 20 }); // mange kan komme samtidig; hver kollisjon betyr at en annen ble telt
+      const r = await bump(statsStore(deps, context), `d/${osloNow(deps.now()).date}`, page, source);
       if (r.error) console.error("Statistikk: for mange samtidige treff, ett ble ikke telt");
     } catch (err) {
       console.error("Statistikk: lagringen svarte ikke:", err && err.name);
@@ -90,25 +101,45 @@ export async function handle(req, context, deps) {
   // GET /api/stats
   if (req.method !== "GET") return json({ error: "Bruk GET." }, 405);
   if (isRetiredDeploy(context)) return retiredResponse();
-  const password = deps.env.ADMIN_PASSWORD;
-  const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  // Bare eierens oversikt (lesenøkkelen), ikke barberens innlogging. Sjekkes før noen lagring åpnes.
+  if (!keyMatches(req.headers.get("x-stats-key"), deps.env.STATS_READ_KEY)) return json({ error: "Mangler gyldig lesenøkkel." }, 401);
+  const n = RANGES.includes(Number(url.searchParams.get("days"))) ? Number(url.searchParams.get("days")) : 30;
+  const store = statsStore(deps, context);
+  const today = osloNow(deps.now()).date;
+  const dates = Array.from({ length: Math.max(n, 30) }, (_, i) => addDays(today, -i)); // nyeste først
+  let docs;
   try {
-    const nowMs = deps.now().getTime();
-    if (!password || !(await readSession(bookingStore(deps, context), token, password, nowMs))) return json({ error: "Logg inn på nytt." }, 401);
-    const store = statsStore(deps, context);
-    const today = osloNow(deps.now()).date;
-    const dates = Array.from({ length: 30 }, (_, i) => addDays(today, -i));
-    // En dag som ikke kan leses, er ikke «0 besøk»: feilen går til catch nedenfor (503), aldri et sikkert tall (SPEC R18)
-    const docs = await Promise.all(dates.map((d) => store.get(`d/${d}`, { type: "json" })));
-    const days = dates.map((date, i) => { const doc = dayDoc(docs[i]); return { date, views: doc.views, sources: doc.sources }; });
-    const sum = (n) => days.slice(0, n).reduce((a, d) => a + d.views, 0);
-    const sources = {};
-    for (const s of SOURCES) sources[s] = days.reduce((a, d) => a + (d.sources[s] || 0), 0);
-    return json({ today, totals: { today: sum(1), week: sum(7), month: sum(30) }, sources, days });
+    // En dag som ikke kan leses, er ikke «0 besøk»: svaret er 503 uten tall, aldri et sikkert tall (SPEC R18)
+    docs = (await Promise.all(dates.map((d) => store.get(`d/${d}`, { type: "json" })))).map(statsDay);
   } catch (err) {
     console.error("Statistikk: kunne ikke lese:", err && err.name);
     return json({ error: "Kunne ikke hente statistikken." }, 503);
   }
+  const dayDocs = {};
+  dates.forEach((d, i) => { dayDocs[d] = docs[i]; });
+
+  // Bookingene som ikke kan leses, gir null (ukjent), aldri 0 (SPEC R18)
+  let b = null;
+  try { b = await bookingStats(bookingStore(deps, context), store, dates, today, dayDocs); }
+  catch (err) { console.error("Bookingstatistikk: kunne ikke lese bookingene:", err && err.name); }
+
+  const days = dates.map((date, i) => {
+    const d = docs[i];
+    const bk = b ? b.perDay[i] : null;
+    return { date, views: d.views, visits: d.visits, sources: d.sources, bookings: bk ? { web: bk.web, admin: bk.admin, cancelled: bk.cancelled } : null };
+  });
+  const sum = (k, len) => days.slice(0, len).reduce((a, d) => a + d[k], 0);
+  const sources = {};
+  for (const s of SOURCES) sources[s] = days.slice(0, n).reduce((a, d) => a + (d.sources[s] || 0), 0);
+  const bt = b ? sumDays(b.perDay.slice(0, n)) : null;
+  return json({
+    site: bare(url.hostname), today, range: n,
+    // today/week/month = sidevisninger; views/visits = valgt periode
+    totals: { today: sum("views", 1), week: sum("views", 7), month: sum("views", 30), views: sum("views", n), visits: sum("visits", n) },
+    sources,
+    days,
+    bookings: bt ? { web: bt.web, admin: bt.admin, cancelled: bt.cancelled, services: bt.services, weekdays: bt.weekdays, upcoming7: b.upcoming7 } : null,
+  });
 }
 
 export default (req, context) => handle(req, context, liveDeps());

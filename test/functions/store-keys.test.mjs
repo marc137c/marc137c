@@ -23,6 +23,7 @@ import { getReviews, STALE_LIMIT_MS } from "../../netlify/lib/reviews.mjs";
 import { buildFeed, KEEP_POSTS_MS } from "../../netlify/lib/social.mjs";
 
 const PW = "fake-admin-password";
+const STATS_KEY = "fake-owner-stats-key"; // the owner's overview reads /api/stats with it (merge of main 6bf86e8)
 const PHONE = "+47 912 34 567";
 const IP = "198.51.100.23";
 const IP6 = "2a01:79c:cebd:1000::42";
@@ -46,7 +47,7 @@ test("store keys: every row names its stores, what it holds and a non-empty dele
 test("store keys: after every handler has run, every stored key has a deletion rule and no key name holds a phone or an IP", async () => {
   const device = makeDevice("apple");
   const push = fakePushService({ devices: [device] });
-  const d = testDeps({ now: NOW, env: { ADMIN_PASSWORD: PW }, fetch: push.fetch });
+  const d = testDeps({ now: NOW, env: { ADMIN_PASSWORD: PW, STATS_READ_KEY: STATS_KEY }, fetch: push.fetch });
   const ctx = (ip) => ({ ...PRODUCTION, ip });
   const call = (fn, path, { method = "GET", json, token, ip = IP, params } = {}) =>
     fn.handle(request(path, { method, json, headers: token ? { Authorization: "Bearer " + token } : {} }), { ...ctx(ip), params }, d).then(read);
@@ -70,11 +71,13 @@ test("store keys: after every handler has run, every stored key has a deletion r
   const id = made.body.item.id;
   assert.equal((await call(admin, `/api/admin/items/${id}`, { method: "PATCH", json: { date: "2027-01-05", expect: made.body.item.updatedAt }, token, params: { id } })).status, 200);
   assert.equal((await call(admin, "/api/admin/cancel-phone", { method: "POST", json: { phone: PHONE }, token })).body.cancelled, 1);
-  // A page view from Instagram (visitor statistics) and the barber reading them
+  // A page view from Instagram (visitor statistics), and the owner's overview reading them (the barber's token cannot);
+  // the read freezes the booking numbers of the days 14 or more days old into their day documents
   const view = await stats.handle(request("/api/hit", { method: "POST", body: JSON.stringify({ p: "/", r: "l.instagram.com" }),
     headers: { "Content-Type": "text/plain", "User-Agent": "Mozilla/5.0 (iPhone) Safari/604.1", "X-Nf-Client-Connection-Ip": IP } }), ctx(IP), d);
   assert.equal(view.status, 204);
-  assert.equal((await call(stats, "/api/stats", { token })).status, 200);
+  assert.equal((await call(stats, "/api/stats", { token })).status, 401);
+  assert.equal((await read(await stats.handle(request("/api/stats", { headers: { "X-Stats-Key": STATS_KEY } }), ctx(IP), d))).status, 200);
   assert.equal((await call(retention, "/.netlify/functions/retention", { method: "POST", json: {} })).status, 200);
 
   const problems = [];
@@ -97,7 +100,9 @@ test("store keys: after every handler has run, every stored key has a deletion r
   }
   // Round 3 (SPEC R44): no counter document per client or number, only the fixed set
   assert.deepEqual(keys.filter((k) => k.startsWith("rl/") && !/^rl\/(secret|all|login\/all|b\/(ip|phone|login\/ip)\/[0-9a-f])$/.test(k)), []);
-  assert.deepEqual(d.blobs.keys("stats"), ["d/2026-11-12"]);
+  const statsKeys = d.blobs.keys("stats");
+  assert.ok(statsKeys.includes("d/2026-11-12") && statsKeys.includes("d/2026-10-29"), statsKeys.join(", "));
+  assert.deepEqual(statsKeys.filter((k) => !/^d\/\d{4}-\d{2}-\d{2}$/.test(k)), []);
   // Fix-up round 2 (demo-counters.test.mjs): the privacy facts said the counters store «bare tidspunkter», but every
   // hit also stores an id (for a web booking derived from its request). A row that lists its fields must name every
   // field the handlers actually store under it, as paths: «hits[].t», «alertedAt».

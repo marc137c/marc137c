@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { RETENTION_DAYS, STATS_KEEP_DAYS, COUNTER_MAX_AGE_MS } from "../../netlify/lib/store-keys.mjs";
 import { PUSH_SERVICES } from "../../netlify/lib/push.mjs";
 import { SOURCES } from "../../netlify/functions/stats.mjs";
+import { SNAPSHOT_AFTER } from "../../netlify/lib/stats-bookings.mjs";
 import { parseDocument } from "../helpers/mini-dom.mjs";
 import { loadSite } from "../helpers/site-page.mjs";
 
@@ -90,6 +91,8 @@ test("D6: the page does not claim flows that no longer exist", () => {
 
 test("D6: the visitor statistics are described as they are built (stats.mjs)", () => {
   const text = pageText();
+  assert.ok(text.includes(`Når dagen er ${SNAPSHOT_AFTER} dager gammel`), `the booking numbers are added after SNAPSHOT_AFTER (${SNAPSHOT_AFTER}) days`);
+  assert.ok(text.includes("uten navn, telefonnummer eller annet om kunden"), "the booking numbers are numbers only");
   assert.ok(text.includes("informasjonskapsler"), "says no cookies");
   assert.ok(text.includes("IP-adresse"), "says no IP address is stored");
   assert.ok(text.includes(`${STATS_KEEP_DAYS} dager`), `kept ${STATS_KEEP_DAYS} dager`);
@@ -185,7 +188,9 @@ const FIELD_WORDS = {
     "hits[].t": "tidspunktet for hvert forsøk", "hits[].id": "en kode for forsøket", alertedAt: "når taket sist ble nådd",
     "hits[].k": "et navn laget av adressen eller nummeret med en hemmelig nøkkel", // round 3: the name sits in the hit
   },
-  "d/": { views: "hvor mange ganger", pages: "forsiden og denne siden", sources: "hvor besøkene kom fra" },
+  // merge of main (2026-11-17): visits apart from views, and the booking numbers frozen into the day after SNAPSHOT_AFTER days
+  "d/": { views: "hvor mange ganger", pages: "forsiden og denne siden", sources: "hvor besøkene kom fra",
+    visits: "hvor mange av visningene som er nye besøk", bookings: "antall bestillinger som ble gjort den dagen" },
 };
 test("privacy: the page names every field the abuse counters and the visitor statistics store, and only counters that exist", async () => {
   const { KEY_RULES } = await import("../../netlify/lib/store-keys.mjs");

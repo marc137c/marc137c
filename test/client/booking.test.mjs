@@ -6,6 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { boot, later, readSite, FRIDAY, RATE_LIMITED } from "./booking-harness.mjs";
 import * as CLOSED from "../fixtures/closed-days.mjs";
+import { CONFIG } from "../../netlify/lib/booking-core.mjs";
 
 const CALL = "409 63 911";
 const PROMISE = /mottatt|bekrefter|received|confirm/i;
@@ -292,17 +293,21 @@ test("F8: a 409 puts 'takenNow' in #msg-time with focus on a free time", async (
 // F19: the server's answer decides "now" and the booking rules; the device clock is only used before it answers.
 const TODAY = "2026-11-12";
 const offered = (site) => site.slots().filter((x) => x.t !== null && !x.disabled).map((x) => x.t);
+// Oslo time on TODAY, from minutes after midnight. The cases below are placed around 17:30 (1050, the last start on a
+// Thursday) from the lead time CONFIG.leadMin (15 min since the owner's choice of 2026-11-17), so they hold for any value.
+const LEAD = CONFIG.leadMin;
+const osloToday = (min) => `${TODAY}T${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}:00+01:00`;
 
 test("F19: with the server clock 90 s ahead of the device, 17:30 today is not offered (the server would say too_early)", async () => {
-  const site = await boot({ now: "2026-11-12T16:30:00+01:00", serverAheadMs: 90000 });
+  const site = await boot({ now: osloToday(1050 - LEAD), serverAheadMs: 90000 }); // the device still offers 17:30
   await site.pick({ service: "Herreklipp", date: TODAY });
   assert.ok(!offered(site).includes(1050), "17:30 is not offered: " + offered(site));
   assert.equal(site.slots().filter((x) => x.t === 1050).length, 0);
 });
 
 for (const [label, now, ahead, has1730] of [
-  ["10 min behind", "2026-11-12T16:25:00+01:00", 600000, false],
-  ["10 min ahead of", "2026-11-12T16:35:00+01:00", -600000, true],
+  ["10 min behind", osloToday(1050 - LEAD - 5), 600000, false],
+  ["10 min ahead of", osloToday(1050 - LEAD + 5), -600000, true],
 ]) {
   test(`F19: a device clock ${label} the server still offers exactly the server's times`, async () => {
     const site = await boot({ now, serverAheadMs: ahead });
@@ -541,8 +546,8 @@ test("F7/F56: server.blockDay('2026-11-16') shows the day as ', stengt', and a c
   assert.match((await site.day("2026-11-17")).getAttribute("aria-label"), /, stengt$/);
 });
 
-test("F56: Full service at 16:25 makes today 'is-nofit' (not fully booked), and short times say 'For kort'", async () => {
-  const site = await boot({ now: "2026-11-12T16:25:00+01:00" });
+test("F56: Full service when only 17:30 is left makes today 'is-nofit' (not fully booked), and short times say 'For kort'", async () => {
+  const site = await boot({ now: osloToday(1050 - LEAD - 5) }); // the lead time leaves only 17:30 today
   await site.pick({ service: "Herreklipp", date: TODAY, time: 1050 });
   site.choose(site.select, "Full service"); await site.flush();
   const today = await site.day(TODAY);

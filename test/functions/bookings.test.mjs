@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { testDeps, request, read, quiet, PRODUCTION } from "../helpers/deps.mjs";
 import { storedItems, counterHits, CUSTOMER_PHONE } from "../helpers/bookings.mjs";
 import { handle, config } from "../../netlify/functions/bookings.mjs";
-import { validateCustomer } from "../../netlify/lib/booking-core.mjs";
+import { validateCustomer, CONFIG } from "../../netlify/lib/booking-core.mjs";
 import { counterRef, limiterSecret, ALL_KEY } from "../../netlify/lib/limits.mjs";
 import { vapidKeys, saveSubscription, parseSubscription, pushGen } from "../../netlify/lib/push.mjs";
 import { makeDevice, fakePushService } from "../helpers/fake-push.mjs";
@@ -63,9 +63,12 @@ test("bookings: validation errors carry a code; a taken slot is 409", async () =
 });
 
 test("bookings: today's slots respect the injected clock (lead time)", async () => {
+  // 10:00 in Oslo: 10:00 is inside the lead time (CONFIG.leadMin, 15 min since the owner's choice of 2026-11-17), 10:30 is not
   const d = testDeps({ now: NOW });
-  const res = await read(await handle(post({ ...BODY, date: "2026-11-12", start: 630 }), PRODUCTION, d));
+  const res = await read(await handle(post({ ...BODY, date: "2026-11-12", start: 600 }), PRODUCTION, d));
   assert.deepEqual([res.status, res.body.code], [400, "too_early"]);
+  const ok = await read(await handle(post({ ...BODY, date: "2026-11-12", start: 600 + CONFIG.slotMin * Math.ceil(CONFIG.leadMin / CONFIG.slotMin) }), PRODUCTION, d));
+  assert.equal(ok.status, 201, JSON.stringify(ok.body));
 });
 
 test("bookings: honeypot, oversize and broken JSON", async () => {
@@ -180,13 +183,18 @@ test("bookings: a phone over 30 characters is 400 bad_phone and stores nothing (
 // customer booked a second time. Rule: a replay of a stored requestId (same date and start, still active) answers
 // 201 with the stored booking before the date window, the lead time, the opening hours or the caps are checked.
 const RID2 = "retry-req-0001";
-const today = { ...BODY, date: "2026-11-12", start: 660, requestId: RID2 }; // Thursday 12 Nov 11:00, booked at 10:00
+const today = { ...BODY, date: "2026-11-12", start: 660, requestId: RID2 }; // Thursday 12 Nov 11:00
+// Oslo time on 12 Nov (UTC+1) as an ISO instant. From the lead time (CONFIG.leadMin), so the cases hold for any value:
+// BOOKED_AT is the last minute at which 11:00 is still offered, RETRY_AT the first one at which it is too early.
+const osloAt = (min, sec) => new Date(Date.UTC(2026, 10, 12, 0, 0, sec) + (min - 60) * 60e3).toISOString();
+const BOOKED_AT = osloAt(660 - CONFIG.leadMin - 1, 40);
+const RETRY_AT = osloAt(660 - CONFIG.leadMin + 1, 23);
 for (const [label, later] of [
-  ["the lead time has passed (today, 40 s later past 10:00)", "2026-11-12T09:01:23Z"],
+  ["the lead time has passed (today, about a minute later)", RETRY_AT],
   ["the date has passed (just after midnight)", "2026-11-12T23:10:00Z"],
 ]) {
   test(`bookings replay: a stored booking retried after ${label} answers 201 with the stored booking`, async () => {
-    const d = testDeps({ now: "2026-11-12T08:59:40Z" }); // 09:59:40 in Oslo: 11:00 is the first time offered
+    const d = testDeps({ now: BOOKED_AT }); // 11:00 is the first time offered
     const first = await read(await handle(post(today), PRODUCTION, d));
     assert.equal(first.status, 201, JSON.stringify(first.body));
     d.clock.set(later);
@@ -197,18 +205,18 @@ for (const [label, later] of [
   });
 }
 test("bookings replay: a request with a requestId nobody stored still gets the clock rules (400 too_early)", async () => {
-  const d = testDeps({ now: "2026-11-12T09:01:23Z" });
+  const d = testDeps({ now: RETRY_AT });
   const r = await read(await handle(post({ ...today, requestId: "never-stored-01" }), PRODUCTION, d));
   assert.deepEqual([r.status, r.body.code], [400, "too_early"]);
   assert.equal(storedItems(d.blobs).length, 0);
 });
 test("bookings replay: the same requestId on a cancelled booking is not a replay", async () => {
-  const d = testDeps({ now: "2026-11-12T08:59:40Z" });
+  const d = testDeps({ now: BOOKED_AT });
   const first = await read(await handle(post(today), PRODUCTION, d));
   const doc = d.blobs.json("bookings", "m/2026-11");
   doc.items[0].status = "cancelled";
   d.blobs.seed("bookings", "m/2026-11", doc);
-  d.clock.set("2026-11-12T09:01:23Z");
+  d.clock.set(RETRY_AT);
   const retry = await read(await handle(post(today), PRODUCTION, d));
   assert.equal(first.status, 201);
   assert.deepEqual([retry.status, retry.body.code], [400, "too_early"]);

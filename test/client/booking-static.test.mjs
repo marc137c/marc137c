@@ -106,7 +106,9 @@ test("R2: the timeout guard finds a bare fetch and accepts one inside withTimeou
 test("R2: every fetch( in viggos-barbershop/*.js is inside withTimeout(…)", () => {
   const files = readdirSync(SITE).filter((f) => f.endsWith(".js")).sort();
   const withFetch = files.filter((f) => /\bfetch\s*\(/.test(read(f)));
-  assert.ok(withFetch.length >= 6, "the scan sees the site's requests: " + withFetch.join(", "));
+  // booking.js, admin.js, admin-sw.js, reviews.js, social-feed.js (admin-stats.js went with the merge of main: the
+  // statistics are the owner's only)
+  for (const f of ["admin-sw.js", "admin.js", "booking.js", "reviews.js", "social-feed.js"]) assert.ok(withFetch.includes(f), "the scan sees the site's requests: " + f);
   const bare = files.filter((f) => bareFetches(read(f)).length > 0);
   assert.deepEqual(bare, [], "files with a fetch outside withTimeout: wrap it");
   assert.deepEqual(bareFetches(bookingJs), [], "booking.js has no bare fetch");

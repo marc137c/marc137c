@@ -9,7 +9,7 @@ export const CONFIG = {
   // [åpner, stenger] i minutter. 0 = søndag.
   hours: { 0: null, 1: [600, 1080], 2: [600, 1080], 3: [600, 1080], 4: [600, 1080], 5: [600, 1080], 6: [600, 1020] },
   slotMin: 30,   // kundene kan velge starttid hvert 30. minutt
-  leadMin: 60,   // i dag: tidligst én time frem i tid
+  leadMin: 15,   // i dag: tidligst 15 minutter frem i tid (eierens valg 17.11.2026)
   maxDays: 60,   // hvor langt frem kundene kan bestille
   // Varighet per tjeneste i minutter (navnene må være like som i bestillingsskjemaet)
   durations: {

@@ -1,0 +1,9 @@
+{
+  "name": "oversikt",
+  "private": true,
+  "description": "Eierens oversikt: besøk og bookinger for alle bedriftene, side om side",
+  "type": "module",
+  "dependencies": {
+    "@netlify/blobs": "^11.1.4"
+  }
+}

@@ -9,6 +9,8 @@ import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const NETLIFY = fileURLToPath(new URL("../../netlify", import.meta.url));
+// The owner's overview (oversikt/, merged from main) writes Blobs too, under the same rule
+const OVERSIKT = fileURLToPath(new URL("../../oversikt/netlify", import.meta.url));
 
 function* mjs(dir) {
   for (const name of readdirSync(dir)) {
@@ -53,16 +55,18 @@ test("blind writes: the checker sees conditional calls, the comment with a reaso
   assert.deepEqual(calls.filter(isBlind).map((c) => c.line), [6, 7, 8]);
 });
 
-test("blind writes: every .setJSON( under netlify/ is conditional or explains itself", () => {
+test("blind writes: every .setJSON( under netlify/ and oversikt/netlify/ is conditional or explains itself", () => {
   const blind = [];
-  let calls = 0;
-  for (const file of mjs(NETLIFY)) {
-    const rel = relative(NETLIFY, file).split(sep).join("/");
+  let calls = 0, oversikt = 0;
+  for (const [name, root] of [["netlify", NETLIFY], ["oversikt/netlify", OVERSIKT]]) for (const file of mjs(root)) {
+    const rel = relative(root, file).split(sep).join("/");
     for (const c of setJsonCalls(readFileSync(file, "utf8").replace(/\r\n/g, "\n"))) {
       calls++;
-      if (isBlind(c)) blind.push(`netlify/${rel}:${c.line} ${c.lineText.trim()}`);
+      if (root === OVERSIKT) oversikt++;
+      if (isBlind(c)) blind.push(`${name}/${rel}:${c.line} ${c.lineText.trim()}`);
     }
   }
+  assert.ok(oversikt >= 1, `the scan sees the overview's writes (${oversikt})`);
   assert.ok(calls >= 5, `the scan found the server's writes (${calls})`);
   assert.deepEqual(blind, [], "add onlyIfMatch/onlyIfNew (or mutateJSON), or `// blind-write-ok: <reason>`");
 });

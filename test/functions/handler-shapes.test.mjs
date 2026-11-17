@@ -75,7 +75,7 @@ test("handler shapes: the beacon /api/hit never throws on a non-object body; it 
     }
     assert.equal(res.status, 204, body);
     assert.equal(res.headers["cache-control"], "no-store");
-    assert.deepEqual(d.blobs.json("stats", "d/2026-11-12"), { views: 1, pages: { forside: 1 }, sources: { direkte: 1 } }, body);
+    assert.deepEqual(d.blobs.json("stats", "d/2026-11-12"), { views: 1, visits: 1, pages: { forside: 1 }, sources: { direkte: 1 } }, body);
   }
 });
 

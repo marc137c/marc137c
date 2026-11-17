@@ -21,8 +21,14 @@ const PW = "fake-admin-password";
 const NOW = "2026-11-16T09:00:00Z";
 const FN_DIR = fileURLToPath(new URL("../../netlify/functions/", import.meta.url));
 const bearer = (d) => ({ Authorization: "Bearer " + makeToken(PW, d.clock.now()) });
+// /api/stats answers only the owner's overview (merge of main 6bf86e8): its read key, never the barber's token
+const STATS_KEY = "fake-owner-stats-key";
+const statsKey = { "X-Stats-Key": STATS_KEY };
+// Since that merge /api/stats also reads the booking months for the owner's booking numbers. Unreadable months make
+// those numbers null (unknown) in an otherwise good reply, never 0: that is its explicit flag.
+const bookingsUnknown = (body) => body.bookings === null && Array.isArray(body.days) && body.days.length > 0 && body.days.every((x) => x.bookings === null);
 
-// [label, the keys whose reads fail, call(d, ctx)]
+// [label, the keys whose reads fail, call(d, ctx), optional: how a good reply marks the unreadable part unknown]
 const READS = [
   ["GET /api/availability", /^m\//, (d) => availability.handle(request("/api/availability"), PRODUCTION, d)],
   ["GET /api/admin/items", /^m\//, (d) => admin.handle(request("/api/admin/items?from=2026-11-16&to=2026-11-22", { headers: bearer(d) }), PRODUCTION, d)],
@@ -30,13 +36,14 @@ const READS = [
   ["GET /api/admin/calendar", /^calendar\//, (d) => admin.handle(request("/api/admin/calendar", { headers: bearer(d) }), PRODUCTION, d)],
   ["GET /api/calendar/<token>.ics", /^m\//, (d, c) => calendar.handle(request(new URL(c.feed).pathname), PRODUCTION, d)],
   ["GET /api/bookings/<id>.ics", /^m\//, (d, c) => bookingIcs.handle(request(`/api/bookings/${c.id}.ics`), PRODUCTION, d)],
-  ["GET /api/stats", /^d\//, (d) => stats.handle(request("/api/stats", { headers: bearer(d) }), PRODUCTION, d)],
+  ["GET /api/stats", /^d\//, (d) => stats.handle(request("/api/stats", { headers: statsKey }), PRODUCTION, d)],
+  ["GET /api/stats (booking months)", /^m\//, (d) => stats.handle(request("/api/stats", { headers: statsKey }), PRODUCTION, d), bookingsUnknown],
 ];
 
-for (const [label, keys, call] of READS) {
+for (const [label, keys, call, unknown] of READS) {
   test(`read faults: ${label} with its documents unreadable is non-2xx or flags the error, never a confident value`, async (t) => {
     quiet(t);
-    const d = testDeps({ now: NOW, env: { ADMIN_PASSWORD: PW } });
+    const d = testDeps({ now: NOW, env: { ADMIN_PASSWORD: PW, STATS_READ_KEY: STATS_KEY } });
     const store = d.getStore({ name: "bookings", consistency: "strong" });
     const [b] = seedItems(d.blobs, [item({ date: "2026-11-18", start: 600 })]);
     d.blobs.seed("stats", "d/2026-11-16", { views: 3, pages: { forside: 3 }, sources: { direkte: 3 } });
@@ -45,7 +52,7 @@ for (const [label, keys, call] of READS) {
     assert.ok((await call(d, ctx)).status < 300, `${label} works without the fault`);
     d.blobs.inject({ method: "GET", key: keys, fault: "fail-before", status: 500, times: Infinity });
     const res = await read(await call(d, ctx));
-    const flagged = res.body && typeof res.body === "object" && (res.body.error !== undefined || res.body.unknown === true);
+    const flagged = res.body && typeof res.body === "object" && (res.body.error !== undefined || res.body.unknown === true || (unknown ? unknown(res.body) : false));
     assert.ok(res.status >= 300 || flagged, `${label}: ${res.status} ${JSON.stringify(res.body).slice(0, 200)}`);
   });
 }

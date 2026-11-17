@@ -157,17 +157,16 @@ function side(body, prop) {
   const v = m[2].trim().split(/\s+/);
   return v.length === 1 ? v[0] : v[1];
 }
-// Every direct child block of #app (in admin.html, plus the stats panel admin-stats.js appends) keeps at least
-// 12 px on each side from 320 to 768 px: a card (side borders) through its own margin, a full-width bar through
-// its padding. A card centred with margin auto gets it only from a min-width of its max-width + 24 px.
+// Every direct child block of #app in admin.html keeps at least 12 px on each side from 320 to 768 px: a card (side
+// borders) through its own margin, a full-width bar through its padding. A card centred with margin auto gets it only
+// from a min-width of its max-width + 24 px. /admin has no statistics panel: the statistics are the owner's only
+// (merge of main 6bf86e8), and no script adds a block to #app.
 test("layout round 2: every direct child of #app keeps a 12-px side gutter on phones and tablets", () => {
   const app = between(HTML.replace(/\r\n/g, "\n"), '<div class="app" id="app" hidden>', '\n  </div>\n');
   const classes = [...app.matchAll(/\n    <(?:header|main|section|div|nav)\s+class="([^" ]+)/g)].map((m) => m[1]);
-  const statsJs = readFileSync(new URL("admin-stats.js", SITE), "utf8");
-  assert.match(statsJs, /className = "stats-panel"/);
-  assert.match(statsJs, /app\.appendChild\(section\)/);
-  classes.push("stats-panel");
-  assert.deepEqual(classes, ["top", "day", "stats-panel"]);
+  assert.deepEqual(classes, ["top", "day"]);
+  assert.doesNotMatch(HTML, /admin-stats|stats-panel/);
+  assert.doesNotMatch(CSS, /stats-panel/);
   for (const c of classes) {
     const body = ruleIn(null, "." + c);
     const card = /(^|;|\s)border(-left|-right)?\s*:/.test(body);

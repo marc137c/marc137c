@@ -9,6 +9,9 @@ import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const NETLIFY = fileURLToPath(new URL("../../netlify", import.meta.url));
+// The owner's overview (oversikt/, merged from main) is a Netlify site of its own with the same runtime rule
+const OVERSIKT = fileURLToPath(new URL("../../oversikt/netlify", import.meta.url));
+const ROOTS = [["netlify", NETLIFY], ["oversikt/netlify", OVERSIKT]];
 const NEWER_THAN_NODE_18 = [
   ["String.prototype.toWellFormed / isWellFormed (Node 20)", /\.(toWellFormed|isWellFormed)\s*\(/],
   ["Object.groupBy / Map.groupBy (Node 21)", /\b(Object|Map)\.groupBy\s*\(/],
@@ -27,14 +30,17 @@ function* mjs(dir) {
   }
 }
 
-test("server APIs: nothing under netlify/ needs a Node newer than 18", () => {
+test("server APIs: nothing under netlify/ or oversikt/netlify/ needs a Node newer than 18", () => {
   const hits = [];
-  for (const file of mjs(NETLIFY)) {
+  let files = 0;
+  for (const [name, root] of ROOTS) for (const file of mjs(root)) {
+    files++;
     readFileSync(file, "utf8").split(/\r?\n/).forEach((line, i) => {
       if (/^\s*\/\//.test(line)) return;
-      for (const [what, re] of NEWER_THAN_NODE_18) if (re.test(line)) hits.push(`netlify/${relative(NETLIFY, file).split(sep).join("/")}:${i + 1} ${what}`);
+      for (const [what, re] of NEWER_THAN_NODE_18) if (re.test(line)) hits.push(`${name}/${relative(root, file).split(sep).join("/")}:${i + 1} ${what}`);
     });
   }
+  assert.ok(files > 10, `the scan sees the functions (${files})`);
   assert.deepEqual(hits, []);
 });
 

@@ -5,6 +5,7 @@
 //       – :focus-visible i en selektorliste (gamle nettlesere dropper da HELE regelen), :is/:where/:has, nesting (&)
 //       – grid med gap uten grid-gap, sticky uten -webkit-sticky, backdrop-filter uten -webkit-
 //       – aspect-ratio uten en «@supports not (aspect-ratio …)»-reserve, @container/@layer/@property, color-mix/oklch
+//       – background-clip: text uten nok padding over/under (sløyfene i skrivefonten blir kuttet)
 //       – dialog-stil «.x[open]» inni @supports uten tilsvarende «.x.dialog-shim[open]» utenfor (Safari < 15.4, Firefox < 98)
 //  Filer – WebP i <source> uten JPG/PNG-<img> i samme <picture>, data-full .webp uten .jpg ved siden av
 //          (lysboksen bytter til .jpg i nettlesere uten WebP), og lenker til filer som ikke finnes.
@@ -91,6 +92,18 @@ function checkCss(name, src) {
     if (/(^|[\s,])&/.test(r.selector) || /[{;]\s*&/.test(r.body)) report(where, "CSS-nesting (&) støttes ikke i eldre nettlesere.");
     const props = new Map();
     for (const [p, v] of r.decls) { if (!props.has(p)) props.set(p, []); props.get(p).push(v); }
+    // Gulltekst (background-clip: text) males bare innenfor elementets boks. Skrivefonten (Great Vibes / Snell Roundhand)
+    // har sløyfer over og under bokstavhøyden; med line-height 1 havner de utenfor og blir usynlige (V-en i logoen ble
+    // «kuttet»). Krev luft over og under i em (motvirk med negativ margin hvis plasseringen skal stå stille).
+    if ([...(props.get("background-clip") || []), ...(props.get("-webkit-background-clip") || [])].some((v) => /\btext\b/.test(v))) {
+      const em = (v) => { const m = /^(-?[\d.]+)em$/.exec(v || ""); return m ? +m[1] : null; };
+      const pad = (props.get("padding") || []).slice(-1)[0];
+      const parts = pad ? pad.trim().split(/\s+/) : [];
+      const top = em((props.get("padding-top") || []).slice(-1)[0] || parts[0]);
+      const bottom = em((props.get("padding-bottom") || []).slice(-1)[0] || parts[2] || parts[0]);
+      if (top === null || top < 0.3 || bottom === null || bottom < 0.15)
+        report(where, "Tekst med background-clip: text trenger padding over (minst .3em) og under (minst .15em) i samme regel, ellers kuttes sløyfene i skrivefonten. Motvirk med negativ margin.");
+    }
     r.decls.forEach(([p, v], idx) => {
       if (p.startsWith("--")) return; // egendefinerte variabler leses ikke direkte av nettleseren
       if (BAD_PROP.test(p)) report(where, `«${p}» støttes ikke i eldre nettlesere.`);

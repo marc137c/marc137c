@@ -128,7 +128,7 @@ const DAY_NO = ["søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "
 const weekday = (date) => new Date(date + "T12:00:00Z").getUTCDay();
 const addDays = (date, n) => new Date(Date.parse(date + "T12:00:00Z") + n * 864e5).toISOString().slice(0, 10);
 const availability = (today, nowMinutes, closed = []) => ({
-  today, nowMinutes, lastDate: addDays(today, 60), hours: CONFIG.hours, slotMin: 30, leadMin: 60, maxDays: 60,
+  today, nowMinutes, lastDate: addDays(today, CONFIG.maxDays), hours: CONFIG.hours, slotMin: CONFIG.slotMin, leadMin: CONFIG.leadMin, maxDays: CONFIG.maxDays,
   durations: { "Full service": 60, "Herreklipp": 30 }, busy: {}, closed,
 });
 async function hero(answer, opts = {}) {

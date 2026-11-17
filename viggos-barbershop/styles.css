@@ -108,7 +108,8 @@ p { margin: 0 0 1em; }
 .brand-script {
   font: 400 2rem/1 var(--script);
   background: var(--logo-grad); -webkit-background-clip: text; background-clip: text; color: transparent;
-  padding: 0 .35em; margin: 0 -.2em; /* plass til swashene (iPhone tegner V-en lenger ut); margin holder bredden lik */
+  /* Gullet males bare inni boksen: luft over/under/på sidene til sløyfene på V og g, negativ margin holder plasseringen lik */
+  padding: .35em .35em .2em; margin: -.35em -.2em -.2em;
 }
 .brand-caps { font: 600 .58rem var(--caps); letter-spacing: .42em; color: var(--logo-gold); margin: -2px 0 0 .42em; }
 .nav-menu { display: flex; align-items: center; gap: 28px; }
@@ -310,7 +311,8 @@ input:focus, select:focus { outline: none; border-color: var(--gold); box-shadow
 .logo-script {
   display: block;
   font: 400 4.6rem/1 var(--script); font-size: clamp(4.6rem, 15vw, 9.5rem);
-  padding: 0 .45em .1em; /* hele V-en og g-en, også når iPhone bruker en annen skrift */
+  /* Gullet males bare inni boksen: luft til sløyfene på V og g (også med iPhones reserveskrift), negativ margin holder plasseringen lik */
+  padding: .35em .45em .2em; margin: -.35em 0 -.1em;
   background: var(--logo-grad); background-size: 200% auto;
   -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(var(--logo-shadow));
