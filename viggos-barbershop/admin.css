@@ -59,7 +59,13 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
 .title { font-family: var(--caps); color: var(--gold); letter-spacing: .08em; margin-right: auto; }
 .sync { font-size: .8rem; color: var(--muted); }
 .day-nav { display: flex; align-items: center; gap: 8px; max-width: 900px; margin: 10px auto 0; }
-.day-nav input { flex: 1; max-width: 220px; min-width: 0; }
+/* Datofeltet har alltid plass til hele datoen («17.11.2026» og kalenderikonet), ved alle bredder (runde 3). Eldre
+   Chromium (60; Samsung Internet 8 er 63) holder av plass til tømme- og pilknappene inne i feltet, ved alle bredder:
+   de skjules, og feltet får 9.5em (152 px; Chromium 60 trenger om lag 146). Er raden for kort (et 360 px vindu med
+   rullefelt), gir de runde knappene plass, ikke feltet. Før gjaldt dette bare under 360 px, så et 360–389 px vindu
+   viste «11/17/2». */
+.day-nav input { flex: 1; max-width: 220px; min-width: 9.5em; }
+.day-nav input::-webkit-clear-button, .day-nav input::-webkit-inner-spin-button { display: none; }
 .icon { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--gold); font-size: 1.4rem; cursor: pointer; padding: 0; }
 .chip { min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; cursor: pointer; white-space: nowrap; flex: 0 0 auto; }
 .week { display: flex; gap: 6px; overflow-x: auto; max-width: 900px; margin: 10px auto 0; padding-bottom: 2px; scrollbar-width: none; }
@@ -175,15 +181,11 @@ label.check input { width: 20px; min-height: 20px; height: 20px; accent-color: v
   .top-row .sync, .top-row a.link { min-width: 0; }
 }
 
-/* 320–359 px (Chrome og Samsung på små telefoner, Galaxy Fold-forsiden): datofeltet beholder plass til hele datoen
-   («17.11.2026» og kalenderikonet); de runde knappene, mellomrommene og «I dag» gir plass i stedet. Eldre Chromium
-   (60; Samsung Internet 8 er 63) holder av plass til tømme- og pilknappene inne i feltet og viste bare «11/17/2» ved
-   136 px: de knappene skjules her (kalenderikonet blir), og feltet får 9.5em (runde 2). */
+/* 320–359 px (Chrome og Samsung på små telefoner, Galaxy Fold-forsiden): datofeltet beholder sine 9.5em (se
+   .day-nav input over); de runde knappene, mellomrommene og «I dag» gir plass i stedet. */
 @media (max-width: 359px) {
   .day-nav { gap: 4px; }
   .day-nav .icon { width: 34px; }
-  .day-nav input { min-width: 9.5em; }
-  .day-nav input::-webkit-clear-button, .day-nav input::-webkit-inner-spin-button { display: none; }
   .day-nav .chip { padding: 0 6px; }
 }
 

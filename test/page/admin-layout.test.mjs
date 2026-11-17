@@ -31,6 +31,30 @@ function ruleIn(at, selector) {
   return m[2];
 }
 const px = (body, prop) => { const m = new RegExp(`(^|;|\\s)${prop}\\s*:\\s*(\\d+)px`).exec(body); assert.ok(m, `${prop} in «${body.trim()}»`); return Number(m[2]); };
+// Every rule whose selector list is exactly `selector`, with the at-rules around it ([] at the top level of admin.css)
+function rulesFor(selector) {
+  const out = [], stack = [];
+  let head = 0;
+  for (let i = 0; i < CSS.length; i++) {
+    if (CSS[i] === "{") {
+      const sel = CSS.slice(head, i).trim();
+      if (sel[0] === "@") stack.push(sel);
+      else {
+        const end = CSS.indexOf("}", i);
+        if (sel === selector) out.push({ at: stack.slice(), body: CSS.slice(i + 1, end) });
+        i = end;
+      }
+      head = i + 1;
+    } else if (CSS[i] === "}") { stack.pop(); head = i + 1; } else if (CSS[i] === ";" && !stack.length) head = i + 1;
+  }
+  return out;
+}
+// The body of the one rule for `selector` that no @media or @supports surrounds
+function topLevelRule(selector) {
+  const top = rulesFor(selector).filter((r) => !r.at.length);
+  assert.equal(top.length, 1, `one top-level rule «${selector}» in admin.css (found ${top.length})`);
+  return top[0].body;
+}
 
 test("layout: the header's top row is title, status, «Se nettsiden» and «Oppsett»; «Logg ut» is in the Oppsett sheet", () => {
   const top = between(HTML, '<div class="top-row">', "</div>");
@@ -142,11 +166,11 @@ test("layout F92: the day title has only its first letter upper-case, today and 
   assert.doesNotMatch(ruleIn(null, ".day-head h2"), /text-transform/, "no text-transform on the title");
 });
 
-test("layout F92: «I dag» never wraps and keeps its width; the date field may shrink", () => {
+test("layout F92: «I dag» never wraps and keeps its width; the date field grows and shrinks with the row", () => {
   const chip = ruleIn(null, ".chip");
   assert.match(chip, /white-space:\s*nowrap/);
   assert.match(chip, /flex:\s*0 0 auto/);
-  assert.match(ruleIn(null, ".day-nav input"), /min-width:\s*0/);
+  assert.match(ruleIn(null, ".day-nav input"), /flex:\s*1/);
 });
 
 // ---------- Round 2: layout guards from the device run (SPEC R27) ----------
@@ -195,7 +219,7 @@ test("layout round 2: in phone landscape (height ≤ 500 px) the header is not s
 // calendar icon) and the round buttons, the gaps and «I dag» give way instead.
 test("layout round 2: at 359 px and below the date field keeps room for the whole date, and the row still fits 320 px", () => {
   const q = "@media (max-width: 359px)";
-  const input = ruleIn(q, ".day-nav input");
+  const input = topLevelRule(".day-nav input"); // round 3: at every width, not only here
   const em = /min-width:\s*([\d.]+)em/.exec(input);
   assert.ok(em && Number(em[1]) >= 7.5, input);
   const icon = px(ruleIn(q, ".day-nav .icon"), "width");
@@ -250,7 +274,7 @@ test("layout fix-up: the CSS fallback (before the script has measured) clears th
 // (The whole value must still be checked by eye in Chromium 60 at a 320-px content width: DEPLOY §4.)
 test("layout fix-up: at 359 px and below the date field has room for «11/17/2026» in Chromium 60, and the row fits 288 px", () => {
   const q = "@media (max-width: 359px)";
-  const em = /min-width:\s*([\d.]+)em/.exec(ruleIn(q, ".day-nav input"));
+  const em = /min-width:\s*([\d.]+)em/.exec(topLevelRule(".day-nav input")); // round 3: at every width
   assert.ok(em && Number(em[1]) * 16 >= 146 + 6, `min-width ${em && em[1]}em`);
   const css = readFileSync(new URL("../../viggos-barbershop/admin.css", import.meta.url), "utf8");
   assert.match(css, /\.day-nav input::-webkit-clear-button, \.day-nav input::-webkit-inner-spin-button \{ display: none; \}/);
@@ -264,3 +288,28 @@ test("layout fix-up: at 359 px and below the date field has room for «11/17/202
   }
   assert.ok(icon >= 32, "the round buttons stay easy to hit");
 });
+
+// Round 3 (c60-admin-360.png, still_open 22): Chromium 60 draws the clear and spin buttons inside a date field at every
+// width, but their hiding and the field's 9.5em were scoped to «max-width: 359px», the one width the cut was reported
+// at. A 360-px desktop window (343 px of content beside a 17-px scrollbar) gave the field 133 px: «11/17/2». Guard: a
+// fix for an engine feature is scoped to that feature, never to a viewport width. Both rules sit at the top level of
+// admin.css, no width query lowers the field's minimum, and where the row is short the round buttons give way (they
+// may shrink), not the field: at 343 px of content they keep at least 30 px.
+test("layout round 3: the date field hides old Chromium's clear and spin buttons and keeps 9.5em at every width", () => {
+  const hide = topLevelRule(".day-nav input::-webkit-clear-button, .day-nav input::-webkit-inner-spin-button");
+  assert.match(hide, /display:\s*none/);
+  assert.deepEqual(rulesFor(".day-nav input::-webkit-clear-button, .day-nav input::-webkit-inner-spin-button").map((r) => r.at), [[]], "and nowhere inside a query");
+  const field = topLevelRule(".day-nav input");
+  const em = /min-width:\s*([\d.]+)em/.exec(field);
+  assert.ok(em && Number(em[1]) * 16 >= 152, `the field keeps 9.5em (152 px) in «${field.trim()}»`);
+  for (const r of rulesFor(".day-nav input").filter((x) => x.at.length)) {
+    assert.doesNotMatch(r.body, /min-width/, `«${r.at.join(" ")}» changes the field's minimum width`);
+  }
+  // The round buttons can give way: nothing stops them from shrinking
+  for (const r of rulesFor(".icon").concat(rulesFor(".day-nav .icon"))) assert.doesNotMatch(r.body, /flex(-shrink)?:\s*(0|none)|min-width/, r.body);
+  // A 360-px desktop window: 343 px of content, 16-px padding each side, «I dag» 66 px (measured), three 8-px gaps
+  const gap = px(ruleIn(null, ".day-nav"), "gap");
+  const icon = (343 - 32 - Number(em[1]) * 16 - 66 - 3 * gap) / 2;
+  assert.ok(icon >= 30, `the round buttons get ${icon} px each`);
+});
+
