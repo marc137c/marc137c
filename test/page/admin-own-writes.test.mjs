@@ -175,3 +175,62 @@ test("own writes: the card tapped before the list has reloaded opens the version
   assert.equal(page.$("editor").open, false, "no sheet for a booking this device deleted");
   assert.doesNotMatch(said(page), BLAME, said(page));
 });
+
+// Still_open 12 (probe R3-OWN1): «endret fra denne enheten» was claimed by the phone number: after «Avlys alle» for a
+// number, any later cancelled booking from it counted as this device's own change, also one cancelled on the PC.
+// Root cause: the cancel-phone reply gave only a count, so the page could not know which versions it wrote. Rule:
+// «own change» is claimed only for a stored version (id + updatedAt) this device received in a reply.
+test("own writes: a later cancel made on another device, of a booking from a number this device bulk-cancelled, is «et annet sted»", async () => {
+  const s = await realServer();
+  const phone = await s.login(), pc = await s.login();
+  const spam = await s.web({ start: 780, name: "Falsk 1", phone: PHONE });
+  await s.web({ start: 810, name: "Falsk 2", phone: PHONE });
+  const page = await loadRealAdmin({ token: phone, now: DAY + "T09:00", confirm: () => true, routes: {
+    "GET /api/admin/items": s.route, "POST /api/admin/cancel-phone": s.route } });
+  page.tap("timeline", `[data-id="${spam.id}"] button.item-open`);
+  await page.flush();
+  page.$("cancel-phone").click();
+  await page.flush();
+  assert.match(page.alerts[0] || "", /^2 nettbestillinger fra 911 22 333 er avlyst/);
+  // An hour later the same customer books for real; the phone opens it, and Viggo cancels it on the PC
+  s.deps.clock.advance(3600e3);
+  const real = await s.web({ start: 840, name: "Kari Ekte", phone: PHONE });
+  page.wake();
+  await page.flush();
+  page.tap("timeline", `[data-id="${real.id}"] button.item-open`);
+  await page.flush();
+  s.deps.clock.advance(60e3);
+  const r = await s.call(`/api/admin/items/${enc(real.id)}`, { method: "PATCH", token: pc, json: { status: "cancelled", expect: real.updatedAt } });
+  assert.equal(r.status, 200);
+  page.wake();
+  await page.flush();
+  assert.equal(page.$("editor").open, true);
+  assert.equal(page.$("edit-msg").textContent, "Avtalen er endret et annet sted – lukk og åpne den på nytt.");
+});
+
+test("own writes: after «Avlys alle», the other booking's card tapped before the reload opens it as this device cancelled it, and saving it works", async () => {
+  const s = await realServer();
+  const t = await s.login();
+  const ali = await s.web({ start: 660, name: "Ali", phone: PHONE });
+  const ali2 = await s.web({ start: 900, name: "Ali", phone: PHONE });
+  const gets = held();
+  let holdGets = false;
+  const page = await loadRealAdmin({ token: t, now: DAY + "T09:00", confirm: () => true, routes: {
+    "GET /api/admin/items": (c) => (holdGets && /from=2026-11-19&to=2026-11-19/.test(c.url) ? gets.route(c).then(() => s.route(c)) : s.route(c)),
+    "POST /api/admin/cancel-phone": s.route, [CONTROLS["Lagre"].route(ali2)]: s.route,
+  } });
+  page.tap("timeline", `[data-id="${ali.id}"] button.item-open`);
+  await page.flush();
+  holdGets = true; // the reload after the cancel does not answer yet: the timeline still shows Ali2 as booked
+  page.$("cancel-phone").click();
+  await page.flush();
+  assert.match(page.alerts[0] || "", /^2 nettbestillinger/);
+  page.tap("timeline", `[data-id="${ali2.id}"] button.item-open`);
+  await page.flush();
+  assert.equal(page.field("cancelled").checked, true, "the sheet shows Ali2 as this device cancelled it");
+  CONTROLS["Lagre"].start(page, 1);
+  await page.flush();
+  assert.doesNotMatch(said(page), BLAME, said(page));
+  const stored = (await s.items(t)).filter((i) => i.id === ali2.id)[0];
+  assert.deepEqual([stored.status, stored.note], ["cancelled", "Notat 1"], "the note is saved on the cancelled booking");
+});

@@ -618,14 +618,16 @@ export function monthsBetween(fromDate, toDate) {
 // { id, m: req, at } i månedens cancelLog (ingen kundedata, høyst et døgn), i den samme skrivingen som avlyser den.
 // Et nytt kall med den samme nøkkelen (svaret på det første gikk tapt) teller dem med, så svaret er det samme som
 // det første kallet ville gitt, ikke «0 avlyst». Uten req skrives ingen logg.
-// Svarer { ok, cancelled } eller { error, status: 503, cancelled } (det som rakk å bli avlyst; kall igjen).
+// Svarer { ok, cancelled, items } eller { error, status: 503, cancelled } (det som rakk å bli avlyst; kall igjen).
+// items (runde 3): { id, updatedAt } for hver avtale kallet (eller et tidligere med samme nøkkel) avlyste, med
+// versjonen det lagret, så /admin kjenner igjen nøyaktig sine egne endringer (ikke på telefonnummeret). Ingen kundedata.
 const CANCEL_PASSES = { min: 2, max: 3 };
 const CANCEL_LOG_MAX = 300;
 export async function cancelMatching(store, months, match, now = new Date(), { req } = {}) {
   const stamp = now.toISOString();
   const nowMs = now.getTime();
   const key = isRequestId(req) ? req : null;
-  const done = new Set(); // id-halene dette kallet (eller et tidligere med samme nøkkel) har avlyst
+  const done = new Map(); // id-hale → { id, updatedAt } for det dette kallet (eller et tidligere med samme nøkkel) har avlyst
   for (let pass = 0; pass < CANCEL_PASSES.max; pass++) {
     let fresh = 0; // id-haler denne runden avlyste for første gang
     for (const ym of months) {
@@ -636,7 +638,7 @@ export async function cancelMatching(store, months, match, now = new Date(), { r
           const moving = doc.items.find((i) => active(i) && match(i) && pendingMove(i));
           if (moving) return { unsettled: pendingMove(moving), noWrite: true };
           const log = Array.isArray(doc.cancelLog) ? doc.cancelLog : [];
-          const earlier = key ? log.filter((e) => e && e.m === key && freshOut(e, nowMs)).map((e) => String(e.id)) : [];
+          const earlier = key ? log.filter((e) => e && e.m === key && freshOut(e, nowMs)).map((e) => ({ id: String(e.id), updatedAt: String(e.at) })) : [];
           const hit = []; // avlyst i denne skrivingen
           for (const i of doc.items) {
             if (!active(i) || !match(i)) continue;
@@ -658,13 +660,13 @@ export async function cancelMatching(store, months, match, now = new Date(), { r
       if (r.error) return { error: "Fikk ikke avlyst alle. Prøv igjen om litt.", status: 503, cancelled: done.size };
       for (const id of r.ids) {
         if (!done.has(idSuffix(id))) fresh++;
-        done.add(idSuffix(id));
+        done.set(idSuffix(id), { id, updatedAt: stamp });
       }
-      for (const id of r.earlier) done.add(idSuffix(id));
+      for (const e of r.earlier) if (!done.has(idSuffix(e.id))) done.set(idSuffix(e.id), e);
     }
     if (pass + 1 >= CANCEL_PASSES.min && !fresh) break;
   }
-  return { ok: true, cancelled: done.size };
+  return { ok: true, cancelled: done.size, items: Array.from(done.values()) };
 }
 
 // ---------- Admin-innlogging ----------

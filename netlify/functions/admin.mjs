@@ -7,8 +7,9 @@
 //   DELETE /api/admin/items/:id        slette for godt (?expect=<updatedAt>: 412 «stale» hvis endret et annet sted;
 //                                      ?req=<nøkkel>: det samme trykket sendt på nytt svarer 200, ikke 404, SPEC R1)
 //   POST   /api/admin/cancel-phone     { phone, requestId? } avlys alle kommende nettbestillinger fra dette nummeret,
-//                                      uansett skrivemåte (etter en flom av falske bestillinger, X2.4) → { ok, cancelled };
-//                                      det samme trykket sendt på nytt (samme requestId) svarer det samme antallet
+//                                      uansett skrivemåte (etter en flom av falske bestillinger, X2.4) → { ok, cancelled,
+//                                      items: [{ id, updatedAt }] }; det samme trykket sendt på nytt (samme requestId)
+//                                      svarer det samme antallet og de samme versjonene
 //   GET    /api/admin/calendar         lenken til kalenderen på telefonen: { enabled, createdAt, links }, eller
 //                                      { enabled: false, expired: true } når passordet er byttet siden den ble laget
 //   POST   /api/admin/calendar         lag lenken { replace: false } (beholder en som finnes) eller lag en ny
@@ -168,7 +169,8 @@ export async function handle(req, context, deps) {
       const r = await cancelMatching(store, monthsBetween(today, addDays(today, 92)), (i) =>
         i.source === "nettside" && (i.type ?? "booking") === "booking" && isDate(i.date) && i.date >= today && phoneKey(i.phone) === key, deps.now(), { req: body.requestId });
       if (r.error) return json({ error: r.error, cancelled: r.cancelled }, r.status);
-      return json({ ok: true, cancelled: r.cancelled });
+      // items: { id, updatedAt } for hver avtale den avlyste (runde 3), så /admin kjenner igjen sine egne versjoner
+      return json({ ok: true, cancelled: r.cancelled, items: r.items });
     }
     if (path === "/api/admin/calendar" && req.method === "GET") {
       const { feed, stale } = await readFeedState(store, feedGen(password));

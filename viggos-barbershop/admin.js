@@ -625,22 +625,22 @@
   // Avtalen er endret på en annen enhet siden arket ble åpnet (412 «stale», X1.1)
   const STALE_TEXT = "Avtalen er endret på en annen enhet, så endringen ble ikke lagret. Listen oppdateres nå.";
   const STALE_DELETE = "Avtalen er endret på en annen enhet, så den ble ikke slettet. Listen oppdateres nå.";
-  // Det denne enheten selv har skrevet per avtale-id (runde 2 og 3): { deleted } etter Slett, { updatedAt, moved, item }
-  // etter Lagre; og numrene «Avlys alle» avlyste. load() skylder da aldri på «et annet sted» for det enheten gjorde selv,
-  // og et kort fra en liste som ikke er hentet på nytt, åpnes slik enheten fikk avtalen tilbake (freshest).
+  // Det denne enheten selv har skrevet per avtale-id (runde 2 og 3), alltid versjonen serveren svarte med: { deleted }
+  // etter Slett, { updatedAt, moved, item } etter Lagre, { updatedAt, patch } for hver avtale «Avlys alle» avlyste (svaret
+  // nevner dem). load() skylder da aldri på «et annet sted» for det enheten gjorde selv, og sier «fra denne enheten» bare
+  // for en versjon den selv fikk tilbake (før runde 3: for enhver avlyst avtale fra et nummer den en gang avlyste, også
+  // en avlyst på en annen enhet). Et kort fra en liste som ikke er hentet på nytt, åpnes slik enheten fikk den (freshest).
   const ownWrites = {};
-  const cancelledHere = {}; // de siste 8 sifrene i et nummer → true
-  const last8 = (phone) => String(phone || "").replace(/\D/g, "").slice(-8);
   const OWN_CHANGE = "Avtalen er endret fra denne enheten – lukk og åpne den på nytt for å se endringen.";
   function ownChange(ed, fresh) {
     const w = ownWrites[ed.id];
     if (w && fresh && w.updatedAt && fresh.updatedAt === w.updatedAt) return true;
-    if (w && !fresh && w.moved) return true;
-    return !!fresh && fresh.status === "cancelled" && !!cancelledHere[last8(fresh.phone)];
+    return !!w && !fresh && !!w.moved;
   }
   function freshest(it) {
     const w = ownWrites[it.id];
-    return w && w.item && w.updatedAt && String(w.updatedAt) > String(it.updatedAt || "") ? w.item : it;
+    if (!w || !w.updatedAt || String(w.updatedAt) <= String(it.updatedAt || "")) return it;
+    return w.item || (w.patch ? Object.assign({}, it, w.patch) : it);
   }
   // Avtalen er flyttet til en annen måned (ny id) eller slettet på en annen enhet (404, X1.3)
   const GONE_SAVE = "Avtalen er flyttet eller slettet fra en annen enhet, så endringen ble ikke lagret. Listen oppdateres nå.";
@@ -854,7 +854,10 @@
     api("/api/admin/cancel-phone", { method: "POST", body: JSON.stringify({ phone: fl.phone, requestId: key }) }).then((r) => {
       forget();
       const n = Number(r.cancelled) || 0;
-      cancelledHere[last8(fl.phone)] = true;
+      // De nøyaktige versjonene den lagret (runde 3). En eldre server sender ingen: da regnes ingenting som «herfra».
+      (Array.isArray(r.items) ? r.items : []).forEach((x) => {
+        if (x && typeof x.id === "string" && typeof x.updatedAt === "string") ownWrites[x.id] = { updatedAt: x.updatedAt, patch: { status: "cancelled", updatedAt: x.updatedAt } };
+      });
       if (call.here()) dlg.close();
       call.unlock();
       alert(`${n} ${n === 1 ? "nettbestilling" : "nettbestillinger"} fra ${fl.phone} er avlyst. Kundene har ikke fått beskjed.`);
