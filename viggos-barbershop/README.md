@@ -21,7 +21,7 @@ Bestillinger lagres i Netlify Blobs (lageret `bookings`) via Netlify Functions, 
 
 ## Bestillingskalender
 `booking.js`: kunden velger tjeneste (og eventuelle tillegg), dag og tid, og skriver navn og telefon.
-- Kalenderen følger åpningstidene: søndager og passerte dager er stengt, tider deles i 30 minutter, i dag vises bare tider minst én time frem, og man kan bestille opptil 60 dager frem.
+- Kalenderen følger åpningstidene: søndager og passerte dager er stengt, tider deles i 30 minutter, i dag vises bare tider minst 15 minutter frem, og man kan bestille opptil 60 dager frem.
 - **Opptatte tider vises i rødt med «Opptatt»**, dager med noen bookinger får en gull prikk, og fullbookede dager blir røde. Tider der valgt tjeneste ikke rekker før neste avtale eller stengetid er grået ut.
 - Bestillingen lagres med en gang (`/api/bookings`). To kunder kan aldri få samme tid: den som kommer sist får beskjed om å velge en annen.
 - I tillegg sendes et e-postvarsel via Netlify Forms (feltene `tjeneste`, `tillegg`, `dato`, `tid`, `navn`, `telefon`, alltid på norsk).

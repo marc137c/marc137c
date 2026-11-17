@@ -4,7 +4,7 @@
 // Bruker HOURS fra script.js, så kalenderen alltid følger åpningstidene.
 (() => {
   const SLOT_MIN = 30;     // en ny time hvert 30. minutt
-  const LEAD_MIN = 60;     // i dag: tidligste time er minst én time frem i tid
+  const LEAD_MIN = 15;     // i dag: tidligste time er minst 15 minutter frem i tid (må være lik CONFIG.leadMin)
   const MAX_DAYS = 60;     // hvor langt frem man kan bestille
   // Varighet per tjeneste (minutter). Overskrives av serveren hvis den svarer.
   let DURATIONS = {
