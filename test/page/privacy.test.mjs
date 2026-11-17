@@ -6,7 +6,8 @@ import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { RETENTION_DAYS, STATS_KEEP_DAYS, COUNTER_MAX_AGE_MS } from "../../netlify/lib/store-keys.mjs";
-import { PUSH_SERVICES } from "../../netlify/lib/push.mjs";
+import { PUSH_SERVICES, bookingMessage } from "../../netlify/lib/push.mjs";
+import { buildCalendar } from "../../netlify/lib/calendar.mjs";
 import { SOURCES } from "../../netlify/functions/stats.mjs";
 import { SNAPSHOT_AFTER } from "../../netlify/lib/stats-bookings.mjs";
 import { parseDocument } from "../helpers/mini-dom.mjs";
@@ -80,6 +81,54 @@ test("D6: every external flow in the code is named on the page", () => {
   // D2: no Forms copy, so the page never names Netlify Forms, and index.html never asks Netlify to collect a form
   assert.doesNotMatch(index, /data-netlify/);
   assert.ok(!text.includes("Netlify Forms"));
+});
+
+// Round 3 (still_open 17): the page said the barber's notice carries «navn, tjeneste og tid» and the phone calendar
+// «navn, telefonnummer, tjeneste og tid», but both also carry the add-ons. The field lists were copied from the
+// owner's wording, not from the functions that build what leaves Netlify. Guard: build each recipient's real payload
+// (bookingMessage for the push notice, buildCalendar for the calendar feed) from a booking with every customer field
+// filled in. The recipient's <li> names each field the payload holds, and says «ikke telefonnummeret» when it does not
+// hold the phone number. SPEC «Privacy facts» says the same.
+const FULL_BOOKING = {
+  id: "2026-11-20_abcd1234", type: "booking", source: "nettside", status: "active", requestId: "r1234567",
+  date: "2026-11-20", start: 600, dur: 30, service: "Herreklipp", addons: ["Vask langt hår", "Styling"],
+  name: "Ola Nordmann", phone: "+47 912 34 567", createdAt: "2026-11-17T09:15:00.000Z", updatedAt: "2026-11-17T09:15:00.000Z",
+};
+const CUSTOMER_FIELDS = [
+  { field: "name", inPayload: (p) => p.includes("Ola Nordmann"), page: /\bnavn\b/, spec: "name" },
+  { field: "phone", inPayload: (p) => /912 ?34 ?567/.test(p), page: /\btelefonnummer\b/, spec: "phone", absent: "ikke telefonnummeret", specAbsent: "never the phone number" },
+  { field: "service", inPayload: (p) => p.includes("Herreklipp"), page: /\btjeneste\b/, spec: "service" },
+  { field: "addons", inPayload: (p) => p.includes("Vask langt hår") && p.includes("Styling"), page: /\btillegg\b/, spec: "add-ons" },
+  { field: "time", inPayload: (p) => /kl\. 10:00|T100000\b/.test(p), page: /\btid\b/, spec: "time" },
+  { field: "createdAt", inPayload: (p) => /20261117T091500Z|2026-11-17T09:15/.test(p), page: /når de ble bestilt/, spec: "when it was booked" },
+];
+const RECIPIENT_PAYLOADS = [
+  { li: "Varsel til barberen:", spec: "The barber's notification", payload: () => JSON.stringify(bookingMessage(FULL_BOOKING)) },
+  // the feed as the calendar service fetches it, with the folded lines joined again (RFC 5545 3.1)
+  { li: "Kalenderen på barberens telefon:", spec: "his calendar service", payload: () => buildCalendar([FULL_BOOKING]).replace(/\r\n[ \t]/g, "") },
+];
+const recipientItem = (strong) => {
+  const m = new RegExp(`<li><strong>${strong}</strong>([\\s\\S]*?)</li>`).exec(read("personvern.html"));
+  return m && m[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+};
+test("privacy: each recipient's sentence names every customer field its real payload carries (push notice, calendar feed)", () => {
+  const facts = readRoot("docs/SPEC.md").split(/\r?\n/).find((l) => l.startsWith("- **Processors and recipients:**"));
+  for (const r of RECIPIENT_PAYLOADS) {
+    const item = recipientItem(r.li);
+    assert.ok(item, `personvern.html has the recipient «${r.li}»`);
+    const payload = r.payload();
+    const sentence = facts.slice(facts.indexOf(r.spec)).split(/(?<=\.) /)[0];
+    for (const f of CUSTOMER_FIELDS) {
+      if (f.inPayload(payload)) {
+        assert.match(item, f.page, `«${r.li}» carries the ${f.field} (${f.page}), so the page names it`);
+        if (f.absent) assert.ok(!item.includes(f.absent), `«${r.li}» carries the ${f.field}; the page must not say «${f.absent}»`);
+        assert.ok(sentence.includes(f.spec), `SPEC «${r.spec}…» names the ${f.field} («${f.spec}»): ${sentence}`);
+      } else if (f.absent) {
+        assert.ok(item.includes(f.absent), `«${r.li}» does not carry the ${f.field}, so the page says «${f.absent}»`);
+        assert.ok(sentence.includes(f.specAbsent), `SPEC «${r.spec}…» says «${f.specAbsent}»`);
+      }
+    }
+  }
 });
 
 test("D6: the page does not claim flows that no longer exist", () => {
