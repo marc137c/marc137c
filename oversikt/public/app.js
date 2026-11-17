@@ -29,26 +29,42 @@
     x.send(body ? JSON.stringify(body) : null);
   }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
-  function num(n) { return n === null || n === undefined ? "–" : String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
-  function pct(a, b) { return b ? String(Math.round((a / b) * 1000) / 10).replace(".", ",") + " %" : "–"; }
+  // Alt som settes inn i innerHTML går gjennom esc() – også tall, siden de kommer fra bedriftenes sider
+  function num(n) { return n === null || n === undefined ? "–" : esc(String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ")); }
+  function pct(a, b) { return a !== null && a !== undefined && b ? String(Math.round((a / b) * 1000) / 10).replace(".", ",") + " %" : "–"; }
   function dm(date) { return Number(date.slice(8, 10)) + "." + Number(date.slice(5, 7)) + "."; }
   function wd(date) { return new Date(date + "T12:00:00Z").getUTCDay(); }
+  // Navn på en kilde; en kilde oversikten ikke kjenner (fra en nyere kopi av settet) vises med sitt eget navn
+  function label(k) { return Object.prototype.hasOwnProperty.call(SRC, k) ? SRC[k] : k; }
+  function isNum(v) { return typeof v === "number" && isFinite(v); }
+  function byCount(o) {
+    return Object.keys(o).filter(function (k) { return isNum(o[k]) && o[k] > 0; }).sort(function (x, y) { return o[y] - o[x]; });
+  }
 
   // ---------- tall per bedrift ----------
+  // Kaster ved feil form, så render() kan gjøre den ene bedriften om til en feilrad
   function summary(site) {
-    if (!site.ok) return { name: site.name, url: site.url, error: site.error };
+    if (!site.ok) return { name: site.name, url: site.url, error: site.error || "Ukjent feil" };
     var d = site.data, b = d.bookings;
-    var top = Object.keys(d.sources).filter(function (k) { return d.sources[k]; }).sort(function (x, y) { return d.sources[y] - d.sources[x]; })[0];
+    if (!d || typeof d.sources !== "object" || !d.sources || !Array.isArray(d.days)) throw new Error("form");
+    d.days.forEach(function (x) { if (!x || typeof x.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(x.date)) throw new Error("dato"); });
+    if (b && (!Array.isArray(b.weekdays) || typeof b.services !== "object" || !b.services)) throw new Error("bookinger");
+    var top = byCount(d.sources)[0];
     var best = -1, bestN = 0;
     if (b) b.weekdays.forEach(function (n, i) { if (n > bestN) { bestN = n; best = i; } });
-    var totalSrc = Object.keys(d.sources).reduce(function (a, k) { return a + (d.sources[k] || 0); }, 0);
+    var totalSrc = Object.keys(d.sources).reduce(function (a, k) { return a + (isNum(d.sources[k]) ? d.sources[k] : 0); }, 0);
     return {
       name: site.name, url: site.url, data: d,
       visits: d.visits, booked: b ? b.web + b.admin : null, web: b ? b.web : null, share: b && d.visits ? b.web / d.visits : null,
       cancelled: b ? b.cancelled : null, upcoming: b ? b.upcoming7 : null,
-      source: top ? SRC[top] + " " + Math.round((d.sources[top] / totalSrc) * 100) + " %" : "–", sourceN: top ? d.sources[top] / totalSrc : null,
+      source: top ? label(top) + " " + Math.round((d.sources[top] / totalSrc) * 100) + " %" : "–", sourceN: top ? d.sources[top] / totalSrc : null,
       busiest: best >= 0 ? DAYS[best] : "–", busiestN: best,
     };
+  }
+  function safeSummary(site) {
+    try { return summary(site); } catch (e) {
+      return { name: site && site.name ? site.name : "Ukjent bedrift", url: site && site.url, error: "Svaret fra siden kunne ikke vises" };
+    }
   }
   var COLS = [
     { key: "name", label: "Bedrift" }, { key: "visits", label: "Besøk" }, { key: "booked", label: "Bookinger" },
@@ -105,50 +121,64 @@
     var last = days[days.length - 1];
     if (last) read.textContent = SHORT[wd(last.date)] + " " + dm(last.date) + ": " + detailAt(last);
   }
+  function errorCard(name, error) {
+    var card = document.createElement("section"); card.className = "card site";
+    card.innerHTML = "<h2>" + esc(name) + '</h2><p class="err">' + esc(error) + "</p>";
+    return card;
+  }
   function renderCards(rows) {
     var cards = $("cards"); cards.innerHTML = "";
     var same = $("same").checked;
     var maxV = 1, maxB = 1;
-    rows.forEach(function (r) { if (r.data) r.data.days.forEach(function (x) { maxV = Math.max(maxV, x.visits); maxB = Math.max(maxB, x.booked || 0); }); });
+    rows.forEach(function (r) { if (r.data) r.data.days.forEach(function (x) { maxV = Math.max(maxV, x.visits || 0); maxB = Math.max(maxB, x.booked || 0); }); });
     rows.forEach(function (r) {
-      var card = document.createElement("section"); card.className = "card site";
-      if (r.error) { card.innerHTML = "<h2>" + esc(r.name) + '</h2><p class="err">' + esc(r.error) + "</p>"; cards.appendChild(card); return; }
-      var d = r.data, b = d.bookings, days = d.days.slice().reverse();
-      var ownV = 1, ownB = 1;
-      days.forEach(function (x) { ownV = Math.max(ownV, x.visits); ownB = Math.max(ownB, x.booked || 0); });
-      card.innerHTML = '<h2><a href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc(r.name) + "</a></h2>" +
-        '<div class="nums"><div><strong>' + num(r.visits) + "</strong><span>besøk</span></div>" +
-        "<div><strong>" + num(r.booked) + "</strong><span>bookinger</span></div>" +
-        "<div><strong>" + pct(r.web, r.visits) + "</strong><span>andel</span></div>" +
-        "<div><strong>" + num(r.upcoming) + "</strong><span>neste 7 dager</span></div></div>";
-      chart(card, "Besøk per dag", days, function (x) { return x.visits; }, function (x) { return x.visits + " besøk (" + x.views + " sidevisninger)"; }, same ? maxV : ownV);
-      if (b) {
-        chart(card, "Bookinger gjort per dag", days, function (x) { return x.booked; }, function (x) {
-          return x.booked === null ? "ingen tall" : x.booked + " bookinger (" + x.web + " fra nettsiden" + (x.cancelled ? ", " + x.cancelled + " avlyst" : "") + ")";
-        }, same ? maxB : ownB);
-        var svc = Object.keys(b.services).sort(function (x, y) { return b.services[y] - b.services[x]; }).slice(0, 4);
-        if (svc.length) {
-          var h = document.createElement("h3"); h.textContent = "Mest booket"; card.appendChild(h);
-          var ul = document.createElement("ul"); ul.className = "list";
-          ul.innerHTML = svc.map(function (k) { return "<li>" + esc(k) + " <strong>" + b.services[k] + "</strong></li>"; }).join("");
-          card.appendChild(ul);
-        }
-      }
-      var src = Object.keys(SRC).filter(function (k) { return d.sources[k]; }).sort(function (x, y) { return d.sources[y] - d.sources[x]; });
-      if (src.length) {
-        var h2 = document.createElement("h3"); h2.textContent = "Besøkene kom fra"; card.appendChild(h2);
-        var ul2 = document.createElement("ul"); ul2.className = "list";
-        ul2.innerHTML = src.map(function (k) { return "<li>" + esc(SRC[k]) + " <strong>" + num(d.sources[k]) + "</strong></li>"; }).join("");
-        card.appendChild(ul2);
-      }
-      cards.appendChild(card);
+      if (r.error) { cards.appendChild(errorCard(r.name, r.error)); return; }
+      // Ett kort om gangen: feiler ett, blir det en feilmelding, og resten tegnes likevel
+      try { cards.appendChild(siteCard(r, same, maxV, maxB)); } catch (e) { cards.appendChild(errorCard(r.name, "Svaret fra siden kunne ikke vises")); }
     });
+  }
+  function siteCard(r, same, maxV, maxB) {
+    var card = document.createElement("section"); card.className = "card site";
+    var d = r.data, b = d.bookings, days = d.days.slice().reverse();
+    var ownV = 1, ownB = 1;
+    days.forEach(function (x) { ownV = Math.max(ownV, x.visits); ownB = Math.max(ownB, x.booked || 0); });
+    card.innerHTML = '<h2><a href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc(r.name) + "</a></h2>" +
+      '<div class="nums"><div><strong>' + num(r.visits) + "</strong><span>besøk</span></div>" +
+      "<div><strong>" + num(r.booked) + "</strong><span>bookinger</span></div>" +
+      "<div><strong>" + pct(r.web, r.visits) + "</strong><span>andel</span></div>" +
+      "<div><strong>" + num(r.upcoming) + "</strong><span>neste 7 dager</span></div></div>";
+    chart(card, "Besøk per dag", days, function (x) { return x.visits; }, function (x) { return x.visits + " besøk (" + x.views + " sidevisninger)"; }, same ? maxV : ownV);
+    if (b) {
+      chart(card, "Bookinger gjort per dag", days, function (x) { return x.booked; }, function (x) {
+        return x.booked === null ? "ingen tall" : x.booked + " bookinger (" + x.web + " fra nettsiden" + (x.cancelled ? ", " + x.cancelled + " avlyst" : "") + ")";
+      }, same ? maxB : ownB);
+      var svc = byCount(b.services).slice(0, 4);
+      if (svc.length) {
+        var h = document.createElement("h3"); h.textContent = "Mest booket"; card.appendChild(h);
+        var ul = document.createElement("ul"); ul.className = "list";
+        ul.innerHTML = svc.map(function (k) { return "<li>" + esc(k) + " <strong>" + num(b.services[k]) + "</strong></li>"; }).join("");
+        card.appendChild(ul);
+      }
+    }
+    var src = byCount(d.sources);
+    if (src.length) {
+      var h2 = document.createElement("h3"); h2.textContent = "Besøkene kom fra"; card.appendChild(h2);
+      var ul2 = document.createElement("ul"); ul2.className = "list";
+      ul2.innerHTML = src.map(function (k) { return "<li>" + esc(label(k)) + " <strong>" + num(d.sources[k]) + "</strong></li>"; }).join("");
+      card.appendChild(ul2);
+    }
+    return card;
   }
   function render() {
     if (!state.data) return;
-    var rows = state.data.sites.map(summary);
+    var rows = (Array.isArray(state.data.sites) ? state.data.sites : []).map(safeSummary);
     renderTable(rows);
     renderCards(rows);
+    // Bedrifter som ikke kom med: eieren skal se det, ikke bare savne dem
+    var notes = [];
+    if (state.data.registryError) notes.push("Bedriftslisten kunne ikke leses – viser bare de faste bedriftene. Trykk Oppdater om litt.");
+    if (Array.isArray(state.data.skipped) && state.data.skipped.length) notes.push("Hoppet over (ugyldig oppføring i bedriftslisten): " + state.data.skipped.join(", ") + ".");
+    $("app-msg").textContent = notes.join(" ");
   }
 
   // ---------- flyt ----------

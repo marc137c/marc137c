@@ -126,3 +126,126 @@ test("bedriftsliste: bedrifter fra lageret kommer med, ugyldige hoppes over, fas
   assert.ok(calls.some((c) => c.url.startsWith("https://anna.example/api/stats") && c.key === good.key), "henter med nøkkelen fra lageret");
   assert.equal(JSON.stringify(j).includes(good.key), false, "nøkkelen sendes aldri til nettleseren");
 });
+
+// ---------- Svar fra bedriftenes sider er utrygge: bare tall, faste former, begrenset størrelse ----------
+const HOSTILE = '<meta http-equiv="refresh" content="0;url=https://evil.example/logg-inn">';
+const tokenFor = (d) => makeToken("riktig-passord", d.now());
+function siteReturning(body, init = { status: 200 }) {
+  const d = deps({ sites: [SITES[0]] });
+  d.fetchImpl = async (url, opts) => { d.calls.push({ url, opts }); return new Response(typeof body === "string" ? body : JSON.stringify(body), init); };
+  return d;
+}
+// Alle tekstverdier i svaret utenom de oversikten selv setter (id, navn, adresse, datoer). Kilde- og tjenestenavn er nøkler, ikke verdier.
+function strayStrings(site) {
+  const out = [];
+  const walk = (v, path) => {
+    if (typeof v === "string") { if (!/^(id|name|url|data\.today|data\.days\.\d+\.date)$/.test(path)) out.push(path + "=" + v); return; }
+    if (v && typeof v === "object") for (const k of Object.keys(v)) walk(v[k], path ? path + "." + k : k);
+  };
+  walk(site, "");
+  return out;
+}
+
+test("slim: HTML i tall, kilder og bookinger fra en bedrift blir aldri med – svaret har bare tall", async () => {
+  const d = siteReturning({ today: "2026-11-17", totals: { visits: HOSTILE, views: "<b>x</b>" },
+    sources: { google: '<a href="https://evil.example/">Logg inn på nytt</a>', qr: 3, "<img src=x>": 5 },
+    days: [{ date: "2026-11-17", visits: "<h1>x</h1>", views: 1, bookings: { web: "<i>u</i>", admin: 1, cancelled: "<b>c</b>" } }, { date: 20261116, visits: 1 }],
+    bookings: { web: "<h1>x</h1>", admin: 1, cancelled: "<b>c</b>", upcoming7: "<i>u</i>", weekdays: ["<x>"], services: { Klipp: "<form action=/><input name=pw type=password></form>", "<b>Skjegg</b>": 2 } } });
+  const j = await (await overview(d, tokenFor(d))).json();
+  const s = j.sites[0];
+  assert.equal(s.ok, true);
+  assert.deepEqual(strayStrings(s), []);
+  assert.equal(JSON.stringify(s).includes("evil.example"), false);
+  assert.equal(JSON.stringify(s).includes("<form"), false);
+  assert.equal(s.data.visits, 0); assert.equal(s.data.sources.google, 0); assert.equal(s.data.sources.qr, 3);
+  assert.equal(s.data.sources["<img src=x>"], undefined, "ukjente kildenavn med rare tegn tas ikke med");
+  assert.deepEqual(s.data.days.map((x) => x.date), ["2026-11-17"], "datoer som ikke er tekst på formen ÅÅÅÅ-MM-DD hoppes over");
+  assert.deepEqual(s.data.bookings.weekdays, [0, 0, 0, 0, 0, 0, 0]);
+  assert.equal(s.data.bookings.services.Klipp, 0);
+  assert.equal(s.data.bookings.services["<b>Skjegg</b>"], 2, "tjenestenavn er tekst (vises escaped), antallet er et tall");
+});
+
+test("slim: en bedrift som sender feil form eller enorme lister gir et lite svar med fast form", () => {
+  const big = {}; for (let i = 0; i < 50000; i++) big["k" + i] = i;
+  const s = slim({ days: [{ date: "2026-11-17", visits: 1 }], sources: big, bookings: { services: big } }, 7);
+  assert.ok(JSON.stringify(s).length < 3000, "svaret er " + JSON.stringify(s).length + " byte");
+  assert.equal(Object.keys(s.bookings.services).length, 20);
+  assert.equal(s.bookings.services.k49999, 49999, "de mest bookede tjenestene beholdes");
+  const empty = slim({ days: [], bookings: {} }, 7);
+  assert.deepEqual(empty.bookings, { web: 0, admin: 0, cancelled: 0, upcoming7: 0, weekdays: [0, 0, 0, 0, 0, 0, 0], services: {} });
+  assert.equal(slim({ days: [], bookings: "tull" }, 7).bookings, null);
+  const extra = slim({ days: [], sources: { nyhetsbrev: 4, constructor: 2, __proto__x: 1 } }, 7).sources;
+  assert.equal(extra.nyhetsbrev, 4, "en ny kilde fra en nyere kopi av settet tas med");
+});
+
+test("oversikt: for stort svar, ikke-JSON og videresending gir en feilrad (og nøkkelen følger ikke en videresending)", async () => {
+  let d = siteReturning("x".repeat(300000));
+  let s = (await (await overview(d, tokenFor(d))).json()).sites[0];
+  assert.equal(s.ok, false); assert.match(s.error, /for stort/);
+  d = siteReturning("<html>ikke json</html>");
+  s = (await (await overview(d, tokenFor(d))).json()).sites[0];
+  assert.equal(s.ok, false); assert.match(s.error, /Ukjent svar/);
+  d = siteReturning("", { status: 302, headers: { location: "https://annen.example/api/stats" } });
+  s = (await (await overview(d, tokenFor(d))).json()).sites[0];
+  assert.equal(s.ok, false); assert.match(s.error, /videresender/);
+  assert.equal(d.calls[0].opts.redirect, "manual", "følger aldri en videresending med nøkkelen");
+});
+
+test("oversikt: en bedriftsliste som henger eller feiler stopper ikke de faste bedriftene, og eieren får beskjed", async () => {
+  for (const registry of [() => new Promise(() => {}), async () => { throw new Error("Blobs 503"); }, () => { throw new Error("sync"); }]) {
+    const d = deps({ registry, registryWaitMs: 50 });
+    const t0 = Date.now();
+    const j = await (await overview(d, tokenFor(d))).json();
+    assert.ok(Date.now() - t0 < 2000, "svarte etter " + (Date.now() - t0) + " ms");
+    assert.deepEqual(j.sites.map((s) => s.id), ["a", "b", "c"]);
+    assert.equal(j.registryError, true);
+  }
+  const ok = deps({ registry: async () => [] });
+  const j = await (await overview(ok, tokenFor(ok))).json();
+  assert.equal(j.registryError, undefined);
+});
+
+test("bedriftsliste: ugyldige oppføringer og lik id som en fast bedrift meldes som hoppet over (ikke stille)", async () => {
+  const good = { id: "frisor-anna", name: "Frisør Anna", url: "https://anna.example/", key: "k".repeat(43) };
+  const d = deps({ registry: async () => [good, { ...good, id: "lang", name: "n".repeat(81) }, { ...good, id: "a" }, { id: "uleselig" }, { id: "<b>" }] });
+  const j = await (await overview(d, tokenFor(d))).json();
+  assert.deepEqual(j.sites.map((s) => s.id), ["a", "b", "c", "frisor-anna"]);
+  assert.deepEqual(j.skipped, ["lang", "a", "uleselig", "(ukjent)"]);
+  assert.equal(j.sites[3].url, "https://anna.example", "adressen lagres som opprinnelse (uten sti)");
+});
+
+test("loadRegistry: én uleselig oppføring blir et navn i «hoppet over»; feil ved listing kastes videre (vises som registryError)", async () => {
+  const { loadRegistry } = await import("../oversikt/netlify/functions/overview.mjs");
+  const good = { id: "frisor-anna", name: "Frisør Anna", url: "https://anna.example", key: "k".repeat(43) };
+  const store = { async list() { return { blobs: [{ key: "site/frisor-anna" }, { key: "site/odelagt" }] }; },
+    async get(k) { if (k === "site/odelagt") throw new Error("500"); return good; } };
+  assert.deepEqual(await loadRegistry(store), [good, { id: "odelagt" }]);
+  await assert.rejects(loadRegistry({ async list() { throw new Error("Blobs nede"); } }));
+});
+
+test("brems: 50 samtidige feil passord fra samme avsender sjekkes høyst 8 ganger (reservert før passordet sjekkes)", async () => {
+  const base = fakeStore();
+  const lag = () => new Promise((r) => setTimeout(r, Math.random() * 5));
+  const store = { m: base.m,
+    async get(k, o) { await lag(); return base.get(k, o); },
+    async getWithMetadata(k, o) { await lag(); return base.getWithMetadata(k, o); },
+    async setJSON(k, v, o) { await lag(); return base.setJSON(k, v, o); },
+    async delete(k) { await lag(); return base.delete(k); } };
+  const d = deps({ store });
+  const statuses = await Promise.all(Array.from({ length: 50 }, (_, i) => login(d, "feil-" + i).then((r) => r.status)));
+  const count = (s) => statuses.filter((x) => x === s).length;
+  assert.ok(count(401) <= 8, "passordet ble sjekket " + count(401) + " ganger");
+  assert.equal(count(401) + count(429), 50);
+  assert.equal((await login(d, "riktig-passord")).status, 429, "også riktig passord venter til vinduet er over");
+});
+
+test("brems: riktig passord bruker ikke opp kvoten", async () => {
+  const d = deps();
+  for (let i = 0; i < 12; i++) assert.equal((await login(d, "riktig-passord")).status, 200);
+});
+
+test("kilder: oversikten kjenner de samme kildene som statistikk-settet og Viggo's", async () => {
+  const { SOURCES } = await import("../oversikt/netlify/functions/overview.mjs");
+  const kit = await import("../stats-kit/netlify/functions/stats.mjs");
+  assert.deepEqual(SOURCES, kit.SOURCES);
+});
