@@ -1,6 +1,6 @@
 // Gyllent partikkel-snøfall over hele siden.
-// Eget lerret som ikke tar imot klikk. Tilpasser seg lyst/mørkt tema,
-// gir litt dybde når man scroller, og står stille ved «redusert bevegelse».
+// Eget lerret som ikke tar imot klikk. Gir litt dybde når man scroller, og står stille ved «redusert bevegelse».
+// Siden har ett tema (mørkt); den gamle lys/mørk-bryteren og lytterne etter den er fjernet (F58).
 (() => {
   const canvas = document.createElement("canvas");
   canvas.id = "gold-snow";
@@ -10,7 +10,6 @@
   if (!ctx) return;
 
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-  const isLight = () => document.documentElement.dataset.theme === "light";
 
   // Ferdigtegnet glødende gullprikk, gjenbrukes for hver partikkel (raskt)
   function makeSprite(core, glow) {
@@ -26,10 +25,7 @@
     g.fillRect(0, 0, 64, 64);
     return s;
   }
-  const SPRITES = {
-    dark: makeSprite("rgba(255, 240, 200, 1)", "rgba(222, 180, 95, .35)"),
-    light: makeSprite("rgba(196, 146, 52, 1)", "rgba(214, 168, 76, .2)"),
-  };
+  const SPRITE = makeSprite("rgba(255, 240, 200, 1)", "rgba(222, 180, 95, .35)");
 
   let W = 0, H = 0, dpr = 1, flakes = [];
   const rand = (a, b) => a + Math.random() * (b - a);
@@ -68,9 +64,7 @@
 
   function draw(step = 1) {
     ctx.clearRect(0, 0, W, H);
-    const light = isLight();
-    const sprite = light ? SPRITES.light : SPRITES.dark;
-    ctx.globalCompositeOperation = light ? "source-over" : "lighter";
+    ctx.globalCompositeOperation = "lighter";
 
     // Litt dybde: nære partikler flytter seg mer når man scroller
     const scrollDelta = window.scrollY - lastScroll;
@@ -86,9 +80,9 @@
       if (x < -20) f.x += W + 40; else if (x > W + 20) f.x -= W + 40;
 
       const shimmer = 0.65 + 0.35 * Math.sin(t * f.twinkle + f.phase * 3);
-      ctx.globalAlpha = Math.min(1, f.alpha * shimmer * (light ? 2.3 : 1));
-      const size = f.r * (light ? 6 : 7); // sprite inkluderer gløden rundt kjernen
-      ctx.drawImage(sprite, x - size / 2, f.y - size / 2, size, size);
+      ctx.globalAlpha = Math.min(1, f.alpha * shimmer);
+      const size = f.r * 7; // sprite inkluderer gløden rundt kjernen
+      ctx.drawImage(SPRITE, x - size / 2, f.y - size / 2, size, size);
     }
     ctx.globalAlpha = 1;
   }
@@ -112,5 +106,4 @@
   window.addEventListener("resize", () => { resize(); if (reduceMotion.matches) draw(0); });
   if (reduceMotion.addEventListener) reduceMotion.addEventListener("change", start); // Safari < 14 har bare addListener
   else if (reduceMotion.addListener) reduceMotion.addListener(start);
-  window.addEventListener("themechange", () => { if (reduceMotion.matches) draw(0); });
 })();

@@ -20,7 +20,6 @@ uniform vec2 resolution;
 uniform float time;
 uniform vec2 pointer;     // 0..1, y opp
 uniform float energy;     // 0..1, øker når pekeren beveger seg
-uniform float light;      // 0 = mørkt tema, 1 = lyst tema
 
 float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 float noise(vec2 p) {
@@ -52,9 +51,9 @@ void main() {
   vec2 r = vec2(fbm(p * 1.4 + q * 2.2 + vec2(1.7, 9.2) + t * 1.3), fbm(p * 1.4 + q * 2.2 + vec2(8.3, 2.8) - t));
   float smoke = fbm(p * 1.2 + r * 2.0);
 
-  // Mørkt tema: dyp grønn marmor. Lyst tema: elfenben med salviegrønn røyk.
-  vec3 bg    = mix(vec3(0.043, 0.059, 0.051), vec3(0.969, 0.949, 0.910), light);
-  vec3 wood  = mix(vec3(0.06, 0.20, 0.13), vec3(0.80, 0.85, 0.77), light);
+  // Dyp grønn marmor (sidens eneste tema; lys/mørk-bryteren er fjernet, F58)
+  vec3 bg    = vec3(0.043, 0.059, 0.051);
+  vec3 wood  = vec3(0.06, 0.20, 0.13);
   vec3 gold  = vec3(0.81, 0.65, 0.37);
   vec3 cream = vec3(0.95, 0.92, 0.88);
 
@@ -65,14 +64,14 @@ void main() {
   float s = (p.x + p.y) * 5.0 + r.y * 2.5 - time * 0.35;
   float band = fract(s / 3.0);
   vec3 stripe = band < 0.333 ? vec3(0.70, 0.23, 0.20) : band < 0.666 ? cream : vec3(0.17, 0.31, 0.54);
-  float stripeMask = smoothstep(0.45, 0.85, q.y) * mix(0.38, 0.22, light);
+  float stripeMask = smoothstep(0.45, 0.85, q.y) * 0.38;
   col = mix(col, stripe, stripeMask * smoothstep(0.2, 0.8, smoke));
 
   // Gyllen glød rundt pekeren
-  col += gold * exp(-md * 4.5) * (0.12 + energy * 0.35) * mix(1.0, 0.45, light);
+  col += gold * exp(-md * 4.5) * (0.12 + energy * 0.35);
 
   // Vignett og litt filmkorn
-  col *= 1.0 - mix(0.55, 0.16, light) * dot(uv - 0.5, uv - 0.5) * 2.2;
+  col *= 1.0 - 0.55 * dot(uv - 0.5, uv - 0.5) * 2.2;
   col += (hash(gl_FragCoord.xy + time) - 0.5) * 0.025;
 
   fragColor = vec4(col, 1.0);
@@ -112,7 +111,6 @@ void main() {
     time: gl.getUniformLocation(program, "time"),
     pointer: gl.getUniformLocation(program, "pointer"),
     energy: gl.getUniformLocation(program, "energy"),
-    light: gl.getUniformLocation(program, "light"),
   };
 
   // Lavere oppløsning holder det jevnt også på svake mobiler
@@ -140,10 +138,6 @@ void main() {
     target.y = ny;
   }, { passive: true });
 
-  // Tema: glir mykt mellom mørkt og lyst når bryteren brukes
-  const themeTarget = () => (document.documentElement.dataset.theme === "light" ? 1 : 0);
-  let light = themeTarget();
-
   let raf = 0;
   let visible = true;
   const start = performance.now();
@@ -152,13 +146,10 @@ void main() {
     ptr.x += (target.x - ptr.x) * 0.06;
     ptr.y += (target.y - ptr.y) * 0.06;
     energy *= 0.96;
-    light += (themeTarget() - light) * (reduceMotion.matches ? 1 : 0.12);
-    if (Math.abs(themeTarget() - light) < 0.002) light = themeTarget();
     gl.uniform2f(u.resolution, canvas.width, canvas.height);
     gl.uniform1f(u.time, (now - start) / 1000);
     gl.uniform2f(u.pointer, ptr.x, ptr.y);
     gl.uniform1f(u.energy, energy);
-    gl.uniform1f(u.light, light);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     raf = visible && !reduceMotion.matches ? requestAnimationFrame(frame) : 0;
   }
@@ -173,7 +164,6 @@ void main() {
   }
   if (reduceMotion.addEventListener) reduceMotion.addEventListener("change", play); // Safari < 14 har bare addListener
   else if (reduceMotion.addListener) reduceMotion.addListener(play);
-  window.addEventListener("themechange", play);
   window.addEventListener("resize", () => { if (!raf) play(); });
 
   canvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); cancelAnimationFrame(raf); raf = 0; canvas.remove(); });
