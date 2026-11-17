@@ -30,7 +30,8 @@ jobs:
           restore-keys: booking-alarm-
       - name: Se etter nye bookinger
         env:
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          # Hemmelighet (Secrets) eller variabel (Variables) – begge virker
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC || vars.NTFY_TOPIC }}
         run: node .github/booking-alarm.mjs
       - name: Lagre tilstanden
         if: always()

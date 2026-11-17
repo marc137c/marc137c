@@ -32,7 +32,11 @@ async function notify(topic, title, body) {
 async function main() {
   const topic = process.env.NTFY_TOPIC;
   // Mangler kanalen, skal kjøringen bli RØD (ikke «vellykket» uten å varsle noen)
-  if (!topic) { console.error("NTFY_TOPIC mangler – legg den inn som GitHub-hemmelighet (Settings → Secrets and variables → Actions). Ingen varsler sendt."); process.exitCode = 1; return; }
+  if (!topic) {
+    // ::error:: vises øverst på kjøringens side i GitHub, så feilen er lett å se
+    console.log("::error title=NTFY_TOPIC mangler::Legg inn NTFY_TOPIC under Settings → Secrets and variables → Actions (Secrets eller Variables). Ingen varsler sendt.");
+    process.exitCode = 1; return;
+  }
   let prev = null;
   try { prev = JSON.parse(fs.readFileSync(STATE, "utf8")).busy; } catch { /* første kjøring */ }
   let a;
