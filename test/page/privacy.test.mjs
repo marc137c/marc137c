@@ -195,3 +195,39 @@ test("privacy: the page names every field the abuse counters and the visitor sta
   assert.doesNotMatch(text, /bare tidspunkter|per innlogging/);
   assert.match(text, /logge inn i timeboken per IP-adresse/);
 });
+
+// Fix-up round 2: the page named Netlify in the USA but no transfer basis (art. 13(1)(f)), and nothing could fail,
+// because privacy.test.mjs checked the page only against SPEC, whose fact list came from the owner's decisions, not
+// from art. 13. Guard: every art. 13 item maps to a sentence on the page, or to a SPEC «Art. 13 checklist» row
+// («not applicable, because …», or «open: …» with its DEPLOY §6 line). A missing row is a red build.
+const ART13 = {
+  "13(1)(a)": /Behandlingsansvarlig[\s\S]*org\.nr\. 937 845 812[\s\S]*409 63 911/,
+  "13(1)(b)": null,
+  "13(1)(c)": /Formålet er[\s\S]*artikkel 6 nr\. 1 bokstav b/,
+  "13(1)(d)": null,
+  "13(1)(e)": /Hvem som får opplysningene/,
+  "13(1)(f)": /USA[^.]*(Data Privacy Framework|standard personvernbestemmelser|standardkontraktsbestemmelser)/,
+  "13(2)(a)": /Hvor lenge opplysningene lagres/,
+  "13(2)(b)": /innsyn[\s\S]*retting[\s\S]*sletting[\s\S]*begrenses[\s\S]*utlevert/,
+  "13(2)(c)": null,
+  "13(2)(d)": /klage til Datatilsynet/,
+  "13(2)(e)": /Du må oppgi navn og telefonnummer/,
+  "13(2)(f)": null,
+};
+test("privacy: every GDPR art. 13 item is on the page, or SPEC says why not (and an open one is a DEPLOY §6 line)", () => {
+  const text = pageText();
+  const spec = readRoot("docs/SPEC.md");
+  const deploy = readRoot("DEPLOY.md");
+  const six = deploy.slice(deploy.indexOf("## 6."));
+  for (const [item, said] of Object.entries(ART13)) {
+    if (said && said.test(text)) continue;
+    const row = spec.split(/\r?\n/).find((l) => l.startsWith(`- **Art. ${item}**`));
+    assert.ok(row, `art. ${item} is neither on the page nor a SPEC «Art. 13 checklist» row`);
+    if (/^- \*\*Art\. [^*]+\*\* open:/.test(row)) {
+      const [, para, letter] = /13\((\d)\)\((\w)\)/.exec(item);
+      assert.ok(six.includes(`artikkel 13 nr. ${para} bokstav ${letter}`), `art. ${item} is open, so DEPLOY §6 asks about it`);
+    } else {
+      assert.match(row, /\*\* not applicable, because /, `art. ${item}: «not applicable, because …» or «open: …»`);
+    }
+  }
+});

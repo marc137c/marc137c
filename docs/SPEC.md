@@ -30,6 +30,14 @@ This page holds the owner's decisions in force (D) and the rules the November 20
 - **Retention:** bookings are deleted 90 days after the appointment (by the daily clean-up, so at the latest 91 days after the appointment date). Every period stated on the page is its worst case: the threshold plus one clean-up interval (R30).
 - **Rights:** the visitor's GDPR rights, including the right to complain to Datatilsynet.
 
+**Art. 13 checklist (fix-up round 2).** Each item of GDPR art. 13(1)(a)–(f) and 13(2)(a)–(f) is either said on `personvern.html` (`test/page/privacy.test.mjs` holds the sentence for each) or has a row here: «not applicable, because …», or «open: …» with the DEPLOY §6 line that keeps it from being published unanswered.
+
+- **Art. 13(1)(b)** not applicable, because there is no data protection officer: a one-person barbershop whose core activities are neither large-scale monitoring nor special categories of data (art. 37) is not required to have one.
+- **Art. 13(1)(d)** not applicable, because the page names only art. 6(1)(b); if the owner adds art. 6(1)(f) for the abuse counters (DEPLOY §6), the page must name the legitimate interest.
+- **Art. 13(1)(f)** open: Netlify, Inc. is in the USA, and the page names no transfer basis. The mechanism (Netlify's data processing agreement: EU–US Data Privacy Framework certification or standard contractual clauses) has not been verified, so the page does not state one; DEPLOY §6 «Overføring til USA» asks for it to be checked and added before publishing.
+- **Art. 13(2)(c)** not applicable, because nothing is based on consent (art. 6(1)(a)).
+- **Art. 13(2)(f)** not applicable, because there is no automated decision-making or profiling.
+
 ## Rules this plan adds
 
 | ID | Rule | Enforced by | Status |
