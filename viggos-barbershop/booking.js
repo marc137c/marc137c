@@ -86,10 +86,32 @@
     const u = unsettled[k];
     return k !== except && u.date === date && start < u.start + u.dur && u.start < start + dur;
   });
+  // Timer serveren har bekreftet for denne siden: { date, start, dur, when } (runde 3). En time kunden har fått bekreftet,
+  // er kundens egen resten av økten: et nei eller et usikkert svar på et forsøk som overlapper den, betyr aldri «noen
+  // andre», for serveren lagrer aldri to nettbestillinger over hverandre.
+  const mineBooked = [];
+  const overlap = (x, date, start, dur) => x.date === date && start < x.start + x.dur && x.start < start + dur;
+  // Er tidsrommet (helt eller delvis) kundens eget? { booked: x } (en bekreftet time), { pending: true } (et forsøk med
+  // usikkert utfall, unntatt requestId except) eller null. Hver vei som sier «noen andre», «ikke ledig lenger» eller
+  // slipper et valg, spør her først (runde 3, SPEC R47).
+  function ownAt(date, start, dur, except) {
+    const b = mineBooked.filter((x) => overlap(x, date, start, dur))[0];
+    if (b) return { booked: b };
+    return overlapsPending(date, start, dur, except) ? { pending: true } : null;
+  }
+  const UNSURE_STILL = (t) => t.uncertainStill;
+  const ownText = (own) => (own.booked ? (t) => t.ownAlready(own.booked.when(t)) : UNSURE_STILL);
+  // Tidsrom siden selv vet er opptatte, i tillegg til serverens busy: kundens bekreftede timer og tider serveren svarte
+  // 409 «tatt» på. Et merke står til et svar fra /api/availability som ble HENTET etter at merket ble satt, er tatt i
+  // bruk (det svaret vet selv om tiden er opptatt), så en henting som feiler, gjør aldri en tatt tid ledig igjen.
+  let loads = 0, applied = 0; // hentinger startet / nummeret på den siste som ble tatt i bruk
+  let marks = [];             // { date, a, b, load }
+  const mark = (date, a, b) => { marks.push({ date, a, b, load: loads }); };
+  const busyOn = (day) => (busy[day] || []).concat(marks.filter((x) => x.date === day).map((x) => [x.a, x.b]));
   const isBusy = (date, start, dur) => {
     const mine = pendingOn(date).filter((u) => u.start === start);
     const used = [];
-    return (busy[iso(date)] || []).some(([a, b]) => {
+    return busyOn(iso(date)).some(([a, b]) => {
       for (let i = 0; i < mine.length; i++) {
         if (used.indexOf(i) < 0 && a === mine[i].start && b === mine[i].start + mine[i].dur) { used.push(i); return false; }
       }
@@ -182,12 +204,13 @@
     // En valgt tid som ikke er ledig lenger (tatt av en annen, passert, eller for kort for ny tjeneste) slippes, med
     // beskjed om hvorfor ved steget (F49). Aldri et valg med et usikkert forsøk på vei (pendingAt): det avgjør serveren.
     // Overlapper valget et usikkert forsøk, kan grunnen være kundens egen time: si «vi vet fortsatt ikke», aldri «borte».
+    // Overlapper det en time kunden har fått bekreftet, sier vi det (runde 3).
     const pendingTime = pendingAt(state.date, state.time);
     if (state.time !== null && !sending && !pendingTime && !slots.some((x) => x.t === state.time && x.status === "free")) {
       const was = slots.filter((x) => x.t === state.time)[0];
-      const own = overlapsPending(iso(state.date), state.time, duration());
+      const own = ownAt(iso(state.date), state.time, duration());
       state.time = null;
-      dropped.time = own ? (t) => t.uncertainStill : was && was.status === "short" ? (t) => t.tooShortPicked : (t) => t.timeGone;
+      dropped.time = own ? ownText(own) : was && was.status === "short" ? (t) => t.tooShortPicked : (t) => t.timeGone;
       setMsg("err", dropped.time, "time");
     }
     if (!slots.some(isFree)) {
@@ -388,7 +411,6 @@
   listeners();
 
   // Hent opptatte tider fra serveren. Et eldre svar som kommer etter et nyere, brukes ikke.
-  let loads = 0, applied = 0;
   function loadAvailability() {
     const n = ++loads;
     return withTimeout(fetch("/api/availability", { headers: { Accept: "application/json" }, cache: "no-store" })
@@ -397,6 +419,7 @@
         if (n < applied || !data || typeof data !== "object") return;
         applied = n;
         useServer(data);
+        marks = marks.filter((x) => n <= x.load); // et merke satt før denne hentingen startet, vet svaret selv om
         online = true;
       })
       .catch(() => {
@@ -510,40 +533,57 @@
       const start = typeof b.start === "number" ? b.start : t0;
       const when = (t) => t.summary(selectedServiceLabelFor(svc), dateLabel(day), t.time(start));
       const id = typeof b.id === "string" ? b.id : "";
+      const bDate = typeof b.date === "string" ? b.date : mine.date, bDur = typeof b.dur === "number" ? b.dur : mine.dur;
       if (!id || !bookedIds[id]) {
         if (id) bookedIds[id] = true;
         bookedList.push({ when, id });
         renderDone();
+        // Kundens egen time resten av økten (ownAt), og opptatt her selv om hentingen av ledige tider feiler (runde 3)
+        mineBooked.push({ date: bDate, start, dur: bDur, when });
+        mark(bDate, start, start + bDur);
       }
       confirmedReq[mine.requestId] = when;
       if (attempt && attempt.id === mine.requestId) attempt = null;
       // Det lagrede tidsrommet er nå sikkert; et usikkert forsøk som overlapper det, ble ikke lagret (serveren lagrer
       // aldri to nettbestillinger over hverandre)
       delete unsettled[mine.requestId];
-      const bDate = typeof b.date === "string" ? b.date : mine.date, bDur = typeof b.dur === "number" ? b.dur : mine.dur;
       Object.keys(unsettled).forEach((k) => {
         const u = unsettled[k];
         if (u.date === bDate && start < u.start + u.dur && u.start < start + bDur) delete unsettled[k];
       });
-      return when;
+      return { when, date: bDate, start, dur: bDur };
     };
     const booked = (data) => {
-      const when = record(data);
+      const when = record(data).when;
       end(() => done((t) => t.booked(when(t))));
       refresh();
     };
     // Et 2xx som kommer etter at forsøket ga opp (eller etter et nyere forsøk): alltid i #booking-done. Beskjeden og
-    // nullstillingen av skjemaet bare når ingen nyere bestilling er på vei og skjemaet fortsatt viser denne timen.
+    // nullstillingen av skjemaet når ingen nyere bestilling er på vei og skjemaet viser et valg som overlapper timen
+    // (kunden kan ha endret tjeneste, tillegg, navn eller nummer siden): da er valget kundens egen time, ikke en
+    // annens (runde 3). Er en nyere bestilling på vei, avgjør svaret på den (yoursAlready).
     const lateBooked = (data) => {
-      const when = record(data);
-      if (!sending && formShows()) done((t) => t.booked(when(t)));
+      const got = record(data);
+      if (!sending && state.date && state.time !== null && overlap(got, iso(state.date), state.time, duration())) {
+        done((t) => t.booked(got.when(t)));
+      }
       refresh();
+    };
+    // Kunden har allerede en bekreftet time som overlapper dette forsøket (dette forsøkets egen, eller et sent 2xx på et
+    // tidligere): da ble dette ikke lagret, og et nei eller et usikkert svar betyr aldri «noen andre» eller «ring og
+    // sjekk». Beskjeden sier hvilken time kunden har; skjemaet tømmes, så ingenting ber om en tid til (runde 3).
+    const yoursAlready = () => {
+      const when = confirmedReq[mine.requestId];
+      const own = when ? null : ownAt(mine.date, mine.start, mine.dur);
+      if (!when && !(own && own.booked)) return false;
+      settle();
+      end(() => done(when ? (t) => t.booked(when(t)) : ownText(own)));
+      return true;
     };
     // Vi vet ikke om timen ble lagret (ingen svar, nettfeil, eller et svar vi ikke kan stole på). requestId beholdes,
     // så et nytt forsøk med det samme blir samme bestilling hos serveren, og valget står til serveren har svart sikkert.
     const uncertain = () => {
-      const when = confirmedReq[mine.requestId]; // et tidligere svar har allerede bekreftet den
-      if (when) return end(() => done((t) => t.booked(when(t))));
+      if (yoursAlready()) return;
       unsettled[mine.requestId] = { date: mine.date, start: mine.start, dur: mine.dur };
       end(() => setMsg("err", (t) => t.uncertain));
     };
@@ -573,6 +613,8 @@
     const answer = (r) => {
       const status = r.status, data = r.data || {};
       if (ok(r)) return booked(r.data);
+      // Tidsrommet overlapper en time kunden allerede har fått bekreftet: hvilket nei det enn er, har kunden timen
+      if (yoursAlready()) return;
       // Noen andre rakk å ta tiden, eller serveren sier at tiden eller dagen ikke kan bestilles (dens klokke og regler
       // vinner): hent ledige tider på nytt, slipp valget og si hvorfor ved steget
       // En requestId brukt på en annen tid: kundens egen time finnes (flyttet), så aldri «noen andre»

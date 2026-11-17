@@ -184,6 +184,8 @@
       booked: (when) => `Timen er booket: ${when}. Velkommen! Må du endre eller avlyse, ring oss på 409 63 911.`,
       // Linjen som blir stående over skjemaet etter hver bestilling, med lenke til timen som kalenderfil
       bookedLine: (when) => `Timen er booket: ${when}`,
+      // Et nei eller et usikkert svar på et forsøk som overlapper en time kunden allerede har fått bekreftet (runde 3)
+      ownAlready: (when) => `Du har allerede en time på det tidspunktet: ${when}. Må du endre eller avlyse, ring oss på 409 63 911.`,
       addToCalendar: "Legg i kalenderen",
       // Anmeldelser
       // Data fra Google (Places API) merkes «Google Maps» (Googles krav); reviews.js hindrer at navnet oversettes
@@ -243,6 +245,7 @@
       reloadPage: "This page has been updated. Please reload it and try again.",
       booked: (when) => `You're booked: ${when}. See you then! To change or cancel, call us on 409 63 911.`,
       bookedLine: (when) => `You're booked: ${when}`,
+      ownAlready: (when) => `You already have an appointment at that time: ${when}. To change or cancel, call us on 409 63 911.`,
       addToCalendar: "Add to calendar",
       // Reviews
       basedOn: (n) => `based on ${n} ${n === 1 ? "review" : "reviews"} on Google Maps`,
