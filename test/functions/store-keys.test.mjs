@@ -92,9 +92,11 @@ test("store keys: after every handler has run, every stored key has a deletion r
   assert.deepEqual(problems, []);
   // Sanity: the run really wrote counters, a month, push and calendar docs
   const keys = d.blobs.keys("bookings");
-  for (const prefix of ["rl/ip/", "rl/phone/", "rl/login/ip/", "m/2026-11", "m/2027-01", "push/subs", "calendar/feed", "rl/secret"]) {
+  for (const prefix of ["rl/b/ip/", "rl/b/phone/", "rl/b/login/ip/", "m/2026-11", "m/2027-01", "push/subs", "calendar/feed", "rl/secret"]) {
     assert.ok(keys.some((k) => k.startsWith(prefix)), `${prefix} in ${keys.join(", ")}`);
   }
+  // Round 3 (SPEC R44): no counter document per client or number, only the fixed set
+  assert.deepEqual(keys.filter((k) => k.startsWith("rl/") && !/^rl\/(secret|all|login\/all|b\/(ip|phone|login\/ip)\/[0-9a-f])$/.test(k)), []);
   assert.deepEqual(d.blobs.keys("stats"), ["d/2026-11-12"]);
   // Fix-up round 2 (demo-counters.test.mjs): the privacy facts said the counters store «bare tidspunkter», but every
   // hit also stores an id (for a web booking derived from its request). A row that lists its fields must name every
@@ -110,10 +112,12 @@ test("store keys: after every handler has run, every stored key has a deletion r
   assert.deepEqual(fieldProblems, []);
   for (const prefix of ["rl/", "d/"]) assert.ok(KEY_RULES.some((r) => r.prefix === prefix && Array.isArray(r.fields)), `the ${prefix} row lists its fields`);
 });
-// Field paths in a stored JSON document: top-level names, and «name[].sub» for arrays of objects
+// Field paths in a stored JSON document: top-level names, and «name[].sub» for arrays of objects (an empty list stores
+// no field: round 3 keeps an emptied counter bucket as { hits: [] })
 function fieldPaths(doc) {
   const out = new Set();
   for (const [k, v] of Object.entries(doc || {})) {
+    if (Array.isArray(v) && v.length === 0) continue;
     if (Array.isArray(v) && v.some((x) => x && typeof x === "object")) for (const x of v) for (const sub of Object.keys(x || {})) out.add(`${k}[].${sub}`);
     else out.add(k);
   }

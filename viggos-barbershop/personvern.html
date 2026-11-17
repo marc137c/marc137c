@@ -41,7 +41,7 @@
     <main>
       <h1>Personvern</h1>
       <p class="lead">Her står hvilke opplysninger Viggo's Barbershop behandler når du bruker nettsiden og bestiller time, hvorfor, hvem som hjelper oss med det, og hvor lenge opplysningene lagres.</p>
-      <p class="small">Sist oppdatert 16. november 2026.</p>
+      <p class="small">Sist oppdatert 17. november 2026.</p>
 
       <h2>Behandlingsansvarlig</h2>
       <address>
@@ -65,14 +65,14 @@
       <p>Ingen andre får opplysningene om bestillingen din.</p>
 
       <h2>Vern mot misbruk</h2>
-      <p>For å stoppe falske og automatiske bestillinger teller serveren nettbestillinger per IP-adresse, per telefonnummer og samlet, og forsøk på å logge inn i timeboken per IP-adresse og samlet. Tellerne lagrer tidspunktet for hvert forsøk og en kode for forsøket (den samlede telleren for bestillinger også når taket sist ble nådd), under et navn laget av adressen eller nummeret med en hemmelig nøkkel, aldri selve adressen eller nummeret. For en nettbestilling lages koden for forsøket med den hemmelige nøkkelen av bestillingens forespørsel, tid og telefonnummer, så den som har tilgang til lagringen, kan knytte telleren til bestillingen så lenge begge finnes. De slettes ved den daglige oppryddingen når det har gått mer enn 24 timer siden siste forsøk, altså senest etter 48 timer.</p>
+      <p>For å stoppe falske og automatiske bestillinger teller serveren nettbestillinger per IP-adresse, per telefonnummer og samlet, og forsøk på å logge inn i timeboken per IP-adresse og samlet. Tellerne lagrer tidspunktet for hvert forsøk og en kode for forsøket. Tellerne per adresse og per nummer lagrer også et navn laget av adressen eller nummeret med en hemmelig nøkkel, aldri selve adressen eller nummeret, og den samlede telleren for bestillinger når taket sist ble nådd. For en nettbestilling lages koden for forsøket med den hemmelige nøkkelen av bestillingens forespørsel, tid og telefonnummer, så den som har tilgang til lagringen, kan knytte forsøket til bestillingen så lenge begge finnes. Hvert forsøk slettes senest ved den første daglige oppryddingen etter at det har gått 24 timer, altså senest etter 48 timer.</p>
       <p>Som for alle nettsteder mottar vertskapet (Netlify) IP-adressen din når nettleseren henter siden. Vi lagrer den ikke.</p>
 
       <h2>Hvor lenge opplysningene lagres</h2>
       <ul>
         <li>En time slettes automatisk 90 dager etter timedatoen, også en avlyst time. Oppryddingen kjører hver natt, så det skjer senest 91 dager etter timedatoen.</li>
         <li>Barberen kan slette en time før det, for eksempel hvis du ber om det.</li>
-        <li>Misbrukstellerne slettes ved den daglige oppryddingen når det har gått mer enn 24 timer siden siste forsøk, altså senest etter 48 timer.</li>
+        <li>Misbrukstellerne: hvert forsøk slettes senest ved den første daglige oppryddingen etter at det har gått 24 timer, altså senest etter 48 timer.</li>
         <li>Besøksstatistikken (uten personopplysninger, se under) slettes etter 400 dager, ved den daglige oppryddingen, altså senest etter 401 dager.</li>
       </ul>
 

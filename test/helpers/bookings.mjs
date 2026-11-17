@@ -40,3 +40,10 @@ export function seedItems(blobs, items) {
 export function storedItems(blobs) {
   return blobs.keys("bookings").filter((k) => k.startsWith("m/")).flatMap((k) => blobs.json("bookings", k).items);
 }
+
+// The hits of one rate-limit counter: a shared key ("rl/all"), or { key, name } for a client or a number in its
+// bucket (counterRef in netlify/lib/limits.mjs: only the hits marked with its name count).
+export function counterHits(blobs, ref, store = "bookings") {
+  const { key, name } = typeof ref === "string" ? { key: ref } : ref;
+  return ((blobs.json(store, key) || {}).hits || []).filter((h) => name === undefined || (h && h.k === name));
+}

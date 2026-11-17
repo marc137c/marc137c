@@ -36,10 +36,15 @@ function seedStore(blobs, store) {
   blobs.seed(store, "m/2027-01", { items: [keepCancelled] });
   blobs.seed(store, "m/2026-10", { items: [] }); // an empty old month
   blobs.seed(store, "rl/secret", { k: "A".repeat(43) });
-  blobs.seed(store, "rl/ip/oldoldoldoldoldoldold", { hits: [{ t: nowMs - 25 * 3600e3, id: "a" }] });
-  blobs.seed(store, "rl/phone/newnewnewnewnewnewnew", { hits: [{ t: nowMs - 25 * 3600e3, id: "a" }, { t: nowMs - 3600e3, id: "b" }] });
+  // the counters (limits.mjs): buckets of named hits and the two shared documents
+  blobs.seed(store, "rl/b/ip/3", { hits: [{ t: nowMs - 25 * 3600e3, id: "a", k: "o".repeat(22) }] });
+  blobs.seed(store, "rl/b/phone/c", { hits: [{ t: nowMs - 25 * 3600e3, id: "a", k: "n".repeat(22) }, { t: nowMs - 3600e3, id: "b", k: "n".repeat(22) }, { t: nowMs - 2 * 3600e3, id: "c", k: "m".repeat(22) }] });
   blobs.seed(store, "rl/all", { hits: [{ t: nowMs - 30 * 3600e3, id: "a" }], alertedAt: nowMs - 2 * 3600e3 });
-  blobs.seed(store, "rl/login/all", { hits: [] });
+  blobs.seed(store, "rl/login/all", { hits: [{ t: nowMs - 49 * 3600e3, id: "z" }], alertedAt: nowMs - 26 * 3600e3 });
+  // leftovers of builds before round 3: one document per client or number (never released, so always deleted)
+  blobs.seed(store, "rl/ip/oldoldoldoldoldoldold", { hits: [{ t: nowMs - 25 * 3600e3, id: "a" }] });
+  blobs.seed(store, "rl/phone/newnewnewnewnewnewnew", { hits: [{ t: nowMs - 3600e3, id: "b" }] });
+  blobs.seed(store, "rl/login/ip/newnewnewnewnewnewnew", { hits: [{ t: nowMs - 60e3, id: "c" }] });
   blobs.seed(store, "auth/epoch", { t: nowMs - 10 * DAY });
   blobs.seed(store, "auth/ip/198.51.100.5", { count: 3, start: nowMs - 60e3 });
   blobs.seed(store, "auth/all", { count: 9, start: nowMs - 60e3 });
@@ -81,12 +86,16 @@ test("retention: bookings 90 days after their date, ghosts and empty old months 
   }
 });
 
-test("retention: counters a day after their newest hit, legacy auth/* always; the secret, the epoch and push/calendar stay", async () => {
+test("retention: every counter hit and pause alert a day old goes, the counter documents stay; leftovers and legacy auth/* always go; the secret, the epoch and push/calendar stay", async () => {
   const { d, blobs } = site();
   await run(d);
   for (const store of ["bookings", "bookings-preview"]) {
     const keys = blobs.keys(store).filter((k) => !k.startsWith("m/"));
-    assert.deepEqual(keys, ["auth/epoch", "calendar/feed", "push/subs", "rl/all", "rl/phone/newnewnewnewnewnewnew", "rl/secret"], store);
+    assert.deepEqual(keys, ["auth/epoch", "calendar/feed", "push/subs", "rl/all", "rl/b/ip/3", "rl/b/phone/c", "rl/login/all", "rl/secret"], store);
+    assert.deepEqual(blobs.json(store, "rl/b/ip/3"), { hits: [] }, "an emptied bucket is written empty (one of a fixed set)");
+    assert.deepEqual(blobs.json(store, "rl/b/phone/c").hits.map((h) => h.id), ["b", "c"], "the hit over a day old went, the same number's newer hit stayed");
+    assert.deepEqual(blobs.json(store, "rl/all"), { hits: [], alertedAt: nowMs - 2 * 3600e3 }, "a recent pause alert stays");
+    assert.deepEqual(blobs.json(store, "rl/login/all"), { hits: [] });
   }
 });
 
@@ -203,9 +212,9 @@ test("retention round 2: a counter hit just after a run is gone within the state
   const blobs = new FakeBlobs({ clock });
   const d = testDeps({ blobs });
   const hit = runAt + 60e3;
-  blobs.seed("bookings", "rl/ip/xxxxxxxxxxxxxxxxxxxxxx", { hits: [{ t: hit, id: "a" }] });
+  blobs.seed("bookings", "rl/b/ip/7", { hits: [{ t: hit, id: "a", k: "x".repeat(22) }] });
   clock.advance(RUN_EVERY_MS);
-  const gone = await runUntilGone(clock, d, () => !blobs.has("bookings", "rl/ip/xxxxxxxxxxxxxxxxxxxxxx"), runAt + 10 * DAY);
+  const gone = await runUntilGone(clock, d, () => !blobs.json("bookings", "rl/b/ip/7").hits.some((h) => h.id === "a"), runAt + 10 * DAY);
   assert.ok(gone, "deleted at all");
   assert.ok(gone - hit > COUNTER_MAX_AGE_MS, "not before the threshold");
   assert.ok(gone - hit <= STATED.counterHours * 3600e3, `deleted ${(gone - hit) / 3600e3} h after the last hit`);
@@ -234,10 +243,13 @@ for (const [kind, seed, has, statedDays, keepDays] of [
 // ---------- Fix-up round 2: a time budget (retention-load.mjs) ----------
 // Netlify stops a scheduled function after 30 s (docs/contracts/netlify.md). The clean-up walked every key one by
 // one, three Blobs calls per stale counter, bookings first: 600 refused logins from 600 /64s made it need 45 s, and
-// the statistics and Instagram steps never ran. Guard: with 5 000 stale counters at 25 ms per Blobs call (the
-// fake clock adds concurrent calls up, so this is the pessimistic case), one run stops cleanly inside the limit,
-// has done the bounded work (bookings, statistics, Instagram) first, says how much is left, and later runs finish.
-test("retention budget: 5 000 stale counters at 25 ms per call: the run stops cleanly within 30 s, bookings, statistics and Instagram done first, and later nights finish", async (t) => {
+// the statistics and Instagram steps never ran. Round 3: the current counters are a fixed set (counter-flood.test.mjs
+// proves the nightly work stays the same under any flood); what can still be large is a one-off backlog of leftovers
+// from older builds (a document per client or number, auth/ip/<address>). Guard: with 5 000 of them at 25 ms per
+// Blobs call (the fake clock adds concurrent calls up, so this is the pessimistic case), one run stops cleanly inside
+// the limit, has done everything else first (bookings, statistics, Instagram, the current counters), says how much is
+// left, and later runs finish.
+test("retention budget: 5 000 leftover counters at 25 ms per call: the run stops cleanly within 30 s, bookings, statistics, Instagram and the current counters done first, and later nights finish", async (t) => {
   const out = quiet(t);
   const clock = new FakeClock(NOW);
   const blobs = new FakeBlobs({ clock, latencyMs: 25 });
@@ -245,6 +257,7 @@ test("retention budget: 5 000 stale counters at 25 ms per call: the run stops cl
   const old = nowMs - 3 * DAY;
   for (let i = 0; i < 5000; i++) blobs.seed("bookings", `rl/login/ip/${String(i).padStart(22, "x")}`, i % 2 ? { hits: [] } : { hits: [{ t: old, id: "a" + i }] });
   blobs.seed("bookings", "rl/secret", { k: "s".repeat(43) });
+  blobs.seed("bookings", "rl/b/phone/f", { hits: [{ t: old, id: "kari", k: "k".repeat(22) }] }); // a customer's number
   blobs.seed("bookings", "m/2026-10", { items: [item({ date: "2026-10-05", name: "Gammel kunde" })] });
   blobs.seed("stats", "d/2025-01-01", { views: 1, pages: { forside: 1 }, sources: { direkte: 1 } });
   blobs.seed("social", "oauth-state-" + "c".repeat(48), { platform: "instagram", created_at: old });
@@ -257,6 +270,7 @@ test("retention budget: 5 000 stale counters at 25 ms per call: the run stops cl
   assert.equal(blobs.has("bookings", "m/2026-10"), false, "the old booking (personal data) went first");
   assert.equal(blobs.has("stats", "d/2025-01-01"), false, "the statistics step ran");
   assert.equal(blobs.has("social", "oauth-state-" + "c".repeat(48)), false, "the Instagram step ran");
+  assert.deepEqual(blobs.json("bookings", "rl/b/phone/f").hits, [], "the customer's old hit went in the first run, before the leftovers");
   assert.ok(first.body.unfinished > 0 && counters() > 0, `stopped early: ${JSON.stringify(first.body)}, ${counters()} counters left`);
   assert.ok(out.log.some((a) => /stoppet/i.test(String(a[0]))), "it says so in the log");
   let nights = 1;
@@ -268,17 +282,57 @@ test("retention budget: 5 000 stale counters at 25 ms per call: the run stops cl
     assert.ok(clock.now() - t1 < 30e3);
     nights++;
   }
-  assert.equal(counters(), 0, `all stale counters gone after ${nights} nights`);
+  assert.equal(counters(), 0, `all leftovers gone after ${nights} nights`);
   assert.ok(blobs.has("bookings", "rl/secret"));
 });
 
-test("retention budget: a stale counter costs two Blobs calls (read, delete), never a metadata read too", async () => {
+// Round 3 (list-starves-months.mjs): the clean-up listed every key in the store before it first checked the
+// deadline, so 100 000 keys at 200 ms per list page used up the budget in the listing: {deleted: 0}, and a booking
+// stayed 103 days. Guard: each step lists only its own prefix, right before it runs, and reads no new list page
+// after the deadline; a slow, long listing of leftovers can never hold back the months, the bounded steps or the
+// current counters, and the run still ends inside the limit.
+test("retention budget: a listing that alone would take 40 s (5 000 leftovers, 50 keys per page, 400 ms per page) stops at the deadline, after the months, statistics, Instagram and current counters are done", async (t) => {
+  const out = quiet(t);
+  const clock = new FakeClock(NOW);
+  const blobs = new FakeBlobs({ clock, listPageSize: 50, latencyMs: (req) => (req.op === "LIST" ? 400 : 25) });
+  const d = testDeps({ blobs });
+  const old = nowMs - 3 * DAY;
+  for (let i = 0; i < 2500; i++) blobs.seed("bookings", `auth/ip/198.51.${i >> 8}.${i & 255}`, { n: 1, start: old });
+  for (let i = 0; i < 2500; i++) blobs.seed("bookings", `rl/ip/${String(i).padStart(22, "q")}`, { hits: [{ t: nowMs - 60e3, id: "a" }] });
+  blobs.seed("bookings", "rl/b/phone/2", { hits: [{ t: old, id: "kari", k: "k".repeat(22) }] });
+  blobs.seed("bookings", "m/2026-10", { items: [item({ date: "2026-10-05", name: "Gammel kunde" })] });
+  blobs.seed("stats", "d/2025-01-01", { views: 1, pages: {}, sources: {} });
+  blobs.seed("social", "oauth-state-" + "d".repeat(48), { platform: "instagram", created_at: old });
+  const t0 = clock.now();
+  const first = await run(d);
+  assert.ok(clock.now() - t0 < 30e3, `the run took ${(clock.now() - t0) / 1000} s on the virtual clock`);
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  assert.equal(blobs.has("bookings", "m/2026-10"), false, "the months first");
+  assert.equal(blobs.has("stats", "d/2025-01-01"), false);
+  assert.equal(blobs.has("social", "oauth-state-" + "d".repeat(48)), false);
+  assert.deepEqual(blobs.json("bookings", "rl/b/phone/2").hits, [], "the current counters before the leftovers");
+  assert.ok(first.body.unfinished > 0, JSON.stringify(first.body));
+  const lists = blobs.log.filter((e) => e.method === "LIST");
+  assert.ok(lists.every((e) => e.at - 400 < t0 + retention.BUDGET_MS), "no list page was asked for after the deadline");
+  assert.ok(out.log.some((a) => /stoppet/i.test(String(a[0]))));
+  for (let night = 0; night < 30 && blobs.keys("bookings").some((k) => k.startsWith("auth/ip/") || k.startsWith("rl/ip/")); night++) {
+    clock.advance(DAY);
+    assert.equal((await run(d)).status, 200);
+  }
+  assert.deepEqual(blobs.keys("bookings").filter((k) => k.startsWith("auth/ip/") || k.startsWith("rl/ip/")), [], "later nights finish");
+});
+
+test("retention budget: a counter with a stale hit costs two Blobs calls (read, conditional write), a leftover one (delete), and nothing stale one read", async () => {
   const clock = new FakeClock(NOW);
   const blobs = new FakeBlobs({ clock });
   const d = testDeps({ blobs });
+  for (let i = 0; i < 16; i++) blobs.seed("bookings", `rl/b/ip/${i.toString(16)}`, { hits: [{ t: nowMs - 3 * DAY, id: "a", k: "y".repeat(22) }] });
+  for (let i = 0; i < 16; i++) blobs.seed("bookings", `rl/b/phone/${i.toString(16)}`, { hits: [{ t: nowMs - 3600e3, id: "a", k: "y".repeat(22) }] });
   for (let i = 0; i < 20; i++) blobs.seed("bookings", `rl/ip/${String(i).padStart(22, "y")}`, { hits: [{ t: nowMs - 3 * DAY, id: "a" }] });
   const from = blobs.log.length;
   await run(d);
-  const onCounters = blobs.log.slice(from).filter((e) => e.store === "bookings" && e.key && e.key.startsWith("rl/ip/"));
-  assert.equal(onCounters.length, 40, JSON.stringify([...new Set(onCounters.map((e) => e.method))]));
+  const on = (re) => blobs.log.slice(from).filter((e) => e.store === "bookings" && e.key && re.test(e.key)).map((e) => e.method);
+  assert.deepEqual(on(/^rl\/b\/ip\//).sort(), [...Array(16).fill("GET"), ...Array(16).fill("PUT")].sort());
+  assert.deepEqual(on(/^rl\/b\/phone\//), Array(16).fill("GET"));
+  assert.deepEqual(on(/^rl\/ip\//), Array(20).fill("DELETE"));
 });

@@ -181,7 +181,10 @@ test("privacy: every claim that depends on a browser feature holds on every targ
 // counter «per innlogging» that does not exist. Guard: the page describes each stored field of the stores it
 // explains, with the same field list as KEY_RULES (which store-keys.test.mjs checks against what the handlers store).
 const FIELD_WORDS = {
-  "rl/": { "hits[].t": "tidspunktet for hvert forsøk", "hits[].id": "en kode for forsøket", alertedAt: "når taket sist ble nådd" },
+  "rl/": {
+    "hits[].t": "tidspunktet for hvert forsøk", "hits[].id": "en kode for forsøket", alertedAt: "når taket sist ble nådd",
+    "hits[].k": "et navn laget av adressen eller nummeret med en hemmelig nøkkel", // round 3: the name sits in the hit
+  },
   "d/": { views: "hvor mange ganger", pages: "forsiden og denne siden", sources: "hvor besøkene kom fra" },
 };
 test("privacy: the page names every field the abuse counters and the visitor statistics store, and only counters that exist", async () => {

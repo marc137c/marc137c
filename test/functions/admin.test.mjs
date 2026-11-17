@@ -6,11 +6,11 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { testDeps, request, read, quiet, PRODUCTION, PREVIEW } from "../helpers/deps.mjs";
-import { item, seedItems, storedItems, CUSTOMER_PHONE } from "../helpers/bookings.mjs";
+import { item, seedItems, storedItems, counterHits, CUSTOMER_PHONE } from "../helpers/bookings.mjs";
 import { FakeBlobs } from "../helpers/fake-blobs.mjs";
 import { FakeClock } from "../helpers/clock.mjs";
 import { makeToken, makeDeviceMark, verifyDeviceMark } from "../../netlify/lib/booking-core.mjs";
-import { counterKey, limiterSecret, clientKey } from "../../netlify/lib/limits.mjs";
+import { counterRef, limiterSecret, clientKey, BUCKETS } from "../../netlify/lib/limits.mjs";
 import { handle, config } from "../../netlify/functions/admin.mjs";
 
 const PASSWORD = "fake-admin-password";
@@ -46,8 +46,8 @@ test("admin: a wrong password waits 500 ms on the injected clock, counts the fai
   const res = await read(await handle(request("/api/admin/login", { method: "POST", json: { password: "nope" } }), { ...PRODUCTION, ip: "203.0.113.9" }, d));
   assert.equal(res.status, 401);
   assert.ok(d.clock.now() - before >= 500);
-  const ipKey = counterKey(await limiterSecret(d.getStore({ name: "bookings", consistency: "strong" })), "login/ip", "203.0.113.9");
-  assert.deepEqual(d.blobs.json("bookings", ipKey).hits.map((h) => h.t), [before]);
+  const ipRef = counterRef(await limiterSecret(d.getStore({ name: "bookings", consistency: "strong" })), "login/ip", "203.0.113.9");
+  assert.deepEqual(counterHits(d.blobs, ipRef).map((h) => h.t), [before]);
   assert.deepEqual(d.blobs.json("bookings", "rl/login/all").hits.map((h) => h.t), [before]);
   assert.equal(d.blobs.keys("bookings").filter((k) => k.startsWith("auth/")).length, 0, "the old auth/* counters are gone");
 });
@@ -93,8 +93,8 @@ test("admin: create, move and delete use the injected clock and the deploy's own
 
 // ---------- Login limits (F4, F5): counted atomically before the password is checked ----------
 const live = (d) => d.getStore({ name: "bookings", consistency: "strong" });
-const loginKey = async (d, ip) => counterKey(await limiterSecret(live(d)), "login/ip", clientKey(ip));
-const hitCount = (d, key) => (d.blobs.json("bookings", key) || { hits: [] }).hits.length;
+const loginKey = async (d, ip) => counterRef(await limiterSecret(live(d)), "login/ip", clientKey(ip));
+const hitCount = (d, ref) => counterHits(d.blobs, ref).length;
 const tryLogin = (d, password, ip, extra = {}) =>
   handle(request("/api/admin/login", { method: "POST", json: { password, ...extra } }), { ...PRODUCTION, ip }, d).then(read);
 const tally = (rs) => rs.reduce((m, r) => ({ ...m, [r.status]: (m[r.status] || 0) + 1 }), {});
@@ -320,13 +320,17 @@ test("admin login abuse: 600 wrong logins from 600 /64s leave only the counted a
     if (i % 50 === 49) d.clock.advance(60e3);
   }
   assert.deepEqual(st, { 401: 100, 429: 500 });
-  const docs = d.blobs.keys("bookings").filter((k) => k.startsWith("rl/login/ip/"));
-  assert.equal(docs.length, 100, "one per counted attempt, none for a refused one");
-  assert.equal(docs.filter((k) => d.blobs.json("bookings", k).hits.length === 0).length, 0);
+  // Round 3 (SPEC R44): no document per client any more. The 100 counted attempts sit in the fixed set of login
+  // buckets, one hit each; the 500 refused ones left nothing.
+  const docs = d.blobs.keys("bookings").filter((k) => k.startsWith("rl/") && !["rl/secret", "rl/login/all"].includes(k));
+  assert.ok(docs.length <= BUCKETS && docs.every((k) => /^rl\/b\/login\/ip\/[0-9a-f]$/.test(k)), docs.join(" "));
+  assert.equal(docs.reduce((n, k) => n + d.blobs.json("bookings", k).hits.length, 0), 100, "one hit per counted attempt, none for a refused one");
+  assert.equal(hitCount(d, "rl/login/all"), 100);
 });
-test("admin login abuse: a successful login gives its hit back by deleting its client's now-empty document", async () => {
+test("admin login abuse: a successful login gives its hit back and leaves no document of its own", async () => {
   const d = testDeps({ now: NOW, env });
   assert.equal((await tryLogin(d, PASSWORD, "203.0.113.21")).status, 200);
-  assert.deepEqual(d.blobs.keys("bookings").filter((k) => k.startsWith("rl/login/ip/")), []);
-  assert.ok(d.blobs.has("bookings", "rl/login/all"), "the one global counter document stays");
+  const ref = await loginKey(d, "203.0.113.21");
+  assert.equal(hitCount(d, ref), 0);
+  assert.deepEqual(d.blobs.keys("bookings").filter((k) => k.startsWith("rl/") && k !== ref.key), ["rl/login/all", "rl/secret"], "only its bucket, the shared counter and the secret");
 });

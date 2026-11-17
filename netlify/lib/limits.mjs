@@ -1,13 +1,22 @@
 // Tellere med glidende tidsvindu i Netlify Blobs, konfliktsikre (ETag): to samtidige forespørsler kan aldri
 // begge få den siste plassen. Brukes mot flom av nettbestillinger (F2) og mot gjetting av admin-passordet (F4/F5).
-// Et dokument per teller: { hits: [{ t: ms, id }], alertedAt? }. id gjør skrivingen trygg å gjenta: gikk svaret
+// Et tellerdokument: { hits: [{ t: ms, id, k? }], alertedAt? }. id gjør skrivingen trygg å gjenta: gikk svaret
 // tapt etter at skrivingen ble lagret, finner neste forsøk sin egen id og teller ikke to ganger, og release() kan
 // ta tilbake akkurat det treffet.
 //
-// Personvern (NEW-pii-keys, SPEC R4): nøkkelen til en teller er aldri telefonnummeret eller IP-adressen selv, men en
-// nøkkel-hash av den: rl/<slag>/<HMAC-SHA256(hemmelighet, slag + ":" + verdi), 22 tegn base64url>. Hemmeligheten er
-// 32 tilfeldige byte i dokumentet SECRET_KEY i samme lagring (en forhåndsvisning har sin egen), laget én gang.
-// Tellerne slettes av den daglige oppryddingen (netlify/functions/retention.mjs) når nyeste treff er over et døgn gammelt.
+// Dokumentene er et fast sett (runde 3, SPEC R44): de to felles tellerne (ALL_KEY, LOGIN_ALL_KEY) og BUCKETS bøtter
+// per slag (rl/b/<slag>/<0-f>). Før runde 3 hadde hver klient og hvert nummer sitt eget dokument, så det var den som
+// spurte som bestemte hvor mange dokumenter det ble: 9 600 feil innlogginger i døgnet fra 9 600 /64-nett ga 9 600
+// dokumenter, flere enn den daglige oppryddingen rakk, og «senest etter 48 timer» holdt ikke. Nå står hver klients
+// og hvert nummers treff i bøtta navnet hører til, merket med navnet (k), og telles bare med sine egne treff, så to
+// klienter i samme bøtte aldri deler tak. En bøtte holder høyst BUCKET_MAX_HITS treff: blir den full, går de eldste
+// først (færre avvisninger, aldri flere). Lagringen tellerne kan bruke, og oppryddingens arbeid, er dermed fast.
+//
+// Personvern (NEW-pii-keys, SPEC R4): navnet på en teller er aldri telefonnummeret eller IP-adressen selv, men en
+// nøkkel-hash av den: HMAC-SHA256(hemmelighet, slag + ":" + verdi), 22 tegn base64url (k); bøtta er 4 bit av
+// siste byte i samme hash. Hemmeligheten er 32 tilfeldige byte i dokumentet SECRET_KEY i samme lagring (en forhåndsvisning har sin
+// egen), laget én gang. Den daglige oppryddingen (netlify/functions/retention.mjs) sletter hvert treff som er over et
+// døgn gammelt.
 import { randomBytes, createHmac } from "node:crypto";
 import { mutateJSON } from "./booking-core.mjs";
 
@@ -16,60 +25,66 @@ const DAY = 24 * HOUR;
 export const newToken = () => randomBytes(8).toString("hex");
 
 const initHits = (data) => (data && typeof data === "object" && Array.isArray(data.hits) ? data : { hits: [] });
+export const BUCKETS = 16;           // bøtter per slag (ip, phone, login/ip)
+export const BUCKET_MAX_HITS = 2000; // treff per bøtte; en innloggingsbøtte når det aldri (felles tak 100 per 15 min)
+// En teller er en nøkkel (et felles dokument) eller { key, name } (en klient eller et nummer i en bøtte)
+const refOf = (ref) => (typeof ref === "string" ? { key: ref } : ref);
+const mine = (hits, name) => (name === undefined ? hits : hits.filter((h) => h && h.k === name));
+// De eldste treffene går når en bøtte er full (ellers står de i rekkefølgen de ble lagret)
+function capHits(hits, max) {
+  if (hits.length <= max) return hits;
+  const drop = new Set(hits.map((h, i) => [h.t, i]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).slice(0, hits.length - max).map((x) => x[1]));
+  return hits.filter((h, i) => !drop.has(i));
+}
 const longest = (rules) => Math.max(...rules.map((r) => r.windowMs));
 const validHit = (h) => h && typeof h === "object" && Number.isFinite(h.t);
 const recent = (hits, rules, nowMs) => hits.filter((h) => validHit(h) && nowMs - h.t < longest(rules));
 const isFull = (hits, rules, nowMs) => rules.some((r) => hits.filter((h) => nowMs - h.t < r.windowMs).length >= r.max);
 const hasOwn = (hits, token) => hits.some((h) => h && h.id === token);
 
-// Tar én plass i telleren key hvis alle reglene ({ max, windowMs }) har plass. Svarer { ok: true } (own: true når
-// dette forsøket allerede er telt), { ok: false, limited: true } eller { error, status } hvis lagringen ikke ble enig
-// med seg selv. Med alertMs > 0 svarer den første avvisningen innen alertMs også tripped: true (alertedAt i samme
-// skriving), så Viggo bare får ett varsel om at taket er nådd.
-export async function take(store, key, rules, { nowMs, token = newToken(), alertMs = 0 } = {}) {
+// Tar én plass i telleren ref (en nøkkel, eller { key, name } i en bøtte) hvis alle reglene ({ max, windowMs }) har
+// plass. Svarer { ok: true } (own: true når dette forsøket allerede er telt), { ok: false, limited: true } eller
+// { error, status } hvis lagringen ikke ble enig med seg selv. Med alertMs > 0 svarer den første avvisningen innen
+// alertMs også tripped: true (alertedAt i samme skriving), så Viggo bare får ett varsel om at taket er nådd.
+// Hver skriving tar bort treff eldre enn det lengste vinduet, og en bøtte holder høyst BUCKET_MAX_HITS.
+export async function take(store, ref, rules, { nowMs, token = newToken(), alertMs = 0 } = {}) {
+  const { key, name } = refOf(ref);
   return mutateJSON(store, key, initHits, (doc) => {
-    if (hasOwn(doc.hits, token)) return { ok: true, own: true, noWrite: true }; // vårt forrige forsøk ble lagret
+    if (hasOwn(mine(doc.hits, name), token)) return { ok: true, own: true, noWrite: true }; // vårt forrige forsøk ble lagret
     doc.hits = recent(doc.hits, rules, nowMs);
-    if (isFull(doc.hits, rules, nowMs)) {
+    if (isFull(mine(doc.hits, name), rules, nowMs)) {
       if (alertMs > 0 && !(Number.isFinite(doc.alertedAt) && nowMs - doc.alertedAt < alertMs)) {
         doc.alertedAt = nowMs;
         return { ok: false, limited: true, tripped: true };
       }
       return { ok: false, limited: true, noWrite: true };
     }
-    doc.hits.push({ t: nowMs, id: token });
+    doc.hits.push(name === undefined ? { t: nowMs, id: token } : { t: nowMs, id: token, k: name });
+    if (name !== undefined) doc.hits = capHits(doc.hits, BUCKET_MAX_HITS);
     return { ok: true };
   });
 }
 
 // Bare lesing: er telleren full for et nytt forsøk? Et forsøk som allerede er telt (samme token), er aldri «fullt».
-export async function peek(store, key, rules, { nowMs, token } = {}) {
+export async function peek(store, ref, rules, { nowMs, token } = {}) {
+  const { key, name } = refOf(ref);
   const doc = initHits(await store.get(key, { type: "json" }));
-  if (token !== undefined && hasOwn(doc.hits, token)) return { full: false, own: true };
-  return { full: isFull(recent(doc.hits, rules, nowMs), rules, nowMs), alertedAt: doc.alertedAt };
+  const hits = mine(doc.hits, name);
+  if (token !== undefined && hasOwn(hits, token)) return { full: false, own: true };
+  return { full: isFull(recent(hits, rules, nowMs), rules, nowMs), alertedAt: doc.alertedAt };
 }
 
 // Tar tilbake treffet med denne id-en (et forsøk som likevel ikke ble noe av). Svarer { ok } eller { error, status }.
-// Blir en klients eller et nummers teller tom (ingen treff, intet pausevarsel), slettes dokumentet i stedet for å
-// lagres tomt (runde 2): ellers la hvert avviste forsøk igjen et dokument som den daglige oppryddingen måtte gå
-// gjennom. Sletting kan ikke være betinget i Netlify Blobs, så et treff skrevet i millisekundene mellom lesingen og
-// slettingen kan gå tapt; det gir høyst ett ekstra forsøk for den samme klienten eller det samme nummeret. De felles
-// tellerne (rl/all, rl/login/all) er ett dokument hver og slettes aldri her, så det felles taket er alltid eksakt.
-const isShared = (key) => key === ALL_KEY || key === LOGIN_ALL_KEY;
-export async function release(store, key, token) {
-  let drop = false;
-  const r = await mutateJSON(store, key, initHits, (doc) => {
-    drop = false;
-    if (!hasOwn(doc.hits, token)) return { ok: true, noWrite: true };
-    doc.hits = doc.hits.filter((h) => !(h && h.id === token));
-    if (!isShared(key) && !doc.hits.some(validHit) && !Number.isFinite(doc.alertedAt)) {
-      drop = true;
-      return { ok: true, released: true, noWrite: true };
-    }
+// Alltid en betinget skriving, aldri en sletting: dokumentene er et fast sett og en bøtte deles av mange klienter, så
+// et treff en annen skrev samtidig, går aldri tapt (en sletting kan ikke være betinget i Netlify Blobs).
+export async function release(store, ref, token) {
+  const { key, name } = refOf(ref);
+  return mutateJSON(store, key, initHits, (doc) => {
+    const own = (h) => h && h.id === token && (name === undefined || h.k === name);
+    if (!doc.hits.some(own)) return { ok: true, noWrite: true };
+    doc.hits = doc.hits.filter((h) => !own(h));
     return { ok: true, released: true };
   });
-  if (drop) await store.delete(key);
-  return r;
 }
 
 // Taket er nådd uten at noen har fått varsel innen alertMs: skriv alertedAt og svar tripped (bare én gang)
@@ -98,9 +113,12 @@ export async function limiterSecret(store) {
   if (r.error) throw new Error("Kunne ikke lage teller-hemmeligheten: " + r.error);
   return r.k;
 }
-// Nøkkelen til telleren for verdien (et telefonnummer fra phoneKey, en klient fra clientKey)
-export const counterKey = (secret, kind, value) =>
-  `rl/${kind}/${createHmac("sha256", secret).update(`${kind}:${value}`).digest("base64url").slice(0, 22)}`;
+// Telleren for verdien (et telefonnummer fra phoneKey, en klient fra clientKey): { key: bøtta, name: nøkkel-hashen }
+export const BUCKET_RE = /^rl\/b\/(ip|phone|login\/ip)\/[0-9a-f]$/;
+export function counterRef(secret, kind, value) {
+  const h = createHmac("sha256", secret).update(`${kind}:${value}`).digest();
+  return { key: `rl/b/${kind}/${(h[31] % BUCKETS).toString(16)}`, name: h.toString("base64url").slice(0, 22) };
+}
 
 // ---------- Hvem som spør ----------
 function ipv4(s) {
@@ -156,7 +174,7 @@ export function phoneKey(phone) {
 }
 
 // ---------- Admin-innlogging (F4, F5) ----------
-// Hvert forsøk telles før passordet sjekkes: per klient (rl/login/ip/<hash>) og totalt (LOGIN_ALL_KEY).
+// Hvert forsøk telles før passordet sjekkes: per klient (counterRef(…, "login/ip", …)) og totalt (LOGIN_ALL_KEY).
 export const LOGIN_LIMITS = {
   ip: [{ max: 10, windowMs: 15 * 60 * 1000 }],
   all: [{ max: 100, windowMs: 15 * 60 * 1000 }],
@@ -176,9 +194,9 @@ export const ALL_KEY = "rl/all";
 export const ALERT_MS = DAY; // Viggo får høyst ett varsel per døgn om at nettbestillingen er satt på pause
 const ORDER = ["ip", "phone", "all"];
 
-// Nøklene til de tre tellerne for denne klienten og dette nummeret
+// De tre tellerne for denne klienten og dette nummeret (to i bøtter, og den felles nøkkelen)
 export function bookingKeys(secret, { ip, phone }) {
-  return { ip: counterKey(secret, "ip", clientKey(ip)), phone: counterKey(secret, "phone", phoneKey(phone)), all: ALL_KEY };
+  return { ip: counterRef(secret, "ip", clientKey(ip)), phone: counterRef(secret, "phone", phoneKey(phone)), all: ALL_KEY };
 }
 
 // Tokenet et forsøk telles med. Uten requestId et nytt for hvert forsøk. Med requestId (SPEC R1, F1) det samme for
@@ -234,9 +252,10 @@ export async function releaseBookingSlot(store, slot, kinds) {
 // hver gang. Bare et forsøk som kan ha lagret en bestilling, er unntatt fra å telles på nytt. Feiler aldri.
 export async function forgetToken(store, slot, kind) {
   if (!slot || !slot.keys || !slot.keys[kind]) return;
+  const { key, name } = refOf(slot.keys[kind]);
   try {
-    const r = await mutateJSON(store, slot.keys[kind], initHits, (doc) => {
-      const hit = doc.hits.find((h) => h && h.id === slot.token);
+    const r = await mutateJSON(store, key, initHits, (doc) => {
+      const hit = doc.hits.find((h) => h && h.id === slot.token && (name === undefined || h.k === name));
       if (!hit) return { ok: true, noWrite: true };
       hit.id = newToken();
       return { ok: true };

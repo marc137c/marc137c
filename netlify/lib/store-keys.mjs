@@ -3,9 +3,10 @@
 // and fails on any stored key without one, or on a key name that contains a phone number or an IP address.
 // The daily clean-up (netlify/functions/retention.mjs) carries out the rules marked «daily clean-up».
 // personvern.html (step 6) imports RETENTION_DAYS, so the page and the code always say the same number of days.
+import { BUCKETS, BUCKET_MAX_HITS } from "./limits.mjs";
 
 export const RETENTION_DAYS = 90;                    // bookings: deleted this many days after the appointment
-export const COUNTER_MAX_AGE_MS = 24 * 60 * 60 * 1000; // rate-limit counters: deleted a day after their newest hit
+export const COUNTER_MAX_AGE_MS = 24 * 60 * 60 * 1000; // rate-limit counters: every hit deleted once it is a day old
 export const STATS_KEEP_DAYS = 400;                  // visitor statistics (no personal data): about 13 months
 export const OAUTH_STATE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // an Instagram connection that was never finished
 
@@ -20,9 +21,9 @@ export const KEY_RULES = Object.freeze([
     deletion: `daily clean-up: every item ${RETENTION_DAYS} days after its date (cancelled ones too, and impossible dates); a month document left empty is deleted once the whole month is past that limit. The barber can delete an item at any time («Slett»).` },
   { stores: BOOKING_STORES, key: "rl/secret", holds: "32 random bytes behind the counter key names; no personal data",
     deletion: "kept for the life of the store; deleting it only resets every counter" },
-  { stores: BOOKING_STORES, prefix: "rl/", holds: "rate-limit counters, one document per client (IP address or IPv6 /64) or phone number for web bookings, per client for logins, and one shared counter each for all web bookings and all logins; the document name is a keyed hash of the address or number (never the value itself). Each hit holds its time and an id for the attempt; for a web booking the id is a keyed hash of the booking's requestId, date, time and phone, so with store access a counter can be linked to its booking while both exist. The shared booking counter also holds when the cap last alerted the barber.",
-    fields: ["hits[].t", "hits[].id", "alertedAt"],
-    deletion: "daily clean-up: deleted when the newest hit (and any pause alert) is more than 24 hours old, so at the latest 48 hours after it" },
+  { stores: BOOKING_STORES, prefix: "rl/", holds: `rate-limit counters, a fixed set of documents whatever the traffic (SPEC R44): one shared counter each for all web bookings and all logins (rl/all, rl/login/all), and ${BUCKETS} buckets per kind, at most ${BUCKET_MAX_HITS} hits each: rl/b/ip/* and rl/b/phone/* count web bookings per client (IP address or IPv6 /64) and per phone number, rl/b/login/ip/* logins per client. Each hit holds its time and an id for the attempt, and in a bucket the keyed hash of the address or number it counts (never the value itself; the bucket is 4 bits of the same hash). For a web booking the id is a keyed hash of the booking's requestId, date, time and phone, so with store access a hit can be linked to its booking while both exist. The shared booking counter also holds when the cap last alerted the barber. Any other rl/ document is a per-client counter left by a build from before round 3.`,
+    fields: ["hits[].t", "hits[].id", "hits[].k", "alertedAt"],
+    deletion: "daily clean-up: every hit and pause alert more than 24 hours old is removed from its document (a conditional rewrite; the documents themselves stay), so each is gone at the latest 48 hours after the attempt, whatever the number of attempts; every write also drops the hits older than the counter's longest window, and a full bucket its oldest hits. A per-client document from before round 3 is deleted without being read." },
   { stores: BOOKING_STORES, key: "auth/epoch", holds: "the time «Slå av varsler på alle andre enheter» was last pressed; no personal data",
     deletion: "kept; it only ever moves forward" },
   { stores: BOOKING_STORES, prefix: "auth/", holds: "legacy login counters from before the hashed counters (auth/ip/<address>, auth/all)",

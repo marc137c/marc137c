@@ -12,10 +12,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { testDeps, request, read, quiet, PRODUCTION } from "../helpers/deps.mjs";
 import { oslo } from "../helpers/clock.mjs";
-import { item, seedItems, storedItems } from "../helpers/bookings.mjs";
+import { item, seedItems, storedItems, counterHits } from "../helpers/bookings.mjs";
 import { makeDevice, fakePushService } from "../helpers/fake-push.mjs";
 import { addDays, dayOfWeek, CONFIG } from "../../netlify/lib/booking-core.mjs";
-import { BOOKING_LIMITS, phoneKey, clientKey, counterKey, limiterSecret, ALL_KEY } from "../../netlify/lib/limits.mjs";
+import { BOOKING_LIMITS, phoneKey, clientKey, counterRef, limiterSecret, ALL_KEY } from "../../netlify/lib/limits.mjs";
 import { vapidKeys, saveSubscription, parseSubscription, pushGen } from "../../netlify/lib/push.mjs";
 import { handle } from "../../netlify/functions/bookings.mjs";
 
@@ -46,9 +46,11 @@ async function flood(d, n, { ip = (i) => `203.0.113.${i % 250}`, phone = mobile,
 }
 const statuses = (rs) => rs.reduce((m, r) => ({ ...m, [r.status]: (m[r.status] || 0) + 1 }), {});
 const live = (d) => d.getStore({ name: "bookings", consistency: "strong" });
-// The stored key of a counter, as limits.mjs names it (a keyed hash of the value)
-const keyOf = async (d, kind, value) => counterKey(await limiterSecret(live(d)), kind, value);
-const hits = (d, key) => (d.blobs.json("bookings", key) || { hits: [] }).hits.length;
+// A counter, as limits.mjs finds it: its bucket and its name there (a keyed hash of the value); or a shared key
+const keyOf = async (d, kind, value) => counterRef(await limiterSecret(live(d)), kind, value);
+const hits = (d, ref) => counterHits(d.blobs, ref).length;
+// Every hit in the buckets of one kind (round 3: rl/b/<kind>/<0-f>, a fixed set of documents)
+const kindHits = (d, kind) => d.blobs.keys("bookings").filter((k) => k.startsWith(`rl/b/${kind}/`)).flatMap((k) => d.blobs.json("bookings", k).hits);
 
 test("rate limit: the limits are the documented ones", () => {
   assert.deepEqual(BOOKING_LIMITS, {
@@ -100,7 +102,9 @@ test("rate limit: a landline written with and without +47 shares one counter", a
   const formats = ["+47 69 17 00 00", "69170000", "0047 69 17 00 00", "69 17 00 00", "+4769170000", "0047 69170000", "69-17-00-00"];
   const rs = await flood(d, formats.length, { phone: (i) => formats[i], slots: allSlots() });
   assert.deepEqual(rs.map((r) => r.status), [201, 201, 201, 201, 201, 201, 429]);
-  assert.deepEqual(d.blobs.keys("bookings").filter((k) => k.startsWith("rl/phone/")), [await keyOf(d, "phone", "69170000")]);
+  const ref = await keyOf(d, "phone", "69170000");
+  assert.deepEqual([...new Set(kindHits(d, "phone").map((h) => `${h.k}`))], [ref.name], "one name in the phone buckets");
+  assert.equal(hits(d, ref), 6);
 });
 
 test("rate limit: a flood from rotating clients and numbers stores at most 20 per hour and 40 per 24 h", async (t) => {
@@ -151,12 +155,13 @@ test("rate limit: concurrent requests from one client are counted atomically (ne
 
 test("rate limit: a lost reply on a counter write is not counted twice", async () => {
   const d = testDeps({ now: NOW });
-  d.blobs.inject({ method: "PUT", key: /^rl\/ip\//, fault: "lost-response" });
+  const rule = d.blobs.inject({ method: "PUT", key: /^rl\/b\/ip\//, fault: "lost-response" });
   const res = await read(await handle(post(body({ date: "2026-11-13", start: 600 }, mobile(1))), from("198.51.100.5"), d));
   assert.equal(res.status, 201);
-  const key = await keyOf(d, "ip", "198.51.100.5");
-  assert.equal(d.blobs.json("bookings-preview", key), undefined);
-  assert.equal(hits(d, key), 1);
+  assert.equal(rule.hits, 1, "the fault hit the client's bucket write");
+  const ref = await keyOf(d, "ip", "198.51.100.5");
+  assert.equal(d.blobs.json("bookings-preview", ref.key), undefined);
+  assert.equal(hits(d, ref), 1);
 });
 
 test("rate limit: cross-site and non-JSON posts are refused before anything is counted or stored", async () => {
@@ -215,11 +220,11 @@ test("rate limit: ::ffff:198.51.100.5 and 198.51.100.5 are one client", async ()
   const d = testDeps({ now: NOW });
   const rs = await flood(d, 7, { ip: (i) => (i % 2 ? "::ffff:198.51.100.5" : "198.51.100.5"), slots: allSlots() });
   assert.deepEqual(rs.map((r) => r.status), [201, 201, 201, 201, 201, 429, 429]);
-  assert.equal(d.blobs.keys("bookings").filter((k) => k.startsWith("rl/ip/")).length, 1);
+  assert.equal(new Set(kindHits(d, "ip").map((h) => h.k)).size, 1, "one client name in the IP buckets");
 });
 
 // ---------- the lockout demo (audit/ready/server/demo-lockout.mjs) ----------
-const phoneHits = (d) => d.blobs.keys("bookings").filter((k) => k.startsWith("rl/phone/")).reduce((n, k) => n + hits(d, k), 0);
+const phoneHits = (d) => kindHits(d, "phone").length;
 
 test("rate limit: 40 attempts on a taken slot from one /64 stop at the client cap, cost the global counter nothing, and a real customer still books", async () => {
   const d = testDeps({ now: oslo("2026-11-16", 9, 0) }); // Monday 09:00
@@ -334,16 +339,22 @@ test("rate limit: no key in any store holds the customer's phone number or IP ad
     assert.equal((await read(await handle(post(body(slots.next().value, phone)), from(ip), d))).status, 201);
   }
   const keys = [...d.blobs.stores.keys()].flatMap((s) => d.blobs.keys(s));
-  assert.ok(keys.some((k) => k.startsWith("rl/ip/")) && keys.some((k) => k.startsWith("rl/phone/")), keys.join(" "));
+  assert.ok(keys.some((k) => k.startsWith("rl/b/ip/")) && keys.some((k) => k.startsWith("rl/b/phone/")), keys.join(" "));
   for (const k of keys) {
     for (const secret of ["98765432", "41234567", "22334455", "62.249", "2a01", "cebd", "84.210"]) assert.ok(!k.includes(secret), `${k} holds ${secret}`);
     assert.doesNotMatch(k, /\d{8}|\d{1,3}\.\d{1,3}\.\d{1,3}/, k);
   }
+  // round 3: the name inside a bucket is the keyed hash too, so no counter document holds the number or the address
+  for (const k of d.blobs.keys("bookings").filter((x) => x.startsWith("rl/b/"))) {
+    const text = d.blobs.text("bookings", k);
+    for (const secret of ["98765432", "41234567", "22334455", "62.249", "2a01", "cebd", "84.210"]) assert.ok(!text.includes(secret), `${k} holds ${secret}`);
+  }
   // the keyed hash is the same for the same value, differs per kind, and is never the value itself
   const secret = await limiterSecret(live(d));
-  assert.equal(counterKey(secret, "phone", "98765432"), counterKey(secret, "phone", "98765432"));
-  assert.notEqual(counterKey(secret, "phone", "98765432"), counterKey(secret, "ip", "98765432"));
-  assert.match(counterKey(secret, "phone", "98765432"), /^rl\/phone\/[A-Za-z0-9_-]{22}$/);
+  assert.deepEqual(counterRef(secret, "phone", "98765432"), counterRef(secret, "phone", "98765432"));
+  assert.notEqual(counterRef(secret, "phone", "98765432").name, counterRef(secret, "ip", "98765432").name);
+  assert.match(counterRef(secret, "phone", "98765432").key, /^rl\/b\/phone\/[0-9a-f]$/);
+  assert.match(counterRef(secret, "phone", "98765432").name, /^[A-Za-z0-9_-]{22}$/);
   assert.equal(d.blobs.json("bookings", "rl/secret").k, secret);
 });
 

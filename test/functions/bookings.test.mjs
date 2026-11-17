@@ -2,10 +2,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { testDeps, request, read, quiet, PRODUCTION } from "../helpers/deps.mjs";
-import { storedItems, CUSTOMER_PHONE } from "../helpers/bookings.mjs";
+import { storedItems, counterHits, CUSTOMER_PHONE } from "../helpers/bookings.mjs";
 import { handle, config } from "../../netlify/functions/bookings.mjs";
 import { validateCustomer } from "../../netlify/lib/booking-core.mjs";
-import { counterKey, limiterSecret, ALL_KEY } from "../../netlify/lib/limits.mjs";
+import { counterRef, limiterSecret, ALL_KEY } from "../../netlify/lib/limits.mjs";
 import { vapidKeys, saveSubscription, parseSubscription, pushGen } from "../../netlify/lib/push.mjs";
 import { makeDevice, fakePushService } from "../helpers/fake-push.mjs";
 
@@ -93,8 +93,8 @@ const RID = "rq_7fK2mQ9xLp4Z";
 const PASSWORD = "fake-admin-password";
 const live = (d) => d.getStore({ name: "bookings", consistency: "strong" });
 const hitsOf = async (d, kind, value) => {
-  const key = kind === "all" ? ALL_KEY : counterKey(await limiterSecret(live(d)), kind, value);
-  return (d.blobs.json("bookings", key) || { hits: [] }).hits.length;
+  const ref = kind === "all" ? ALL_KEY : counterRef(await limiterSecret(live(d)), kind, value);
+  return counterHits(d.blobs, ref).length;
 };
 async function withDevice() {
   const dev = makeDevice("fcm");
