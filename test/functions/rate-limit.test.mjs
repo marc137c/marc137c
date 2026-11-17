@@ -432,3 +432,20 @@ test("rate limit: 300 identical requests (same body and requestId) on a taken sl
   assert.ok(allWrites <= 10, `${allWrites} writes to rl/all`);
   assert.equal(hits(d, await keyOf(d, "ip", "198.51.100.66")), 5, "five counted attempts, each with its own id");
 });
+
+// Fix-up round 2, abuse-suite rule (SPEC R34): a refused request (any 429) leaves zero new keys and writes nothing,
+// also now that a refused request with a requestId looks for a stored replay first (a read only).
+test("rate limit: a 429 (the client cap) with or without a requestId writes nothing and leaves zero new keys", async () => {
+  const d = testDeps({ now: NOW });
+  const slots = allSlots();
+  const ip = "198.51.100.77";
+  for (let i = 0; i < 5; i++) assert.equal((await read(await handle(post(body(slots.next().value, mobile(i))), from(ip), d))).status, 201);
+  const keys = JSON.stringify(d.blobs.keys("bookings"));
+  const from0 = d.blobs.log.length;
+  for (const extra of [{}, { requestId: "refused-req-01" }]) {
+    const r = await read(await handle(post({ ...body(slots.next().value, mobile(50)), ...extra }), from(ip), d));
+    assert.equal(r.status, 429);
+  }
+  assert.deepEqual(d.blobs.log.slice(from0).filter((e) => e.method === "PUT" || e.method === "DELETE"), []);
+  assert.equal(JSON.stringify(d.blobs.keys("bookings")), keys);
+});
