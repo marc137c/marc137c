@@ -175,6 +175,28 @@ test("D6: index.html links personvern.html from the footer and under the booking
   assert.ok(line.querySelector('a[href="/personvern.html"]'), "the English line links too");
 });
 
+// Round 3 (still_open 18): the line under «Bestill time» said name and phone are used «bare til timen din» / «only …
+// for your appointment», but limits.mjs also turns the phone number into a keyed hash for the per-number counter and
+// the attempt code, to stop fake bookings. The short notice was hand-written reassurance that no rule tied to the
+// purposes in the code. Guard: the notice (both languages) makes no exclusive claim, names the booking and, while
+// limits.mjs counts per phone number, the fake-booking purpose; personvern.html explains that counter; and DEPLOY §6
+// asks the owner to approve the exact Norwegian line.
+test("privacy: the line under «Bestill time» names every use of the name and the phone number and claims no «only»", async () => {
+  const limits = readRoot("netlify/lib/limits.mjs");
+  const phoneCounted = /phoneKey\(phone\)/.test(limits); // bookingKeys (the per-number counter) and bookingToken (the attempt code)
+  const no = parseDocument(read("index.html")).querySelector(".booking-privacy").textContent.replace(/\s+/g, " ").trim();
+  const en = (await loadSite({ lang: "en" })).qs(".booking-privacy").textContent.replace(/\s+/g, " ").trim();
+  for (const [lang, line, booking, abuse] of [["nb", no, /timen din/, /falske bestillinger/], ["en", en, /appointment/, /fake bookings/]]) {
+    assert.doesNotMatch(line, /\b(bare|kun|only|just|solely)\b/i, `${lang}: no exclusive claim: ${line}`);
+    assert.match(line, booking, `${lang}: names the booking: ${line}`);
+    if (phoneCounted) assert.match(line, abuse, `${lang}: limits.mjs counts per phone number, so the line names that use: ${line}`);
+  }
+  if (phoneCounted) assert.match(pageText(), /nettbestillinger per IP-adresse, per telefonnummer/, "personvern.html explains the per-number counter");
+  const deploy = readRoot("DEPLOY.md");
+  const six = deploy.slice(deploy.indexOf("## 6."));
+  assert.ok(six.includes(`«${no.replace(/ Les mer i personvernerklæringen\.$/, "")}»`), `DEPLOY §6 asks the owner to approve «${no}»`);
+});
+
 // Round 2 (SPEC R31): a link from another page to /#x must land at #x. The front page opens at the top and drops
 // anchors, except those script.js names in START_AT (site-script.test.mjs proves it scrolls there).
 test("D6 round 2: every /#anchor link from personvern.html and 404.html is one the front page opens at", () => {
