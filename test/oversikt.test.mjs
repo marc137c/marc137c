@@ -4,6 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { FakeBlobs } from "./helpers/fake-blobs.mjs";
+import { FakeClock } from "./helpers/clock.mjs";
 import { handle, makeToken, verifyToken, slim } from "../oversikt/netlify/functions/overview.mjs";
 
 const AUTH_STORE = "oversikt-auth";
@@ -62,6 +63,80 @@ test("brems: lagringen er begrenset – bare to vinduer finnes samtidig, uansett
   await login(d, "feil", "10.9.9.9");
   await new Promise((r) => setTimeout(r, 20)); // slettingen av det eldste vinduet venter ikke på svaret
   assert.ok(d.store.keys().length <= 2, "fant " + d.store.keys().join(", "));
+});
+
+// Runde 3 (server): bremsen var «sjekk, så handle» – hvert parallelt forsøk fikk passordet sammenlignet, og nesten ingen
+// feil ble skrevet (200 parallelle: 200 sjekket, all=6). Nå tar hvert forsøk plassen sin med en betinget skriving før
+// sammenligningen. Lagringen svarer med 30 ms forsinkelse, så forsøkene virkelig overlapper.
+function raceDeps() {
+  const clock = new FakeClock("2026-11-17T10:00:00Z");
+  const blobs = new FakeBlobs({ clock, latencyMs: 30 });
+  const store = blobs.getStore({ name: AUTH_STORE, consistency: "strong" });
+  return { env: { OVERVIEW_PASSWORD: "riktig-passord" }, store, blobs, clock, fetchImpl: async () => { throw new Error("ingen nett"); }, now: () => clock.now(), sites: [] };
+}
+const tallyOf = (rs) => rs.reduce((m, r) => ({ ...m, [r.status]: (m[r.status] || 0) + 1 }), {});
+const recorded = (d) => d.blobs.keys(AUTH_STORE).map((k) => d.blobs.json(AUTH_STORE, k)).reduce((n, doc) => n + ((doc && doc.all) || 0), 0);
+// Etter et parallelt utbrudd: feil passord ett og ett til bremsen slår inn; svarer hvor mange som ble sammenlignet
+async function untilBrake(d, ipAt) {
+  let checked = 0;
+  for (let i = 0; i < 60; i++) {
+    const r = await login(d, "etterpå-" + i, ipAt(i));
+    if (r.status === 429) return checked;
+    assert.equal(r.status, 401, "etter utbruddet: " + r.status);
+    checked++;
+  }
+  throw new Error("bremsen slo aldri inn");
+}
+
+test("brems: 200 parallel wrong passwords from one sender compare at most 8; the rest get 429 or 503, and every compared one is recorded", async () => {
+  const d = raceDeps();
+  const rs = await Promise.all(Array.from({ length: 200 }, (_, i) => login(d, "gjett-" + i, "203.0.113.7")));
+  const st = tallyOf(rs);
+  assert.deepEqual(Object.keys(st).filter((s) => !["401", "429", "503"].includes(s)), [], JSON.stringify(st));
+  assert.ok((st[401] || 0) <= 8, "sammenlignet " + (st[401] || 0) + " passord: " + JSON.stringify(st));
+  assert.ok(recorded(d) >= (st[401] || 0), "skrevet " + recorded(d) + ", sammenlignet " + (st[401] || 0));
+  const more = await untilBrake(d, () => "203.0.113.7");
+  assert.equal((st[401] || 0) + more, 8, "i alt 8 sammenlignet i vinduet før 429");
+  assert.equal((await login(d, "riktig-passord", "203.0.113.7")).status, 429, "også riktig passord venter");
+});
+
+test("brems: 200 parallel wrong passwords from many senders compare at most 40 in all; the rest get 429 or 503", async () => {
+  const d = raceDeps();
+  const rs = await Promise.all(Array.from({ length: 200 }, (_, i) => login(d, "gjett-" + i, "2001:db8:" + i.toString(16) + "::1")));
+  const st = tallyOf(rs);
+  assert.deepEqual(Object.keys(st).filter((s) => !["401", "429", "503"].includes(s)), [], JSON.stringify(st));
+  assert.ok((st[401] || 0) <= 40, "sammenlignet " + (st[401] || 0) + " passord: " + JSON.stringify(st));
+  assert.ok(recorded(d) >= (st[401] || 0), "skrevet " + recorded(d) + ", sammenlignet " + (st[401] || 0));
+  const more = await untilBrake(d, (i) => "198.51.100." + i);
+  assert.equal((st[401] || 0) + more, 40, "i alt 40 sammenlignet i vinduet før 429");
+});
+
+test("brems: when the counter cannot be written, the answer is 503 and the password is never compared", async () => {
+  const d = raceDeps();
+  d.blobs.inject({ method: "PUT", fault: "fail-before", status: 500, times: Infinity });
+  const r = await login(d, "riktig-passord");
+  assert.equal(r.status, 503, "et riktig passord gir ikke billett uten at forsøket er telt");
+  assert.match((await r.json()).error, /ikke tilgjengelig akkurat nå/);
+  d.blobs.clearFaults();
+  d.blobs.inject({ fault: "network-down", times: Infinity });
+  assert.equal((await login(d, "feil")).status, 503);
+});
+
+test("brems: a correct password gives its place back, and a request without a password takes none", async () => {
+  const d = deps();
+  for (let i = 0; i < 7; i++) assert.equal((await login(d, "feil" + i)).status, 401);
+  for (let i = 0; i < 3; i++) assert.equal((await login(d, "riktig-passord")).status, 200);
+  const empty = await handle(new Request("https://o.example/api/login", { method: "POST", body: "{}" }), { ip: "1.2.3.4" }, d);
+  assert.equal(empty.status, 400);
+  assert.equal((await login(d, "feil-8")).status, 401, "plass nummer 8 er fortsatt ledig");
+  assert.equal((await login(d, "feil-9")).status, 429);
+});
+
+test("brems: rare failures (one every 45 minutes for two days) still leave at most two counter documents", async () => {
+  const d = deps();
+  for (let i = 0; i < 64; i++) { await login(d, "feil", "10.1.0." + (i % 250)); d.tick(45 * 60 * 1000); }
+  await new Promise((r) => setTimeout(r, 20));
+  assert.ok(d.store.keys().length <= 2, "fant " + d.store.keys().length + ": " + d.store.keys().slice(0, 5).join(", "));
 });
 
 test("billett: går ut etter 12 timer og gjelder ikke med et annet passord", () => {

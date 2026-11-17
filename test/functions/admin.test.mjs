@@ -111,6 +111,17 @@ test("admin login: 50 parallel wrong logins from one IP check the password at mo
   for (const r of rs.filter((x) => x.status === 429)) assert.match(r.body.error, /For mange feil forsøk/);
 });
 
+test("admin login: 150 parallel wrong logins from many senders check the password at most 100 times; the rest are 429 or 503", async () => {
+  const clock = new FakeClock(NOW);
+  const blobs = new FakeBlobs({ clock, latencyMs: 30 });
+  const d = testDeps({ clock, blobs, env });
+  const rs = await Promise.all(Array.from({ length: 150 }, (_, i) => tryLogin(d, "guess" + i, `2a01:79c:${i.toString(16)}:1::1`)));
+  const st = tally(rs);
+  assert.deepEqual(Object.keys(st).filter((s) => !["401", "429", "503"].includes(s)), [], JSON.stringify(st));
+  assert.ok((st[401] || 0) <= 100, JSON.stringify(st));
+  assert.ok(hitCount(d, "rl/login/all") >= (st[401] || 0), "every compared password holds a place in the global counter");
+});
+
 test("admin login: an IPv6 /64 is one client for the login limit too", async () => {
   const d = testDeps({ now: NOW, env });
   const rs = [];

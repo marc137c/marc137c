@@ -9,7 +9,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { unreachableSupport, testsWithoutAssert } from "./helpers/meta-rules.mjs";
+import { unreachableSupport, testsWithoutAssert, passwordBrakeGaps } from "./helpers/meta-rules.mjs";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const tmp = [];
@@ -61,4 +61,25 @@ test("meta: every non-test .mjs under test/helpers, test/client and test/fixture
 test("meta: every *.test.mjs calls an assertion", () => {
   assert.deepEqual(testsWithoutAssert(ROOT), [],
     "these test files only run code: add assert calls on the outcome");
+});
+
+// Round 3 (server): the overview's login brake was check-then-act, and its tests only sent attempts one after another.
+const BRAKE_TREE = {
+  "netlify/functions/a.mjs": 'export async function handle(b, pw) { if (!checkPassword(b.password, pw)) return 401; }',
+  "netlify/functions/b.mjs": 'export function checkPassword(given, pw) { return given === pw; }',
+  "netlify/functions/d.mjs": ["// passwordOk(x) only in a comment", "export const x = 1;"].join("\n"),
+  "oversikt/netlify/functions/c.mjs": ["export const passwordOk = (g, pw) => g === pw;", "export function h(b, pw) { return passwordOk(b.password, pw); }"].join("\n"),
+  "test/a.test.mjs": ['import { handle } from "../netlify/functions/a.mjs";', 'test("50 parallel wrong logins from one IP", () => {});',
+    'test("150 parallel wrong logins from many senders", () => {});'].join("\n"),
+  "test/c.test.mjs": ['import { h } from "../oversikt/netlify/functions/c.mjs";', 'test("200 parallel wrong passwords from one sender", () => {});',
+    'test("many senders, one after another", () => {});'].join("\n"),
+};
+
+test("meta: on a made-up tree, a password handler without parallel wrong-password tests from one and many senders is reported", () => {
+  assert.deepEqual(passwordBrakeGaps(tree(BRAKE_TREE)), ["oversikt/netlify/functions/c.mjs: many senders"]);
+});
+
+test("meta: every handler that compares a password has parallel wrong-password tests from one sender and from many senders", () => {
+  assert.deepEqual(passwordBrakeGaps(ROOT), [],
+    "reserve the brake slot with a conditional write before the comparison, and test it with parallel wrong passwords");
 });

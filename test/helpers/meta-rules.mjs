@@ -86,3 +86,32 @@ function callsAssert(file) {
 export function testsWithoutAssert(root) {
   return listMjs(join(root, "test")).filter(isTest).filter((f) => !callsAssert(f)).map((p) => rel(root, p)).sort();
 }
+
+// Round 3 (server): every handler that compares a password must reserve its brake slot with a conditional write
+// BEFORE the comparison, and that is only proven by firing many wrong passwords at once. passwordBrakeGaps(root)
+// lists each handler under netlify/functions or oversikt/netlify/functions that compares a password (calls
+// checkPassword(…) or passwordOk(…), or timingSafeEqual(…) on a line naming a password) and lacks, in a test file
+// that imports it, a test titled «parallel wrong … one sender/IP» and one titled «parallel wrong … many senders».
+const HANDLER_DIRS = ["netlify/functions", "oversikt/netlify/functions"];
+const COMPARES_PASSWORD = /(?<!function\s+)\b(?:checkPassword|passwordOk)\s*\(|timingSafeEqual\([^\n]*(?:password|passord|\bpw\b)/i;
+const NEEDS = [["one sender", /\bone (?:sender|IP)\b/i], ["many senders", /\bmany senders\b/i]];
+function importsOf(file) {
+  const src = readFileSync(file, "utf8");
+  const out = [];
+  for (const m of src.matchAll(/(?:from\s+|import\s*\(\s*)["'](\.{1,2}\/[^"']+)["']/g)) out.push(resolve(dirname(file), m[1]));
+  return out;
+}
+const titlesOf = (file) => [...readFileSync(file, "utf8").matchAll(/\btest\(\s*(["'`])(.*?)\1/g)].map((m) => m[2]);
+export function passwordBrakeGaps(root) {
+  const tests = listMjs(join(root, "test")).filter(isTest);
+  const gaps = [];
+  for (const dir of HANDLER_DIRS) {
+    for (const h of listMjs(join(root, dir))) {
+      const code = readFileSync(h, "utf8").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
+      if (!COMPARES_PASSWORD.test(code)) continue;
+      const titles = tests.filter((t) => importsOf(t).includes(resolve(h))).flatMap(titlesOf).filter((t) => /parallel wrong/i.test(t));
+      for (const [name, re] of NEEDS) if (!titles.some((t) => re.test(t))) gaps.push(rel(root, h) + ": " + name);
+    }
+  }
+  return gaps.sort();
+}
