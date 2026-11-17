@@ -1,0 +1,16 @@
+# Eierens oversikt over alle bedriftene (egen Netlify-side, ikke Viggo's).
+# Publiseres fra denne mappen: netlify deploy --prod (se oversikt/README.md).
+[build]
+  publish = "public"
+
+[functions]
+  directory = "netlify/functions"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"

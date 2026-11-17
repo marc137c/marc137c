@@ -168,18 +168,24 @@ dialog:not([open]) { display: none; }
 .dialog-shim-backdrop { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 999; background: rgba(0, 0, 0, .6); }
 .item .tag-err { color: var(--err); background: rgba(239,124,115,.16); }
 
-/* Besøksstatistikk (admin-stats.js) */
+/* Statistikk (admin-stats.js): én tallrekke per diagram, ingen forklaringsboks (tittelen sier hva det er) */
 .stats-panel { max-width: 900px; margin: 24px auto 40px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
 .stats-panel h2 { margin: 0 0 12px; font-size: 1.1rem; }
+.sp-block { padding: 6px 0 14px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
 .sp-nums { display: flex; flex-wrap: wrap; margin: 0 -8px; }
 .sp-nums > div { flex: 1 1 90px; margin: 0 8px 10px; }
-.sp-nums strong { display: block; font-size: 1.6rem; color: var(--gold); }
+.sp-nums strong { display: block; font-size: 1.5rem; color: var(--text); }
 .sp-nums span { font-size: .8rem; color: var(--muted); }
-.sp-chart { display: flex; align-items: flex-end; height: 90px; margin: 8px 0 4px; }
-.sp-bar { flex: 1; height: 100%; margin: 0 2px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
-.sp-bar span { display: block; width: 100%; min-height: 2px; border-radius: 4px 4px 0 0; background: var(--gold); }
-.sp-bar small { font-size: .6rem; color: var(--muted); margin-top: 2px; }
-.sp-sub { margin: 12px 0 4px; font-size: .85rem; color: var(--muted); }
+.sp-title { margin: 6px 0 4px; font-size: .85rem; font-weight: 600; color: var(--muted); }
+.sp-chart { display: flex; align-items: flex-end; height: 96px; border-bottom: 1px solid var(--line); }
+.sp-bar { flex: 1 1 0; height: 100%; margin: 0 1px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative; cursor: pointer; outline: none; }
+.sp-bar span { display: block; width: 100%; max-width: 24px; border-radius: 4px 4px 0 0; background: var(--gold); }
+.sp-bar small { position: absolute; bottom: -18px; font-size: .6rem; color: var(--muted); }
+.sp-bar:hover span, .sp-bar:focus span { opacity: .75; }
+.sp-bar:focus small { color: var(--text); font-weight: 700; }
+.sp-read { margin: 22px 0 0; min-height: 1.3em; font-size: .85rem; color: var(--text); }
+.sp-sub { margin: 10px 0 4px; font-size: .88rem; color: var(--muted); }
+.sp-sub strong { color: var(--text); }
 .sp-src { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; }
 .sp-src li { margin: 0 14px 6px 0; font-size: .9rem; }
 .sp-note { margin: 10px 0 0; font-size: .75rem; color: var(--muted); }

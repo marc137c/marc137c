@@ -14,6 +14,7 @@
     "samsung >= 8"
   ],
   "scripts": {
-    "check": "node scripts/check-es2015.mjs && node scripts/check-css-assets.mjs"
+    "check": "node scripts/check-es2015.mjs && node scripts/check-css-assets.mjs",
+    "test": "node --test \"test/**/*.test.mjs\""
   }
 }

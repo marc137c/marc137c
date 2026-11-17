@@ -98,7 +98,7 @@ const phoneOk = (p) => { const n = String(p ?? "").replace(/\D/g, "").length; re
 const fail = (code, error, status = 400) => ({ error, code, status });
 
 // Gamle tjenestenavn → nye (godtas fortsatt, i tilfelle noen har den gamle siden åpen)
-const SERVICE_ALIASES = { "Herreklipp + skjeggtrim (maskin)": "Herreklipp + skjeggtrim" };
+export const SERVICE_ALIASES = { "Herreklipp + skjeggtrim (maskin)": "Herreklipp + skjeggtrim" };
 const alias = (s) => (Object.prototype.hasOwnProperty.call(SERVICE_ALIASES, s) ? SERVICE_ALIASES[s] : s);
 
 // Regler for kundebestillinger
