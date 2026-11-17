@@ -242,7 +242,23 @@ lightboxDlg.addEventListener("close", () => { lightboxImg.removeAttribute("src")
 lightboxDlg.addEventListener("click", (e) => { if (e.target === lightboxDlg) lightboxDlg.close(); });
 
 // Kartet: ingenting hentes fra Google før besøkeren trykker «Vis kart» (F47). Uten henvisningsadresse.
-const mapBtn = document.getElementById("map-load");
+// Safari 10–11.0 og iOS 10–11.4 kjenner ikke referrerpolicy på <iframe> (caniuse «referrer-policy»: delvis), så der
+// ville Google fått hele adressen til forsiden. Der blir «Vis kart» en vanlig lenke til Google Maps i en ny fane med
+// rel="noopener noreferrer", som virker i alle nettleserne siden støtter (runde 2), og ingenting legges inn i siden.
+let mapBtn = document.getElementById("map-load");
+const mapFrame = document.querySelector(".map-frame");
+if (mapBtn && mapFrame && !("referrerPolicy" in mapFrame)) {
+  const link = document.createElement("a");
+  link.setAttribute("class", mapBtn.getAttribute("class"));
+  link.setAttribute("id", "map-load");
+  link.setAttribute("data-i18n", mapBtn.getAttribute("data-i18n"));
+  link.setAttribute("href", (mapFrame.getAttribute("data-src") || "").replace("&output=embed", ""));
+  link.setAttribute("target", "_blank");
+  link.setAttribute("rel", "noopener noreferrer");
+  link.textContent = mapBtn.textContent;
+  mapBtn.parentNode.replaceChild(link, mapBtn);
+  mapBtn = null;
+}
 if (mapBtn) mapBtn.addEventListener("click", () => {
   const frame = document.querySelector(".map-frame");
   const note = document.getElementById("map-note");

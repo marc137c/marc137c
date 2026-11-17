@@ -51,6 +51,15 @@ class Node {
     this.childNodes.push(n);
     return n;
   }
+  replaceChild(n, old) {
+    const i = this.childNodes.indexOf(old);
+    if (i < 0) throw new Error("replaceChild: not a child");
+    if (n.parentNode) n.parentNode.removeChild(n);
+    this.childNodes[this.childNodes.indexOf(old)] = n;
+    n.parentNode = this;
+    old.parentNode = null;
+    return old;
+  }
   removeChild(n) {
     const i = this.childNodes.indexOf(n);
     if (i >= 0) this.childNodes.splice(i, 1);
@@ -122,6 +131,8 @@ export class Element extends Node {
     this.tagName = this.localName.toUpperCase();
     this._attrs = new Map();
     this.style = {};
+    // Every current engine reflects referrerpolicy on <iframe>; a test deletes it to act as Safari 10–11.0 (F47)
+    if (this.localName === "iframe") this.referrerPolicy = "";
   }
   getAttribute(n) { n = n.toLowerCase(); return this._attrs.has(n) ? this._attrs.get(n) : null; }
   setAttribute(n, v) { this._attrs.set(n.toLowerCase(), String(v)); }

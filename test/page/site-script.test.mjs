@@ -242,3 +242,26 @@ test("site round 2: any other anchor (/#om) still opens at the top", async () =>
   assert.ok(tops.length >= 1 && tops.every(([x, y]) => x === 0 && y === 0));
   assert.equal(site.location.hash, "");
 });
+
+// Fix-up round 2: Safari 10–11.0 and iOS 10–11.4 ignore referrerpolicy="no-referrer" on the iframe (caniuse
+// «referrer-policy»: partial there), so «Vis kart» sent Google the front page's full address, ?fbclid/utm included,
+// while personvern.html says the map gets no referrer. Where the iframe has no referrerPolicy, «Vis kart» is a
+// plain link with rel="noopener noreferrer" (supported on every target) that opens Google Maps in a new tab.
+test("F47 old Safari: an iframe without referrerPolicy turns «Vis kart» into a noreferrer link, and nothing is embedded", async () => {
+  const site = await page({ search: "?fbclid=abc&utm_source=ig", before: (ctx) => { delete ctx.document.querySelector("iframe").referrerPolicy; } });
+  const frame = site.qs("iframe");
+  const link = site.$("map-load");
+  assert.equal(link.tagName, "A", "a link, not a button");
+  assert.deepEqual(link.getAttribute("rel").split(/\s+/).sort(), ["noopener", "noreferrer"]);
+  assert.equal(link.getAttribute("target"), "_blank");
+  assert.equal(link.getAttribute("href"), frame.getAttribute("data-src").replace("&output=embed", ""));
+  assert.equal(link.textContent, "Vis kart (Google Maps)");
+  click(link);
+  assert.equal(frame.hasAttribute("src"), false, "no embedded map, so no Referer from the iframe");
+  await site.setLang("en");
+  assert.equal(site.$("map-load").textContent, "Show map (Google Maps)", "the link is translated like the button");
+});
+test("F47: a browser with referrerPolicy on the iframe keeps the button and the embedded map", async () => {
+  const site = await page();
+  assert.equal(site.$("map-load").tagName, "BUTTON");
+});

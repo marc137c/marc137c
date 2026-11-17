@@ -149,3 +149,30 @@ test("D6: every local link in index.html, personvern.html and 404.html points at
     }
   }
 });
+
+// Fix-up round 2: a privacy promise was written from how current browsers behave («Siden sender ikke med hvilken
+// side du kom fra» rests on referrerpolicy on <iframe>, which Safari 10–11.0 and iOS 10–11.4 ignore). Guard: every
+// page claim that depends on a browser feature is listed here with its caniuse key and the browserslist targets
+// that lack it (from caniuse-lite 1.0.30001820, as the audit recorded it), and it must either hold on every target
+// or name a feature-detected fallback whose test exists.
+const FEATURE_CLAIMS = [
+  {
+    claim: "Siden sender ikke med hvilken side du kom fra",
+    caniuse: "referrer-policy (the referrerpolicy attribute on <iframe>)",
+    lacking: ["safari 10", "safari 10.1", "safari 11", "ios_saf 10.0-10.2", "ios_saf 10.3", "ios_saf 11.0-11.2", "ios_saf 11.3-11.4"],
+    fallback: { where: "viggos-barbershop/script.js", detect: '"referrerPolicy" in mapFrame', test: ["test/page/site-script.test.mjs", "F47 old Safari"] },
+  },
+];
+test("privacy: every claim that depends on a browser feature holds on every target or names a tested fallback", () => {
+  const text = pageText();
+  const targets = JSON.parse(readRoot("package.json")).browserslist;
+  for (const c of FEATURE_CLAIMS) {
+    assert.ok(text.includes(c.claim), `the page still says «${c.claim}» (update or remove this row)`);
+    for (const t of c.lacking) assert.ok(targets.some((x) => x.startsWith(t.split(" ")[0])), `${t} is a browserslist family`);
+    if (!c.lacking.length) continue;
+    assert.ok(c.fallback, `«${c.claim}» does not hold on ${c.lacking.join(", ")} and names no fallback`);
+    assert.ok(readRoot(c.fallback.where).includes(c.fallback.detect), `${c.fallback.where} feature-detects: ${c.fallback.detect}`);
+    const [file, title] = c.fallback.test;
+    assert.ok(readRoot(file).split(/\r?\n/).some((l) => l.includes("test(") && l.includes(title)), `${file} has the test «${title}»`);
+  }
+});
