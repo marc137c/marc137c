@@ -1014,12 +1014,17 @@
   const isStandalone = () => navigator.standalone === true || !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
   // En iPad: «iPad» i brukeragenten, eller en «Mac» med berøringsskjerm (Safari på iPad sender en Mac-brukeragent)
   const isIpad = () => /iPad/.test(navigator.userAgent || "") || navigator.platform === "iPad" || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-  // iOS-versjonen fra brukeragenten («OS 15_8» → [15, 8]). En iPad i skrivebordsmodus har ikke det, men Safari-versjonen
-  // («Version/15.6.1» → [15, 6]) følger iPadOS-versjonen (runde 2). null: ukjent (en Hjem-skjerm-app på iPad har ingen).
+  // iOS-versjonen fra brukeragenten: { v: [15, 8], safari: false } fra «OS 15_8». En iPad i skrivebordsmodus sender en
+  // Mac-brukeragent uten den delen, bare Safari-versjonen («Version/15.6.1»), og den er ikke iPadOS-versjonen: iPadOS
+  // 15.7 og 15.8 sender «Version/15.6,2» (WebKit-feil 245360 og 245213). Den gir derfor { v, safari: true }, som bare
+  // sier om enheten er under 16, og teksten nevner aldri et versjonsnummer derfra (runde 3). null: ukjent (en
+  // Hjem-skjerm-app på iPad har ingen av delene).
   const iosVersion = () => {
     const ua = navigator.userAgent || "";
-    const m = /OS (\d+)_(\d+)/.exec(ua) || (isIos() ? /Version\/(\d+)\.(\d+)/.exec(ua) : null);
-    return m ? [Number(m[1]), Number(m[2])] : null;
+    const m = /OS (\d+)_(\d+)/.exec(ua);
+    if (m) return { v: [Number(m[1]), Number(m[2])], safari: false };
+    const s = isIos() ? /Version\/(\d+)\.(\d+)/.exec(ua) : null;
+    return s ? { v: [Number(s[1]), Number(s[2])], safari: true } : null;
   };
   // Versjoner bare enheter som aldri får iOS/iPadOS 16 har: 15.8 og nyere 15 (iPhone 6s, 7, SE 1. gen.; iPad Air 2,
   // mini 4) og 12.5 (iPhone 5s, 6; iPad Air, mini 2–3). Andre under 16 kan ofte oppdateres (runde 2).
@@ -1163,13 +1168,16 @@
       // får oppdateringen og hvem som ikke kan; 16.0–16.3 kan oppdatere. Er versjonen ukjent, lover teksten ingenting
       // som kan være umulig. Teksten sier iPad på en iPad.
       const ios = isIos(), pad = ios && isIpad();
-      const v = ios ? iosVersion() : null;
+      const found = ios ? iosVersion() : null;
+      const v = found && found.v;
       const dev = pad ? "iPad" : "iPhone", os = pad ? "iPadOS" : "iOS";
       if (v && v[0] < 16) {
-        if (iosStuck(v)) return pushLimited(seq, null, `Varsler på ${dev} krever ${os} 16.4 eller nyere, og denne har ${os} ${v[0]}.${v[1]}. Bruk kalenderlenken over, eller slå på varsler på en annen telefon eller PC.`);
+        // Fra Safari-versjonen (iPad i skrivebordsmodus): bare «under 16» er sikkert, så verken versjonen eller «sitter fast»
+        const has = (name) => (found.safari ? "" : ` (denne har ${name} ${v[0]}.${v[1]})`);
+        if (!found.safari && iosStuck(v)) return pushLimited(seq, null, `Varsler på ${dev} krever ${os} 16.4 eller nyere, og denne har ${os} ${v[0]}.${v[1]}. Bruk kalenderlenken over, eller slå på varsler på en annen telefon eller PC.`);
         return pushLimited(seq, null, pad
-          ? `Varsler krever iPadOS 16.4 eller nyere (denne har iPadOS ${v[0]}.${v[1]}). Kan iPaden oppdateres (Innstillinger → Generelt → Programvareoppdatering), virker det etterpå; iPad Air 2, iPad mini 4 og eldre modeller kan ikke det – bruk da kalenderlenken over eller en annen telefon eller PC.`
-          : `Varsler krever iOS 16.4 eller nyere (denne har iOS ${v[0]}.${v[1]}). Kan telefonen oppdateres (Innstillinger → Generelt → Programvareoppdatering), virker det etterpå; iPhone 7 og eldre modeller (også SE 1. generasjon) kan ikke det – bruk da kalenderlenken over eller en annen telefon eller PC.`);
+          ? `Varsler krever iPadOS 16.4 eller nyere${has("iPadOS")}. Kan iPaden oppdateres (Innstillinger → Generelt → Programvareoppdatering), virker det etterpå; iPad Air 2, iPad mini 4 og eldre modeller kan ikke det – bruk da kalenderlenken over eller en annen telefon eller PC.`
+          : `Varsler krever iOS 16.4 eller nyere${has("iOS")}. Kan telefonen oppdateres (Innstillinger → Generelt → Programvareoppdatering), virker det etterpå; iPhone 7 og eldre modeller (også SE 1. generasjon) kan ikke det – bruk da kalenderlenken over eller en annen telefon eller PC.`);
       }
       if (ios && !v) return pushLimited(seq, null, `Varsler krever iOS eller iPadOS 16.4 eller nyere. Har ikke denne ${pad ? "iPaden" : "enheten"} det, bruk kalenderlenken over eller en annen telefon eller PC.`);
       if (ios && isStandalone()) return pushLimited(seq, null, `Varsler på ${dev} krever ${os} 16.4 eller nyere. Oppdater under Innstillinger → Generelt → Programvareoppdatering.`);

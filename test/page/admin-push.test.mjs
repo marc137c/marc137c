@@ -811,11 +811,24 @@ const IPAD_UA = (v) => `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWeb
 const ipad = (v, extra = {}) => Object.assign({ userAgent: IPAD_UA(v), platform: "MacIntel", push: false }, extra);
 const MAY_UPDATE_IPHONE = (v) => `Varsler krever iOS 16.4 eller nyere (denne har iOS ${v}). Kan telefonen oppdateres (Innstillinger → Generelt → Programvareoppdatering), virker det etterpå; iPhone 7 og eldre modeller (også SE 1. generasjon) kan ikke det – bruk da kalenderlenken over eller en annen telefon eller PC.`;
 const MAY_UPDATE_IPAD = (v) => `Varsler krever iPadOS 16.4 eller nyere (denne har iPadOS ${v}). Kan iPaden oppdateres (Innstillinger → Generelt → Programvareoppdatering), virker det etterpå; iPad Air 2, iPad mini 4 og eldre modeller kan ikke det – bruk da kalenderlenken over eller en annen telefon eller PC.`;
+// Round 3 (still_open 14): the Safari version in a desktop-mode iPad's user agent is not the iPadOS version. iPadOS
+// 15.7 and 15.8 send «Version/15.6,2» (WebKit bugs 245360, 245213), so an iPad on 15.7 was told «denne har iPadOS
+// 15.6», and the stuck rule (15.8) could never match. Guard (SPEC R40): the fixtures use user agents copied from real
+// devices or WebKit bug reports at each boundary, and a version read from Version/ is never printed as the OS version.
+const IPAD_15_7 = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.6,2 Safari/605.1.15";
+const IPHONE_15_7 = "Mozilla/5.0 (iPhone; CPU iPhone OS 15_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.6,2 Mobile/15E148 Safari/604.1";
+const MAY_UPDATE_IPAD_ANY = "Varsler krever iPadOS 16.4 eller nyere. Kan iPaden oppdateres (Innstillinger → Generelt → Programvareoppdatering), virker det etterpå; iPad Air 2, iPad mini 4 og eldre modeller kan ikke det – bruk da kalenderlenken over eller en annen telefon eller PC.";
 const IOS_UA_2 = [
   ["iPhone iOS 15.7 Safari tab (an iPhone 8 or newer can still update)", { iosVersion: "15_7" }, MAY_UPDATE_IPHONE("15.7"), [], false],
   ["iPhone iOS 14.8 Home Screen", { iosVersion: "14_8", standalone: true }, MAY_UPDATE_IPHONE("14.8"), [], false],
   ["iPhone iOS 12.5 (an iPhone 6 or 5s, stuck)", { iosVersion: "12_5" }, "Varsler på iPhone krever iOS 16.4 eller nyere, og denne har iOS 12.5. Bruk kalenderlenken over, eller slå på varsler på en annen telefon eller PC.", [], false],
-  ["iPad in desktop mode, iPadOS 15 Safari", ipad("15.6.1"), MAY_UPDATE_IPAD("15.6"), [], false],
+  ["iPad in desktop mode, iPadOS 15.6.1 Safari", ipad("15.6.1"), MAY_UPDATE_IPAD_ANY, [], false],
+  ["iPad in desktop mode, iPadOS 15.7 (real user agent, WebKit bug 245360)", ipad(null, { userAgent: IPAD_15_7 }), MAY_UPDATE_IPAD_ANY, [], false],
+  ["iPad in desktop mode, iPadOS 14 Safari", ipad("14.1.2"), MAY_UPDATE_IPAD_ANY, [], false],
+  ["iPhone iOS 15.7 (real user agent, WebKit bug 245213: Version/15.6,2)", { userAgent: IPHONE_15_7 }, MAY_UPDATE_IPHONE("15.7"), [], false],
+  // An iPad asking for mobile sites keeps «OS x_y» (bug 245213's user agent with the iPad token): that version is exact
+  ["iPad in mobile mode, iPadOS 15.7", { userAgent: IPHONE_15_7.replace("iPhone; CPU iPhone OS", "iPad; CPU OS"), platform: "iPad" }, MAY_UPDATE_IPAD("15.7"), [], false],
+  ["iPad in mobile mode, iPadOS 15.8 (an iPad Air 2 or mini 4, stuck)", { userAgent: IPHONE_15_7.replace("iPhone; CPU iPhone OS 15_7", "iPad; CPU OS 15_8"), platform: "iPad" }, "Varsler på iPad krever iPadOS 16.4 eller nyere, og denne har iPadOS 15.8. Bruk kalenderlenken over, eller slå på varsler på en annen telefon eller PC.", [], false],
   ["iPad in desktop mode, iPadOS 16.3 Safari", ipad("16.3"), "", [], true],
   ["iPad in desktop mode, iPadOS 17 Safari", ipad("17.2"), "", [], true],
   ["iPad Home Screen app (desktop mode, no Version/)", ipad(null, { standalone: true }), "Varsler krever iOS eller iPadOS 16.4 eller nyere. Har ikke denne iPaden det, bruk kalenderlenken over eller en annen telefon eller PC.", [], false],
@@ -830,3 +843,13 @@ for (const [label, opts, text, left, hint] of IOS_UA_2) {
     assert.equal(page.$("push-ios").hidden, !hint, `${label}: the Home Screen steps ${hint ? "shown" : "hidden"}`);
   });
 }
+
+test("admin push panel round 3: a desktop-mode iPad (no «OS x_y» in its user agent) is never told a version number", async () => {
+  for (const v of ["13.1", "14.1.2", "15.0", "15.6.1", "15.6,2"]) {
+    const b = fakePushBrowser({ device: makeDevice("apple"), ios: true, push: false, userAgent: IPAD_UA(v), platform: "MacIntel" });
+    const page = await openSettings({ navigator: b.navigator, globals: b.globals, routes: routes() });
+    const text = msg(page);
+    assert.match(text, /iPad/, v);
+    assert.doesNotMatch(text.replace(/16\.4/g, ""), /\d+[.,]\d+/, `${v}: «${text}»`);
+  }
+});
