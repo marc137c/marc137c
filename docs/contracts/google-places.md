@@ -44,10 +44,11 @@ None of this applies to the owner's three `FEATURED` reviews in `reviews.js` (ow
 
 ## 6. The Google Cloud project needs a billing account
 
-- **Docs:** https://developers.google.com/maps/documentation/places/web-service/cloud-setup
-- **Rule (unquoted):** Places API (New) refuses every request from a project with no billing account linked, also within the free monthly usage. The refusal is HTTP 403 with `reason: "BILLING_DISABLED"` (body as in `test/fixtures/places/billing-disabled.json`).
-- **What the code does:** logs «Places 403: Google Cloud-prosjektet har ingen betalingskonto (BILLING_DISABLED). Koble en betalingskonto til prosjektet i console.cloud.google.com (Billing → Link a billing account) …». Until then the page shows the owner's `FEATURED` reviews. The README setup step for billing comes in step 6 (F83).
-- **Test:** `test/lib/reviews.test.mjs` (F83: the log line for the search and for the place lookup).
+- **Docs:** https://developers.google.com/maps/documentation/places/web-service/cloud-setup and https://developers.google.com/maps/billing-and-pricing/pricing
+- **Quotes (fetched 17 November 2026, round 3):** "Verify that you have a Google Cloud project with billing enabled." (cloud-setup, prerequisites). The pricing page lists free usage caps per month: Places API Place Details Enterprise + Atmosphere 1,000 (the SKU a request for `reviews` falls under) and Text Search Pro 5,000 (`displayName` and `formattedAddress`).
+- **Rule (unquoted):** the refusal from a project without billing is HTTP 403 with `reason: "BILLING_DISABLED"` (body as in `test/fixtures/places/billing-disabled.json`), also within the free monthly usage.
+- **What the code does:** logs «Places 403: Google Cloud-prosjektet har ingen betalingskonto (BILLING_DISABLED). Koble en betalingskonto til prosjektet i console.cloud.google.com (Billing → Link a billing account) …». Until then the page shows the owner's `FEATURED` reviews. With the 12-hour cache a working setup makes about two place lookups a day, far below the free 1,000 a month. The README's setup step 1 links a billing account, and its troubleshooting line names this log line (F83).
+- **Test:** `test/lib/reviews.test.mjs` (F83: the log line for the search and for the place lookup), `test/docs/docs.test.mjs` (F83: the README's billing step and BILLING_DISABLED).
 
 ## 7. Finding the place: Text Search, and place IDs
 
