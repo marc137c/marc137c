@@ -351,3 +351,51 @@ test("privacy: every GDPR art. 13 item is on the page, or SPEC says why not (and
     }
   }
 });
+
+// Round 3 fix-up 1 (privacy): the privacy facts came from the code's data flows (what leaves Netlify) and from the
+// page's own recipient list, so nobody listed who can READ the bookings through accounts: the holder of the Netlify
+// team that runs the site and of the GitHub repository it is built from, whoever knows ADMIN_PASSWORD, whoever holds
+// STATS_READ_KEY. And «Ingen andre får opplysningene om bestillingen din.» was never checked against anything.
+// Guard: SPEC «Access» has a row «- **Art. 13(1)(e), <party>** …» for every party that can read the booking store or
+// the timebook, and ACCESS here lists the same parties. Each is said on the page («said on the page»), or «open: …»
+// with a DEPLOY §6 line (artikkel 13 nr. 1 bokstav e) naming it, or «not applicable, because …». While any party
+// is open, the page claims nothing about «ingen andre»; every other exclusive claim («bare», «kun», «ingen andre»)
+// on the page is listed in EXCLUSIVE_OK with the reason it holds against the Access list and the recipients.
+const ACCESS = [
+  { party: "the barber", page: /Barberen ser bestillingen i den passordbeskyttede timeboken/ },
+  { party: "Netlify", page: /<strong>Netlify<\/strong> \(Netlify, Inc\., USA\) drifter nettsiden/ },
+  { party: "the holder of the Netlify team and the GitHub repository", deploy: "netlify-teamet" },
+  { party: "whoever knows ADMIN_PASSWORD", deploy: "admin_password" },
+  { party: "the holder of STATS_READ_KEY" },
+];
+const EXCLUSIVE_OK = {
+  "Bestillingen lagres bare der, ikke i e-post eller i en skjematjeneste.": "Netlify Blobs is the only booking store (D2); the phone calendar's copy is its own bullet right below",
+  "Roboter og forhåndsvisninger telles ikke, bare besøk på den publiserte nettsiden.": "stats.mjs counts production only and skips bots (test/functions/stats.test.mjs)",
+  "Bare tall, uten navn, telefonnummer eller annet om kunden.": "the statistics' booking numbers are counts only (stats-bookings.mjs; «D6: the visitor statistics are described as they are built»)",
+};
+test("privacy: every party that can read the bookings is named on the page or is an open SPEC «Access» row with a DEPLOY §6 line; no unbacked exclusive claim", () => {
+  const html = read("personvern.html");
+  const spec = readRoot("docs/SPEC.md").split(/\r?\n/);
+  const deploy = readRoot("DEPLOY.md");
+  const six = deploy.slice(deploy.indexOf("## 6.")).split(/\r?\n/).filter((l) => l.startsWith("- [ ]"));
+  const rows = spec.filter((l) => l.startsWith("- **Art. 13(1)(e), "));
+  assert.deepEqual(rows.map((l) => /^- \*\*Art\. 13\(1\)\(e\), ([^*]+)\*\*/.exec(l)[1]).sort(), ACCESS.map((a) => a.party).sort(),
+    "SPEC «Access» and ACCESS name the same parties");
+  let open = 0;
+  for (const a of ACCESS) {
+    const row = rows.find((l) => l.startsWith(`- **Art. 13(1)(e), ${a.party}**`));
+    if (/\*\* said on the page/.test(row)) {
+      assert.ok(a.page && a.page.test(html), `${a.party}: SPEC says it is on the page`);
+    } else if (/\*\* open:/.test(row)) {
+      open++;
+      assert.ok(a.deploy && six.some((l) => l.includes("artikkel 13 nr. 1 bokstav e") && l.toLowerCase().includes(a.deploy)),
+        `${a.party} is open, so a DEPLOY §6 line (artikkel 13 nr. 1 bokstav e) asks about ${a.deploy}`);
+    } else {
+      assert.match(row, /\*\* not applicable, because /, `${a.party}: «said on the page», «open: …» or «not applicable, because …»`);
+    }
+  }
+  const text = pageText();
+  if (open) assert.doesNotMatch(text, /\bingen andre\b/i, "a party with access is not on the page yet, so the page cannot say «ingen andre»");
+  const sentences = text.split(/(?<=[.!?])\s+/).filter((s) => /\b(bare|kun|ingen andre|only)\b/i.test(s));
+  for (const s of sentences) assert.ok(EXCLUSIVE_OK[s.trim()], `an exclusive claim needs a reason in EXCLUSIVE_OK, checked against SPEC «Access» and the recipients: «${s.trim()}»`);
+});
